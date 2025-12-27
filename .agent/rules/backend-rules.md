@@ -1,3 +1,8 @@
+---
+trigger: glob
+globs: *.py
+---
+
 # Backend Rules
 
 Coding standards for Python/Django backend. Scoped to `*.py` files.
