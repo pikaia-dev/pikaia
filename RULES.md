@@ -16,6 +16,7 @@ Coding standards for Tango teams and AI agents.
 - Default: `created_at`, `updated_at` timestamps on all business entities; exceptions allowed with justification
 - Business logic in services, not views or models
 - No raw SQL unless absolutely necessary
+- Timezones: always store UTC; convert in presentation layer
 
 ## API (Django Ninja)
 
@@ -37,7 +38,7 @@ Coding standards for Tango teams and AI agents.
 - Views/routers stay thin
 - Orchestration & side effects in services
 - Models may contain small domain invariants and helpers; avoid fat models
-- External APIs wrapped in dedicated clients
+- External APIs wrapped in dedicated clients. Clients should be injectable/mocked + have retries/timeouts standardized.
 
 ## Naming
 
