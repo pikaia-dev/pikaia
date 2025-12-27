@@ -74,3 +74,10 @@ Coding standards for Tango teams and AI agents.
 
 - Templates: React Email (requires build step to compile to HTML assets)
 - Sending: Resend API
+
+## Performance
+
+- **Database**:
+    - **Avoid N+1**: Use `select_related` (FKs) and `prefetch_related` (M2M/Reverse FKs) by default in services
+    - **Indexing**: Add indexes for any field frequently used in `filter()`, `ordering`, or `distinct()`
+
