@@ -19,17 +19,20 @@ Coding standards for Tango teams and AI agents.
 
 ## API (Django Ninja)
 
-- Routes start at `/api/` (versioning handled by API Gateway)
+- Routes start at `/api/v1/` (explicit versioning in code preferred over gateway-only)
 - Use Pydantic schemas for request/response
 - Consistent error format across all endpoints
-- Paginate all potentially unbounded lists; use consistent limit/offset or cursor (choose one); allow explicit opt-out for small static enumerations
+- Paginate all potentially unbounded lists
+    - Default: Cursor pagination (infinite scroll ready)
+    - Admin tables: Limit/Offset
+    - Small static enumerations: Explicit opt-out allowed
 
 ## Testing
 
 - Tests required for all business logic
 - Use `pytest` with `pytest-django`
-- Factories for flexible object graphs (esp. DB models)
-- Fixtures for stable shared setup, heavy objects, or external stubs
+- **Factories** (via `factory_boy`) for all DB models; avoid raw fixtures for data
+- Fixtures reserved for external services stubs or static config
 - Test file mirrors source: `apps/billing/services.py` → `tests/billing/test_services.py`
 
 ## Architecture Boundaries
@@ -53,10 +56,10 @@ Coding standards for Tango teams and AI agents.
 ## Environment
 
 - Use `.env` for local config (never commit)
-- All secrets in AWS Secrets Manager for deployed envs
+- All secrets in AWS Secrets Manager for deployed envs (injected as env vars via ECS Task Definition)
 - Config via `pydantic-settings`
 
 ## Email
 
-- Templates: React Email
+- Templates: React Email (requires build step to compile to HTML assets)
 - Sending: Resend API
