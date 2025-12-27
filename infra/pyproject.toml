@@ -1,0 +1,14 @@
+[project]
+name = "tango-infra"
+version = "0.1.0"
+description = "AWS CDK infrastructure for Tango SaaS Starter"
+requires-python = ">=3.12"
+dependencies = [
+    "aws-cdk-lib>=2.233",
+    "constructs>=10.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0",
+]

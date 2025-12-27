@@ -205,3 +205,27 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Node.js
+node_modules/
+.pnpm-store/
+.turbo/
+
+# Build outputs
+frontend/dist/
+emails/build/
+*.tsbuildinfo
+
+# CDK
+infra/cdk.out/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
