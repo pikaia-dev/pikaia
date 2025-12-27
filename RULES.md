@@ -59,6 +59,17 @@ Coding standards for Tango teams and AI agents.
 - All secrets in AWS Secrets Manager for deployed envs (injected as env vars via ECS Task Definition)
 - Config via `pydantic-settings`
 
+## Security
+
+- **Non-negotiables in deployed envs**:
+    - `DEBUG=False`
+    - `SECURE_SSL_REDIRECT=True`
+    - `SECURE_HSTS_SECONDS` set (with subdomains)
+    - `SESSION_COOKIE_SECURE=True`, `CSRF_COOKIE_SECURE=True`
+    - `SECURE_PROXY_SSL_HEADER` configured (behind load balancer)
+- **Networking**: Strict CORS policy and `ALLOWED_HOSTS` whitelist
+- **Validation**: Strict input validation (Pydantic); file uploads must have size limits and type validation (magic numbers, not just extensions)
+
 ## Email
 
 - Templates: React Email (requires build step to compile to HTML assets)
