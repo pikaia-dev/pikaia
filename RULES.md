@@ -2,12 +2,6 @@
 
 Coding standards for Tango teams and AI agents.
 
-For language-specific rules, see:
-- [RULES_BACKEND.md](./RULES_BACKEND.md) — Python/Django
-- [RULES_FRONTEND.md](./RULES_FRONTEND.md) — TypeScript/React
-
----
-
 ## Comments
 
 - Explain **why**, not what (code should be self-explanatory)

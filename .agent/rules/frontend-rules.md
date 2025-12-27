@@ -1,6 +1,11 @@
+---
+trigger: glob
+globs: *.ts, *.tsx
+---
+
 # Frontend Rules
 
-Coding standards for TypeScript/React frontend. Scoped to `*.ts`, `*.tsx` files.
+Coding standards for TypeScript/React frontend. 
 
 ## Typing & Linting
 
