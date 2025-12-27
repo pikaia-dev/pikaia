@@ -12,13 +12,11 @@ A production-ready B2B SaaS starter template built with Django Ninja, Stytch B2B
 
 ### Authentication (Stytch B2B)
 
-| Feature | Status |
-|---------|--------|
-| Magic links | ✅ Supported |
-| Password-based auth | ✅ Supported |
-| SSO (Google, Microsoft, SAML) | ✅ Supported |
-| MFA | ✅ Supported |
-| SCIM provisioning | ✅ Enterprise-ready |
+- Magic links
+- Password-based auth
+- SSO (Google, Microsoft, SAML)
+- MFA
+- SCIM provisioning
 
 **Key Design Decisions:**
 
@@ -58,14 +56,12 @@ Stytch (source of truth)
 
 ### Billing (Stripe)
 
-| Feature | Status |
-|---------|--------|
-| Per-seat pricing | ✅ Default plan, extensible |
-| Subscription plans | ✅ Monthly & annual with price difference |
-| Credits system | ✅ Via Stripe Customer Balance |
-| Customer Portal | ✅ Stripe-hosted billing management |
-| Webhooks | ✅ Payment events, subscription changes |
-| Checkout | ✅ Stripe Checkout (easy migration to Elements later) |
+- Per-seat pricing (default plan, extensible)
+- Subscription plans (monthly & annual with price difference)
+- Credits system via Stripe Customer Balance
+- Customer Portal (Stripe-hosted billing management)
+- Webhooks for payment events and subscription changes
+- Stripe Checkout (easy migration to Elements later)
 
 **Payment Flow:**
 ```
@@ -93,15 +89,15 @@ Stytch (source of truth)
 
 ### AWS Services
 
-| Service | Purpose | Status |
-|---------|---------|:------:|
-| S3 | File uploads, static assets | ✅ |
-| CloudFront | CDN for frontend | ✅ |
-| SQS | Message queue | ✅ |
-| EventBridge | Event routing (webhooks, async) | ✅ |
-| Lambda | Background task processing | ✅ |
-| Secrets Manager | API keys, credentials | ✅ |
-| CloudWatch | Logs, metrics, alerts | ✅ |
+| Service | Purpose |
+|---------|---------|
+| S3 | File uploads, static assets |
+| CloudFront | CDN for frontend |
+| SQS | Message queue |
+| EventBridge | Event routing (webhooks, async) |
+| Lambda | Background task processing |
+| Secrets Manager | API keys, credentials |
+| CloudWatch | Logs, metrics, alerts |
 
 **No Redis/ElastiCache** - using EventBridge + SQS + Lambda instead of Celery.
 
