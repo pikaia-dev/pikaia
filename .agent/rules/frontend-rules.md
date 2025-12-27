@@ -31,6 +31,23 @@ Coding standards for TypeScript/React frontend.
 
 - No secrets in frontend; only `VITE_*` config
 
+## Performance
+
+- **Algorithm Complexity**:
+    - Consider O() complexity when implementing algorithms
+    - Prefer optimal solutions where possible, but don't sacrifice readability for minor gains
+- **Rendering**:
+    - Minimize unnecessary re-renders; use `useMemo`/`useCallback` judiciously (not everywhere)
+    - Lazy load routes and heavy components (`React.lazy`, `Suspense`)
+    - Virtualize long lists (if >100 items)
+- **Loading & Refresh**:
+    - Use optimistic updates for snappy UX where appropriate
+    - Prefetch data on hover/focus for anticipated navigation
+    - Skeleton loaders instead of spinners for content areas
+- **Bundle Size**:
+    - Tree-shake; avoid importing entire libraries
+    - Monitor bundle size in CI (alert on significant increases)
+
 ## Testing
 
 - Vitest for lib/API tests
