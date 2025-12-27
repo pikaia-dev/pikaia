@@ -1,180 +1,134 @@
 # Tango Django Ninja Stytch SaaS Starter
 
-A production-ready B2B SaaS starter template built with Django Ninja, Stytch B2B authentication, Stripe billing, and AWS infrastructure.
+A production-ready B2B SaaS starter built with Django Ninja, Stytch authentication, Stripe billing, and AWS infrastructure.
 
-## Architecture Decisions
+## Quick Start
+
+### Prerequisites
+
+- Python 3.12+ with [uv](https://docs.astral.sh/uv/)
+- Node.js 20+ with [pnpm](https://pnpm.io/)
+- PostgreSQL 16+ (`brew install postgresql@16`)
+
+### Setup
+
+```bash
+# Clone and enter
+git clone https://github.com/TangoAgency/tango-django-ninja-stytch-saas-starter.git
+cd tango-django-ninja-stytch-saas-starter
+
+# PostgreSQL (macOS)
+brew services start postgresql@16
+export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"  # Add to ~/.zshrc
+createuser -s postgres 2>/dev/null || true
+psql -U postgres -c "ALTER USER postgres PASSWORD 'postgres';"
+createdb -U postgres tango
+
+# Backend
+cd backend
+cp ../.env.example .env  # Edit with your API keys
+uv sync
+uv run python manage.py migrate
+uv run python manage.py runserver  # http://localhost:8000
+
+# Frontend (new terminal)
+cd frontend
+pnpm install
+pnpm dev  # http://localhost:5173
+```
+
+### Common Commands
+
+```bash
+# Backend (always use uv run)
+uv run pytest                      # Tests
+uv run ruff check . && uv run ruff format .  # Lint & format
+
+# Frontend
+pnpm dlx shadcn@latest add button dialog  # Add components
+```
+
+---
+
+## Architecture
+
+### Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Backend | Django 6.0, Django Ninja, PostgreSQL |
+| Frontend | Vite, React 19, TypeScript, Tailwind, shadcn-ui |
+| Auth | Stytch B2B (magic links, SSO, MFA, SCIM) |
+| Billing | Stripe (subscriptions, per-seat, checkout) |
+| Infra | AWS CDK, ECS Fargate, Aurora Serverless |
 
 ### Multi-Tenancy
 
-- **Approach**: Shared database with tenant ID columns (organization-scoped data)
-- **Terminology**: "Organization" (aligned with Stytch B2B naming)
-- **Future consideration**: Can evolve to schema-per-tenant or database-per-tenant if needed
+- **Shared database** with organization-scoped data
+- **Custom User model** synced from Stytch
+- **Member model** for org-level roles (admin, member, viewer)
 
-### Authentication (Stytch B2B)
+```
+User (cross-org identity)
+  └── memberships → Member[]
+                      └── organization
+                      └── role
+```
 
-- Magic links
-- Password-based auth
-- SSO (Google, Microsoft, SAML)
-- MFA
-- SCIM provisioning
+### Authentication Flow
 
-**Key Design Decisions:**
-
-- **Organization creation**: Self-service (users sign up → create org → invite members)
-- **RBAC approach**: Hybrid
-  - Stytch handles org-level roles (`admin`, `member`, `viewer`)
-  - Django handles entity-level permissions (project access, resource sharing)
-- **Source of truth**: Stytch for org/member data, synced to Django via webhooks
-- **Session handling**: JWTs (stateless, short expiry + refresh tokens)
-  - Better for multi-platform (web, mobile, desktop, API access)
-  - Validate locally with Stytch public keys
-
-**Data Flow:**
 ```
 Stytch (source of truth)
-├── Organizations, Members, Org-level Roles
+├── Organizations, Members, Roles
 ├── SSO/SCIM provisioning
-└── Webhook sync → Django (read replica + extensions)
-                   └── Entity-level permissions
-                   └── App-specific data
+└── Webhooks → Django (sync + extensions)
 ```
 
-### Frontend
+- JWTs validated locally with Stytch public keys
+- Org picker for users with multiple memberships
 
-| Component | Technology |
-|-----------|------------|
-| Bundler | Vite |
-| Styling | Tailwind CSS |
-| Components | shadcn-ui |
-| Architecture | Separate SPA |
-
-**Key Design Decisions:**
-
-- Django Ninja serves as a pure API backend
-- Frontend is a separate application (independent deployments)
-- API-first approach enables web, mobile, desktop, and API access to use the same backend
-
-### Billing (Stripe)
-
-- Per-seat pricing (default plan, extensible)
-- Subscription plans (monthly & annual with price difference)
-- Credits system via Stripe Customer Balance
-- Customer Portal (Stripe-hosted billing management)
-- Webhooks for payment events and subscription changes
-- Stripe Checkout (easy migration to Elements later)
-
-**Payment Flow:**
-```
-1. User signs up → Stytch
-2. Creates org → Django + Stripe Customer created
-3. Upgrade → Stripe Checkout → Webhook → Subscription activated
-```
-
-### AWS Infrastructure
-
-| Component | Technology |
-|-----------|------------|
-| Compute | ECS Fargate |
-| Database | Aurora Serverless v2 PostgreSQL |
-| Infrastructure as Code | AWS CDK (Python) |
-
-**Multi-Region Strategy:**
-
-- Starter deploys to **single region**
-- Users have a `region` field for future geo-routing
-- Clear documentation for multi-region expansion:
-  - Add Aurora read replicas in other regions
-  - Or separate Aurora clusters per region for full data residency
-  - Route 53 geolocation routing
-
-### AWS Services
-
-| Service | Purpose |
-|---------|---------|
-| S3 | File uploads, static assets |
-| CloudFront | CDN for frontend |
-| SQS | Message queue |
-| EventBridge | Event routing (webhooks, async) |
-| Lambda | Background task processing |
-| Secrets Manager | API keys, credentials |
-| CloudWatch | Logs, metrics, alerts |
-
-**No Redis/ElastiCache** - using EventBridge + SQS + Lambda instead of Celery.
-
-### Email
-
-| Type | Provider |
-|------|----------|
-| Auth emails (magic links, OTPs) | Stytch (built-in) |
-| Billing emails (receipts, invoices) | Stripe (built-in) |
-| App emails (welcome, notifications) | **Resend** (default) |
-
-- Resend chosen for better DX, managed deliverability, and no ops burden
-- SES documented as alternative for cost optimization at scale
-- Email abstracted behind `EmailProvider` interface for swappability
-
-### Background Task Architecture
+### Billing Flow
 
 ```
-External webhook (Stripe, Stytch)
-        │
-        ▼
-   EventBridge  ──→  Routes by event type
-        │
-        ├──→ SQS queue ──→ Lambda consumer
-        └──→ Direct Lambda (simple cases)
+User signs up → Creates org → Stripe Customer
+             → Upgrade → Checkout → Webhook → Subscription active
 ```
 
-No Celery, no Redis - fully AWS-native, serverless background processing.
+### Background Tasks
+
+```
+Webhook → EventBridge → SQS → Lambda
+```
+
+No Celery/Redis — fully serverless on AWS.
+
+---
 
 ## Project Structure
 
 ```
-tango-django-ninja-stytch-saas-starter/
-├── backend/                      # Django project
-│   ├── apps/                     # Domain apps
-│   │   ├── accounts/             # User/Member sync, profiles
-│   │   ├── billing/              # Stripe integration
-│   │   ├── organizations/        # Multi-tenancy
-│   │   └── core/                 # Shared models, utils
-│   ├── config/                   # Django settings & root config
-│   │   ├── settings/
-│   │   │   ├── base.py
-│   │   │   ├── local.py
-│   │   │   └── production.py
-│   │   ├── urls.py
-│   │   ├── api.py                # Django Ninja root
-│   │   └── wsgi.py / asgi.py
-│   ├── tests/                    # Mirrors apps/ structure
-│   ├── manage.py
-│   ├── pyproject.toml            # uv
-│   └── Dockerfile
+├── backend/              # Django Ninja API
+│   ├── apps/
+│   │   ├── accounts/     # User, Member models
+│   │   ├── organizations/# Organization model
+│   │   ├── billing/      # Stripe integration
+│   │   └── core/         # Shared base models
+│   └── config/settings/  # base.py, local.py, production.py
 │
-├── frontend/                     # Vite + React + TypeScript
-│   ├── src/
-│   │   ├── components/           # Reusable UI (shadcn-ui)
-│   │   ├── features/             # Feature modules
-│   │   ├── lib/                  # API client, utils
-│   │   ├── layouts/
-│   │   └── pages/
-│   ├── package.json
-│   └── Dockerfile
+├── frontend/             # Vite + React + shadcn-ui
+│   └── src/components/ui/
 │
-├── infra/                        # AWS CDK (Python)
-│   ├── app.py
-│   ├── stacks/
-│   └── constructs/
+├── infra/                # AWS CDK (Python)
+│   └── stacks/
 │
-├── emails/                       # React Email templates
-│   └── src/templates/
-│
-├── docker-compose.yml            # Local dev
-├── pnpm-workspace.yaml
-└── .env.example
+└── emails/               # React Email templates
 ```
 
-**Tooling**: uv (Python), pnpm (Node), ruff (linting)
+**Tooling**: uv (Python), pnpm (Node), ruff (lint/format)
 
-## Getting Started
+---
 
-See [GETTING_STARTED.md](./GETTING_STARTED.md) for detailed setup instructions.
+## Documentation
+
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — Git workflow, commit format
+- [RULES.md](./RULES.md) — Coding standards
