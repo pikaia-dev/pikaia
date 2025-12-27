@@ -9,6 +9,12 @@ Coding standards for Tango teams and AI agents.
 - Format with `ruff format`, lint with `ruff check`
 - Imports: stdlib → third-party → local (enforced by ruff/isort)
 
+## Comments
+
+- Explain **why**, not what (code should be self-explanatory)
+- No commented-out code (use git history)
+- No chain-of-thought reasoning in comments
+
 ## Django
 
 - Apps live in `apps/` directory
