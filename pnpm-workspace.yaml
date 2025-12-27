@@ -1,4 +1,6 @@
-# pnpm workspace configuration
 packages:
-  - 'frontend'
-  - 'emails'
+  - frontend
+  - emails
+
+onlyBuiltDependencies:
+  - esbuild

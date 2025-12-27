@@ -192,9 +192,13 @@ tango-django-ninja-stytch-saas-starter/
 git clone https://github.com/TangoAgency/tango-django-ninja-stytch-saas-starter.git
 cd tango-django-ninja-stytch-saas-starter
 
-# 2. Start PostgreSQL and create database
+# 2. PostgreSQL setup
 brew services start postgresql@16
-createdb tango
+# Add PostgreSQL binaries to PATH (add to ~/.zshrc for persistence)
+export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
+createuser -s postgres 2>/dev/null || true       # Create postgres superuser (if missing)
+psql -U postgres -c "ALTER USER postgres PASSWORD 'postgres';"
+createdb -U postgres tango
 
 # 3. Backend setup (creates .venv automatically)
 cd backend
