@@ -82,3 +82,12 @@ Coding standards for Tango teams and AI agents.
     - **Avoid N+1**: Use `select_related` (FKs) and `prefetch_related` (M2M/Reverse FKs) by default in services
     - **Indexing**: Add indexes for any field frequently used in `filter()`, `ordering`, or `distinct()`
 
+## Data Consistency & Transactions
+
+- **Transactions**: Use `transaction.atomic()` for multi-write invariants and webhook-driven mutations (not every single `.save()`)
+- **External Calls**: Never call external APIs (Stripe, Stytch, Resend) inside a DB transaction
+- **Webhooks**: Handlers must be idempotent:
+    - Dedupe by event ID (store processed IDs)
+    - Side effects must be safe on replay (e.g., don't create duplicate rows/emails)
+- **Delivery**: Assume "at-least-once" from EventBridge/SQS
+- **Event Publishing**: Use `transaction.on_commit()` to publish events after successful commit
