@@ -51,6 +51,10 @@ Coding standards for Python/Django backend. Scoped to `*.py` files.
 
 ## Performance
 
+- **Algorithm Complexity**:
+    - Consider O() complexity when implementing algorithms
+    - Prefer optimal solutions where possible, but don't sacrifice readability for minor gains
+    - Document non-obvious performance trade-offs in comments
 - **Database**:
     - **Avoid N+1**: Use `select_related` (FKs) and `prefetch_related` (M2M/Reverse FKs) by default in services
     - **Indexing**: Add indexes for any field frequently used in `filter()`, `ordering`, or `distinct()`
