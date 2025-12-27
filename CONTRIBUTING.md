@@ -12,8 +12,6 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
 
 **Types**: `feat` | `fix` | `docs` | `chore` | `refactor`
 
-**Scope** (optional): `auth`, `billing`, `api`, `frontend`, `db`, `infra`
-
 **Examples**:
 ```
 feat(auth): add magic link authentication
