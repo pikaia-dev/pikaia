@@ -25,12 +25,20 @@ refactor(api): extract pagination logic
 
 ## Branching Strategy
 
-> TBD
+- **Main Branch**: `main` (production-ready)
+- **Feature Branches**: `feat/<name>`, `fix/<name>`, `chore/<name>` (branched from `main`)
+- **Strategy**: Trunk-Based Development (short-lived branches, frequent merges)
+    - *Exception*: Direct commits to `main` allowed during initial "vibe coding" / prototyping phase.
 
 ## Pull Requests
 
-> TBD
+- **Target**: `main`
+- **Merge Strategy**: **Merge Commit** (preserve individual commits; do not squash-and-merge)
+- **Requirements**:
+    - CI checks passed
+    - 1 approval required (human or designated AI reviewer)
+    - Clean commit history (rebase interactive before merging if necessary)
 
 ## Code Style
 
-> TBD
+See [rules.md](./RULES.md) for detailed coding standards.
