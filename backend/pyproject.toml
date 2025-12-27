@@ -1,0 +1,38 @@
+[project]
+name = "tango-backend"
+version = "0.1.0"
+description = "Django Ninja backend for Tango SaaS Starter"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=6.0",
+    "django-ninja>=1.5",
+    "pydantic>=2.12",
+    "pydantic-settings>=2.12",
+    "psycopg[binary]>=3.3",
+    "gunicorn>=23.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0",
+    "pytest-django>=4.11",
+    "factory-boy>=3.3",
+    "ruff>=0.14",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "config"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.local"
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
