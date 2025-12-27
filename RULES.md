@@ -5,7 +5,7 @@ Coding standards for Tango teams and AI agents.
 ## Python
 
 - Python 3.12+
-- Use type hints everywhere
+- Use type hints everywhere; allow `Any` at integration boundaries (ORM, 3rd-party libs) with a comment
 - Format with `ruff format`, lint with `ruff check`
 - Imports: stdlib → third-party → local (enforced by ruff/isort)
 
@@ -14,8 +14,7 @@ Coding standards for Tango teams and AI agents.
 - Apps live in `apps/` directory
 - Models: singular names (`Organization`, not `Organizations`)
 - Default: `created_at`, `updated_at` timestamps on all business entities; exceptions allowed with justification
-- Business logic in services, not views or models
-- No raw SQL unless absolutely necessary
+- No raw SQL unless absolutely necessary; if used: parameterized, reviewed, and covered by tests
 - Timezones: always store UTC; convert in presentation layer
 
 ## API (Django Ninja)
@@ -23,7 +22,7 @@ Coding standards for Tango teams and AI agents.
 - Routes start at `/api/` (versioning handled by API Gateway)
 - Use Pydantic schemas for request/response
 - Consistent error format across all endpoints
-- Paginate all potentially unbounded lists; allow explicit opt-out for small static enumerations.
+- Paginate all potentially unbounded lists; use consistent limit/offset or cursor (choose one); allow explicit opt-out for small static enumerations
 
 ## Testing
 
@@ -38,7 +37,8 @@ Coding standards for Tango teams and AI agents.
 - Views/routers stay thin
 - Orchestration & side effects in services
 - Models may contain small domain invariants and helpers; avoid fat models
-- External APIs wrapped in dedicated clients. Clients should be injectable/mocked + have retries/timeouts standardized.
+- External APIs wrapped in dedicated clients (injectable/mockable)
+- All outbound HTTP uses same wrapper/defaults (timeouts, retries, backoff); retries only for idempotent requests
 
 ## Naming
 
@@ -48,7 +48,7 @@ Coding standards for Tango teams and AI agents.
 | Classes | PascalCase | `UserService` |
 | Functions | snake_case | `get_user_by_id` |
 | Constants | SCREAMING_SNAKE | `MAX_RETRY_COUNT` |
-| URLs | kebab-case | `/api/v1/user-profiles` |
+| URLs | kebab-case | `/api/user-profiles` |
 
 ## Environment
 
