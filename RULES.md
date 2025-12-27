@@ -42,6 +42,7 @@ Coding standards for Tango teams and AI agents.
 - Models may contain small domain invariants and helpers; avoid fat models
 - External APIs wrapped in dedicated clients (injectable/mockable)
 - All outbound HTTP uses same wrapper/defaults (timeouts, retries, backoff); retries only for idempotent requests
+- Authorization enforced in service layer (decorators only for coarse-grained checks)
 
 ## Naming
 
