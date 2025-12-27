@@ -51,7 +51,7 @@ Coding standards for Tango teams and AI agents.
 | Classes | PascalCase | `UserService` |
 | Functions | snake_case | `get_user_by_id` |
 | Constants | SCREAMING_SNAKE | `MAX_RETRY_COUNT` |
-| URLs | kebab-case | `/api/user-profiles` |
+| URLs | kebab-case | `/api/v1/user-profiles` |
 
 ## Environment
 
