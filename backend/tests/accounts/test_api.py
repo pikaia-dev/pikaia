@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from django.test import Client, RequestFactory
+from ninja.errors import HttpError
 
 from apps.accounts.api import (
     authenticate_magic_link,
@@ -139,7 +140,7 @@ class TestSendMagicLink:
 
         with (
             patch("apps.accounts.api.get_stytch_client", return_value=mock_client),
-            pytest.raises(ValueError, match="Failed to send magic link"),
+            pytest.raises(HttpError),
         ):
             send_magic_link(request, payload)
 
@@ -202,7 +203,7 @@ class TestAuthenticateMagicLink:
 
         with (
             patch("apps.accounts.api.get_stytch_client", return_value=mock_client),
-            pytest.raises(ValueError, match="Invalid or expired token"),
+            pytest.raises(HttpError),
         ):
             authenticate_magic_link(request, payload)
 
@@ -268,7 +269,7 @@ class TestCreateOrganization:
 
         with (
             patch("apps.accounts.api.get_stytch_client", return_value=mock_client),
-            pytest.raises(ValueError, match="Failed to create organization"),
+            pytest.raises(HttpError),
         ):
             create_organization(request, payload)
 
@@ -330,7 +331,7 @@ class TestExchangeSession:
 
         with (
             patch("apps.accounts.api.get_stytch_client", return_value=mock_client),
-            pytest.raises(ValueError, match="Failed to join organization"),
+            pytest.raises(HttpError),
         ):
             exchange_session(request, payload)
 
@@ -359,7 +360,7 @@ class TestLogout:
         """Should error when no session token provided."""
         request = request_factory.post("/api/v1/auth/logout")
 
-        with pytest.raises(ValueError, match="No session token provided"):
+        with pytest.raises(HttpError):
             logout(request)
 
     def test_revoke_failure_handled_gracefully(self, request_factory: RequestFactory) -> None:
@@ -396,7 +397,6 @@ class TestGetCurrentUser:
         """Should return authenticated user, member, and org info."""
         # Create test data using factories
         user = UserFactory(
-            stytch_user_id="user-me-123",
             email="me@example.com",
             name="Test User",
         )
@@ -430,5 +430,5 @@ class TestGetCurrentUser:
         request = request_factory.get("/api/v1/auth/me")
         # Don't set auth attributes - simulates unauthenticated request
 
-        with pytest.raises(ValueError, match="Not authenticated"):
+        with pytest.raises(HttpError):
             get_current_user(request)

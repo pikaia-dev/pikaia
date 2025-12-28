@@ -84,7 +84,6 @@ class UserInfo(BaseModel):
     """Current user info response."""
 
     id: int
-    stytch_user_id: str
     email: str
     name: str
 

@@ -25,12 +25,10 @@ class TestGetOrCreateUserFromStytch:
     def test_creates_new_user(self) -> None:
         """Should create a new user when none exists."""
         user = get_or_create_user_from_stytch(
-            stytch_user_id="user-new-123",
             email="new@example.com",
             name="New User",
         )
 
-        assert user.stytch_user_id == "user-new-123"
         assert user.email == "new@example.com"
         assert user.name == "New User"
         assert User.objects.count() == 1
@@ -38,19 +36,16 @@ class TestGetOrCreateUserFromStytch:
     def test_updates_existing_user(self) -> None:
         """Should update an existing user when one exists."""
         existing = UserFactory(
-            stytch_user_id="user-existing-123",
-            email="old@example.com",
+            email="existing@example.com",
             name="Old Name",
         )
 
         user = get_or_create_user_from_stytch(
-            stytch_user_id="user-existing-123",
-            email="updated@example.com",
+            email="existing@example.com",
             name="Updated Name",
         )
 
         assert user.id == existing.id
-        assert user.email == "updated@example.com"
         assert user.name == "Updated Name"
         assert User.objects.count() == 1
 
@@ -172,8 +167,7 @@ class TestSyncSessionToLocal:
         assert org.name == "Acme Corp"
         assert org.slug == "acme"
 
-        # Check user
-        assert user.stytch_user_id == "user-abc-123"  # member- replaced with user-
+        # Check user - email is the identifier
         assert user.email == "jane@example.com"
         assert user.name == "Jane Doe"
 
@@ -230,7 +224,7 @@ class TestSyncSessionEdgeCases:
             "StytchMember",
             (),
             {
-                "member_id": f"member-{user.stytch_user_id}",
+                "member_id": "member-admin-test",
                 "email_address": user.email,
                 "name": user.name,
                 "roles": ["stytch_admin"],
@@ -258,7 +252,7 @@ class TestSyncSessionEdgeCases:
             "StytchMember",
             (),
             {
-                "member_id": f"member-{user.stytch_user_id}",
+                "member_id": "member-norole-test",
                 "email_address": user.email,
                 "name": user.name,
                 # No "roles" key – getattr will return []
@@ -285,7 +279,6 @@ class TestUpdateExistingRecords:
         """Updating an existing user should change the name field when provided."""
         existing = UserFactory(name="Old Name")
         updated_user = get_or_create_user_from_stytch(
-            stytch_user_id=existing.stytch_user_id,
             email=existing.email,
             name="New Name",
         )

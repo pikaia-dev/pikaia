@@ -7,9 +7,14 @@ Handles Stytch B2B authentication flows:
 - Session management
 """
 
+import logging
+
 from django.http import HttpRequest
 from ninja import Router
+from ninja.errors import HttpError
 from stytch.core.response_base import StytchError
+
+logger = logging.getLogger(__name__)
 
 from apps.accounts.schemas import (
     DiscoveredOrganization,
@@ -45,8 +50,8 @@ def send_magic_link(request: HttpRequest, payload: MagicLinkSendRequest) -> Mess
             email_address=payload.email,
         )
     except StytchError as e:
-        # Let Django Ninja's error handling deal with this
-        raise ValueError(f"Failed to send magic link: {e.details.error_message}") from e
+        logger.warning("Failed to send magic link: %s", e.details.error_message)
+        raise HttpError(400, "Failed to send magic link. Please check the email address.") from e
 
     return MessageResponse(message="Magic link sent. Check your email.")
 
@@ -69,7 +74,8 @@ def authenticate_magic_link(
             discovery_magic_links_token=payload.token,
         )
     except StytchError as e:
-        raise ValueError(f"Invalid or expired token: {e.details.error_message}") from e
+        logger.warning("Magic link authentication failed: %s", e.details.error_message)
+        raise HttpError(400, "Invalid or expired token.") from e
 
     # Build list of discovered organizations
     discovered_orgs = [
@@ -107,7 +113,8 @@ def create_organization(
             organization_slug=payload.organization_slug,
         )
     except StytchError as e:
-        raise ValueError(f"Failed to create organization: {e.details.error_message}") from e
+        logger.warning("Failed to create organization: %s", e.details.error_message)
+        raise HttpError(400, "Failed to create organization.") from e
 
     # Sync to local database
     user, member, org = sync_session_to_local(
@@ -139,7 +146,8 @@ def exchange_session(
             organization_id=payload.organization_id,
         )
     except StytchError as e:
-        raise ValueError(f"Failed to join organization: {e.details.error_message}") from e
+        logger.warning("Failed to join organization: %s", e.details.error_message)
+        raise HttpError(400, "Failed to join organization.") from e
 
     # Sync to local database
     user, member, org = sync_session_to_local(
@@ -159,19 +167,26 @@ def exchange_session(
 def logout(request: HttpRequest) -> MessageResponse:
     """
     Revoke the current session.
+
+    Expects session JWT in Authorization header (Bearer <session_jwt>),
+    consistent with other authenticated endpoints.
     """
-    # Get session token from Authorization header
+    # Get session JWT from Authorization header
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
-        raise ValueError("No session token provided")
+        raise HttpError(401, "No session provided")
 
-    session_token = auth_header.replace("Bearer ", "")
+    session_jwt = auth_header.replace("Bearer ", "")
     client = get_stytch_client()
 
-    import contextlib
-
-    with contextlib.suppress(StytchError):
-        client.sessions.revoke(session_token=session_token)
+    try:
+        # Authenticate the JWT to get the member_session_id
+        response = client.sessions.authenticate_jwt(session_jwt=session_jwt)
+        # Revoke using member_session_id (from the authenticated session)
+        client.sessions.revoke(member_session_id=response.member_session.member_session_id)
+    except StytchError:
+        # Session already invalid/expired - still return success
+        pass
 
     return MessageResponse(message="Logged out successfully")
 
@@ -185,7 +200,7 @@ def get_current_user(request: HttpRequest) -> MeResponse:
     """
     # These are set by the auth middleware
     if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
-        raise ValueError("Not authenticated")
+        raise HttpError(401, "Not authenticated")
 
     user = request.auth_user  # type: ignore[attr-defined]
     member = request.auth_member  # type: ignore[attr-defined]
@@ -194,7 +209,6 @@ def get_current_user(request: HttpRequest) -> MeResponse:
     return MeResponse(
         user=UserInfo(
             id=user.id,
-            stytch_user_id=user.stytch_user_id,
             email=user.email,
             name=user.name,
         ),
