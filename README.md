@@ -26,13 +26,14 @@ createdb -U postgres tango
 
 # Backend
 cd backend
-cp ../.env.example .env  # Edit with your API keys
+cp .env.example .env  # Edit with your API keys
 uv sync
 uv run python manage.py migrate
 uv run python manage.py runserver  # http://localhost:8000
 
 # Frontend (new terminal)
 cd frontend
+cp .env.example .env  # Edit with Stytch public token
 pnpm install
 pnpm dev  # http://localhost:5173
 ```
@@ -53,11 +54,22 @@ pnpm dlx shadcn@latest add button dialog  # Add components
 #### Stytch (Authentication)
 
 1. Create a **B2B project** at [stytch.com](https://stytch.com/dashboard)
-2. Copy **Project ID** and **Secret** to `backend/.env`
-3. Go to **Redirect URLs** → Add `http://localhost:5173/auth/callback`
-   - Check **Enabled** for: Login, Signup, Invite, Reset password, Discovery
-   - Check **Default** for all (for local dev)
-4. Go to **Authentication** → Enable **Magic Links** (minimum for testing)
+2. Copy **Project ID** and **Secret** to `.env` (backend)
+3. Copy **Public Token** from **SDK Configuration** to `frontend/.env`
+
+**Dashboard Configuration:**
+
+| Section | Setting | Value |
+|---------|---------|-------|
+| **Redirect URLs** | Add URL | `http://localhost:5173/auth/callback` |
+| | Enable | Login, Signup, Invite, Reset password, Discovery |
+| | Set Default | All (for local dev) |
+| **Authorized applications** | Domains | `localhost` |
+| **Authentication** | Magic Links | ✅ Enabled |
+| **Organization settings** | Create Organizations | ✅ Allow members to create |
+| **SDK Configuration** | HttpOnly cookies | ❌ Disabled (required for JS token access) |
+
+> **Important:** HttpOnly cookies must be disabled for the frontend to access session JWTs via the Stytch SDK's `session.getTokens()` method.
 
 #### Stripe (Billing)
 
