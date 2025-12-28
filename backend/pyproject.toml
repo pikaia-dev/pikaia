@@ -13,6 +13,7 @@ dependencies = [
     "gunicorn>=23.0",
     "stytch>=14.0",
     "email-validator>=2.2",
+    "django-cors-headers>=4.6",
 ]
 
 [project.optional-dependencies]

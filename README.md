@@ -68,6 +68,25 @@ pnpm dlx shadcn@latest add button dialog  # Add components
 
 ---
 
+## Production Configuration
+
+### CORS
+
+In development, `CORS_ALLOW_ALL_ORIGINS = True` permits all cross-origin requests. For production, create `config/settings/production.py`:
+
+```python
+from .base import *  # noqa: F403
+
+CORS_ALLOWED_ORIGINS = [
+    "https://app.yourdomain.com",
+]
+
+# Optional: Allow credentials (cookies, auth headers)
+CORS_ALLOW_CREDENTIALS = True
+```
+
+---
+
 ## Architecture
 
 ### Tech Stack
