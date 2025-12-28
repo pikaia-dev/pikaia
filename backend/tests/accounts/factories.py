@@ -17,7 +17,6 @@ class UserFactory(DjangoModelFactory):
     class Meta:
         model = User
 
-    stytch_user_id = factory.Sequence(lambda n: f"user-test-{n}")
     email = factory.Sequence(lambda n: f"user{n}@example.com")
     name = factory.Faker("name")
     is_active = True

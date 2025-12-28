@@ -13,34 +13,20 @@ from apps.organizations.models import Organization
 
 
 def get_or_create_user_from_stytch(
-    stytch_user_id: str,
     email: str,
     name: str = "",
 ) -> User:
     """
     Get or create a User from Stytch data.
 
+    Email is the cross-org identifier in Stytch B2B.
     Called during authentication to sync user data.
     """
-    # First try to find by stytch_user_id (primary identifier)
-    try:
-        user = User.objects.get(stytch_user_id=stytch_user_id)
-        # Update mutable fields
-        user.email = email
-        user.name = name
-        user.save(update_fields=["email", "name"])
-        return user
-    except User.DoesNotExist:
-        # Fallback to email lookup – handles cases where the user was created
-        # with the same email but a different stytch_user_id.
-        user, created = User.objects.update_or_create(
-            email=email,
-            defaults={
-                "stytch_user_id": stytch_user_id,
-                "name": name,
-            },
-        )
-        return user
+    user, created = User.objects.update_or_create(
+        email=email,
+        defaults={"name": name},
+    )
+    return user
 
 
 def get_or_create_organization_from_stytch(
@@ -106,9 +92,8 @@ def sync_session_to_local(
             slug=stytch_organization.organization_slug,
         )
 
-        # Sync user
+        # Sync user - email is the cross-org identifier
         user = get_or_create_user_from_stytch(
-            stytch_user_id=stytch_member.member_id.replace("member-", "user-"),
             email=stytch_member.email_address,
             name=stytch_member.name or "",
         )

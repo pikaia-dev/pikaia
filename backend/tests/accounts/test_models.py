@@ -26,13 +26,6 @@ class TestUserModel:
 
         assert str(user) == "test@example.com"
 
-    def test_stytch_user_id_unique(self) -> None:
-        """stytch_user_id must be unique."""
-        UserFactory(stytch_user_id="user-123")
-
-        with pytest.raises(IntegrityError):
-            UserFactory(stytch_user_id="user-123")
-
     def test_email_unique(self) -> None:
         """Email must be unique."""
         UserFactory(email="duplicate@example.com")
