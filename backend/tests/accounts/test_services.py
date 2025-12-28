@@ -215,3 +215,94 @@ class TestSyncSessionToLocal:
 
         assert member.role == "admin"
         assert member.is_admin is True
+
+
+@pytest.mark.django_db
+class TestSyncSessionEdgeCases:
+    """Edge cases for sync_session_to_local."""
+
+    def test_admin_role_detection(self) -> None:
+        """When the Stytch member has the admin flag, the Member role should be 'admin'."""
+        org = OrganizationFactory()
+        user = UserFactory()
+        # Stytch objects are simple mocks with the needed attributes
+        stytch_member = type(
+            "StytchMember",
+            (),
+            {
+                "member_id": f"member-{user.stytch_user_id}",
+                "email_address": user.email,
+                "name": user.name,
+                "roles": ["stytch_admin"],
+            },
+        )
+        stytch_org = type(
+            "StytchOrg",
+            (),
+            {
+                "organization_id": org.stytch_org_id,
+                "organization_name": org.name,
+                "organization_slug": org.slug,
+            },
+        )
+        user_obj, member_obj, org_obj = sync_session_to_local(stytch_member, stytch_org)
+        assert member_obj.role == "admin"
+        assert member_obj.user == user_obj
+        assert member_obj.organization == org_obj
+
+    def test_member_role_detection_when_no_roles(self) -> None:
+        """When the Stytch member has no roles list, default to 'member'."""
+        org = OrganizationFactory()
+        user = UserFactory()
+        stytch_member = type(
+            "StytchMember",
+            (),
+            {
+                "member_id": f"member-{user.stytch_user_id}",
+                "email_address": user.email,
+                "name": user.name,
+                # No "roles" key – getattr will return []
+            },
+        )
+        stytch_org = type(
+            "StytchOrg",
+            (),
+            {
+                "organization_id": org.stytch_org_id,
+                "organization_name": org.name,
+                "organization_slug": org.slug,
+            },
+        )
+        _, member_obj, _ = sync_session_to_local(stytch_member, stytch_org)
+        assert member_obj.role == "member"
+
+
+@pytest.mark.django_db
+class TestUpdateExistingRecords:
+    """Tests for updating existing records via service functions."""
+
+    def test_update_user_name(self) -> None:
+        """Updating an existing user should change the name field when provided."""
+        existing = UserFactory(name="Old Name")
+        updated_user = get_or_create_user_from_stytch(
+            stytch_user_id=existing.stytch_user_id,
+            email=existing.email,
+            name="New Name",
+        )
+        assert updated_user.id == existing.id
+        assert updated_user.name == "New Name"
+
+    def test_update_member_role(self) -> None:
+        """If a Member already exists, calling get_or_create_member_from_stytch with a new role updates it."""
+        user = UserFactory()
+        org = OrganizationFactory()
+        member = MemberFactory(user=user, organization=org, role="member")
+        # Call with admin role – should update the existing record
+        updated_member = get_or_create_member_from_stytch(
+            user=user,
+            organization=org,
+            stytch_member_id=member.stytch_member_id,
+            role="admin",
+        )
+        assert updated_member.id == member.id
+        assert updated_member.role == "admin"

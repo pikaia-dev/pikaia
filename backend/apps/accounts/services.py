@@ -22,14 +22,25 @@ def get_or_create_user_from_stytch(
 
     Called during authentication to sync user data.
     """
-    user, created = User.objects.update_or_create(
-        stytch_user_id=stytch_user_id,
-        defaults={
-            "email": email,
-            "name": name,
-        },
-    )
-    return user
+    # First try to find by stytch_user_id (primary identifier)
+    try:
+        user = User.objects.get(stytch_user_id=stytch_user_id)
+        # Update mutable fields
+        user.email = email
+        user.name = name
+        user.save(update_fields=["email", "name"])
+        return user
+    except User.DoesNotExist:
+        # Fallback to email lookup – handles cases where the user was created
+        # with the same email but a different stytch_user_id.
+        user, created = User.objects.update_or_create(
+            email=email,
+            defaults={
+                "stytch_user_id": stytch_user_id,
+                "name": name,
+            },
+        )
+        return user
 
 
 def get_or_create_organization_from_stytch(
