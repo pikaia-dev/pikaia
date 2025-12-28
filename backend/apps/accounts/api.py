@@ -14,8 +14,6 @@ from ninja import Router
 from ninja.errors import HttpError
 from stytch.core.response_base import StytchError
 
-logger = logging.getLogger(__name__)
-
 from apps.accounts.schemas import (
     DiscoveredOrganization,
     DiscoveryCreateOrgRequest,
@@ -32,6 +30,8 @@ from apps.accounts.schemas import (
 )
 from apps.accounts.services import sync_session_to_local
 from apps.accounts.stytch_client import get_stytch_client
+
+logger = logging.getLogger(__name__)
 
 router = Router(tags=["auth"])
 
