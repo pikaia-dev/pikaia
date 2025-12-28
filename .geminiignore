@@ -15,12 +15,6 @@ pnpm-lock.yaml
 # Node modules
 node_modules/
 
-# Build outputs
-frontend/dist/
-emails/build/
-*.tsbuildinfo
-infra/cdk.out/
-
 # Cache directories
 **/.ruff_cache/
 **/.pytest_cache/
