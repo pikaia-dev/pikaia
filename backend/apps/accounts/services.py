@@ -132,9 +132,15 @@ def sync_session_to_local(
             name=stytch_member.name or "",
         )
 
-        # Determine role from Stytch RBAC (simplified)
-        # In full implementation, parse stytch_member.roles
-        role = "admin" if "stytch_admin" in getattr(stytch_member, "roles", []) else "member"
+        # Determine role from Stytch RBAC
+        # member.roles is an array of role objects with role_id field
+        # e.g. [{"role_id": "stytch_admin", "sources": [...]}, ...]
+        roles = getattr(stytch_member, "roles", []) or []
+        role_ids = [
+            getattr(r, "role_id", None) or r.get("role_id") if hasattr(r, "get") else getattr(r, "role_id", None)
+            for r in roles
+        ]
+        role = "admin" if "stytch_admin" in role_ids else "member"
 
         # Sync member
         member = get_or_create_member_from_stytch(

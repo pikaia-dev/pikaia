@@ -316,7 +316,7 @@ class TestAdminRoleSync:
                 member_id="member-admin-test",
                 email_address="admin@example.com",
                 name="Admin User",
-                roles=["stytch_admin", "editor"],
+                roles=[{"role_id": "stytch_admin"}, {"role_id": "editor"}],
             ),
             organization=MockStytchOrg(
                 organization_id="org-admin-test",
