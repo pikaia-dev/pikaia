@@ -11,6 +11,8 @@ dependencies = [
     "pydantic-settings>=2.12",
     "psycopg[binary]>=3.3",
     "gunicorn>=23.0",
+    "stytch>=11.0",
+    "email-validator>=2.2",
 ]
 
 [project.optional-dependencies]

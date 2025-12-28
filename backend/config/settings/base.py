@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     SECRET_KEY: str = "django-insecure-change-me-in-production"
     DEBUG: bool = False
-    ALLOWED_HOSTS: list[str] = []
+    ALLOWED_HOSTS_STR: str = ""  # Comma-separated, parsed below
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/tango"
 
     # Stytch
@@ -42,7 +42,7 @@ SECRET_KEY = settings.SECRET_KEY
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = settings.DEBUG
 
-ALLOWED_HOSTS = settings.ALLOWED_HOSTS
+ALLOWED_HOSTS = [h.strip() for h in settings.ALLOWED_HOSTS_STR.split(",") if h.strip()]
 
 # Application definition
 INSTALLED_APPS = [
@@ -65,6 +65,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.core.middleware.StytchAuthMiddleware",
+    "apps.core.middleware.TenantContextMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -124,3 +126,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Custom user model
 AUTH_USER_MODEL = "accounts.User"
+
+# Stytch B2B authentication
+STYTCH_PROJECT_ID = settings.STYTCH_PROJECT_ID
+STYTCH_SECRET = settings.STYTCH_SECRET
