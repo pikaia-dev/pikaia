@@ -16,14 +16,22 @@ from apps.accounts.api import (
     create_organization,
     exchange_session,
     get_current_user,
+    get_organization,
     logout,
     send_magic_link,
+    update_billing,
+    update_organization,
+    update_profile,
 )
 from apps.accounts.schemas import (
+    BillingAddressSchema,
     DiscoveryCreateOrgRequest,
     DiscoveryExchangeRequest,
     MagicLinkAuthenticateRequest,
     MagicLinkSendRequest,
+    UpdateBillingRequest,
+    UpdateOrganizationRequest,
+    UpdateProfileRequest,
 )
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
 
@@ -536,3 +544,246 @@ class TestGetCurrentUser:
 
         with pytest.raises(HttpError):
             get_current_user(request)
+
+
+# --- Settings Endpoints Tests ---
+
+
+@pytest.mark.django_db
+class TestUpdateProfile:
+    """Tests for update_profile endpoint."""
+
+    def test_success_updates_name(self, request_factory: RequestFactory) -> None:
+        """Should update user name locally and sync to Stytch."""
+        user = UserFactory(name="Old Name")
+        org = OrganizationFactory()
+        member = MemberFactory(user=user, organization=org)
+
+        request = request_factory.patch("/api/v1/auth/me/profile")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = UpdateProfileRequest(name="New Name")
+
+        with patch("apps.accounts.api.get_stytch_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_get_client.return_value = mock_client
+
+            result = update_profile(request, payload)
+
+        assert result.name == "New Name"
+        user.refresh_from_db()
+        assert user.name == "New Name"
+        mock_client.organizations.members.update.assert_called_once()
+
+    def test_stytch_sync_failure_doesnt_fail_request(
+        self, request_factory: RequestFactory
+    ) -> None:
+        """Should succeed even if Stytch sync fails."""
+        from stytch.core.response_base import StytchError, StytchErrorDetails
+
+        user = UserFactory(name="Old Name")
+        org = OrganizationFactory()
+        member = MemberFactory(user=user, organization=org)
+
+        request = request_factory.patch("/api/v1/auth/me/profile")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = UpdateProfileRequest(name="New Name")
+
+        with patch("apps.accounts.api.get_stytch_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.organizations.members.update.side_effect = StytchError(
+                StytchErrorDetails(
+                    error_type="api_error",
+                    error_message="Stytch API error",
+                    status_code=500,
+                    request_id="req-123",
+                )
+            )
+            mock_get_client.return_value = mock_client
+
+            result = update_profile(request, payload)
+
+        # Local update should succeed even if Stytch fails
+        assert result.name == "New Name"
+        user.refresh_from_db()
+        assert user.name == "New Name"
+
+    def test_unauthenticated(self, request_factory: RequestFactory) -> None:
+        """Should error when not authenticated."""
+        request = request_factory.patch("/api/v1/auth/me/profile")
+        payload = UpdateProfileRequest(name="Test")
+
+        with pytest.raises(HttpError):
+            update_profile(request, payload)
+
+
+@pytest.mark.django_db
+class TestGetOrganization:
+    """Tests for get_organization endpoint."""
+
+    def test_success_returns_org_with_billing(
+        self, request_factory: RequestFactory
+    ) -> None:
+        """Should return organization details including billing info."""
+        org = OrganizationFactory(
+            billing_email="billing@example.com",
+            billing_name="Acme Corp Inc.",
+            billing_address_line1="123 Main St",
+            billing_city="San Francisco",
+            billing_country="US",
+            vat_id="DE123456789",
+        )
+        user = UserFactory()
+        member = MemberFactory(user=user, organization=org)
+
+        request = request_factory.get("/api/v1/auth/organization")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        result = get_organization(request)
+
+        assert result.name == org.name
+        assert result.billing.billing_email == "billing@example.com"
+        assert result.billing.billing_name == "Acme Corp Inc."
+        assert result.billing.address.line1 == "123 Main St"
+        assert result.billing.address.country == "US"
+        assert result.billing.vat_id == "DE123456789"
+
+    def test_unauthenticated(self, request_factory: RequestFactory) -> None:
+        """Should error when not authenticated."""
+        request = request_factory.get("/api/v1/auth/organization")
+
+        with pytest.raises(HttpError):
+            get_organization(request)
+
+
+@pytest.mark.django_db
+class TestUpdateOrganization:
+    """Tests for update_organization endpoint."""
+
+    def test_admin_can_update_name(self, request_factory: RequestFactory) -> None:
+        """Admin should be able to update organization name."""
+        org = OrganizationFactory(name="Old Name")
+        user = UserFactory()
+        member = MemberFactory(user=user, organization=org, role="admin")
+
+        request = request_factory.patch("/api/v1/auth/organization")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = UpdateOrganizationRequest(name="New Name")
+
+        with patch("apps.accounts.api.get_stytch_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_get_client.return_value = mock_client
+
+            result = update_organization(request, payload)
+
+        assert result.name == "New Name"
+        org.refresh_from_db()
+        assert org.name == "New Name"
+        mock_client.organizations.update.assert_called_once()
+
+    def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
+        """Non-admin should be rejected with 403."""
+        org = OrganizationFactory()
+        user = UserFactory()
+        member = MemberFactory(user=user, organization=org, role="member")
+
+        request = request_factory.patch("/api/v1/auth/organization")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = UpdateOrganizationRequest(name="New Name")
+
+        with pytest.raises(HttpError) as exc_info:
+            update_organization(request, payload)
+
+        assert exc_info.value.status_code == 403
+
+    def test_unauthenticated(self, request_factory: RequestFactory) -> None:
+        """Should error when not authenticated."""
+        request = request_factory.patch("/api/v1/auth/organization")
+        payload = UpdateOrganizationRequest(name="Test")
+
+        with pytest.raises(HttpError):
+            update_organization(request, payload)
+
+
+@pytest.mark.django_db
+class TestUpdateBilling:
+    """Tests for update_billing endpoint."""
+
+    def test_admin_can_update_billing(self, request_factory: RequestFactory) -> None:
+        """Admin should be able to update billing info."""
+        org = OrganizationFactory()
+        user = UserFactory()
+        member = MemberFactory(user=user, organization=org, role="admin")
+
+        request = request_factory.patch("/api/v1/auth/organization/billing")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = UpdateBillingRequest(
+            billing_email="new-billing@example.com",
+            billing_name="New Corp Inc.",
+            address=BillingAddressSchema(
+                line1="456 New St",
+                line2="Suite 100",
+                city="New York",
+                state="NY",
+                postal_code="10001",
+                country="US",
+            ),
+            vat_id="DE999888777",
+        )
+
+        result = update_billing(request, payload)
+
+        assert result.billing.billing_email == "new-billing@example.com"
+        assert result.billing.billing_name == "New Corp Inc."
+        assert result.billing.address.line1 == "456 New St"
+        assert result.billing.vat_id == "DE999888777"
+
+        org.refresh_from_db()
+        assert org.billing_email == "new-billing@example.com"
+        assert org.billing_address_line1 == "456 New St"
+
+    def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
+        """Non-admin should be rejected with 403."""
+        org = OrganizationFactory()
+        user = UserFactory()
+        member = MemberFactory(user=user, organization=org, role="member")
+
+        request = request_factory.patch("/api/v1/auth/organization/billing")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = UpdateBillingRequest(
+            billing_name="Test",
+            vat_id="",
+        )
+
+        with pytest.raises(HttpError) as exc_info:
+            update_billing(request, payload)
+
+        assert exc_info.value.status_code == 403
+
+    def test_unauthenticated(self, request_factory: RequestFactory) -> None:
+        """Should error when not authenticated."""
+        request = request_factory.patch("/api/v1/auth/organization/billing")
+        payload = UpdateBillingRequest(billing_name="Test", vat_id="")
+
+        with pytest.raises(HttpError):
+            update_billing(request, payload)
+
