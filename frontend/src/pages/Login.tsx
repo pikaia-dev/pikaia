@@ -7,75 +7,65 @@ import { B2BProducts, AuthFlowType } from '@stytch/vanilla-js/b2b'
 const config = {
     products: [B2BProducts.emailMagicLinks],
     sessionOptions: {
-        sessionDurationMinutes: 60, // Match Stytch default max
+        sessionDurationMinutes: 60,
     },
     authFlowType: AuthFlowType.Discovery,
 }
 
+// Stytch styles aligned with shadcn/ui default theme (neutral/zinc)
 const styles = {
     container: {
-        width: '400px',
+        width: '100%',
     },
     colors: {
-        primary: '#0f172a',
-        secondary: '#64748b',
-        success: '#22c55e',
-        error: '#ef4444',
+        primary: '#18181b',      // zinc-900 - matches shadcn primary
+        secondary: '#71717a',    // zinc-500 - muted text
+        success: '#22c55e',      // green-500
+        error: '#ef4444',        // red-500
     },
     buttons: {
         primary: {
-            backgroundColor: '#0f172a',
-            textColor: '#ffffff',
-            borderRadius: '8px',
+            backgroundColor: '#18181b',  // zinc-900
+            textColor: '#fafafa',        // zinc-50
+            borderRadius: '6px',         // matches shadcn radius
         },
     },
     inputs: {
-        borderRadius: '8px',
+        borderColor: '#e4e4e7',  // zinc-200 - matches shadcn input border
+        borderRadius: '6px',
     },
+    fontFamily: 'inherit',      // Use app's font
 }
 
 export default function Login() {
     const navigate = useNavigate()
     const { session, isInitialized } = useStytchMemberSession()
 
-    // Redirect to dashboard once session is confirmed
     useEffect(() => {
         if (isInitialized && session) {
             navigate('/dashboard', { replace: true })
         }
     }, [session, isInitialized, navigate])
 
-    // Show loading while checking session
-    if (!isInitialized) {
+    if (!isInitialized || session) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div>
-            </div>
-        )
-    }
-
-    // If already logged in, show loading (will redirect via useEffect)
-    if (session) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div>
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
             </div>
         )
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50">
-            <div className="w-full max-w-md p-8">
-                <div className="text-center mb-8">
-                    <h1 className="text-2xl font-bold text-slate-900">Welcome</h1>
-                    <p className="text-slate-600 mt-2">Sign in to continue</p>
+        <div className="min-h-screen flex items-center justify-center bg-background">
+            <div className="w-full max-w-sm p-8">
+                <div className="text-center mb-6">
+                    <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
+                    <p className="text-sm text-muted-foreground mt-2">
+                        Enter your email to sign in to your account
+                    </p>
                 </div>
-                <StytchB2B
-                    config={config}
-                    styles={styles}
-                />
+                <StytchB2B config={config} styles={styles} />
             </div>
         </div>
     )
 }
-
