@@ -1,5 +1,5 @@
 ---
-trigger: glob
+trigger: always_on
 globs: *.ts, *.tsx
 ---
 
