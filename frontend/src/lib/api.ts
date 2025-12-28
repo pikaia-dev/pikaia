@@ -1,5 +1,11 @@
 /**
- * API client with authentication.
+ * API client with token provider pattern for authentication.
+ * 
+ * Token sourcing is centralized and uses the Stytch SDK's session.getTokens()
+ * method rather than parsing document.cookie directly. This approach:
+ * - Uses the official SDK API (maintained by Stytch)
+ * - Fails explicitly if HttpOnly cookies are enabled
+ * - Is more secure and maintainable
  */
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
@@ -8,25 +14,22 @@ interface ApiError {
     detail: string
 }
 
-class ApiClient {
-    private getAuthToken(): string | null {
-        // Get Stytch session JWT from cookies
-        // The Stytch SDK stores it in a cookie named 'stytch_session_jwt'
-        const cookies = document.cookie.split(';')
-        for (const cookie of cookies) {
-            const [name, value] = cookie.trim().split('=')
-            if (name === 'stytch_session_jwt') {
-                return value
-            }
-        }
-        return null
-    }
+/**
+ * Token provider function type.
+ * Returns JWT token string or null if no session.
+ */
+export type TokenProvider = () => string | null
 
-    private async request<T>(
+/**
+ * Creates an API client with the given token provider.
+ * This allows swapping token sourcing without touching client internals.
+ */
+export function createApiClient(getToken: TokenProvider) {
+    async function request<T>(
         endpoint: string,
         options: RequestInit = {}
     ): Promise<T> {
-        const token = this.getAuthToken()
+        const token = getToken()
 
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
@@ -51,21 +54,32 @@ class ApiClient {
         return response.json()
     }
 
-    async get<T>(endpoint: string): Promise<T> {
-        return this.request<T>(endpoint, { method: 'GET' })
-    }
+    return {
+        get<T>(endpoint: string): Promise<T> {
+            return request<T>(endpoint, { method: 'GET' })
+        },
 
-    async post<T>(endpoint: string, data?: unknown): Promise<T> {
-        return this.request<T>(endpoint, {
-            method: 'POST',
-            body: data ? JSON.stringify(data) : undefined,
-        })
+        post<T>(endpoint: string, data?: unknown): Promise<T> {
+            return request<T>(endpoint, {
+                method: 'POST',
+                body: data ? JSON.stringify(data) : undefined,
+            })
+        },
+
+        put<T>(endpoint: string, data?: unknown): Promise<T> {
+            return request<T>(endpoint, {
+                method: 'PUT',
+                body: data ? JSON.stringify(data) : undefined,
+            })
+        },
+
+        delete<T>(endpoint: string): Promise<T> {
+            return request<T>(endpoint, { method: 'DELETE' })
+        },
     }
 }
 
-export const api = new ApiClient()
-
-// API types matching backend schemas
+// API response types matching backend schemas
 export interface UserInfo {
     id: number
     email: string
@@ -90,9 +104,4 @@ export interface MeResponse {
     user: UserInfo
     member: MemberInfo
     organization: OrganizationInfo
-}
-
-// API functions
-export async function getCurrentUser(): Promise<MeResponse> {
-    return api.get<MeResponse>('/auth/me')
 }
