@@ -30,13 +30,19 @@ from apps.accounts.schemas import (
 )
 from apps.accounts.services import sync_session_to_local
 from apps.accounts.stytch_client import get_stytch_client
+from apps.core.schemas import ErrorResponse
 
 logger = logging.getLogger(__name__)
 
 router = Router(tags=["auth"])
 
 
-@router.post("/magic-link/send", response=MessageResponse)
+@router.post(
+    "/magic-link/send",
+    response={200: MessageResponse, 400: ErrorResponse},
+    operation_id="sendMagicLink",
+    summary="Send magic link email",
+)
 def send_magic_link(request: HttpRequest, payload: MagicLinkSendRequest) -> MessageResponse:
     """
     Send a magic link email for discovery authentication.
@@ -56,7 +62,12 @@ def send_magic_link(request: HttpRequest, payload: MagicLinkSendRequest) -> Mess
     return MessageResponse(message="Magic link sent. Check your email.")
 
 
-@router.post("/magic-link/authenticate", response=MagicLinkAuthenticateResponse)
+@router.post(
+    "/magic-link/authenticate",
+    response={200: MagicLinkAuthenticateResponse, 400: ErrorResponse},
+    operation_id="authenticateMagicLink",
+    summary="Authenticate magic link token",
+)
 def authenticate_magic_link(
     request: HttpRequest,
     payload: MagicLinkAuthenticateRequest,
@@ -94,7 +105,12 @@ def authenticate_magic_link(
     )
 
 
-@router.post("/discovery/create-org", response=SessionResponse)
+@router.post(
+    "/discovery/create-org",
+    response={200: SessionResponse, 400: ErrorResponse},
+    operation_id="createOrganization",
+    summary="Create new organization",
+)
 def create_organization(
     request: HttpRequest,
     payload: DiscoveryCreateOrgRequest,
@@ -130,7 +146,12 @@ def create_organization(
     )
 
 
-@router.post("/discovery/exchange", response=SessionResponse)
+@router.post(
+    "/discovery/exchange",
+    response={200: SessionResponse, 400: ErrorResponse},
+    operation_id="exchangeSession",
+    summary="Exchange IST for session",
+)
 def exchange_session(
     request: HttpRequest,
     payload: DiscoveryExchangeRequest,
@@ -163,7 +184,12 @@ def exchange_session(
     )
 
 
-@router.post("/logout", response=MessageResponse)
+@router.post(
+    "/logout",
+    response={200: MessageResponse, 401: ErrorResponse},
+    operation_id="logout",
+    summary="Revoke current session",
+)
 def logout(request: HttpRequest) -> MessageResponse:
     """
     Revoke the current session.
@@ -191,7 +217,12 @@ def logout(request: HttpRequest) -> MessageResponse:
     return MessageResponse(message="Logged out successfully")
 
 
-@router.get("/me", response=MeResponse)
+@router.get(
+    "/me",
+    response={200: MeResponse, 401: ErrorResponse},
+    operation_id="getCurrentUser",
+    summary="Get current user info",
+)
 def get_current_user(request: HttpRequest) -> MeResponse:
     """
     Get current authenticated user, member, and organization info.
