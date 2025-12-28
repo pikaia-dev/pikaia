@@ -44,21 +44,21 @@ export default function Dashboard() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div>
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
             </div>
         )
     }
 
     if (error) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+            <div className="min-h-screen flex items-center justify-center bg-background">
                 <Card className="w-full max-w-md">
                     <CardHeader>
-                        <CardTitle className="text-red-600">Error</CardTitle>
+                        <CardTitle className="text-destructive">Error</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-slate-600 mb-4">{error}</p>
+                        <p className="text-muted-foreground mb-4">{error}</p>
                         <Button onClick={handleLogout} variant="outline">
                             Back to Login
                         </Button>
@@ -69,86 +69,81 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50">
-            {/* Header */}
-            <header className="bg-white border-b border-slate-200">
+        <div className="min-h-screen bg-background">
+            <header className="bg-card border-b border-border">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center h-16">
-                        <div className="flex items-center space-x-4">
-                            <h1 className="text-xl font-semibold text-slate-900">
+                    <div className="flex justify-between items-center h-14">
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-lg font-semibold">
                                 {userData?.organization.name || 'Dashboard'}
                             </h1>
                             {userData?.organization.slug && (
-                                <span className="text-sm text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
                                     {userData.organization.slug}
                                 </span>
                             )}
                         </div>
-                        <div className="flex items-center space-x-4">
-                            <span className="text-sm text-slate-600">
+                        <div className="flex items-center gap-4">
+                            <span className="text-sm text-muted-foreground">
                                 {userData?.user.email || member?.email_address}
                             </span>
                             <Button onClick={handleLogout} variant="outline" size="sm">
-                                Logout
+                                Log out
                             </Button>
                         </div>
                     </div>
                 </div>
             </header>
 
-            {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {/* User Info Card */}
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     <Card>
-                        <CardHeader>
-                            <CardTitle>User</CardTitle>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-base">User</CardTitle>
                             <CardDescription>Your account details</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-2">
                             <div>
-                                <span className="text-sm text-slate-500">Name</span>
-                                <p className="font-medium">{userData?.user.name || 'Not set'}</p>
+                                <span className="text-xs text-muted-foreground">Name</span>
+                                <p className="text-sm font-medium">{userData?.user.name || 'Not set'}</p>
                             </div>
                             <div>
-                                <span className="text-sm text-slate-500">Email</span>
-                                <p className="font-medium">{userData?.user.email}</p>
+                                <span className="text-xs text-muted-foreground">Email</span>
+                                <p className="text-sm font-medium">{userData?.user.email}</p>
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Member Info Card */}
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Membership</CardTitle>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-base">Membership</CardTitle>
                             <CardDescription>Your role in this organization</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-2">
                             <div>
-                                <span className="text-sm text-slate-500">Role</span>
-                                <p className="font-medium capitalize">{userData?.member.role}</p>
+                                <span className="text-xs text-muted-foreground">Role</span>
+                                <p className="text-sm font-medium capitalize">{userData?.member.role}</p>
                             </div>
                             <div>
-                                <span className="text-sm text-slate-500">Admin</span>
-                                <p className="font-medium">{userData?.member.is_admin ? 'Yes' : 'No'}</p>
+                                <span className="text-xs text-muted-foreground">Admin</span>
+                                <p className="text-sm font-medium">{userData?.member.is_admin ? 'Yes' : 'No'}</p>
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Organization Info Card */}
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Organization</CardTitle>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-base">Organization</CardTitle>
                             <CardDescription>Current workspace</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-2">
                             <div>
-                                <span className="text-sm text-slate-500">Name</span>
-                                <p className="font-medium">{userData?.organization.name}</p>
+                                <span className="text-xs text-muted-foreground">Name</span>
+                                <p className="text-sm font-medium">{userData?.organization.name}</p>
                             </div>
                             <div>
-                                <span className="text-sm text-slate-500">Slug</span>
-                                <p className="font-medium">{userData?.organization.slug}</p>
+                                <span className="text-xs text-muted-foreground">Slug</span>
+                                <p className="text-sm font-medium">{userData?.organization.slug}</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -157,3 +152,4 @@ export default function Dashboard() {
         </div>
     )
 }
+
