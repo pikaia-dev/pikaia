@@ -1,6 +1,7 @@
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { StytchB2B } from '@stytch/react/b2b'
-import { B2BProducts, AuthFlowType, StytchEventType } from '@stytch/vanilla-js/b2b'
+import { StytchB2B, useStytchMemberSession } from '@stytch/react/b2b'
+import { B2BProducts, AuthFlowType } from '@stytch/vanilla-js/b2b'
 
 // Discovery config - let Stytch Dashboard handle redirect URLs
 const config = {
@@ -35,6 +36,32 @@ const styles = {
 
 export default function Login() {
     const navigate = useNavigate()
+    const { session, isInitialized } = useStytchMemberSession()
+
+    // Redirect to dashboard once session is confirmed
+    useEffect(() => {
+        if (isInitialized && session) {
+            navigate('/dashboard', { replace: true })
+        }
+    }, [session, isInitialized, navigate])
+
+    // Show loading while checking session
+    if (!isInitialized) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div>
+            </div>
+        )
+    }
+
+    // If already logged in, show loading (will redirect via useEffect)
+    if (session) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div>
+            </div>
+        )
+    }
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -46,15 +73,9 @@ export default function Login() {
                 <StytchB2B
                     config={config}
                     styles={styles}
-                    callbacks={{
-                        onEvent: (event) => {
-                            if (event.type === StytchEventType.AuthenticateFlowComplete) {
-                                navigate('/dashboard', { replace: true })
-                            }
-                        },
-                    }}
                 />
             </div>
         </div>
     )
 }
+
