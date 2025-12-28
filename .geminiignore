@@ -4,9 +4,9 @@ venv/
 env/
 
 # Python cache
-__pycache__/
-*.py[codz]
-*.pyc
+**/__pycache__/
+**/*.py[codz]
+**/*.pyc
 
 # Dependency locks (large, not useful for AI context)
 uv.lock
@@ -22,11 +22,11 @@ emails/build/
 infra/cdk.out/
 
 # Cache directories
-.ruff_cache/
-.pytest_cache/
-.mypy_cache/
-.turbo/
-.cache/
+**/.ruff_cache/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.turbo/
+**/.cache/
 
 # IDE settings
 .idea/
@@ -36,12 +36,12 @@ infra/cdk.out/
 .git/
 
 # Compiled extensions
-*.so
-*.egg-info/
+**/*.so
+**/*.egg-info/
 
 # OS files
-.DS_Store
-Thumbs.db
+**/.DS_Store
+**/Thumbs.db
 
 # Coverage reports
 htmlcov/
