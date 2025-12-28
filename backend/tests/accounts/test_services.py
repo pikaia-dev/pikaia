@@ -197,7 +197,7 @@ class TestSyncSessionToLocal:
             member_id="member-admin-123",
             email_address="admin@example.com",
             name="Admin User",
-            roles=["stytch_admin", "viewer"],
+            roles=[{"role_id": "stytch_admin"}, {"role_id": "viewer"}],
         )
         stytch_org = MockStytchOrg(
             organization_id="org-admin-789",
@@ -227,7 +227,7 @@ class TestSyncSessionEdgeCases:
                 "member_id": "member-admin-test",
                 "email_address": user.email,
                 "name": user.name,
-                "roles": ["stytch_admin"],
+                "roles": [{"role_id": "stytch_admin"}],
             },
         )
         stytch_org = type(
