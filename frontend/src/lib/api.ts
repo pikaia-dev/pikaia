@@ -8,7 +8,9 @@
  * - Is more secure and maintainable
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+import { config } from './env'
+
+const API_URL = config.apiUrl
 
 interface ApiError {
     detail: string
