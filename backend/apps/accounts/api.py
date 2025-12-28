@@ -31,10 +31,12 @@ from apps.accounts.schemas import (
 from apps.accounts.services import sync_session_to_local
 from apps.accounts.stytch_client import get_stytch_client
 from apps.core.schemas import ErrorResponse
+from apps.core.security import BearerAuth
 
 logger = logging.getLogger(__name__)
 
 router = Router(tags=["auth"])
+bearer_auth = BearerAuth()
 
 
 @router.post(
@@ -191,6 +193,7 @@ def exchange_session(
 @router.post(
     "/logout",
     response={200: MessageResponse, 401: ErrorResponse},
+    auth=bearer_auth,
     operation_id="logout",
     summary="Revoke current session",
 )
@@ -224,6 +227,7 @@ def logout(request: HttpRequest) -> MessageResponse:
 @router.get(
     "/me",
     response={200: MeResponse, 401: ErrorResponse},
+    auth=bearer_auth,
     operation_id="getCurrentUser",
     summary="Get current user info",
 )
