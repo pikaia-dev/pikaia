@@ -48,6 +48,24 @@ uv run ruff check . && uv run ruff format .  # Lint & format
 pnpm dlx shadcn@latest add button dialog  # Add components
 ```
 
+### Third-Party Services
+
+#### Stytch (Authentication)
+
+1. Create a **B2B project** at [stytch.com](https://stytch.com/dashboard)
+2. Copy **Project ID** and **Secret** to `backend/.env`
+3. Go to **Redirect URLs** → Add `http://localhost:5173/auth/callback`
+   - Check **Enabled** for: Login, Signup, Invite, Reset password, Discovery
+   - Check **Default** for all (for local dev)
+4. Go to **Authentication** → Enable **Magic Links** (minimum for testing)
+
+#### Stripe (Billing)
+
+1. Create account at [stripe.com](https://dashboard.stripe.com)
+2. Go to **Developers** → **API keys** → Copy **Secret key** to `backend/.env`
+3. Webhook secret: Set up later when implementing billing
+
+
 ---
 
 ## Architecture
