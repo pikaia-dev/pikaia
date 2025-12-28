@@ -76,6 +76,13 @@ export function createApiClient(getToken: TokenProvider) {
         delete<T>(endpoint: string): Promise<T> {
             return request<T>(endpoint, { method: 'DELETE' })
         },
+
+        patch<T>(endpoint: string, data?: unknown): Promise<T> {
+            return request<T>(endpoint, {
+                method: 'PATCH',
+                body: data ? JSON.stringify(data) : undefined,
+            })
+        },
     }
 }
 
@@ -105,3 +112,29 @@ export interface MeResponse {
     member: MemberInfo
     organization: OrganizationInfo
 }
+
+// Organization settings types
+export interface BillingAddress {
+    line1: string
+    line2: string
+    city: string
+    state: string
+    postal_code: string
+    country: string
+}
+
+export interface BillingInfo {
+    billing_email: string
+    billing_name: string
+    address: BillingAddress
+    vat_id: string
+}
+
+export interface OrganizationDetail {
+    id: number
+    stytch_org_id: string
+    name: string
+    slug: string
+    billing: BillingInfo
+}
+

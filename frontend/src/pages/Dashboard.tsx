@@ -87,6 +87,9 @@ export default function Dashboard() {
                             <span className="text-sm text-muted-foreground">
                                 {userData?.user.email || member?.email_address}
                             </span>
+                            <Button asChild variant="ghost" size="sm">
+                                <a href="/settings">Settings</a>
+                            </Button>
                             <Button onClick={handleLogout} variant="outline" size="sm">
                                 Log out
                             </Button>

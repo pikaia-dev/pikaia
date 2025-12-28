@@ -5,6 +5,7 @@ Handles Stytch B2B authentication flows:
 - Magic link send/authenticate
 - Discovery org creation/exchange
 - Session management
+- User profile and organization settings
 """
 
 import logging
@@ -15,6 +16,8 @@ from ninja.errors import HttpError
 from stytch.core.response_base import StytchError
 
 from apps.accounts.schemas import (
+    BillingAddressSchema,
+    BillingInfoResponse,
     DiscoveredOrganization,
     DiscoveryCreateOrgRequest,
     DiscoveryExchangeRequest,
@@ -24,8 +27,12 @@ from apps.accounts.schemas import (
     MemberInfo,
     MeResponse,
     MessageResponse,
+    OrganizationDetailResponse,
     OrganizationInfo,
     SessionResponse,
+    UpdateBillingRequest,
+    UpdateOrganizationRequest,
+    UpdateProfileRequest,
     UserInfo,
 )
 from apps.accounts.services import sync_session_to_local
@@ -264,3 +271,154 @@ def get_current_user(request: HttpRequest) -> MeResponse:
             slug=org.slug,
         ),
     )
+
+
+# --- User Profile Settings ---
+
+
+@router.patch(
+    "/me/profile",
+    response={200: UserInfo, 401: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="updateProfile",
+    summary="Update user profile",
+)
+def update_profile(request: HttpRequest, payload: UpdateProfileRequest) -> UserInfo:
+    """
+    Update current user's profile (name).
+
+    This is our system's data - synced out to Stytch.
+    """
+    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+        raise HttpError(401, "Not authenticated")
+
+    user = request.auth_user  # type: ignore[attr-defined]
+    user.name = payload.name
+    user.save(update_fields=["name", "updated_at"])
+
+    # TODO: Sync to Stytch (member.name)
+
+    return UserInfo(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+    )
+
+
+# --- Organization Settings (Admin Only) ---
+
+
+@router.get(
+    "/organization",
+    response={200: OrganizationDetailResponse, 401: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="getOrganization",
+    summary="Get current organization details",
+)
+def get_organization(request: HttpRequest) -> OrganizationDetailResponse:
+    """
+    Get current organization details including billing info.
+
+    All authenticated members can view.
+    """
+    if not hasattr(request, "auth_organization") or request.auth_organization is None:  # type: ignore[attr-defined]
+        raise HttpError(401, "Not authenticated")
+
+    org = request.auth_organization  # type: ignore[attr-defined]
+
+    return OrganizationDetailResponse(
+        id=org.id,
+        stytch_org_id=org.stytch_org_id,
+        name=org.name,
+        slug=org.slug,
+        billing=BillingInfoResponse(
+            billing_email=org.billing_email,
+            billing_name=org.billing_name,
+            address=BillingAddressSchema(
+                line1=org.billing_address_line1,
+                line2=org.billing_address_line2,
+                city=org.billing_city,
+                state=org.billing_state,
+                postal_code=org.billing_postal_code,
+                country=org.billing_country,
+            ),
+            vat_id=org.vat_id,
+        ),
+    )
+
+
+@router.patch(
+    "/organization",
+    response={200: OrganizationDetailResponse, 401: ErrorResponse, 403: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="updateOrganization",
+    summary="Update organization settings",
+)
+def update_organization(
+    request: HttpRequest, payload: UpdateOrganizationRequest
+) -> OrganizationDetailResponse:
+    """
+    Update organization settings (name).
+
+    Admin only. This is our system's data - synced out to Stytch.
+    """
+    if not hasattr(request, "auth_member") or request.auth_member is None:  # type: ignore[attr-defined]
+        raise HttpError(401, "Not authenticated")
+
+    member = request.auth_member  # type: ignore[attr-defined]
+    if not member.is_admin:
+        raise HttpError(403, "Admin access required")
+
+    org = request.auth_organization  # type: ignore[attr-defined]
+    org.name = payload.name
+    org.save(update_fields=["name", "updated_at"])
+
+    # TODO: Sync to Stytch (organization.name)
+
+    return get_organization(request)
+
+
+@router.patch(
+    "/organization/billing",
+    response={200: OrganizationDetailResponse, 401: ErrorResponse, 403: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="updateBilling",
+    summary="Update organization billing info",
+)
+def update_billing(
+    request: HttpRequest, payload: UpdateBillingRequest
+) -> OrganizationDetailResponse:
+    """
+    Update organization billing info (address, VAT, etc.).
+
+    Admin only. This is our system's data - synced out to Stripe.
+    """
+    if not hasattr(request, "auth_member") or request.auth_member is None:  # type: ignore[attr-defined]
+        raise HttpError(401, "Not authenticated")
+
+    member = request.auth_member  # type: ignore[attr-defined]
+    if not member.is_admin:
+        raise HttpError(403, "Admin access required")
+
+    org = request.auth_organization  # type: ignore[attr-defined]
+
+    # Update billing fields
+    if payload.billing_email is not None:
+        org.billing_email = payload.billing_email
+    org.billing_name = payload.billing_name
+    org.vat_id = payload.vat_id
+
+    if payload.address:
+        org.billing_address_line1 = payload.address.line1
+        org.billing_address_line2 = payload.address.line2
+        org.billing_city = payload.address.city
+        org.billing_state = payload.address.state
+        org.billing_postal_code = payload.address.postal_code
+        org.billing_country = payload.address.country
+
+    org.save()
+
+    # TODO: Sync to Stripe (customer address, tax_id)
+
+    return get_organization(request)
+
