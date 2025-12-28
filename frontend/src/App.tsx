@@ -3,7 +3,7 @@ import { useStytchMemberSession } from '@stytch/react/b2b'
 import Login from './pages/Login'
 import AuthCallback from './pages/AuthCallback'
 import Dashboard from './pages/Dashboard'
-import SettingsLayout from './pages/settings/SettingsLayout'
+import AppLayout from './layouts/AppLayout'
 import ProfileSettings from './pages/settings/ProfileSettings'
 import OrganizationSettings from './pages/settings/OrganizationSettings'
 import BillingSettings from './pages/settings/BillingSettings'
@@ -32,31 +32,25 @@ function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
+
+      {/* Authenticated routes with sidebar layout */}
       <Route
-        path="/dashboard"
         element={
           <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute>
-            <SettingsLayout />
+            <AppLayout />
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/settings/profile" replace />} />
-        <Route path="profile" element={<ProfileSettings />} />
-        <Route path="organization" element={<OrganizationSettings />} />
-        <Route path="billing" element={<BillingSettings />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/settings/profile" element={<ProfileSettings />} />
+        <Route path="/settings/organization" element={<OrganizationSettings />} />
+        <Route path="/settings/billing" element={<BillingSettings />} />
+        <Route path="/settings" element={<Navigate to="/settings/profile" replace />} />
       </Route>
+
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   )
 }
 
 export default App
-
