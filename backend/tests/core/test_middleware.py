@@ -126,17 +126,27 @@ class TestJWTAuthentication:
             name="Test Org",
             slug="test-org",
         )
-        member = Member.objects.create(
+        Member.objects.create(
             stytch_member_id="member-123",
             user=user,
             organization=org,
             role="member",
         )
 
-        # Mock Stytch response
+        # Mock Stytch full authenticate response
         mock_client = MagicMock()
-        mock_client.sessions.authenticate_jwt.return_value = MockJWTAuthResponse(
-            member_session=MockMemberSession(member_id="member-123")
+        mock_client.sessions.authenticate.return_value = MockFullAuthResponse(
+            member=MockStytchMember(
+                member_id="member-123",
+                email_address="test@example.com",
+                name="Test User",
+                roles=[],
+            ),
+            organization=MockStytchOrg(
+                organization_id="org-123",
+                organization_name="Test Org",
+                organization_slug="test-org",
+            ),
         )
         mock_get_client.return_value = mock_client
 
@@ -144,9 +154,9 @@ class TestJWTAuthentication:
         request = make_request("/api/v1/test", "Bearer valid-jwt")
         middleware(request)
 
-        assert request.auth_user == user
-        assert request.auth_member == member
-        assert request.auth_organization == org
+        assert request.auth_user.email == "test@example.com"
+        assert request.auth_member.stytch_member_id == "member-123"
+        assert request.auth_organization.stytch_org_id == "org-123"
 
     @patch("apps.accounts.stytch_client.get_stytch_client")
     def test_invalid_jwt_sets_none(
@@ -156,7 +166,7 @@ class TestJWTAuthentication:
     ) -> None:
         """Invalid/expired JWT results in None auth context."""
         mock_client = MagicMock()
-        mock_client.sessions.authenticate_jwt.side_effect = StytchError(
+        mock_client.sessions.authenticate.side_effect = StytchError(
             StytchErrorDetails(
                 status_code=401,
                 request_id="test-request-id",
