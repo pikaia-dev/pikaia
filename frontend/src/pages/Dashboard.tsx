@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStytchB2BClient, useStytchMemberSession, useStytchMember } from '@stytch/react/b2b'
-import { getCurrentUser, type MeResponse } from '../lib/api'
+import { useApi } from '../hooks/useApi'
+import type { MeResponse } from '../lib/api'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 
@@ -10,6 +11,7 @@ export default function Dashboard() {
     const { session } = useStytchMemberSession()
     const { member } = useStytchMember()
     const navigate = useNavigate()
+    const { getCurrentUser } = useApi()
     const [userData, setUserData] = useState<MeResponse | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
@@ -29,7 +31,7 @@ export default function Dashboard() {
         if (session) {
             fetchUser()
         }
-    }, [session])
+    }, [session, getCurrentUser])
 
     const handleLogout = async () => {
         try {
