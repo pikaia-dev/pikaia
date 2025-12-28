@@ -6,6 +6,7 @@ Shared configuration for all environments.
 
 from pathlib import Path
 
+from pydantic import PostgresDsn
 from pydantic_settings import BaseSettings
 
 
@@ -15,7 +16,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "django-insecure-change-me-in-production"
     DEBUG: bool = False
     ALLOWED_HOSTS: str = ""  # Comma-separated list, e.g. "localhost,127.0.0.1"
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/tango"
+    DATABASE_URL: PostgresDsn = "postgresql://postgres:postgres@localhost:5432/tango"
 
     # Stytch
     STYTCH_PROJECT_ID: str = ""
@@ -94,18 +95,22 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-# Database
-# Using PostgreSQL configured via DATABASE_URL
-DATABASES = {
-    "default": {
+# Database - parsed from DATABASE_URL
+def _parse_postgres_dsn(dsn: PostgresDsn) -> dict:
+    """Convert pydantic PostgresDsn to Django DATABASES format."""
+    # pydantic v2: hosts() returns list of dicts with username, password, host, port
+    host_info = dsn.hosts()[0] if dsn.hosts() else {}
+    return {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "tango",
-        "USER": "postgres",
-        "PASSWORD": "postgres",
-        "HOST": "localhost",
-        "PORT": "5432",
+        "NAME": dsn.path.lstrip("/") if dsn.path else "",
+        "USER": host_info.get("username") or "",
+        "PASSWORD": host_info.get("password") or "",
+        "HOST": host_info.get("host") or "localhost",
+        "PORT": str(host_info.get("port") or 5432),
     }
-}
+
+
+DATABASES = {"default": _parse_postgres_dsn(settings.DATABASE_URL)}
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
