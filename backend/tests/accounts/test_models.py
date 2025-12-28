@@ -1,0 +1,96 @@
+"""
+Tests for accounts models.
+"""
+
+import pytest
+from django.db import IntegrityError
+
+from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
+
+
+@pytest.mark.django_db
+class TestUserModel:
+    """Tests for User model."""
+
+    def test_create_user(self) -> None:
+        """Should create a user with required fields."""
+        user = UserFactory()
+
+        assert user.pk is not None
+        assert user.is_active is True
+        assert user.is_staff is False
+
+    def test_user_str(self) -> None:
+        """String representation should be email."""
+        user = UserFactory(email="test@example.com")
+
+        assert str(user) == "test@example.com"
+
+    def test_stytch_user_id_unique(self) -> None:
+        """stytch_user_id must be unique."""
+        UserFactory(stytch_user_id="user-123")
+
+        with pytest.raises(IntegrityError):
+            UserFactory(stytch_user_id="user-123")
+
+    def test_email_unique(self) -> None:
+        """Email must be unique."""
+        UserFactory(email="duplicate@example.com")
+
+        with pytest.raises(IntegrityError):
+            UserFactory(email="duplicate@example.com")
+
+
+@pytest.mark.django_db
+class TestMemberModel:
+    """Tests for Member model."""
+
+    def test_create_member(self) -> None:
+        """Should create a member linking user to org."""
+        member = MemberFactory()
+
+        assert member.pk is not None
+        assert member.user is not None
+        assert member.organization is not None
+
+    def test_member_str(self) -> None:
+        """String representation should be user @ org."""
+        user = UserFactory(email="jane@example.com")
+        org = OrganizationFactory(name="Acme Corp")
+        member = MemberFactory(user=user, organization=org)
+
+        assert str(member) == "jane@example.com @ Acme Corp (member)"
+
+    def test_is_admin_true_for_admin_role(self) -> None:
+        """is_admin should be True for admin role."""
+        member = MemberFactory(role="admin")
+
+        assert member.is_admin is True
+
+    def test_is_admin_false_for_member_role(self) -> None:
+        """is_admin should be False for member role."""
+        member = MemberFactory(role="member")
+
+        assert member.is_admin is False
+
+    def test_unique_user_org_combination(self) -> None:
+        """User can only have one membership per org."""
+        user = UserFactory()
+        org = OrganizationFactory()
+        MemberFactory(user=user, organization=org)
+
+        with pytest.raises(IntegrityError):
+            MemberFactory(user=user, organization=org)
+
+    def test_user_can_be_in_multiple_orgs(self) -> None:
+        """User can be member of multiple organizations."""
+        user = UserFactory()
+        org1 = OrganizationFactory()
+        org2 = OrganizationFactory()
+
+        m1 = MemberFactory(user=user, organization=org1)
+        m2 = MemberFactory(user=user, organization=org2)
+
+        assert m1.pk is not None
+        assert m2.pk is not None
+        assert user.memberships.count() == 2
