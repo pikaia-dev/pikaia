@@ -4,26 +4,52 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Organization',
+            name="Organization",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('stytch_org_id', models.CharField(db_index=True, help_text="Stytch organization_id, e.g. 'organization-xxx'", max_length=255, unique=True)),
-                ('name', models.CharField(max_length=255)),
-                ('slug', models.SlugField(help_text="URL-safe identifier, e.g. 'acme-corp'", max_length=255, unique=True)),
-                ('stripe_customer_id', models.CharField(blank=True, db_index=True, help_text="Stripe customer ID, e.g. 'cus_xxx'", max_length=255)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                (
+                    "stytch_org_id",
+                    models.CharField(
+                        db_index=True,
+                        help_text="Stytch organization_id, e.g. 'organization-xxx'",
+                        max_length=255,
+                        unique=True,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                (
+                    "slug",
+                    models.SlugField(
+                        help_text="URL-safe identifier, e.g. 'acme-corp'",
+                        max_length=255,
+                        unique=True,
+                    ),
+                ),
+                (
+                    "stripe_customer_id",
+                    models.CharField(
+                        blank=True,
+                        db_index=True,
+                        help_text="Stripe customer ID, e.g. 'cus_xxx'",
+                        max_length=255,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
             ],
             options={
-                'ordering': ['-created_at'],
+                "ordering": ["-created_at"],
             },
         ),
     ]

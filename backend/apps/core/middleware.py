@@ -2,33 +2,111 @@
 Core middleware.
 """
 
+import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from django.http import HttpRequest, HttpResponse
+from stytch.core.response_base import StytchError
 
 if TYPE_CHECKING:
-    from apps.accounts.models import Member
+    from apps.accounts.models import Member, User
     from apps.organizations.models import Organization
+
+logger = logging.getLogger(__name__)
+
+
+class StytchAuthMiddleware:
+    """
+    Validates Stytch session JWT from Authorization header.
+
+    Sets request.auth_user, request.auth_member, and request.auth_organization
+    for authenticated requests. Allows unauthenticated requests to pass through
+    (authorization enforced at endpoint level).
+    """
+
+    # Paths that don't require authentication
+    PUBLIC_PATHS = {
+        "/api/v1/health",
+        "/api/v1/auth/magic-link/send",
+        "/api/v1/auth/magic-link/authenticate",
+        "/api/v1/auth/discovery/create-org",
+        "/api/v1/auth/discovery/exchange",
+        "/admin/",
+    }
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        # Initialize auth context
+        request.auth_user: User | None = None  # type: ignore[attr-defined]
+        request.auth_member: Member | None = None  # type: ignore[attr-defined]
+        request.auth_organization: Organization | None = None  # type: ignore[attr-defined]
+
+        # Skip auth for public paths
+        if self._is_public_path(request.path):
+            return self.get_response(request)
+
+        # Extract JWT from Authorization header
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            session_jwt = auth_header.replace("Bearer ", "")
+            self._authenticate_jwt(request, session_jwt)
+
+        return self.get_response(request)
+
+    def _is_public_path(self, path: str) -> bool:
+        """Check if path is public (no auth required)."""
+        return any(path.startswith(public_path) for public_path in self.PUBLIC_PATHS)
+
+    def _authenticate_jwt(self, request: HttpRequest, session_jwt: str) -> None:
+        """Validate JWT and populate request with user/member/org."""
+        # Import here to avoid circular imports
+        from apps.accounts.models import Member
+        from apps.accounts.stytch_client import get_stytch_client
+
+        client = get_stytch_client()
+
+        try:
+            # Authenticate the session JWT
+            response = client.sessions.authenticate_jwt(session_jwt=session_jwt)
+
+            # Look up local Member by stytch_member_id
+            try:
+                member = Member.objects.select_related("user", "organization").get(
+                    stytch_member_id=response.member.member_id
+                )
+
+                request.auth_user = member.user  # type: ignore[attr-defined]
+                request.auth_member = member  # type: ignore[attr-defined]
+                request.auth_organization = member.organization  # type: ignore[attr-defined]
+
+            except Member.DoesNotExist:
+                logger.warning(
+                    "Member not found for stytch_member_id: %s",
+                    response.member.member_id,
+                )
+
+        except StytchError as e:
+            # Invalid/expired JWT - request continues unauthenticated
+            logger.debug("JWT authentication failed: %s", e.details.error_message)
 
 
 class TenantContextMiddleware:
     """
-    Extracts organization context from authenticated request.
-    
-    Sets request.organization and request.member for use in views and services.
-    The actual JWT parsing will be implemented with Stytch integration.
+    Legacy middleware - kept for compatibility.
+
+    Auth context is now set by StytchAuthMiddleware.
+    This middleware can be used for additional tenant-scoping logic.
     """
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
-        # Initialize tenant context (will be populated by auth middleware)
-        request.organization: Organization | None = None  # type: ignore[attr-defined]
-        request.member: Member | None = None  # type: ignore[attr-defined]
-
-        # TODO: Extract org/member from JWT claims after Stytch integration
-        # The auth middleware will decode the JWT and look up the org/member
+        # Copy from auth middleware to legacy names for compatibility
+        request.organization = getattr(request, "auth_organization", None)  # type: ignore[attr-defined]
+        request.member = getattr(request, "auth_member", None)  # type: ignore[attr-defined]
 
         return self.get_response(request)

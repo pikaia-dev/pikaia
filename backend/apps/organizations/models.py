@@ -8,7 +8,7 @@ from django.db import models
 class Organization(models.Model):
     """
     Local replica of Stytch Organization.
-    
+
     Stytch is the source of truth for org/member data.
     This model syncs via webhooks and holds app-specific extensions.
     """

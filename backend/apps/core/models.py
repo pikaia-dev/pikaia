@@ -8,7 +8,7 @@ from django.db import models
 class TimestampedModel(models.Model):
     """
     Abstract base model with created_at/updated_at timestamps.
-    
+
     All business entities should inherit from this or TenantScopedModel.
     """
 
@@ -22,11 +22,11 @@ class TimestampedModel(models.Model):
 class TenantScopedModel(TimestampedModel):
     """
     Abstract base model for all organization-scoped entities.
-    
+
     Provides:
     - Automatic organization FK
     - Timestamps from TimestampedModel
-    
+
     Usage:
         class Project(TenantScopedModel):
             name = models.CharField(max_length=255)

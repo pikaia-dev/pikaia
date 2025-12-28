@@ -49,7 +49,7 @@ class UserManager(BaseUserManager):
 class User(AbstractBaseUser, PermissionsMixin):
     """
     Custom User model - cross-org identity synced from Stytch.
-    
+
     This is AUTH_USER_MODEL. Stytch handles authentication;
     we sync user data for Django ecosystem compatibility.
     """
@@ -92,7 +92,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 class Member(models.Model):
     """
     Org-scoped membership linking User to Organization.
-    
+
     A user can be a member of multiple organizations with different roles.
     Role is synced from Stytch RBAC.
     """
