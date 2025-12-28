@@ -64,18 +64,20 @@ class StytchAuthMiddleware:
         """Validate JWT and populate request with user/member/org."""
         # Import here to avoid circular imports
         from apps.accounts.models import Member
+        from apps.accounts.services import sync_session_to_local
         from apps.accounts.stytch_client import get_stytch_client
 
         client = get_stytch_client()
 
         try:
-            # Authenticate the session JWT
+            # First, try local JWT validation (fast, no network call)
             response = client.sessions.authenticate_jwt(session_jwt=session_jwt)
+            member_id = response.member_session.member_id
 
             # Look up local Member by stytch_member_id
             try:
                 member = Member.objects.select_related("user", "organization").get(
-                    stytch_member_id=response.member.member_id
+                    stytch_member_id=member_id
                 )
 
                 request.auth_user = member.user  # type: ignore[attr-defined]
@@ -83,10 +85,27 @@ class StytchAuthMiddleware:
                 request.auth_organization = member.organization  # type: ignore[attr-defined]
 
             except Member.DoesNotExist:
-                logger.warning(
-                    "Member not found for stytch_member_id: %s",
-                    response.member.member_id,
+                # Member not in local DB - do JIT sync via full authenticate
+                logger.info(
+                    "Member not found locally for stytch_member_id: %s, syncing...",
+                    member_id,
                 )
+                try:
+                    # Full authenticate returns member and organization data
+                    full_response = client.sessions.authenticate(
+                        session_jwt=session_jwt
+                    )
+                    # Sync to local database
+                    user, member, org = sync_session_to_local(
+                        stytch_member=full_response.member,
+                        stytch_organization=full_response.organization,
+                    )
+                    request.auth_user = user  # type: ignore[attr-defined]
+                    request.auth_member = member  # type: ignore[attr-defined]
+                    request.auth_organization = org  # type: ignore[attr-defined]
+                    logger.info("Successfully synced member %s", member_id)
+                except StytchError as e:
+                    logger.warning("JIT sync failed: %s", e.details.error_message)
 
         except StytchError as e:
             # Invalid/expired JWT - request continues unauthenticated

@@ -124,6 +124,8 @@ Stytch (source of truth)
 - JWTs validated locally with Stytch public keys
 - Org picker for users with multiple memberships
 
+> **Note:** Currently, local User/Member/Organization records sync **inline during auth flows** (login, org creation). Out-of-band changes (e.g., admin edits in Stytch dashboard, SCIM provisioning) require webhook handlers — a future enhancement.
+
 ### Billing Flow
 
 ```
