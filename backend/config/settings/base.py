@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     SECRET_KEY: str = "django-insecure-change-me-in-production"
     DEBUG: bool = False
-    ALLOWED_HOSTS: list[str] = []
+    ALLOWED_HOSTS: str = ""  # Comma-separated list, e.g. "localhost,127.0.0.1"
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/tango"
 
     # Stytch
@@ -42,7 +42,7 @@ SECRET_KEY = settings.SECRET_KEY
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = settings.DEBUG
 
-ALLOWED_HOSTS = settings.ALLOWED_HOSTS
+ALLOWED_HOSTS = [h.strip() for h in settings.ALLOWED_HOSTS.split(",") if h.strip()]
 
 # Application definition
 INSTALLED_APPS = [
