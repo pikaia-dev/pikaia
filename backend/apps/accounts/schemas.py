@@ -58,7 +58,6 @@ class SessionResponse(BaseModel):
 
     session_token: str
     session_jwt: str
-    user_id: str
     member_id: str
     organization_id: str
 

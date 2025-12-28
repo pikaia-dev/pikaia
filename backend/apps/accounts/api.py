@@ -118,7 +118,6 @@ def create_organization(
     return SessionResponse(
         session_token=response.session_token,
         session_jwt=response.session_jwt,
-        user_id=response.member.member_id,
         member_id=response.member.member_id,
         organization_id=response.organization.organization_id,
     )
@@ -151,7 +150,6 @@ def exchange_session(
     return SessionResponse(
         session_token=response.session_token,
         session_jwt=response.session_jwt,
-        user_id=response.member.member_id,
         member_id=response.member.member_id,
         organization_id=response.organization.organization_id,
     )
