@@ -204,3 +204,92 @@ class MessageResponse(BaseModel):
     message: str = Field(..., description="Human-readable status message")
 
     model_config = {"json_schema_extra": {"example": {"message": "Operation completed successfully."}}}
+
+
+# --- Settings Schemas ---
+
+
+class UpdateProfileRequest(BaseModel):
+    """Request to update user profile."""
+
+    name: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="User's display name",
+        examples=["Jane Doe"],
+    )
+
+
+class UpdateOrganizationRequest(BaseModel):
+    """Request to update organization settings (admin only)."""
+
+    name: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="Organization display name",
+        examples=["Acme Corp"],
+    )
+
+
+class BillingAddressSchema(BaseModel):
+    """Billing address for organization."""
+
+    line1: str = Field("", max_length=255, description="Street address line 1")
+    line2: str = Field("", max_length=255, description="Street address line 2")
+    city: str = Field("", max_length=100, description="City")
+    state: str = Field("", max_length=100, description="State/Province/Region")
+    postal_code: str = Field("", max_length=20, description="Postal/ZIP code")
+    country: str = Field(
+        "",
+        max_length=2,
+        description="ISO 3166-1 alpha-2 country code",
+        examples=["US", "DE", "PL"],
+    )
+
+
+class UpdateBillingRequest(BaseModel):
+    """Request to update organization billing info (admin only)."""
+
+    billing_email: EmailStr | None = Field(
+        None,
+        description="Email for invoices",
+        examples=["billing@company.com"],
+    )
+    billing_name: str = Field(
+        "",
+        max_length=255,
+        description="Legal/company name for invoices",
+        examples=["Acme Corporation Inc."],
+    )
+    address: BillingAddressSchema | None = Field(
+        None,
+        description="Billing address",
+    )
+    vat_id: str = Field(
+        "",
+        max_length=50,
+        description="EU VAT number",
+        examples=["DE123456789"],
+    )
+
+
+class BillingInfoResponse(BaseModel):
+    """Organization billing info response."""
+
+    billing_email: str = Field(..., description="Email for invoices")
+    billing_name: str = Field(..., description="Legal/company name")
+    address: BillingAddressSchema = Field(..., description="Billing address")
+    vat_id: str = Field(..., description="EU VAT number")
+
+
+class OrganizationDetailResponse(BaseModel):
+    """Full organization details response."""
+
+    id: int = Field(..., description="Local database ID")
+    stytch_org_id: str = Field(..., description="Stytch organization ID")
+    name: str = Field(..., description="Organization display name")
+    slug: str = Field(..., description="URL-safe identifier")
+    billing: BillingInfoResponse = Field(..., description="Billing information")
+
