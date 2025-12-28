@@ -6,7 +6,7 @@ Handles sync between Stytch and local User/Member/Organization models.
 
 from typing import Any
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from apps.accounts.models import Member, User
 from apps.organizations.models import Organization
@@ -21,12 +21,20 @@ def get_or_create_user_from_stytch(
 
     Email is the cross-org identifier in Stytch B2B.
     Called during authentication to sync user data.
+
+    Uses select_for_update for explicit row locking under concurrent requests.
     """
-    user, created = User.objects.update_or_create(
-        email=email,
-        defaults={"name": name},
-    )
-    return user
+    try:
+        user = User.objects.select_for_update().get(email=email)
+        user.name = name
+        user.save(update_fields=["name", "updated_at"])
+        return user
+    except User.DoesNotExist:
+        try:
+            return User.objects.create(email=email, name=name)
+        except IntegrityError:
+            # Concurrent insert won the race, fetch the winner
+            return User.objects.get(email=email)
 
 
 def get_or_create_organization_from_stytch(
@@ -38,15 +46,25 @@ def get_or_create_organization_from_stytch(
     Get or create an Organization from Stytch data.
 
     Called during org creation or when user joins an org.
+
+    Uses select_for_update for explicit row locking under concurrent requests.
     """
-    org, created = Organization.objects.update_or_create(
-        stytch_org_id=stytch_org_id,
-        defaults={
-            "name": name,
-            "slug": slug,
-        },
-    )
-    return org
+    try:
+        org = Organization.objects.select_for_update().get(stytch_org_id=stytch_org_id)
+        org.name = name
+        org.slug = slug
+        org.save(update_fields=["name", "slug", "updated_at"])
+        return org
+    except Organization.DoesNotExist:
+        try:
+            return Organization.objects.create(
+                stytch_org_id=stytch_org_id,
+                name=name,
+                slug=slug,
+            )
+        except IntegrityError:
+            # Concurrent insert won the race, fetch the winner
+            return Organization.objects.get(stytch_org_id=stytch_org_id)
 
 
 def get_or_create_member_from_stytch(
@@ -59,16 +77,27 @@ def get_or_create_member_from_stytch(
     Get or create a Member linking User to Organization.
 
     Called during authentication after org selection.
+
+    Uses select_for_update for explicit row locking under concurrent requests.
     """
-    member, created = Member.objects.update_or_create(
-        stytch_member_id=stytch_member_id,
-        defaults={
-            "user": user,
-            "organization": organization,
-            "role": role,
-        },
-    )
-    return member
+    try:
+        member = Member.objects.select_for_update().get(stytch_member_id=stytch_member_id)
+        member.user = user
+        member.organization = organization
+        member.role = role
+        member.save(update_fields=["user", "organization", "role", "updated_at"])
+        return member
+    except Member.DoesNotExist:
+        try:
+            return Member.objects.create(
+                stytch_member_id=stytch_member_id,
+                user=user,
+                organization=organization,
+                role=role,
+            )
+        except IntegrityError:
+            # Concurrent insert won the race, fetch the winner
+            return Member.objects.get(stytch_member_id=stytch_member_id)
 
 
 def sync_session_to_local(
@@ -80,6 +109,11 @@ def sync_session_to_local(
 
     Called after successful authentication to ensure local
     User, Member, and Organization records exist.
+
+    This function is idempotent and concurrency-safe:
+    - Uses transaction.atomic() for all-or-nothing semantics
+    - Uses select_for_update() for explicit row locking
+    - Falls back to IntegrityError handling for race conditions
 
     Returns:
         Tuple of (user, member, organization)
@@ -111,3 +145,4 @@ def sync_session_to_local(
         )
 
     return user, member, org
+
