@@ -341,51 +341,59 @@ class TestLogout:
     """Tests for logout endpoint."""
 
     def test_success(self, request_factory: RequestFactory) -> None:
-        """Should successfully revoke session."""
+        """Should successfully revoke session using JWT authentication."""
         mock_client = MagicMock()
+        mock_session = MagicMock()
+        mock_session.member_session.member_session_id = "member_session_123"
+        mock_client.sessions.authenticate_jwt.return_value = mock_session
         mock_client.sessions.revoke.return_value = None
 
         request = request_factory.post(
             "/api/v1/auth/logout",
-            HTTP_AUTHORIZATION="Bearer session_token_abc",
+            HTTP_AUTHORIZATION="Bearer valid_session_jwt",
         )
 
         with patch("apps.accounts.api.get_stytch_client", return_value=mock_client):
             result = logout(request)
 
         assert result.message == "Logged out successfully"
-        mock_client.sessions.revoke.assert_called_once_with(session_token="session_token_abc")
+        mock_client.sessions.authenticate_jwt.assert_called_once_with(
+            session_jwt="valid_session_jwt"
+        )
+        mock_client.sessions.revoke.assert_called_once_with(
+            member_session_id="member_session_123"
+        )
 
     def test_missing_token(self, request_factory: RequestFactory) -> None:
-        """Should error when no session token provided."""
+        """Should error when no session JWT provided."""
         request = request_factory.post("/api/v1/auth/logout")
 
         with pytest.raises(HttpError):
             logout(request)
 
-    def test_revoke_failure_handled_gracefully(self, request_factory: RequestFactory) -> None:
-        """Should succeed even if revoke fails (already revoked, etc)."""
+    def test_expired_jwt_handled_gracefully(self, request_factory: RequestFactory) -> None:
+        """Should succeed even if JWT is expired/invalid (already logged out, etc)."""
         from stytch.core.response_base import StytchError, StytchErrorDetails
 
         mock_client = MagicMock()
         details = StytchErrorDetails(
             error_type="session_not_found",
-            error_message="Session not found",
+            error_message="Session not found or expired",
             error_url="https://stytch.com/docs",
             status_code=404,
             request_id="req-def",
         )
-        mock_client.sessions.revoke.side_effect = StytchError(details)
+        mock_client.sessions.authenticate_jwt.side_effect = StytchError(details)
 
         request = request_factory.post(
             "/api/v1/auth/logout",
-            HTTP_AUTHORIZATION="Bearer invalid_session",
+            HTTP_AUTHORIZATION="Bearer expired_jwt",
         )
 
         with patch("apps.accounts.api.get_stytch_client", return_value=mock_client):
             result = logout(request)
 
-        # Should still return success due to contextlib.suppress
+        # Should still return success - session was already invalid
         assert result.message == "Logged out successfully"
 
 
