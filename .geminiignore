@@ -1,0 +1,49 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[codz]
+*.pyc
+
+# Dependency locks (large, not useful for AI context)
+uv.lock
+pnpm-lock.yaml
+
+# Node modules
+node_modules/
+
+# Build outputs
+frontend/dist/
+emails/build/
+*.tsbuildinfo
+infra/cdk.out/
+
+# Cache directories
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.turbo/
+.cache/
+
+# IDE settings
+.idea/
+.vscode/
+
+# Git
+.git/
+
+# Compiled extensions
+*.so
+*.egg-info/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Coverage reports
+htmlcov/
+.coverage
+coverage.xml
