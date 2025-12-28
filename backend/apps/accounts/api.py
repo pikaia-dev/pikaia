@@ -287,16 +287,30 @@ def update_profile(request: HttpRequest, payload: UpdateProfileRequest) -> UserI
     """
     Update current user's profile (name).
 
-    This is our system's data - synced out to Stytch.
+    Updates local database and syncs to Stytch.
     """
     if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
         raise HttpError(401, "Not authenticated")
 
     user = request.auth_user  # type: ignore[attr-defined]
+    member = request.auth_member  # type: ignore[attr-defined]
+    org = request.auth_organization  # type: ignore[attr-defined]
+
+    # Update local database
     user.name = payload.name
     user.save(update_fields=["name", "updated_at"])
 
-    # TODO: Sync to Stytch (member.name)
+    # Sync to Stytch
+    try:
+        client = get_stytch_client()
+        client.organizations.members.update(
+            organization_id=org.stytch_org_id,
+            member_id=member.stytch_member_id,
+            name=payload.name,
+        )
+    except StytchError as e:
+        logger.warning("Failed to sync name to Stytch: %s", e.details.error_message)
+        # Don't fail the request - local update succeeded
 
     return UserInfo(
         id=user.id,
@@ -360,7 +374,7 @@ def update_organization(
     """
     Update organization settings (name).
 
-    Admin only. This is our system's data - synced out to Stytch.
+    Admin only. Updates local database and syncs to Stytch.
     """
     if not hasattr(request, "auth_member") or request.auth_member is None:  # type: ignore[attr-defined]
         raise HttpError(401, "Not authenticated")
@@ -370,10 +384,21 @@ def update_organization(
         raise HttpError(403, "Admin access required")
 
     org = request.auth_organization  # type: ignore[attr-defined]
+
+    # Update local database
     org.name = payload.name
     org.save(update_fields=["name", "updated_at"])
 
-    # TODO: Sync to Stytch (organization.name)
+    # Sync to Stytch
+    try:
+        client = get_stytch_client()
+        client.organizations.update(
+            organization_id=org.stytch_org_id,
+            organization_name=payload.name,
+        )
+    except StytchError as e:
+        logger.warning("Failed to sync org name to Stytch: %s", e.details.error_message)
+        # Don't fail the request - local update succeeded
 
     return get_organization(request)
 
