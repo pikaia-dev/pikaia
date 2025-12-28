@@ -37,61 +37,68 @@ export default function ProfileSettings() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-32">
+            <div className="flex items-center justify-center h-64">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-foreground" />
             </div>
         )
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Profile</CardTitle>
-                <CardDescription>Manage your personal information</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label htmlFor="email" className="block text-sm font-medium mb-1">
-                            Email
-                        </label>
-                        <input
-                            id="email"
-                            type="email"
-                            value={email}
-                            disabled
-                            className="w-full px-3 py-2 border border-border rounded-md bg-muted text-muted-foreground text-sm"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Email is managed by Stytch and cannot be changed here
-                        </p>
-                    </div>
+        <div className="p-6">
+            <div className="mb-6">
+                <h1 className="text-2xl font-semibold">Profile</h1>
+                <p className="text-muted-foreground">Manage your personal information</p>
+            </div>
 
-                    <div>
-                        <label htmlFor="name" className="block text-sm font-medium mb-1">
-                            Display name
-                        </label>
-                        <input
-                            id="name"
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                            placeholder="Your name"
-                        />
-                    </div>
+            <Card className="max-w-lg">
+                <CardHeader>
+                    <CardTitle className="text-base">Personal Details</CardTitle>
+                    <CardDescription>Update your profile information</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label htmlFor="email" className="block text-sm font-medium mb-1">
+                                Email
+                            </label>
+                            <input
+                                id="email"
+                                type="email"
+                                value={email}
+                                disabled
+                                className="w-full px-3 py-2 border border-border rounded-md bg-muted text-muted-foreground text-sm"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Email is managed by Stytch and cannot be changed here
+                            </p>
+                        </div>
 
-                    {message && (
-                        <p className={`text-sm ${message.type === 'success' ? 'text-green-600' : 'text-destructive'}`}>
-                            {message.text}
-                        </p>
-                    )}
+                        <div>
+                            <label htmlFor="name" className="block text-sm font-medium mb-1">
+                                Display name
+                            </label>
+                            <input
+                                id="name"
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                placeholder="Your name"
+                            />
+                        </div>
 
-                    <Button type="submit" disabled={saving}>
-                        {saving ? 'Saving...' : 'Save changes'}
-                    </Button>
-                </form>
-            </CardContent>
-        </Card>
+                        {message && (
+                            <p className={`text-sm ${message.type === 'success' ? 'text-green-600' : 'text-destructive'}`}>
+                                {message.text}
+                            </p>
+                        )}
+
+                        <Button type="submit" disabled={saving}>
+                            {saving ? 'Saving...' : 'Save changes'}
+                        </Button>
+                    </form>
+                </CardContent>
+            </Card>
+        </div>
     )
 }
