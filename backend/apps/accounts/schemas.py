@@ -2,7 +2,9 @@
 Auth API schemas - Pydantic models for request/response.
 """
 
-from pydantic import BaseModel, EmailStr, Field
+import re
+
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 # --- Request Schemas ---
 
@@ -60,6 +62,22 @@ class DiscoveryCreateOrgRequest(BaseModel):
         description="URL-safe identifier for the organization (lowercase, hyphens allowed)",
         examples=["acme-corp"],
     )
+
+    @field_validator("organization_slug", mode="before")
+    @classmethod
+    def normalize_and_validate_slug(cls, v: str) -> str:
+        """Normalize slug and validate against Stytch requirements."""
+        if not isinstance(v, str):
+            raise ValueError("Slug must be a string")
+        # Normalize: strip, lowercase, spaces to hyphens
+        slug = v.strip().lower().replace(" ", "-")
+        # Validate: 2-128 chars, alphanumeric + hyphen/period/underscore/tilde
+        if not re.match(r"^[a-z0-9._~-]{2,128}$", slug):
+            raise ValueError(
+                "Slug must be 2-128 characters: lowercase letters, numbers, "
+                "hyphens, periods, underscores, or tildes only"
+            )
+        return slug
 
 
 # --- Response Schemas ---

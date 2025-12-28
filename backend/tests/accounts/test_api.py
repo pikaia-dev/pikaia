@@ -247,15 +247,15 @@ class TestCreateOrganization:
         assert result.organization_id == "org-new-456"
 
     def test_stytch_error(self, request_factory: RequestFactory) -> None:
-        """Should raise ValueError on org creation failure."""
+        """Should raise 400 on generic org creation failure."""
         from stytch.core.response_base import StytchError, StytchErrorDetails
 
         mock_client = MagicMock()
         details = StytchErrorDetails(
-            error_type="duplicate_slug",
-            error_message="Slug already taken",
+            error_type="invalid_token",
+            error_message="Invalid IST token",
             error_url="https://stytch.com/docs",
-            status_code=409,
+            status_code=400,
             request_id="req-789",
         )
         mock_client.discovery.organizations.create.side_effect = StytchError(details)
@@ -269,9 +269,105 @@ class TestCreateOrganization:
 
         with (
             patch("apps.accounts.api.get_stytch_client", return_value=mock_client),
-            pytest.raises(HttpError),
+            pytest.raises(HttpError) as exc_info,
         ):
             create_organization(request, payload)
+
+        assert exc_info.value.status_code == 400
+
+    def test_slug_conflict_returns_409(self, request_factory: RequestFactory) -> None:
+        """Should return 409 Conflict when slug is already taken."""
+        from stytch.core.response_base import StytchError, StytchErrorDetails
+
+        mock_client = MagicMock()
+        details = StytchErrorDetails(
+            error_type="duplicate_slug",
+            error_message="Organization slug already exists",
+            error_url="https://stytch.com/docs",
+            status_code=409,
+            request_id="req-conflict",
+        )
+        mock_client.discovery.organizations.create.side_effect = StytchError(details)
+
+        request = request_factory.post("/api/v1/auth/discovery/create-org")
+        payload = DiscoveryCreateOrgRequest(
+            intermediate_session_token="ist_abc",
+            organization_name="Existing Corp",
+            organization_slug="existing",
+        )
+
+        with (
+            patch("apps.accounts.api.get_stytch_client", return_value=mock_client),
+            pytest.raises(HttpError) as exc_info,
+        ):
+            create_organization(request, payload)
+
+        assert exc_info.value.status_code == 409
+        assert "slug already in use" in str(exc_info.value.message).lower()
+
+
+class TestSlugValidation:
+    """Tests for organization slug validation in schema."""
+
+    def test_slug_normalized_to_lowercase(self) -> None:
+        """Uppercase slugs should be normalized to lowercase."""
+        payload = DiscoveryCreateOrgRequest(
+            intermediate_session_token="ist_abc",
+            organization_name="Test Corp",
+            organization_slug="ACME-CORP",
+        )
+        assert payload.organization_slug == "acme-corp"
+
+    def test_slug_spaces_replaced_with_hyphens(self) -> None:
+        """Spaces in slug should be replaced with hyphens."""
+        payload = DiscoveryCreateOrgRequest(
+            intermediate_session_token="ist_abc",
+            organization_name="Test Corp",
+            organization_slug="acme corp",
+        )
+        assert payload.organization_slug == "acme-corp"
+
+    def test_slug_whitespace_stripped(self) -> None:
+        """Leading/trailing whitespace should be stripped."""
+        payload = DiscoveryCreateOrgRequest(
+            intermediate_session_token="ist_abc",
+            organization_name="Test Corp",
+            organization_slug="  acme-corp  ",
+        )
+        assert payload.organization_slug == "acme-corp"
+
+    def test_slug_too_short_rejected(self) -> None:
+        """Slugs with less than 2 characters should be rejected."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError) as exc_info:
+            DiscoveryCreateOrgRequest(
+                intermediate_session_token="ist_abc",
+                organization_name="Test Corp",
+                organization_slug="a",
+            )
+        assert "2-128 characters" in str(exc_info.value)
+
+    def test_slug_invalid_chars_rejected(self) -> None:
+        """Slugs with invalid characters should be rejected."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError) as exc_info:
+            DiscoveryCreateOrgRequest(
+                intermediate_session_token="ist_abc",
+                organization_name="Test Corp",
+                organization_slug="acme@corp!",
+            )
+        assert "lowercase letters" in str(exc_info.value)
+
+    def test_valid_slug_with_special_chars(self) -> None:
+        """Slugs with period, underscore, tilde should be accepted."""
+        payload = DiscoveryCreateOrgRequest(
+            intermediate_session_token="ist_abc",
+            organization_name="Test Corp",
+            organization_slug="acme_corp.test~v2",
+        )
+        assert payload.organization_slug == "acme_corp.test~v2"
 
 
 @pytest.mark.django_db

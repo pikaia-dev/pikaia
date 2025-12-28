@@ -107,7 +107,7 @@ def authenticate_magic_link(
 
 @router.post(
     "/discovery/create-org",
-    response={200: SessionResponse, 400: ErrorResponse},
+    response={200: SessionResponse, 400: ErrorResponse, 409: ErrorResponse},
     operation_id="createOrganization",
     summary="Create new organization",
 )
@@ -129,6 +129,10 @@ def create_organization(
             organization_slug=payload.organization_slug,
         )
     except StytchError as e:
+        error_msg = e.details.error_message.lower() if e.details.error_message else ""
+        if "slug" in error_msg or "duplicate" in error_msg:
+            logger.warning("Organization slug conflict: %s", e.details.error_message)
+            raise HttpError(409, "Organization slug already in use. Try a different one.") from e
         logger.warning("Failed to create organization: %s", e.details.error_message)
         raise HttpError(400, "Failed to create organization.") from e
 
