@@ -3,6 +3,7 @@ import { useStytchMemberSession } from '@stytch/react/b2b'
 import { useApi } from '../hooks/useApi'
 import type { MeResponse } from '../lib/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { LoadingSpinner } from '../components/ui/loading-spinner'
 
 export default function Dashboard() {
     const { session } = useStytchMemberSession()
@@ -30,7 +31,7 @@ export default function Dashboard() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
+                <LoadingSpinner />
             </div>
         )
     }

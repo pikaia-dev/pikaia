@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { useApi } from '../../hooks/useApi'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
+import { LoadingSpinner } from '../../components/ui/loading-spinner'
 
 export default function ProfileSettings() {
     const { getCurrentUser, updateProfile } = useApi()
@@ -40,7 +41,7 @@ export default function ProfileSettings() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-foreground" />
+                <LoadingSpinner size="sm" />
             </div>
         )
     }

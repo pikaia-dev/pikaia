@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { Checkbox } from '../../components/ui/checkbox'
 import { CountryCombobox } from '../../components/ui/country-combobox'
+import { LoadingSpinner } from '../../components/ui/loading-spinner'
 import { getVatPrefix } from '../../lib/countries'
 
 /**
@@ -117,7 +118,7 @@ export default function BillingSettings() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-foreground" />
+                <LoadingSpinner size="sm" />
             </div>
         )
     }
