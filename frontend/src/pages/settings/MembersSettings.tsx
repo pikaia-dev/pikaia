@@ -1,6 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { useApi } from '../../hooks/useApi'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '../../components/ui/alert-dialog'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { LoadingSpinner } from '../../components/ui/loading-spinner'
@@ -17,6 +27,10 @@ export default function MembersSettings() {
     const [inviteName, setInviteName] = useState('')
     const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member')
     const [inviting, setInviting] = useState(false)
+
+    // Delete confirmation dialog state
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [memberToDelete, setMemberToDelete] = useState<{ id: number; email: string } | null>(null)
 
     const loadMembers = useCallback(async () => {
         try {
@@ -66,15 +80,23 @@ export default function MembersSettings() {
         }
     }
 
-    const handleDelete = async (memberId: number, email: string) => {
-        if (!confirm(`Remove ${email} from this organization?`)) return
+    const openDeleteDialog = (memberId: number, email: string) => {
+        setMemberToDelete({ id: memberId, email })
+        setDeleteDialogOpen(true)
+    }
+
+    const handleDeleteConfirm = async () => {
+        if (!memberToDelete) return
 
         try {
-            await deleteMember(memberId)
-            toast.success(`${email} removed`)
+            await deleteMember(memberToDelete.id)
+            toast.success(`${memberToDelete.email} removed`)
             loadMembers()
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Failed to remove member')
+        } finally {
+            setDeleteDialogOpen(false)
+            setMemberToDelete(null)
         }
     }
 
@@ -195,7 +217,7 @@ export default function MembersSettings() {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                onClick={() => handleDelete(member.id, member.email)}
+                                                onClick={() => openDeleteDialog(member.id, member.email)}
                                                 className="text-destructive hover:text-destructive"
                                             >
                                                 Remove
@@ -208,6 +230,28 @@ export default function MembersSettings() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Remove member</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to remove <strong>{memberToDelete?.email}</strong> from this organization?
+                            They will lose access immediately.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteConfirm}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Remove
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }
