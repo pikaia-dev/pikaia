@@ -4,6 +4,8 @@ import { useApi } from '../../hooks/useApi'
 import type { BillingAddress } from '../../lib/api'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
+import { CountryCombobox } from '../../components/ui/country-combobox'
+import { getVatPrefix } from '../../lib/countries'
 
 export default function BillingSettings() {
     const { getOrganization, updateBilling } = useApi()
@@ -53,7 +55,27 @@ export default function BillingSettings() {
 
     const updateAddress = (field: keyof BillingAddress, value: string) => {
         setAddress((prev) => ({ ...prev, [field]: value }))
+
+        // When country changes, update VAT prefix if EU country
+        if (field === 'country') {
+            const prefix = getVatPrefix(value)
+            if (prefix) {
+                // Only update if VAT is empty or starts with a different prefix
+                setVatId((currentVat) => {
+                    // If VAT is empty or doesn't have a valid prefix, set the new one
+                    if (!currentVat || !currentVat.match(/^[A-Z]{2,3}/)) {
+                        return prefix
+                    }
+                    // If VAT already has a prefix, replace it
+                    const vatWithoutPrefix = currentVat.replace(/^[A-Z]{2,3}/, '')
+                    return prefix + vatWithoutPrefix
+                })
+            }
+        }
     }
+
+    // Get current VAT prefix based on country
+    const currentVatPrefix = getVatPrefix(address.country)
 
     if (loading) {
         return (
@@ -179,33 +201,46 @@ export default function BillingSettings() {
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <label htmlFor="country" className="block text-sm font-medium mb-1">
-                                    Country code
+                                    Country
                                 </label>
-                                <input
-                                    id="country"
-                                    type="text"
+                                <CountryCombobox
                                     value={address.country}
-                                    onChange={(e) => updateAddress('country', e.target.value.toUpperCase().slice(0, 2))}
-                                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                    placeholder="US"
-                                    maxLength={2}
+                                    onValueChange={(value) => updateAddress('country', value)}
+                                    placeholder="Select country..."
                                 />
-                                <p className="text-xs text-muted-foreground mt-1">ISO 3166-1 alpha-2 (e.g., US, DE, PL)</p>
                             </div>
 
                             <div>
                                 <label htmlFor="vatId" className="block text-sm font-medium mb-1">
                                     VAT ID
                                 </label>
-                                <input
-                                    id="vatId"
-                                    type="text"
-                                    value={vatId}
-                                    onChange={(e) => setVatId(e.target.value)}
-                                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                    placeholder="DE123456789"
-                                />
-                                <p className="text-xs text-muted-foreground mt-1">EU VAT number for tax exemption</p>
+                                {currentVatPrefix ? (
+                                    <div className="flex">
+                                        <span className="inline-flex items-center px-3 py-2 border border-r-0 border-border rounded-l-md bg-muted text-sm text-muted-foreground">
+                                            {currentVatPrefix}
+                                        </span>
+                                        <input
+                                            id="vatId"
+                                            type="text"
+                                            value={vatId.replace(new RegExp(`^${currentVatPrefix}`), '')}
+                                            onChange={(e) => setVatId(currentVatPrefix + e.target.value)}
+                                            className="flex-1 px-3 py-2 border border-border rounded-r-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                            placeholder="123456789"
+                                        />
+                                    </div>
+                                ) : (
+                                    <input
+                                        id="vatId"
+                                        type="text"
+                                        value={vatId}
+                                        onChange={(e) => setVatId(e.target.value)}
+                                        className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                        placeholder="Enter VAT ID"
+                                    />
+                                )}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    {currentVatPrefix ? 'EU VAT number for tax exemption' : 'VAT ID (optional)'}
+                                </p>
                             </div>
                         </div>
 
