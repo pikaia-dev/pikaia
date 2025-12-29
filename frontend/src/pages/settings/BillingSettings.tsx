@@ -143,11 +143,28 @@ export default function BillingSettings() {
                                 <Checkbox
                                     id="useBillingEmail"
                                     checked={useBillingEmail}
-                                    onCheckedChange={(checked) => {
+                                    onCheckedChange={async (checked) => {
                                         const isChecked = checked === true
                                         setUseBillingEmail(isChecked)
                                         if (isChecked) {
                                             setTimeout(() => billingEmailRef.current?.focus(), 0)
+                                        } else {
+                                            // Auto-save when unchecking since the form is hidden
+                                            setSavingDelivery(true)
+                                            try {
+                                                await updateBilling({
+                                                    use_billing_email: false,
+                                                    billing_name: billingName,
+                                                    address,
+                                                    vat_id: vatId,
+                                                })
+                                                toast.success('Invoice delivery settings saved')
+                                            } catch (err) {
+                                                toast.error(err instanceof Error ? err.message : 'Failed to update')
+                                                setUseBillingEmail(true) // Revert on failure
+                                            } finally {
+                                                setSavingDelivery(false)
+                                            }
                                         }
                                     }}
                                     className="mt-1"
