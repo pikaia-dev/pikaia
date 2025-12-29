@@ -13,6 +13,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from './ui/sidebar'
+import { STYTCH_ROLES } from '../lib/constants'
 
 const mainNavItems = [
     { to: '/dashboard', label: 'Dashboard', icon: Home },
@@ -32,7 +33,7 @@ export function AppSidebar() {
 
     // Check admin from Stytch roles
     const roles = member?.roles || []
-    const isAdmin = roles.some((r: { role_id?: string }) => r.role_id === 'stytch_admin')
+    const isAdmin = roles.some((r: { role_id?: string }) => r.role_id === STYTCH_ROLES.ADMIN)
 
     const handleLogout = async () => {
         try {

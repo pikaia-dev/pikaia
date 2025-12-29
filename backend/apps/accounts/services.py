@@ -8,6 +8,7 @@ from typing import Any
 
 from django.db import IntegrityError, transaction
 
+from apps.accounts.constants import StytchRoles
 from apps.accounts.models import Member, User
 from apps.organizations.models import Organization
 
@@ -135,12 +136,13 @@ def sync_session_to_local(
         # Determine role from Stytch RBAC
         # member.roles is an array of role objects with role_id field
         # e.g. [{"role_id": "stytch_admin", "sources": [...]}, ...]
+        # See StytchRoles for valid role IDs
         roles = getattr(stytch_member, "roles", []) or []
         role_ids = [
             getattr(r, "role_id", None) or r.get("role_id") if hasattr(r, "get") else getattr(r, "role_id", None)
             for r in roles
         ]
-        role = "admin" if "stytch_admin" in role_ids else "member"
+        role = "admin" if StytchRoles.ADMIN in role_ids else "member"
 
         # Sync member
         member = get_or_create_member_from_stytch(
@@ -204,7 +206,7 @@ def invite_member(
     stytch = get_stytch_client()
 
     # Map role to Stytch role IDs
-    roles = ["stytch_admin"] if role == "admin" else []
+    roles = [StytchRoles.ADMIN] if role == "admin" else []
 
     stytch_member_id = None
     invite_sent: bool | str = False
@@ -322,7 +324,7 @@ def update_member_role(
     stytch = get_stytch_client()
 
     # Map role to Stytch role IDs
-    roles = ["stytch_admin"] if role == "admin" else []
+    roles = [StytchRoles.ADMIN] if role == "admin" else []
 
     # Update in Stytch
     stytch.organizations.members.update(
