@@ -110,7 +110,7 @@ export default function BillingSettings() {
                         <CardDescription>Choose where to receive your invoices</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="flex items-start space-x-3">
+                        <div className="flex space-x-3">
                             <Checkbox
                                 id="useBillingEmail"
                                 checked={useBillingEmail}
@@ -122,6 +122,7 @@ export default function BillingSettings() {
                                         setTimeout(() => billingEmailRef.current?.focus(), 0)
                                     }
                                 }}
+                                className="mt-0.5"
                             />
                             <div className="space-y-1">
                                 <label
