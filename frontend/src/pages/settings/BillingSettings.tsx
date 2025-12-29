@@ -276,6 +276,9 @@ export default function BillingSettings() {
                                     onAddressSelect={handleAddressSelect}
                                     placeholder="Start typing to search..."
                                 />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Start typing and select an address to auto-fill all fields below
+                                </p>
                             </div>
 
                             <div>
