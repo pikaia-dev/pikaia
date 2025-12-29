@@ -1,6 +1,6 @@
 /**
- * Google Places Autocomplete utilities
- * Provides address autocomplete with structured address parsing
+ * Google Places API utilities (New API - 2025)
+ * Uses PlaceAutocompleteElement for address autocomplete
  */
 
 export interface ParsedAddress {
@@ -14,25 +14,23 @@ export interface ParsedAddress {
 }
 
 /**
- * Parse Google Places address components into structured format
+ * Parse address components from Place object (New API)
  */
-export function parseAddressComponents(
-    place: google.maps.places.PlaceResult
-): ParsedAddress {
-    const components = place.address_components || []
+export function parseAddressFromPlace(place: google.maps.places.Place): ParsedAddress {
+    const components = place.addressComponents || []
 
     const getComponent = (types: string[]): string => {
         const component = components.find((c) =>
             types.some((type) => c.types.includes(type))
         )
-        return component?.long_name || ''
+        return component?.longText || ''
     }
 
     const getComponentShort = (types: string[]): string => {
         const component = components.find((c) =>
             types.some((type) => c.types.includes(type))
         )
-        return component?.short_name || ''
+        return component?.shortText || ''
     }
 
     // Build street address from components
@@ -41,7 +39,7 @@ export function parseAddressComponents(
     const streetAddress = [streetNumber, route].filter(Boolean).join(' ')
 
     return {
-        formatted_address: place.formatted_address || '',
+        formatted_address: place.formattedAddress || '',
         street_address: streetAddress,
         city: getComponent(['locality', 'sublocality', 'administrative_area_level_3']),
         state: getComponent(['administrative_area_level_1']),
@@ -51,35 +49,95 @@ export function parseAddressComponents(
     }
 }
 
+// Global callback name for Google Maps API
+const CALLBACK_NAME = '__googleMapsCallback'
+
 /**
- * Load Google Places API script dynamically
+ * Wait for the Google Maps library to be fully initialized
+ * with the importLibrary function available
  */
-export function loadGooglePlacesScript(apiKey: string): Promise<void> {
+function waitForGoogleMaps(timeout: number = 10000): Promise<void> {
     return new Promise((resolve, reject) => {
-        // Already loaded
-        if (window.google?.maps?.places) {
-            resolve()
-            return
+        const startTime = Date.now()
+
+        const check = () => {
+            if (typeof google !== 'undefined' &&
+                typeof google.maps !== 'undefined' &&
+                typeof google.maps.importLibrary === 'function') {
+                resolve()
+                return
+            }
+
+            if (Date.now() - startTime > timeout) {
+                reject(new Error('Google Maps initialization timeout'))
+                return
+            }
+
+            setTimeout(check, 100)
         }
 
-        // Check if script is already being loaded
-        const existingScript = document.querySelector(
-            'script[src*="maps.googleapis.com/maps/api/js"]'
-        )
-        if (existingScript) {
-            existingScript.addEventListener('load', () => resolve())
-            existingScript.addEventListener('error', () => reject(new Error('Failed to load Google Places')))
-            return
-        }
-
-        const script = document.createElement('script')
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
-        script.async = true
-        script.defer = true
-        script.onload = () => resolve()
-        script.onerror = () => reject(new Error('Failed to load Google Places'))
-        document.head.appendChild(script)
+        check()
     })
+}
+
+/**
+ * Load Google Maps JavaScript API with Places library (New API)
+ * Returns a promise that resolves when the API is fully ready
+ */
+export async function loadGooglePlacesScript(apiKey: string): Promise<void> {
+    // Check if already loaded
+    if (typeof google !== 'undefined' &&
+        typeof google.maps !== 'undefined' &&
+        typeof google.maps.importLibrary === 'function') {
+        console.log('Google Maps already loaded')
+        return
+    }
+
+    // Check if script is already being loaded
+    const existingScript = document.querySelector(
+        'script[src*="maps.googleapis.com/maps/api/js"]'
+    )
+
+    if (existingScript) {
+        console.log('Google Maps script already exists, waiting for initialization...')
+        await waitForGoogleMaps()
+        return
+    }
+
+    console.log('Loading Google Maps script...')
+
+    // Create a promise for the callback
+    const callbackPromise = new Promise<void>((resolve) => {
+        (window as unknown as Record<string, unknown>)[CALLBACK_NAME] = () => {
+            delete (window as unknown as Record<string, unknown>)[CALLBACK_NAME]
+            console.log('Google Maps callback executed')
+            resolve()
+        }
+    })
+
+    // Load the script
+    const script = document.createElement('script')
+    // Use v=beta for access to new features like PlaceAutocompleteElement
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&v=beta&callback=${CALLBACK_NAME}`
+    script.async = true
+    script.defer = true
+
+    const errorPromise = new Promise<never>((_, reject) => {
+        script.onerror = () => {
+            delete (window as unknown as Record<string, unknown>)[CALLBACK_NAME]
+            reject(new Error('Failed to load Google Maps script'))
+        }
+    })
+
+    document.head.appendChild(script)
+
+    // Wait for either success or error
+    await Promise.race([callbackPromise, errorPromise])
+
+    // After callback, wait for full initialization
+    await waitForGoogleMaps()
+
+    console.log('Google Maps fully loaded and ready')
 }
 
 // Extend window for google types
