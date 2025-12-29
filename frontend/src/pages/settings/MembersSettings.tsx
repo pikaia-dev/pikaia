@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { useApi } from '../../hooks/useApi'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import type { MemberListItem } from '../../lib/api'
 
 export default function MembersSettings() {
@@ -124,15 +125,15 @@ export default function MembersSettings() {
                         </div>
                         <div className="w-32">
                             <label htmlFor="role" className="block text-sm font-medium mb-1">Role</label>
-                            <select
-                                id="role"
-                                value={inviteRole}
-                                onChange={(e) => setInviteRole(e.target.value as 'admin' | 'member')}
-                                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                            >
-                                <option value="member">Member</option>
-                                <option value="admin">Admin</option>
-                            </select>
+                            <Select value={inviteRole} onValueChange={(value) => setInviteRole(value as 'admin' | 'member')}>
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Select role" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="member">Member</SelectItem>
+                                    <SelectItem value="admin">Admin</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                         <Button type="submit" disabled={inviting || !inviteEmail}>
                             {inviting ? 'Sending...' : 'Send Invite'}
@@ -179,14 +180,15 @@ export default function MembersSettings() {
                                             )}
                                         </td>
                                         <td className="p-3">
-                                            <select
-                                                value={member.role}
-                                                onChange={(e) => handleRoleChange(member.id, e.target.value as 'admin' | 'member')}
-                                                className="px-2 py-1 border border-border rounded text-sm bg-background"
-                                            >
-                                                <option value="member">Member</option>
-                                                <option value="admin">Admin</option>
-                                            </select>
+                                            <Select value={member.role} onValueChange={(value) => handleRoleChange(member.id, value as 'admin' | 'member')}>
+                                                <SelectTrigger className="w-24 h-8">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="member">Member</SelectItem>
+                                                    <SelectItem value="admin">Admin</SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                         </td>
                                         <td className="p-3 text-right">
                                             <Button
