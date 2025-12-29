@@ -14,12 +14,16 @@ from ninja.errors import HttpError
 from apps.accounts.api import (
     authenticate_magic_link,
     create_organization,
+    delete_member_endpoint,
     exchange_session,
     get_current_user,
     get_organization,
+    invite_member_endpoint,
+    list_members,
     logout,
     send_magic_link,
     update_billing,
+    update_member_role_endpoint,
     update_organization,
     update_profile,
 )
@@ -27,9 +31,11 @@ from apps.accounts.schemas import (
     BillingAddressSchema,
     DiscoveryCreateOrgRequest,
     DiscoveryExchangeRequest,
+    InviteMemberRequest,
     MagicLinkAuthenticateRequest,
     MagicLinkSendRequest,
     UpdateBillingRequest,
+    UpdateMemberRoleRequest,
     UpdateOrganizationRequest,
     UpdateProfileRequest,
 )
@@ -786,4 +792,441 @@ class TestUpdateBilling:
 
         with pytest.raises(HttpError):
             update_billing(request, payload)
+
+
+# --- Member Management Endpoints Tests ---
+
+
+@dataclass
+class MockStytchMemberForInvite:
+    """Mock Stytch member object for invite response."""
+
+    member_id: str
+
+
+@dataclass
+class MockInviteResponse:
+    """Mock response for member invite."""
+
+    member: MockStytchMemberForInvite
+
+
+@pytest.mark.django_db
+class TestListMembers:
+    """Tests for list_members endpoint."""
+
+    def test_admin_can_list_members(self, request_factory: RequestFactory) -> None:
+        """Admin should see all active organization members."""
+        org = OrganizationFactory()
+        admin_user = UserFactory(email="admin@example.com", name="Admin")
+        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+        member_user = UserFactory(email="member@example.com", name="Member")
+        MemberFactory(user=member_user, organization=org, role="member")
+
+        request = request_factory.get("/api/v1/auth/organization/members")
+        request.auth_user = admin_user  # type: ignore[attr-defined]
+        request.auth_member = admin_member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        result = list_members(request)
+
+        assert len(result.members) == 2
+        emails = [m.email for m in result.members]
+        assert "admin@example.com" in emails
+        assert "member@example.com" in emails
+
+    def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
+        """Non-admin should be rejected with 403."""
+        org = OrganizationFactory()
+        user = UserFactory()
+        member = MemberFactory(user=user, organization=org, role="member")
+
+        request = request_factory.get("/api/v1/auth/organization/members")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        with pytest.raises(HttpError) as exc_info:
+            list_members(request)
+
+        assert exc_info.value.status_code == 403
+
+    def test_unauthenticated(self, request_factory: RequestFactory) -> None:
+        """Should error when not authenticated."""
+        request = request_factory.get("/api/v1/auth/organization/members")
+
+        with pytest.raises(HttpError):
+            list_members(request)
+
+
+@pytest.mark.django_db
+class TestInviteMember:
+    """Tests for invite_member_endpoint."""
+
+    def test_admin_can_invite_member(self, request_factory: RequestFactory) -> None:
+        """Admin should be able to invite new members."""
+        org = OrganizationFactory()
+        user = UserFactory()
+        member = MemberFactory(user=user, organization=org, role="admin")
+
+        mock_client = MagicMock()
+        # Search returns no existing members (new user)
+        mock_client.organizations.members.search.return_value = MagicMock(members=[])
+        # magic_links.email.invite creates member and sends email
+        mock_client.magic_links.email.invite.return_value = MagicMock(member_id="member-new-123")
+
+        request = request_factory.post("/api/v1/auth/organization/members")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = InviteMemberRequest(email="newuser@example.com", name="New User", role="member")
+
+        with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
+            result = invite_member_endpoint(request, payload)
+
+        assert "newuser@example.com" in result.message
+        assert result.stytch_member_id == "member-new-123"
+        # Verify invite email is sent (this also creates the member)
+        mock_client.magic_links.email.invite.assert_called_once_with(
+            organization_id=org.stytch_org_id,
+            email_address="newuser@example.com",
+        )
+
+    def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
+        """Non-admin should be rejected with 403."""
+        org = OrganizationFactory()
+        user = UserFactory()
+        member = MemberFactory(user=user, organization=org, role="member")
+
+        request = request_factory.post("/api/v1/auth/organization/members")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = InviteMemberRequest(email="newuser@example.com")
+
+        with pytest.raises(HttpError) as exc_info:
+            invite_member_endpoint(request, payload)
+
+        assert exc_info.value.status_code == 403
+
+    def test_reinvite_deleted_member_succeeds(self, request_factory: RequestFactory) -> None:
+        """Re-inviting a soft-deleted member should reactivate them."""
+        from django.utils import timezone
+        from stytch.core.response_base import StytchError, StytchErrorDetails
+
+        org = OrganizationFactory()
+        admin_user = UserFactory()
+        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+
+        # Create a soft-deleted member
+        deleted_user = UserFactory(email="deleted@example.com", name="Deleted User")
+        deleted_member = MemberFactory(
+            user=deleted_user, organization=org, role="member", stytch_member_id="old-stytch-id"
+        )
+        deleted_member.deleted_at = timezone.now()
+        deleted_member.save()
+
+        mock_client = MagicMock()
+
+        # Simulate Stytch returning duplicate_email error on first invite attempt
+        details = StytchErrorDetails(
+            error_type="duplicate_email",
+            error_message="This email already exists for this organization.",
+            error_url="https://stytch.com/docs",
+            status_code=400,
+            request_id="test-req",
+        )
+        # First call fails, second call (after reactivate) succeeds
+        mock_client.magic_links.email.invite.side_effect = [
+            StytchError(details),
+            MagicMock(member_id="reactivated-stytch-id"),
+        ]
+
+        # Mock search to return the existing Stytch member (deleted status)
+        mock_search_member = MagicMock()
+        mock_search_member.member_id = "reactivated-stytch-id"
+        mock_search_member.status = "deleted"  # Member was deleted in Stytch
+        mock_client.organizations.members.search.return_value = MagicMock(
+            members=[mock_search_member]
+        )
+
+        request = request_factory.post("/api/v1/auth/organization/members")
+        request.auth_user = admin_user  # type: ignore[attr-defined]
+        request.auth_member = admin_member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = InviteMemberRequest(email="deleted@example.com", name="Deleted User", role="member")
+
+        with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
+            result = invite_member_endpoint(request, payload)
+
+        assert "deleted@example.com" in result.message
+        # Verify member was reactivated
+        deleted_member.refresh_from_db()
+        assert deleted_member.deleted_at is None
+        assert deleted_member.stytch_member_id == "reactivated-stytch-id"
+        mock_client.organizations.members.reactivate.assert_called_once()
+
+    def test_cannot_invite_yourself(self, request_factory: RequestFactory) -> None:
+        """Admin should not be able to invite themselves."""
+        org = OrganizationFactory()
+        user = UserFactory(email="admin@example.com")
+        member = MemberFactory(user=user, organization=org, role="admin")
+
+        request = request_factory.post("/api/v1/auth/organization/members")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = InviteMemberRequest(email="admin@example.com")
+
+        with pytest.raises(HttpError) as exc_info:
+            invite_member_endpoint(request, payload)
+
+        assert exc_info.value.status_code == 400
+        assert "yourself" in str(exc_info.value.message).lower()
+
+    def test_invite_active_member_updates_role_no_email(self, request_factory: RequestFactory) -> None:
+        """Inviting an already-active member should update their role but not send invite email."""
+        from stytch.core.response_base import StytchError, StytchErrorDetails
+
+        org = OrganizationFactory()
+        admin_user = UserFactory()
+        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+
+        # Create an existing active member
+        existing_user = UserFactory(email="existing@example.com")
+        existing_member = MemberFactory(
+            user=existing_user, organization=org, role="member", stytch_member_id="existing-stytch-id"
+        )
+
+        mock_client = MagicMock()
+
+        # Simulate Stytch returning duplicate_email error on invite
+        details = StytchErrorDetails(
+            error_type="duplicate_email",
+            error_message="This email already exists for this organization.",
+            error_url="https://stytch.com/docs",
+            status_code=400,
+            request_id="test-req",
+        )
+        mock_client.magic_links.email.invite.side_effect = StytchError(details)
+
+        # Mock search to return the existing ACTIVE member
+        mock_search_member = MagicMock()
+        mock_search_member.member_id = "existing-stytch-id"
+        mock_search_member.status = "active"  # Member is already active
+        mock_client.organizations.members.search.return_value = MagicMock(
+            members=[mock_search_member]
+        )
+
+        request = request_factory.post("/api/v1/auth/organization/members")
+        request.auth_user = admin_user  # type: ignore[attr-defined]
+        request.auth_member = admin_member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = InviteMemberRequest(email="existing@example.com", role="admin")
+
+        with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
+            result = invite_member_endpoint(request, payload)
+
+        assert "existing@example.com" in result.message
+        assert "already an active member" in result.message.lower()
+        # Verify role was updated
+        mock_client.organizations.members.update.assert_called_once()
+        # Verify NO reactivation was attempted
+        mock_client.organizations.members.reactivate.assert_not_called()
+
+    def test_invite_pending_member_shows_pending_message(self, request_factory: RequestFactory) -> None:
+        """Inviting an already-invited member should show pending message."""
+        org = OrganizationFactory()
+        admin_user = UserFactory()
+        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+
+        # Create an existing invited member
+        pending_user = UserFactory(email="pending@example.com")
+        pending_member = MemberFactory(
+            user=pending_user, organization=org, role="member", stytch_member_id="pending-stytch-id"
+        )
+
+        mock_client = MagicMock()
+
+        # Mock search to return existing INVITED member
+        mock_search_member = MagicMock()
+        mock_search_member.member_id = "pending-stytch-id"
+        mock_search_member.status = "invited"  # Member has pending invitation
+        mock_client.organizations.members.search.return_value = MagicMock(
+            members=[mock_search_member]
+        )
+
+        request = request_factory.post("/api/v1/auth/organization/members")
+        request.auth_user = admin_user  # type: ignore[attr-defined]
+        request.auth_member = admin_member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = InviteMemberRequest(email="pending@example.com", role="member")
+
+        with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
+            result = invite_member_endpoint(request, payload)
+
+        assert "pending@example.com" in result.message
+        assert "pending invitation" in result.message.lower()
+        # Verify role was updated but NO invite email sent
+        mock_client.organizations.members.update.assert_called_once()
+        mock_client.magic_links.email.invite.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestUpdateMemberRole:
+    """Tests for update_member_role_endpoint."""
+
+    def test_admin_can_update_role(self, request_factory: RequestFactory) -> None:
+        """Admin should be able to update member's role."""
+        org = OrganizationFactory()
+        admin_user = UserFactory()
+        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+        target_user = UserFactory()
+        target_member = MemberFactory(user=target_user, organization=org, role="member")
+
+        mock_client = MagicMock()
+
+        request = request_factory.patch(f"/api/v1/auth/organization/members/{target_member.id}")
+        request.auth_user = admin_user  # type: ignore[attr-defined]
+        request.auth_member = admin_member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = UpdateMemberRoleRequest(role="admin")
+
+        with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
+            result = update_member_role_endpoint(request, target_member.id, payload)
+
+        assert "admin" in result.message
+        target_member.refresh_from_db()
+        assert target_member.role == "admin"
+
+    def test_cannot_change_own_role(self, request_factory: RequestFactory) -> None:
+        """Admin should not be able to change their own role."""
+        org = OrganizationFactory()
+        user = UserFactory()
+        member = MemberFactory(user=user, organization=org, role="admin")
+
+        request = request_factory.patch(f"/api/v1/auth/organization/members/{member.id}")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = UpdateMemberRoleRequest(role="member")
+
+        with pytest.raises(HttpError) as exc_info:
+            update_member_role_endpoint(request, member.id, payload)
+
+        assert exc_info.value.status_code == 400
+        assert "own role" in str(exc_info.value.message).lower()
+
+    def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
+        """Non-admin should be rejected with 403."""
+        org = OrganizationFactory()
+        user = UserFactory()
+        member = MemberFactory(user=user, organization=org, role="member")
+        target_member = MemberFactory(organization=org, role="member")
+
+        request = request_factory.patch(f"/api/v1/auth/organization/members/{target_member.id}")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = UpdateMemberRoleRequest(role="admin")
+
+        with pytest.raises(HttpError) as exc_info:
+            update_member_role_endpoint(request, target_member.id, payload)
+
+        assert exc_info.value.status_code == 403
+
+
+@pytest.mark.django_db
+class TestDeleteMember:
+    """Tests for delete_member_endpoint."""
+
+    def test_admin_can_delete_member(self, request_factory: RequestFactory) -> None:
+        """Admin should be able to remove a member."""
+        org = OrganizationFactory()
+        admin_user = UserFactory()
+        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+        target_user = UserFactory(email="target@example.com")
+        target_member = MemberFactory(user=target_user, organization=org, role="member")
+
+        mock_client = MagicMock()
+
+        request = request_factory.delete(f"/api/v1/auth/organization/members/{target_member.id}")
+        request.auth_user = admin_user  # type: ignore[attr-defined]
+        request.auth_member = admin_member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
+            result = delete_member_endpoint(request, target_member.id)
+
+        assert "target@example.com" in result.message
+        target_member.refresh_from_db()
+        assert target_member.deleted_at is not None
+
+    def test_cannot_delete_yourself(self, request_factory: RequestFactory) -> None:
+        """Admin should not be able to remove themselves."""
+        org = OrganizationFactory()
+        user = UserFactory()
+        member = MemberFactory(user=user, organization=org, role="admin")
+
+        request = request_factory.delete(f"/api/v1/auth/organization/members/{member.id}")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        with pytest.raises(HttpError) as exc_info:
+            delete_member_endpoint(request, member.id)
+
+        assert exc_info.value.status_code == 400
+        assert "yourself" in str(exc_info.value.message).lower()
+
+    def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
+        """Non-admin should be rejected with 403."""
+        org = OrganizationFactory()
+        user = UserFactory()
+        member = MemberFactory(user=user, organization=org, role="member")
+        target_member = MemberFactory(organization=org, role="member")
+
+        request = request_factory.delete(f"/api/v1/auth/organization/members/{target_member.id}")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        with pytest.raises(HttpError) as exc_info:
+            delete_member_endpoint(request, target_member.id)
+
+        assert exc_info.value.status_code == 403
+
+    def test_deleted_member_excluded_from_list(self, request_factory: RequestFactory) -> None:
+        """Soft-deleted members should not appear in list."""
+        from django.utils import timezone
+
+        org = OrganizationFactory()
+        admin_user = UserFactory(email="admin@example.com")
+        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+        deleted_user = UserFactory(email="deleted@example.com")
+        deleted_member = MemberFactory(user=deleted_user, organization=org, role="member")
+
+        # Soft delete the member
+        deleted_member.deleted_at = timezone.now()
+        deleted_member.save()
+
+        request = request_factory.get("/api/v1/auth/organization/members")
+        request.auth_user = admin_user  # type: ignore[attr-defined]
+        request.auth_member = admin_member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        result = list_members(request)
+
+        assert len(result.members) == 1
+        assert result.members[0].email == "admin@example.com"
+
 
