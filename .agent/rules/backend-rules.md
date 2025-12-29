@@ -34,6 +34,7 @@ Coding standards for Python/Django backend. Scoped to `*.py` files.
 
 ## Testing
 
+- Always run tests when making changes and make sure relevant tests are not skipped.
 - Tests required for all business logic
 - Use `pytest` with `pytest-django`
 - **Factories** (via `factory_boy`) for all DB models; avoid raw fixtures for data
