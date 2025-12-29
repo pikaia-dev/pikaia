@@ -126,6 +126,7 @@ export interface BillingAddress {
 }
 
 export interface BillingInfo {
+    use_billing_email: boolean
     billing_email: string
     billing_name: string
     address: BillingAddress

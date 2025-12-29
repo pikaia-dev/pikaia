@@ -252,9 +252,13 @@ class BillingAddressSchema(BaseModel):
 class UpdateBillingRequest(BaseModel):
     """Request to update organization billing info (admin only)."""
 
+    use_billing_email: bool = Field(
+        False,
+        description="If True, send invoices to billing_email; otherwise send to admin",
+    )
     billing_email: EmailStr | None = Field(
         None,
-        description="Email for invoices",
+        description="Email for invoices (used only if use_billing_email is True)",
         examples=["billing@company.com"],
     )
     billing_name: str = Field(
@@ -278,6 +282,9 @@ class UpdateBillingRequest(BaseModel):
 class BillingInfoResponse(BaseModel):
     """Organization billing info response."""
 
+    use_billing_email: bool = Field(
+        ..., description="If True, invoices sent to billing_email; otherwise to admin"
+    )
     billing_email: str = Field(..., description="Email for invoices")
     billing_name: str = Field(..., description="Legal/company name")
     address: BillingAddressSchema = Field(..., description="Billing address")
