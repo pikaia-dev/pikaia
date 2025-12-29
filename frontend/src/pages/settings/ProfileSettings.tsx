@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { useApi } from '../../hooks/useApi'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
@@ -9,7 +10,6 @@ export default function ProfileSettings() {
     const [email, setEmail] = useState('')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
-    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
     useEffect(() => {
         getCurrentUser()
@@ -23,13 +23,12 @@ export default function ProfileSettings() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setSaving(true)
-        setMessage(null)
 
         try {
             await updateProfile({ name })
-            setMessage({ type: 'success', text: 'Profile updated successfully' })
+            toast.success('Profile updated successfully')
         } catch (err) {
-            setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to update' })
+            toast.error(err instanceof Error ? err.message : 'Failed to update')
         } finally {
             setSaving(false)
         }
@@ -86,12 +85,6 @@ export default function ProfileSettings() {
                                 placeholder="Your name"
                             />
                         </div>
-
-                        {message && (
-                            <p className={`text-sm ${message.type === 'success' ? 'text-green-600' : 'text-destructive'}`}>
-                                {message.text}
-                            </p>
-                        )}
 
                         <Button type="submit" disabled={saving}>
                             {saving ? 'Saving...' : 'Save changes'}

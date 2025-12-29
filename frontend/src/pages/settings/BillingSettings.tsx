@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { useApi } from '../../hooks/useApi'
 import type { BillingAddress } from '../../lib/api'
 import { Button } from '../../components/ui/button'
@@ -19,7 +20,6 @@ export default function BillingSettings() {
     const [vatId, setVatId] = useState('')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
-    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
     useEffect(() => {
         getOrganization()
@@ -35,7 +35,6 @@ export default function BillingSettings() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setSaving(true)
-        setMessage(null)
 
         try {
             await updateBilling({
@@ -44,9 +43,9 @@ export default function BillingSettings() {
                 address,
                 vat_id: vatId,
             })
-            setMessage({ type: 'success', text: 'Billing info updated successfully' })
+            toast.success('Billing info updated successfully')
         } catch (err) {
-            setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to update' })
+            toast.error(err instanceof Error ? err.message : 'Failed to update')
         } finally {
             setSaving(false)
         }
@@ -209,12 +208,6 @@ export default function BillingSettings() {
                                 <p className="text-xs text-muted-foreground mt-1">EU VAT number for tax exemption</p>
                             </div>
                         </div>
-
-                        {message && (
-                            <p className={`text-sm ${message.type === 'success' ? 'text-green-600' : 'text-destructive'}`}>
-                                {message.text}
-                            </p>
-                        )}
 
                         <Button type="submit" disabled={saving}>
                             {saving ? 'Saving...' : 'Save billing info'}
