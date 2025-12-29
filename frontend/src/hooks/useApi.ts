@@ -1,6 +1,17 @@
 import { useMemo } from 'react'
 import { useStytchB2BClient } from '@stytch/react/b2b'
-import { createApiClient, type MeResponse, type OrganizationDetail, type UserInfo, type BillingAddress } from '../lib/api'
+import {
+    createApiClient,
+    type MeResponse,
+    type OrganizationDetail,
+    type UserInfo,
+    type BillingAddress,
+    type MemberListResponse,
+    type InviteMemberRequest,
+    type InviteMemberResponse,
+    type UpdateMemberRoleRequest,
+    type MessageResponse,
+} from '../lib/api'
 
 /**
  * Hook that provides an authenticated API client using the Stytch SDK.
@@ -40,6 +51,18 @@ export function useApi() {
             address?: BillingAddress
             vat_id: string
         }) => api.patch<OrganizationDetail>('/auth/organization/billing', data),
+
+        // Members
+        listMembers: () =>
+            api.get<MemberListResponse>('/auth/organization/members'),
+
+        inviteMember: (data: InviteMemberRequest) =>
+            api.post<InviteMemberResponse>('/auth/organization/members', data),
+
+        updateMemberRole: (memberId: number, data: UpdateMemberRoleRequest) =>
+            api.patch<MessageResponse>(`/auth/organization/members/${memberId}`, data),
+
+        deleteMember: (memberId: number) =>
+            api.delete<MessageResponse>(`/auth/organization/members/${memberId}`),
     }), [api])
 }
-

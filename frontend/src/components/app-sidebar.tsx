@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useStytchB2BClient, useStytchMember } from '@stytch/react/b2b'
-import { Home, User, Building2, CreditCard, LogOut, Settings } from 'lucide-react'
+import { Home, User, Users, Building2, CreditCard, LogOut, Settings } from 'lucide-react'
 import {
     Sidebar,
     SidebarContent,
@@ -22,6 +22,7 @@ const mainNavItems = [
 const settingsNavItems = [
     { to: '/settings/profile', label: 'Profile', icon: User },
     { to: '/settings/organization', label: 'Organization', icon: Building2, adminOnly: true },
+    { to: '/settings/members', label: 'Members', icon: Users, adminOnly: true },
     { to: '/settings/billing', label: 'Billing', icon: CreditCard, adminOnly: true },
 ]
 

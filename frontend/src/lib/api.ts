@@ -140,3 +140,39 @@ export interface OrganizationDetail {
     billing: BillingInfo
 }
 
+// Member management types
+export interface MemberListItem {
+    id: number
+    stytch_member_id: string
+    email: string
+    name: string
+    role: string
+    is_admin: boolean
+    status: string
+    created_at: string
+}
+
+export interface MemberListResponse {
+    members: MemberListItem[]
+}
+
+export interface InviteMemberRequest {
+    email: string
+    name?: string
+    role?: 'admin' | 'member'
+}
+
+export interface InviteMemberResponse {
+    message: string
+    stytch_member_id: string
+}
+
+export interface UpdateMemberRoleRequest {
+    role: 'admin' | 'member'
+}
+
+export interface MessageResponse {
+    message: string
+}
+
+
