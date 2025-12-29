@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { loadGooglePlacesScript, parseAddressComponents, type ParsedAddress } from '@/lib/google-places'
+import { useState, useEffect, useRef } from 'react'
+import { loadGooglePlacesScript, parseAddressFromPlace, type ParsedAddress } from '@/lib/google-places'
 import { cn } from '@/lib/utils'
 
 interface AddressAutocompleteProps {
@@ -13,7 +13,8 @@ interface AddressAutocompleteProps {
 }
 
 /**
- * Address input with Google Places autocomplete
+ * Address input with Google Places autocomplete (New API - 2025)
+ * Uses PlaceAutocompleteElement for modern address autocomplete
  * Falls back to regular text input if Google Places fails to load
  */
 export function AddressAutocomplete({
@@ -25,12 +26,22 @@ export function AddressAutocomplete({
     className,
     id,
 }: AddressAutocompleteProps) {
-    const inputRef = useRef<HTMLInputElement>(null)
-    const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
+    const containerRef = useRef<HTMLDivElement>(null)
+    const autocompleteRef = useRef<google.maps.places.PlaceAutocompleteElement | null>(null)
+    const initAttemptedRef = useRef(false)
     const [isLoaded, setIsLoaded] = useState(false)
     const [loadError, setLoadError] = useState(false)
+    const [isInitialized, setIsInitialized] = useState(false)
 
-    // Load Google Places script
+    // Stable callback refs to avoid re-renders
+    const onChangeRef = useRef(onChange)
+    const onAddressSelectRef = useRef(onAddressSelect)
+    useEffect(() => {
+        onChangeRef.current = onChange
+        onAddressSelectRef.current = onAddressSelect
+    }, [onChange, onAddressSelect])
+
+    // Load Google Places script (only once)
     useEffect(() => {
         const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY
 
@@ -41,68 +52,134 @@ export function AddressAutocomplete({
         }
 
         loadGooglePlacesScript(apiKey)
-            .then(() => setIsLoaded(true))
+            .then(() => {
+                console.log('Google Places script loaded')
+                setIsLoaded(true)
+            })
             .catch((err) => {
                 console.error('Failed to load Google Places:', err)
                 setLoadError(true)
             })
-    }, [])
+    }, []) // Empty deps - only run once
 
-    // Initialize autocomplete when script is loaded and input is ready
+    // Initialize PlaceAutocompleteElement when script is loaded
     useEffect(() => {
-        if (!isLoaded || !inputRef.current || autocompleteRef.current) return
+        // Prevent multiple initialization attempts
+        if (!isLoaded || !containerRef.current || initAttemptedRef.current) return
+        initAttemptedRef.current = true
 
-        const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
-            types: ['address'],
-            fields: ['address_components', 'formatted_address'],
-        })
+        const initAutocomplete = async () => {
+            try {
+                console.log('Initializing PlaceAutocompleteElement...')
 
-        autocomplete.addListener('place_changed', () => {
-            const place = autocomplete.getPlace()
+                // Import the Places library
+                const { PlaceAutocompleteElement } = await google.maps.importLibrary('places') as google.maps.PlacesLibrary
 
-            if (place.formatted_address) {
-                onChange(place.formatted_address)
+                // Create the PlaceAutocompleteElement with address type
+                const autocomplete = new PlaceAutocompleteElement({
+                    types: ['address'],
+                })
 
-                if (onAddressSelect) {
-                    const parsed = parseAddressComponents(place)
-                    onAddressSelect(parsed)
+                // Apply styling to match our design system
+                autocomplete.style.cssText = `
+                    width: 100%;
+                    --gmpx-color-surface: var(--background, #fff);
+                    --gmpx-color-on-surface: var(--foreground, #000);
+                    --gmpx-font-family-base: inherit;
+                    --gmpx-font-size-base: 0.875rem;
+                `
+
+                // Add the gmp-select listener for when user selects an address
+                autocomplete.addEventListener('gmp-select', async (event: Event) => {
+                    const selectEvent = event as google.maps.places.PlaceAutocompletePlaceSelectEvent
+                    const placePrediction = selectEvent.placePrediction
+
+                    if (placePrediction) {
+                        const place = placePrediction.toPlace()
+
+                        // Fetch address components
+                        await place.fetchFields({
+                            fields: ['formattedAddress', 'addressComponents'],
+                        })
+
+                        // Update the value
+                        const formattedAddress = place.formattedAddress || ''
+                        onChangeRef.current(formattedAddress)
+
+                        // Parse and callback with structured address
+                        if (onAddressSelectRef.current) {
+                            const parsed = parseAddressFromPlace(place)
+                            onAddressSelectRef.current(parsed)
+                        }
+                    }
+                })
+
+                // Append to container
+                if (containerRef.current) {
+                    containerRef.current.appendChild(autocomplete)
+                    autocompleteRef.current = autocomplete
+                    setIsInitialized(true)
+                    console.log('PlaceAutocompleteElement initialized')
                 }
+
+            } catch (err) {
+                console.error('Failed to initialize PlaceAutocompleteElement:', err)
+                setLoadError(true)
             }
-        })
-
-        autocompleteRef.current = autocomplete
-
-        return () => {
-            // Cleanup: Remove the pac-container elements
-            const pacContainers = document.querySelectorAll('.pac-container')
-            pacContainers.forEach((el) => el.remove())
         }
-    }, [isLoaded, onChange, onAddressSelect])
 
-    // Sync external value changes to input
-    const handleChange = useCallback(
-        (e: React.ChangeEvent<HTMLInputElement>) => {
-            onChange(e.target.value)
-        },
-        [onChange]
-    )
+        initAutocomplete()
+    }, [isLoaded]) // Only depend on isLoaded
 
+    // Fallback to regular input if Google Places fails to load
+    if (loadError) {
+        return (
+            <input
+                id={id}
+                type="text"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder="Enter address"
+                disabled={disabled}
+                className={cn(
+                    'w-full px-3 py-2 border border-border rounded-md bg-background text-sm',
+                    'focus:outline-none focus:ring-2 focus:ring-ring',
+                    'disabled:opacity-50 disabled:cursor-not-allowed',
+                    className
+                )}
+            />
+        )
+    }
+
+    // Show loading state while Google Places loads
+    if (!isLoaded) {
+        return (
+            <input
+                id={id}
+                type="text"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder="Loading..."
+                disabled
+                className={cn(
+                    'w-full px-3 py-2 border border-border rounded-md bg-background text-sm',
+                    'opacity-50 cursor-not-allowed',
+                    className
+                )}
+            />
+        )
+    }
+
+    // Render the container for PlaceAutocompleteElement
     return (
-        <input
-            ref={inputRef}
+        <div
+            ref={containerRef}
             id={id}
-            type="text"
-            value={value}
-            onChange={handleChange}
-            placeholder={loadError ? 'Enter address' : placeholder}
-            disabled={disabled}
             className={cn(
-                'w-full px-3 py-2 border border-border rounded-md bg-background text-sm',
-                'focus:outline-none focus:ring-2 focus:ring-ring',
-                'disabled:opacity-50 disabled:cursor-not-allowed',
+                'address-autocomplete-container w-full',
+                disabled && 'opacity-50 pointer-events-none',
                 className
             )}
-            autoComplete="off"
         />
     )
 }
