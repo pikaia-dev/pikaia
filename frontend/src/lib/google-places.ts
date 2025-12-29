@@ -38,10 +38,19 @@ export function parseAddressFromPlace(place: google.maps.places.Place): ParsedAd
     const route = getComponent(['route'])
     const streetAddress = [streetNumber, route].filter(Boolean).join(' ')
 
+    // Extract city with proper fallback chain
+    // Priority: locality (actual city) > administrative_area_level_2 (often city in some countries)
+    // > administrative_area_level_3 > sublocality (district, last resort)
+    const city = getComponent(['locality']) ||
+        getComponent(['administrative_area_level_2']) ||
+        getComponent(['administrative_area_level_3']) ||
+        getComponent(['sublocality']) ||
+        ''
+
     return {
         formatted_address: place.formattedAddress || '',
         street_address: streetAddress,
-        city: getComponent(['locality', 'sublocality', 'administrative_area_level_3']),
+        city,
         state: getComponent(['administrative_area_level_1']),
         postal_code: getComponent(['postal_code']),
         country: getComponent(['country']),
