@@ -1,13 +1,15 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import { useApi } from '../../hooks/useApi'
 import type { BillingAddress } from '../../lib/api'
+import { AddressAutocomplete } from '../../components/ui/address-autocomplete'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { Checkbox } from '../../components/ui/checkbox'
 import { CountryCombobox } from '../../components/ui/country-combobox'
 import { LoadingSpinner } from '../../components/ui/loading-spinner'
-import { getVatPrefix } from '../../lib/countries'
+import { getVatPrefix, getCountryByCode } from '../../lib/countries'
+import type { ParsedAddress } from '../../lib/google-places'
 
 /**
  * Matches EU VAT ID country prefixes (2-3 uppercase letters at the start).
@@ -111,6 +113,37 @@ export default function BillingSettings() {
             })
         }
     }
+
+    // Handle address selection from Google Places autocomplete
+    const handleAddressSelect = useCallback((parsed: ParsedAddress) => {
+        // Update address fields from parsed Google Places result
+        setAddress({
+            line1: parsed.street_address || parsed.formatted_address,
+            line2: '', // User can fill manually if needed
+            city: parsed.city,
+            state: parsed.state,
+            postal_code: parsed.postal_code,
+            country: parsed.country_code.toUpperCase(),
+        })
+
+        // Trigger VAT prefix update for the new country
+        const countryCode = parsed.country_code.toUpperCase()
+        const newPrefix = getVatPrefix(countryCode)
+        const oldPrefix = getVatPrefix(address.country)
+
+        setVatId((currentVat) => {
+            if (newPrefix) {
+                if (!currentVat || !currentVat.match(VAT_PREFIX_PATTERN)) {
+                    return newPrefix
+                }
+                const vatWithoutPrefix = currentVat.replace(VAT_PREFIX_PATTERN, '')
+                return newPrefix + vatWithoutPrefix
+            } else if (oldPrefix && currentVat) {
+                return currentVat.replace(new RegExp(`^${oldPrefix}`), '')
+            }
+            return currentVat
+        })
+    }, [address.country])
 
     // Get current VAT prefix based on country
     const currentVatPrefix = getVatPrefix(address.country)
@@ -236,13 +269,12 @@ export default function BillingSettings() {
                                 <label htmlFor="line1" className="block text-sm font-medium mb-1">
                                     Address line 1
                                 </label>
-                                <input
+                                <AddressAutocomplete
                                     id="line1"
-                                    type="text"
                                     value={address.line1}
-                                    onChange={(e) => updateAddress('line1', e.target.value)}
-                                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                    placeholder="123 Main Street"
+                                    onChange={(value) => updateAddress('line1', value)}
+                                    onAddressSelect={handleAddressSelect}
+                                    placeholder="Start typing to search..."
                                 />
                             </div>
 
