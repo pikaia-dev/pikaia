@@ -4,11 +4,13 @@ import { useApi } from '../../hooks/useApi'
 import type { BillingAddress } from '../../lib/api'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
+import { Checkbox } from '../../components/ui/checkbox'
 import { CountryCombobox } from '../../components/ui/country-combobox'
 import { getVatPrefix } from '../../lib/countries'
 
 export default function BillingSettings() {
     const { getOrganization, updateBilling } = useApi()
+    const [useBillingEmail, setUseBillingEmail] = useState(false)
     const [billingEmail, setBillingEmail] = useState('')
     const [billingName, setBillingName] = useState('')
     const [address, setAddress] = useState<BillingAddress>({
@@ -26,6 +28,7 @@ export default function BillingSettings() {
     useEffect(() => {
         getOrganization()
             .then((data) => {
+                setUseBillingEmail(data.billing.use_billing_email)
                 setBillingEmail(data.billing.billing_email)
                 setBillingName(data.billing.billing_name)
                 setAddress(data.billing.address)
@@ -40,7 +43,8 @@ export default function BillingSettings() {
 
         try {
             await updateBilling({
-                billing_email: billingEmail || undefined,
+                use_billing_email: useBillingEmail,
+                billing_email: useBillingEmail ? billingEmail : undefined,
                 billing_name: billingName,
                 address,
                 vat_id: vatId,
@@ -104,8 +108,29 @@ export default function BillingSettings() {
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <div>
+                        {/* Billing Email Checkbox */}
+                        <div className="flex items-start space-x-3 py-2">
+                            <Checkbox
+                                id="useBillingEmail"
+                                checked={useBillingEmail}
+                                onCheckedChange={(checked) => setUseBillingEmail(checked === true)}
+                            />
+                            <div className="space-y-1">
+                                <label
+                                    htmlFor="useBillingEmail"
+                                    className="text-sm font-medium leading-none cursor-pointer"
+                                >
+                                    Send invoices to a different email
+                                </label>
+                                <p className="text-xs text-muted-foreground">
+                                    By default, invoices are sent to the organization admin
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Conditional Billing Email Field */}
+                        {useBillingEmail && (
+                            <div className="max-w-sm">
                                 <label htmlFor="billingEmail" className="block text-sm font-medium mb-1">
                                     Billing email
                                 </label>
@@ -116,8 +141,14 @@ export default function BillingSettings() {
                                     onChange={(e) => setBillingEmail(e.target.value)}
                                     className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                                     placeholder="billing@company.com"
+                                    required={useBillingEmail}
                                 />
                             </div>
+                        )}
+
+                        <hr className="my-4" />
+
+                        <div>
 
                             <div>
                                 <label htmlFor="billingName" className="block text-sm font-medium mb-1">

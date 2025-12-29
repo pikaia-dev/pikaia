@@ -39,9 +39,13 @@ class Organization(models.Model):
     )
 
     # Billing info - owned by our system, synced to Stripe
+    use_billing_email = models.BooleanField(
+        default=False,
+        help_text="If True, send invoices to billing_email; otherwise send to admin",
+    )
     billing_email = models.EmailField(
         blank=True,
-        help_text="Email for invoices",
+        help_text="Email for invoices (used only if use_billing_email is True)",
     )
     billing_name = models.CharField(
         max_length=255,

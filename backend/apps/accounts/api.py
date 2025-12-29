@@ -358,6 +358,7 @@ def get_organization(request: HttpRequest) -> OrganizationDetailResponse:
         name=org.name,
         slug=org.slug,
         billing=BillingInfoResponse(
+            use_billing_email=org.use_billing_email,
             billing_email=org.billing_email,
             billing_name=org.billing_name,
             address=BillingAddressSchema(
@@ -440,6 +441,7 @@ def update_billing(
     org = request.auth_organization  # type: ignore[attr-defined]
 
     # Update billing fields
+    org.use_billing_email = payload.use_billing_email
     if payload.billing_email is not None:
         org.billing_email = payload.billing_email
     org.billing_name = payload.billing_name

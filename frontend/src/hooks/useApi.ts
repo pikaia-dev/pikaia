@@ -46,6 +46,7 @@ export function useApi() {
             api.patch<OrganizationDetail>('/auth/organization', data),
 
         updateBilling: (data: {
+            use_billing_email: boolean
             billing_email?: string
             billing_name: string
             address?: BillingAddress
