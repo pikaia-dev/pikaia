@@ -122,7 +122,7 @@ export default function BillingSettings() {
                                         setTimeout(() => billingEmailRef.current?.focus(), 0)
                                     }
                                 }}
-                                className="mt-0.5"
+                                className="mt-1"
                             />
                             <div className="space-y-1">
                                 <label
