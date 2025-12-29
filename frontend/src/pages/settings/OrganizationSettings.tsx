@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { useApi } from '../../hooks/useApi'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
@@ -9,7 +10,6 @@ export default function OrganizationSettings() {
     const [slug, setSlug] = useState('')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
-    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
     useEffect(() => {
         getOrganization()
@@ -23,13 +23,12 @@ export default function OrganizationSettings() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setSaving(true)
-        setMessage(null)
 
         try {
             await updateOrganization({ name })
-            setMessage({ type: 'success', text: 'Organization updated successfully' })
+            toast.success('Organization updated successfully')
         } catch (err) {
-            setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to update' })
+            toast.error(err instanceof Error ? err.message : 'Failed to update')
         } finally {
             setSaving(false)
         }
@@ -86,12 +85,6 @@ export default function OrganizationSettings() {
                                 placeholder="Your organization name"
                             />
                         </div>
-
-                        {message && (
-                            <p className={`text-sm ${message.type === 'success' ? 'text-green-600' : 'text-destructive'}`}>
-                                {message.text}
-                            </p>
-                        )}
 
                         <Button type="submit" disabled={saving}>
                             {saving ? 'Saving...' : 'Save changes'}
