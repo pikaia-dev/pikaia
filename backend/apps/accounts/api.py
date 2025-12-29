@@ -21,21 +21,32 @@ from apps.accounts.schemas import (
     DiscoveredOrganization,
     DiscoveryCreateOrgRequest,
     DiscoveryExchangeRequest,
+    InviteMemberRequest,
+    InviteMemberResponse,
     MagicLinkAuthenticateRequest,
     MagicLinkAuthenticateResponse,
     MagicLinkSendRequest,
     MemberInfo,
+    MemberListItem,
+    MemberListResponse,
     MeResponse,
     MessageResponse,
     OrganizationDetailResponse,
     OrganizationInfo,
     SessionResponse,
     UpdateBillingRequest,
+    UpdateMemberRoleRequest,
     UpdateOrganizationRequest,
     UpdateProfileRequest,
     UserInfo,
 )
-from apps.accounts.services import sync_session_to_local
+from apps.accounts.services import (
+    invite_member,
+    list_organization_members,
+    soft_delete_member,
+    sync_session_to_local,
+    update_member_role,
+)
 from apps.accounts.stytch_client import get_stytch_client
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth
@@ -44,6 +55,7 @@ logger = logging.getLogger(__name__)
 
 router = Router(tags=["auth"])
 bearer_auth = BearerAuth()
+
 
 
 @router.post(
@@ -446,4 +458,211 @@ def update_billing(
     # TODO: Sync to Stripe (customer address, tax_id)
 
     return get_organization(request)
+
+
+# --- Member Management (Admin Only) ---
+
+
+@router.get(
+    "/organization/members",
+    response={200: MemberListResponse, 401: ErrorResponse, 403: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="listMembers",
+    summary="List organization members",
+)
+def list_members(request: HttpRequest) -> MemberListResponse:
+    """
+    List all active members of the current organization.
+
+    Admin only.
+    """
+    if not hasattr(request, "auth_member") or request.auth_member is None:  # type: ignore[attr-defined]
+        raise HttpError(401, "Not authenticated")
+
+    member = request.auth_member  # type: ignore[attr-defined]
+    if not member.is_admin:
+        raise HttpError(403, "Admin access required")
+
+    org = request.auth_organization  # type: ignore[attr-defined]
+    members = list_organization_members(org)
+
+    # Fetch member statuses from Stytch
+    from apps.accounts.stytch_client import get_stytch_client
+
+    stytch = get_stytch_client()
+    stytch_statuses: dict[str, str] = {}
+    try:
+        search_result = stytch.organizations.members.search(
+            organization_ids=[org.stytch_org_id],
+            query={"operator": "AND", "operands": []},
+        )
+        for stytch_member in search_result.members:
+            stytch_statuses[stytch_member.member_id] = stytch_member.status
+    except Exception:
+        # If Stytch call fails, default to 'active'
+        pass
+
+    return MemberListResponse(
+        members=[
+            MemberListItem(
+                id=m.id,
+                stytch_member_id=m.stytch_member_id,
+                email=m.user.email,
+                name=m.user.name,
+                role=m.role,
+                is_admin=m.is_admin,
+                status=stytch_statuses.get(m.stytch_member_id, "active"),
+                created_at=m.created_at.isoformat(),
+            )
+            for m in members
+        ]
+    )
+
+
+@router.post(
+    "/organization/members",
+    response={200: InviteMemberResponse, 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="inviteMember",
+    summary="Invite a new member",
+)
+def invite_member_endpoint(
+    request: HttpRequest, payload: InviteMemberRequest
+) -> InviteMemberResponse:
+    """
+    Invite a new member to the organization.
+
+    Admin only. Stytch sends the invite email with Magic Link.
+    """
+    if not hasattr(request, "auth_member") or request.auth_member is None:  # type: ignore[attr-defined]
+        raise HttpError(401, "Not authenticated")
+
+    member = request.auth_member  # type: ignore[attr-defined]
+    if not member.is_admin:
+        raise HttpError(403, "Admin access required")
+
+    # Prevent inviting yourself
+    if payload.email.lower() == member.user.email.lower():
+        raise HttpError(400, "Cannot invite yourself - you're already a member")
+
+    org = request.auth_organization  # type: ignore[attr-defined]
+
+    try:
+        new_member, invite_sent = invite_member(
+            organization=org,
+            email=payload.email,
+            name=payload.name,
+            role=payload.role,
+        )
+    except StytchError as e:
+        logger.warning("Failed to invite member: %s", e.details.error_message)
+        raise HttpError(400, f"Failed to invite member: {e.details.error_message}") from e
+
+    if invite_sent is True:
+        message = f"Invitation sent to {payload.email}"
+    elif invite_sent == "pending":
+        message = f"{payload.email} already has a pending invitation (role updated)"
+    else:
+        message = f"{payload.email} is already an active member (role updated)"
+
+    return InviteMemberResponse(
+        message=message,
+        stytch_member_id=new_member.stytch_member_id,
+    )
+
+
+@router.patch(
+    "/organization/members/{member_id}",
+    response={200: MessageResponse, 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="updateMemberRole",
+    summary="Update member role",
+)
+def update_member_role_endpoint(
+    request: HttpRequest, member_id: int, payload: UpdateMemberRoleRequest
+) -> MessageResponse:
+    """
+    Update a member's role (admin or member).
+
+    Admin only. Cannot change your own role.
+    """
+    from apps.accounts.models import Member
+
+    if not hasattr(request, "auth_member") or request.auth_member is None:  # type: ignore[attr-defined]
+        raise HttpError(401, "Not authenticated")
+
+    current_member = request.auth_member  # type: ignore[attr-defined]
+    if not current_member.is_admin:
+        raise HttpError(403, "Admin access required")
+
+    org = request.auth_organization  # type: ignore[attr-defined]
+
+    # Find the target member
+    try:
+        target_member = Member.objects.select_related("organization").get(
+            id=member_id, organization=org
+        )
+    except Member.DoesNotExist:
+        raise HttpError(404, "Member not found") from None
+
+    # Prevent changing own role
+    if target_member.id == current_member.id:
+        raise HttpError(400, "Cannot change your own role")
+
+    try:
+        update_member_role(target_member, payload.role)
+    except StytchError as e:
+        logger.warning("Failed to update member role: %s", e.details.error_message)
+        raise HttpError(400, f"Failed to update role: {e.details.error_message}") from e
+
+    return MessageResponse(message=f"Role updated to {payload.role}")
+
+
+@router.delete(
+    "/organization/members/{member_id}",
+    response={200: MessageResponse, 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="deleteMember",
+    summary="Remove member from organization",
+)
+def delete_member_endpoint(request: HttpRequest, member_id: int) -> MessageResponse:
+    """
+    Remove a member from the organization.
+
+    Admin only. Cannot remove yourself. Soft deletes locally
+    and removes from Stytch.
+    """
+    from apps.accounts.models import Member
+
+    if not hasattr(request, "auth_member") or request.auth_member is None:  # type: ignore[attr-defined]
+        raise HttpError(401, "Not authenticated")
+
+    current_member = request.auth_member  # type: ignore[attr-defined]
+    if not current_member.is_admin:
+        raise HttpError(403, "Admin access required")
+
+    org = request.auth_organization  # type: ignore[attr-defined]
+
+    # Find the target member
+    try:
+        target_member = Member.objects.select_related("organization", "user").get(
+            id=member_id, organization=org
+        )
+    except Member.DoesNotExist:
+        raise HttpError(404, "Member not found") from None
+
+    # Prevent removing yourself
+    if target_member.id == current_member.id:
+        raise HttpError(400, "Cannot remove yourself")
+
+    email = target_member.user.email
+
+    try:
+        soft_delete_member(target_member)
+    except StytchError as e:
+        logger.warning("Failed to delete member: %s", e.details.error_message)
+        raise HttpError(400, f"Failed to remove member: {e.details.error_message}") from e
+
+    return MessageResponse(message=f"Member {email} removed from organization")
+
 
