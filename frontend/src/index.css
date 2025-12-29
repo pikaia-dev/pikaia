@@ -146,11 +146,13 @@
 }
 
 /* Style the PlaceAutocompleteElement container and its input */
-.address-autocomplete-container {
+.address-autocomplete-container,
+.address-lookup-container {
   position: relative;
 }
 
-.address-autocomplete-container gmp-place-autocomplete {
+.address-autocomplete-container gmp-place-autocomplete,
+.address-lookup-container gmp-place-autocomplete {
   width: 100%;
   display: block;
   border: 1px solid var(--border) !important;
@@ -158,14 +160,16 @@
   background-color: var(--background) !important;
 }
 
-.address-autocomplete-container gmp-place-autocomplete:focus-within {
+.address-autocomplete-container gmp-place-autocomplete:focus-within,
+.address-lookup-container gmp-place-autocomplete:focus-within {
   border-color: var(--ring) !important;
   box-shadow: 0 0 0 2px var(--ring);
 }
 
 /* Target the internal input of PlaceAutocompleteElement */
 .address-autocomplete-container gmp-place-autocomplete input,
-.address-autocomplete-container input[type="text"] {
+.address-autocomplete-container input[type="text"],
+.address-lookup-container gmp-place-autocomplete input {
   width: 100% !important;
   padding: 0.5rem 0.75rem !important;
   border: none !important;
@@ -176,12 +180,19 @@
 }
 
 .address-autocomplete-container gmp-place-autocomplete input:focus,
-.address-autocomplete-container input[type="text"]:focus {
+.address-autocomplete-container input[type="text"]:focus,
+.address-lookup-container gmp-place-autocomplete input:focus {
   outline: none !important;
   box-shadow: none !important;
 }
 
 .address-autocomplete-container gmp-place-autocomplete input::placeholder,
-.address-autocomplete-container input[type="text"]::placeholder {
+.address-autocomplete-container input[type="text"]::placeholder,
+.address-lookup-container gmp-place-autocomplete input::placeholder {
   color: var(--muted-foreground) !important;
+}
+
+/* Address lookup specific - add padding for search icon */
+.address-lookup-container gmp-place-autocomplete input {
+  padding-left: 0 !important;
 }
