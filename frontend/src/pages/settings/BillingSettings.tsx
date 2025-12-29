@@ -58,19 +58,24 @@ export default function BillingSettings() {
 
         // When country changes, update VAT prefix if EU country
         if (field === 'country') {
-            const prefix = getVatPrefix(value)
-            if (prefix) {
-                // Only update if VAT is empty or starts with a different prefix
-                setVatId((currentVat) => {
-                    // If VAT is empty or doesn't have a valid prefix, set the new one
+            const newPrefix = getVatPrefix(value)
+            const oldPrefix = getVatPrefix(address.country)
+
+            setVatId((currentVat) => {
+                if (newPrefix) {
+                    // Switching to EU country - add/replace prefix
                     if (!currentVat || !currentVat.match(/^[A-Z]{2,3}/)) {
-                        return prefix
+                        return newPrefix
                     }
-                    // If VAT already has a prefix, replace it
+                    // Replace old prefix with new one
                     const vatWithoutPrefix = currentVat.replace(/^[A-Z]{2,3}/, '')
-                    return prefix + vatWithoutPrefix
-                })
-            }
+                    return newPrefix + vatWithoutPrefix
+                } else if (oldPrefix && currentVat) {
+                    // Switching from EU to non-EU - remove the old prefix
+                    return currentVat.replace(new RegExp(`^${oldPrefix}`), '')
+                }
+                return currentVat
+            })
         }
     }
 
