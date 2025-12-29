@@ -250,3 +250,41 @@ export function isEuCountry(code: string): boolean {
 export function getVatPrefix(code: string): string | undefined {
     return EU_VAT_PREFIXES[code]
 }
+
+/**
+ * Matches EU VAT ID country prefixes (2-3 uppercase letters at the start).
+ * Examples: "DE" (Germany), "FR" (France), "EL" (Greece), "ATU" (Austria)
+ */
+export const VAT_PREFIX_PATTERN = /^[A-Z]{2,3}/
+
+/**
+ * Updates VAT ID when country changes.
+ * Handles adding/replacing/removing VAT prefixes based on EU membership.
+ *
+ * @param currentVatId - The current VAT ID value
+ * @param oldCountryCode - The previous country code (ISO 3166-1 alpha-2)
+ * @param newCountryCode - The new country code (ISO 3166-1 alpha-2)
+ * @returns The updated VAT ID with appropriate prefix handling
+ */
+export function updateVatIdForCountryChange(
+    currentVatId: string,
+    oldCountryCode: string,
+    newCountryCode: string
+): string {
+    const newPrefix = getVatPrefix(newCountryCode)
+    const oldPrefix = getVatPrefix(oldCountryCode)
+
+    if (newPrefix) {
+        // Switching to EU country - add/replace prefix
+        if (!currentVatId || !currentVatId.match(VAT_PREFIX_PATTERN)) {
+            return newPrefix
+        }
+        // Replace old prefix with new one
+        const vatWithoutPrefix = currentVatId.replace(VAT_PREFIX_PATTERN, '')
+        return newPrefix + vatWithoutPrefix
+    } else if (oldPrefix && currentVatId) {
+        // Switching from EU to non-EU - remove the old prefix
+        return currentVatId.replace(new RegExp(`^${oldPrefix}`), '')
+    }
+    return currentVatId
+}

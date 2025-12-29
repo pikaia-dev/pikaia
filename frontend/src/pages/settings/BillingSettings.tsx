@@ -8,14 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Checkbox } from '../../components/ui/checkbox'
 import { CountryCombobox } from '../../components/ui/country-combobox'
 import { LoadingSpinner } from '../../components/ui/loading-spinner'
-import { getVatPrefix, getCountryByCode } from '../../lib/countries'
+import { getVatPrefix, updateVatIdForCountryChange } from '../../lib/countries'
 import type { ParsedAddress } from '../../lib/google-places'
 
-/**
- * Matches EU VAT ID country prefixes (2-3 uppercase letters at the start).
- * Examples: "DE" (Germany), "FR" (France), "EL" (Greece), "ATU" (Austria - legacy)
- */
-const VAT_PREFIX_PATTERN = /^[A-Z]{2,3}/
+
 
 export default function BillingSettings() {
     const { getOrganization, updateBilling } = useApi()
@@ -93,24 +89,7 @@ export default function BillingSettings() {
 
         // When country changes, update VAT prefix if EU country
         if (field === 'country') {
-            const newPrefix = getVatPrefix(value)
-            const oldPrefix = getVatPrefix(address.country)
-
-            setVatId((currentVat) => {
-                if (newPrefix) {
-                    // Switching to EU country - add/replace prefix
-                    if (!currentVat || !currentVat.match(VAT_PREFIX_PATTERN)) {
-                        return newPrefix
-                    }
-                    // Replace old prefix with new one
-                    const vatWithoutPrefix = currentVat.replace(VAT_PREFIX_PATTERN, '')
-                    return newPrefix + vatWithoutPrefix
-                } else if (oldPrefix && currentVat) {
-                    // Switching from EU to non-EU - remove the old prefix
-                    return currentVat.replace(new RegExp(`^${oldPrefix}`), '')
-                }
-                return currentVat
-            })
+            setVatId((currentVat) => updateVatIdForCountryChange(currentVat, address.country, value))
         }
     }
 
@@ -128,22 +107,10 @@ export default function BillingSettings() {
 
         // Trigger VAT prefix update for the new country
         const countryCode = parsed.country_code.toUpperCase()
-        const newPrefix = getVatPrefix(countryCode)
-        const oldPrefix = getVatPrefix(address.country)
-
-        setVatId((currentVat) => {
-            if (newPrefix) {
-                if (!currentVat || !currentVat.match(VAT_PREFIX_PATTERN)) {
-                    return newPrefix
-                }
-                const vatWithoutPrefix = currentVat.replace(VAT_PREFIX_PATTERN, '')
-                return newPrefix + vatWithoutPrefix
-            } else if (oldPrefix && currentVat) {
-                return currentVat.replace(new RegExp(`^${oldPrefix}`), '')
-            }
-            return currentVat
-        })
-    }, [address.country])
+        // Note: address.country intentionally captures the OLD value before setAddress runs,
+        // which is needed for computing the correct VAT prefix transition
+        setVatId((currentVat) => updateVatIdForCountryChange(currentVat, address.country, countryCode))
+    }, [])
 
     // Get current VAT prefix based on country
     const currentVatPrefix = getVatPrefix(address.country)
