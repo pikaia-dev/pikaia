@@ -7,6 +7,7 @@ import AppLayout from './layouts/AppLayout'
 import ProfileSettings from './pages/settings/ProfileSettings'
 import OrganizationSettings from './pages/settings/OrganizationSettings'
 import BillingSettings from './pages/settings/BillingSettings'
+import MembersSettings from './pages/settings/MembersSettings'
 import './App.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -44,6 +45,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/settings/profile" element={<ProfileSettings />} />
         <Route path="/settings/organization" element={<OrganizationSettings />} />
+        <Route path="/settings/members" element={<MembersSettings />} />
         <Route path="/settings/billing" element={<BillingSettings />} />
         <Route path="/settings" element={<Navigate to="/settings/profile" replace />} />
       </Route>
