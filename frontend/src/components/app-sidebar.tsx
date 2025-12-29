@@ -12,7 +12,6 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarSeparator,
 } from './ui/sidebar'
 
 const mainNavItems = [
@@ -79,8 +78,6 @@ export function AppSidebar() {
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
-
-                <SidebarSeparator />
 
                 {/* Settings Navigation */}
                 <SidebarGroup>
