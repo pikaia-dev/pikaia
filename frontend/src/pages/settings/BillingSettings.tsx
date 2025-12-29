@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import { useApi } from '../../hooks/useApi'
 import type { BillingAddress } from '../../lib/api'
-import { AddressLookup } from '../../components/ui/address-lookup'
+import { AddressAutocomplete } from '../../components/ui/address-autocomplete'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { Checkbox } from '../../components/ui/checkbox'
@@ -265,36 +265,24 @@ export default function BillingSettings() {
                                 />
                             </div>
 
-                            {/* Address lookup - search helper */}
-                            <div className="rounded-lg border border-dashed border-border p-4 bg-muted/30">
-                                <label className="block text-sm font-medium mb-2">
-                                    🔍 Quick Address Lookup
-                                </label>
-                                <AddressLookup
-                                    onAddressSelect={handleAddressSelect}
-                                    placeholder="Search for an address to auto-fill fields..."
-                                />
-                                <p className="text-xs text-muted-foreground mt-2">
-                                    Search and select an address to automatically populate the fields below
-                                </p>
-                            </div>
-
-                            {/* Street Address - editable */}
+                            {/* Street Address with autocomplete */}
                             <div>
                                 <label htmlFor="line1" className="block text-sm font-medium mb-1">
                                     Street Address
                                 </label>
-                                <input
+                                <AddressAutocomplete
                                     id="line1"
-                                    type="text"
                                     value={address.line1}
-                                    onChange={(e) => updateAddress('line1', e.target.value)}
-                                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                    placeholder="123 Main Street"
+                                    onChange={(value) => updateAddress('line1', value)}
+                                    onAddressSelect={handleAddressSelect}
+                                    placeholder="Start typing to search..."
                                 />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Type to search or enter manually
+                                </p>
                             </div>
 
-                            {/* Address Line 2 - editable */}
+                            {/* Address Line 2 */}
                             <div>
                                 <label htmlFor="line2" className="block text-sm font-medium mb-1">
                                     Address Line 2
