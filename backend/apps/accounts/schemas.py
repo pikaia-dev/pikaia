@@ -293,3 +293,68 @@ class OrganizationDetailResponse(BaseModel):
     slug: str = Field(..., description="URL-safe identifier")
     billing: BillingInfoResponse = Field(..., description="Billing information")
 
+
+# --- Member Management Schemas ---
+
+
+class InviteMemberRequest(BaseModel):
+    """Request to invite a new member to the organization."""
+
+    email: EmailStr = Field(
+        ...,
+        description="Email address of the member to invite",
+        examples=["newuser@example.com"],
+    )
+    name: str = Field(
+        "",
+        max_length=255,
+        description="Optional display name for the member",
+        examples=["Jane Doe"],
+    )
+    role: str = Field(
+        "member",
+        pattern="^(admin|member)$",
+        description="Role to assign: 'admin' or 'member'",
+        examples=["member"],
+    )
+
+
+class UpdateMemberRoleRequest(BaseModel):
+    """Request to update a member's role."""
+
+    role: str = Field(
+        ...,
+        pattern="^(admin|member)$",
+        description="New role: 'admin' or 'member'",
+        examples=["admin"],
+    )
+
+
+class MemberListItem(BaseModel):
+    """Member info for list response."""
+
+    id: int = Field(..., description="Local database member ID")
+    stytch_member_id: str = Field(..., description="Stytch member ID")
+    email: str = Field(..., description="Member's email address")
+    name: str = Field(..., description="Member's display name")
+    role: str = Field(..., description="Member's role (admin or member)")
+    is_admin: bool = Field(..., description="Whether member has admin privileges")
+    status: str = Field(..., description="Member status (active, invited)")
+    created_at: str = Field(..., description="When the member joined (ISO format)")
+
+
+class MemberListResponse(BaseModel):
+    """Response containing list of organization members."""
+
+    members: list[MemberListItem] = Field(
+        ..., description="List of active organization members"
+    )
+
+
+class InviteMemberResponse(BaseModel):
+    """Response after inviting a member."""
+
+    message: str = Field(..., description="Success message")
+    stytch_member_id: str = Field(..., description="Stytch member ID of invited member")
+
+
