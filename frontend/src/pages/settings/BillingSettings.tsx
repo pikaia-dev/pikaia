@@ -8,6 +8,12 @@ import { Checkbox } from '../../components/ui/checkbox'
 import { CountryCombobox } from '../../components/ui/country-combobox'
 import { getVatPrefix } from '../../lib/countries'
 
+/**
+ * Matches EU VAT ID country prefixes (2-3 uppercase letters at the start).
+ * Examples: "DE" (Germany), "FR" (France), "EL" (Greece), "ATU" (Austria - legacy)
+ */
+const VAT_PREFIX_PATTERN = /^[A-Z]{2,3}/
+
 export default function BillingSettings() {
     const { getOrganization, updateBilling } = useApi()
     const billingEmailRef = useRef<HTMLInputElement>(null)
@@ -90,11 +96,11 @@ export default function BillingSettings() {
             setVatId((currentVat) => {
                 if (newPrefix) {
                     // Switching to EU country - add/replace prefix
-                    if (!currentVat || !currentVat.match(/^[A-Z]{2,3}/)) {
+                    if (!currentVat || !currentVat.match(VAT_PREFIX_PATTERN)) {
                         return newPrefix
                     }
                     // Replace old prefix with new one
-                    const vatWithoutPrefix = currentVat.replace(/^[A-Z]{2,3}/, '')
+                    const vatWithoutPrefix = currentVat.replace(VAT_PREFIX_PATTERN, '')
                     return newPrefix + vatWithoutPrefix
                 } else if (oldPrefix && currentVat) {
                     // Switching from EU to non-EU - remove the old prefix
