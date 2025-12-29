@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { useApi } from '../../hooks/useApi'
 import type { BillingAddress } from '../../lib/api'
@@ -10,6 +10,7 @@ import { getVatPrefix } from '../../lib/countries'
 
 export default function BillingSettings() {
     const { getOrganization, updateBilling } = useApi()
+    const billingEmailRef = useRef<HTMLInputElement>(null)
     const [useBillingEmail, setUseBillingEmail] = useState(false)
     const [billingEmail, setBillingEmail] = useState('')
     const [billingName, setBillingName] = useState('')
@@ -113,7 +114,14 @@ export default function BillingSettings() {
                             <Checkbox
                                 id="useBillingEmail"
                                 checked={useBillingEmail}
-                                onCheckedChange={(checked) => setUseBillingEmail(checked === true)}
+                                onCheckedChange={(checked) => {
+                                    const isChecked = checked === true
+                                    setUseBillingEmail(isChecked)
+                                    if (isChecked) {
+                                        // Focus the email input after render
+                                        setTimeout(() => billingEmailRef.current?.focus(), 0)
+                                    }
+                                }}
                             />
                             <div className="space-y-1">
                                 <label
@@ -129,16 +137,17 @@ export default function BillingSettings() {
                         </div>
 
                         {useBillingEmail && (
-                            <div className="max-w-sm ml-7">
+                            <div className="pl-7">
                                 <label htmlFor="billingEmail" className="block text-sm font-medium mb-1">
                                     Billing email
                                 </label>
                                 <input
+                                    ref={billingEmailRef}
                                     id="billingEmail"
                                     type="email"
                                     value={billingEmail}
                                     onChange={(e) => setBillingEmail(e.target.value)}
-                                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                    className="w-full max-w-sm px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                                     placeholder="billing@company.com"
                                     required={useBillingEmail}
                                 />
