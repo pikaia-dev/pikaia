@@ -17,6 +17,9 @@ export default function ProfileSettings() {
                 setName(data.user.name)
                 setEmail(data.user.email)
             })
+            .catch((err) => {
+                toast.error(err instanceof Error ? err.message : 'Failed to load profile')
+            })
             .finally(() => setLoading(false))
     }, [getCurrentUser])
 
