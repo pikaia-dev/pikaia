@@ -109,7 +109,7 @@ export function AppSidebar() {
                 </SidebarGroup>
             </SidebarContent>
 
-            <SidebarFooter className="border-t border-sidebar-border p-4">
+            <SidebarFooter className="p-4">
                 <div className="flex items-center gap-3 mb-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-sm font-medium shrink-0">
                         {member?.name?.[0]?.toUpperCase() || member?.email_address?.[0]?.toUpperCase() || '?'}
