@@ -151,12 +151,18 @@ export function AddressAutocomplete({
                 // Parse address components
                 const parsed = parseAddressFromPlaceResult(place)
 
-                // Update the input with just the street address
-                onChange(parsed.street_address || suggestion.mainText)
+                // Use the mainText from the suggestion (what user clicked on)
+                // This preserves the format they selected, e.g., "Pułaskiego 5/15"
+                // instead of reformatting to "5 Kazimierza Pułaskiego"
+                const streetAddress = suggestion.mainText
+                onChange(streetAddress)
 
-                // Notify parent with full parsed address
+                // Notify parent with full parsed address, but override street_address
                 if (onAddressSelect) {
-                    onAddressSelect(parsed)
+                    onAddressSelect({
+                        ...parsed,
+                        street_address: streetAddress,
+                    })
                 }
             }
 
