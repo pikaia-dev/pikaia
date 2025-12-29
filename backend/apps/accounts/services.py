@@ -152,3 +152,213 @@ def sync_session_to_local(
 
     return user, member, org
 
+
+# --- Member Management Services ---
+
+
+def list_organization_members(organization: Organization) -> list[Member]:
+    """
+    List all active members of an organization.
+
+    Uses select_related to avoid N+1 queries.
+
+    Returns:
+        List of active (non-deleted) Member objects.
+    """
+    return list(
+        Member.objects.filter(organization=organization)
+        .select_related("user")
+        .order_by("created_at")
+    )
+
+
+def invite_member(
+    organization: Organization,
+    email: str,
+    name: str = "",
+    role: str = "member",
+) -> tuple[Member, bool | str]:
+    """
+    Invite a new member to the organization via Stytch.
+
+    Creates the member in Stytch which sends an invite email with Magic Link.
+    Then syncs to local database. If the user was previously removed,
+    reactivates their membership in both Stytch and local database.
+
+    Args:
+        organization: The organization to invite to
+        email: Email address of the member to invite
+        name: Optional display name
+        role: Role to assign ('admin' or 'member')
+
+    Returns:
+        Tuple of (Member object, invite_status: True if sent, False if active, 'pending' if already invited)
+
+    Raises:
+        StytchError: If Stytch API call fails (other than duplicate_email)
+    """
+    from stytch.core.response_base import StytchError
+
+    from apps.accounts.stytch_client import get_stytch_client
+
+    stytch = get_stytch_client()
+
+    # Map role to Stytch role IDs
+    roles = ["stytch_admin"] if role == "admin" else []
+
+    stytch_member_id = None
+    invite_sent: bool | str = False
+
+    # First, check if member already exists in Stytch
+    search_result = stytch.organizations.members.search(
+        organization_ids=[organization.stytch_org_id],
+        query={
+            "operator": "AND",
+            "operands": [
+                {"filter_name": "member_emails", "filter_value": [email]}
+            ],
+        },
+    )
+
+    if search_result.members:
+        # Member already exists - check their status
+        existing_member = search_result.members[0]
+        stytch_member_id = existing_member.member_id
+        member_status = getattr(existing_member, "status", "active")
+
+        if member_status == "deleted":
+            # Reactivate deleted member and send invite
+            stytch.organizations.members.reactivate(
+                organization_id=organization.stytch_org_id,
+                member_id=stytch_member_id,
+            )
+            try:
+                stytch.magic_links.email.invite(
+                    organization_id=organization.stytch_org_id,
+                    email_address=email,
+                )
+                invite_sent = True
+            except StytchError:
+                invite_sent = True  # Reactivated even if email failed
+        elif member_status == "invited":
+            # Already invited, don't resend
+            invite_sent = "pending"
+        else:
+            # Active member
+            invite_sent = False
+
+        # Update their role and name
+        stytch.organizations.members.update(
+            organization_id=organization.stytch_org_id,
+            member_id=stytch_member_id,
+            name=name if name else None,
+            roles=roles,
+        )
+    else:
+        # New member - send invite (creates member AND sends email)
+        result = stytch.magic_links.email.invite(
+            organization_id=organization.stytch_org_id,
+            email_address=email,
+        )
+        stytch_member_id = result.member_id
+        invite_sent = True
+
+        # Update role/name if specified (invite doesn't set these)
+        if name or roles:
+            stytch.organizations.members.update(
+                organization_id=organization.stytch_org_id,
+                member_id=stytch_member_id,
+                name=name if name else None,
+                roles=roles,
+            )
+
+    # Sync to local database - wrapped in transaction for select_for_update
+    with transaction.atomic():
+        user = get_or_create_user_from_stytch(email=email, name=name)
+
+        # Check if this user was previously a member (soft-deleted)
+        # Use all_objects to include soft-deleted members
+        existing_member = Member.all_objects.filter(
+            user=user, organization=organization
+        ).first()
+
+        if existing_member:
+            # Reactivate the soft-deleted member with new Stytch ID
+            existing_member.stytch_member_id = stytch_member_id
+            existing_member.role = role
+            existing_member.deleted_at = None  # Reactivate
+            existing_member.save(
+                update_fields=["stytch_member_id", "role", "deleted_at", "updated_at"]
+            )
+            member = existing_member
+        else:
+            # Create new member
+            member = get_or_create_member_from_stytch(
+                user=user,
+                organization=organization,
+                stytch_member_id=stytch_member_id,
+                role=role,
+            )
+
+    return member, invite_sent
+
+
+def update_member_role(
+    member: Member,
+    role: str,
+) -> Member:
+    """
+    Update a member's role locally and sync to Stytch.
+
+    Args:
+        member: The Member to update
+        role: New role ('admin' or 'member')
+
+    Returns:
+        The updated Member object
+    """
+    from apps.accounts.stytch_client import get_stytch_client
+
+    stytch = get_stytch_client()
+
+    # Map role to Stytch role IDs
+    roles = ["stytch_admin"] if role == "admin" else []
+
+    # Update in Stytch
+    stytch.organizations.members.update(
+        organization_id=member.organization.stytch_org_id,
+        member_id=member.stytch_member_id,
+        roles=roles,
+    )
+
+    # Update locally
+    member.role = role
+    member.save(update_fields=["role", "updated_at"])
+
+    return member
+
+
+def soft_delete_member(member: Member) -> None:
+    """
+    Soft delete a member locally and delete from Stytch.
+
+    The member is marked as deleted locally (deleted_at set) and
+    removed from Stytch so they can no longer authenticate.
+
+    Args:
+        member: The Member to delete
+    """
+    from apps.accounts.stytch_client import get_stytch_client
+
+    stytch = get_stytch_client()
+
+    # Delete from Stytch first (prevents login)
+    stytch.organizations.members.delete(
+        organization_id=member.organization.stytch_org_id,
+        member_id=member.stytch_member_id,
+    )
+
+    # Soft delete locally
+    member.soft_delete()
+
+
