@@ -181,7 +181,7 @@ export default function MembersSettings() {
                                         </td>
                                         <td className="p-3">
                                             <Select value={member.role} onValueChange={(value) => handleRoleChange(member.id, value as 'admin' | 'member')}>
-                                                <SelectTrigger className="w-24 h-8">
+                                                <SelectTrigger className="w-28 h-8">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
