@@ -101,15 +101,15 @@ export default function BillingSettings() {
                 <p className="text-muted-foreground">Manage billing information for invoices</p>
             </div>
 
-            <Card className="max-w-2xl">
-                <CardHeader>
-                    <CardTitle className="text-base">Billing Information</CardTitle>
-                    <CardDescription>This information will appear on your invoices</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        {/* Billing Email Checkbox */}
-                        <div className="flex items-start space-x-3 py-2">
+            <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
+                {/* Invoice Delivery Card */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Invoice Delivery</CardTitle>
+                        <CardDescription>Choose where to receive your invoices</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex items-start space-x-3">
                             <Checkbox
                                 id="useBillingEmail"
                                 checked={useBillingEmail}
@@ -128,9 +128,8 @@ export default function BillingSettings() {
                             </div>
                         </div>
 
-                        {/* Conditional Billing Email Field */}
                         {useBillingEmail && (
-                            <div className="max-w-sm">
+                            <div className="max-w-sm ml-7">
                                 <label htmlFor="billingEmail" className="block text-sm font-medium mb-1">
                                     Billing email
                                 </label>
@@ -145,24 +144,28 @@ export default function BillingSettings() {
                                 />
                             </div>
                         )}
+                    </CardContent>
+                </Card>
 
-                        <hr className="my-4" />
-
+                {/* Billing Address Card */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Billing Address</CardTitle>
+                        <CardDescription>This information will appear on your invoices</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
                         <div>
-
-                            <div>
-                                <label htmlFor="billingName" className="block text-sm font-medium mb-1">
-                                    Legal / company name
-                                </label>
-                                <input
-                                    id="billingName"
-                                    type="text"
-                                    value={billingName}
-                                    onChange={(e) => setBillingName(e.target.value)}
-                                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                    placeholder="Acme Corporation Inc."
-                                />
-                            </div>
+                            <label htmlFor="billingName" className="block text-sm font-medium mb-1">
+                                Legal / company name
+                            </label>
+                            <input
+                                id="billingName"
+                                type="text"
+                                value={billingName}
+                                onChange={(e) => setBillingName(e.target.value)}
+                                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                placeholder="Acme Corporation Inc."
+                            />
                         </div>
 
                         <div>
@@ -279,13 +282,13 @@ export default function BillingSettings() {
                                 </p>
                             </div>
                         </div>
+                    </CardContent>
+                </Card>
 
-                        <Button type="submit" disabled={saving}>
-                            {saving ? 'Saving...' : 'Save billing info'}
-                        </Button>
-                    </form>
-                </CardContent>
-            </Card>
+                <Button type="submit" disabled={saving}>
+                    {saving ? 'Saving...' : 'Save billing info'}
+                </Button>
+            </form>
         </div>
     )
 }
