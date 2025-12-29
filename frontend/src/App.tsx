@@ -8,6 +8,7 @@ import ProfileSettings from './pages/settings/ProfileSettings'
 import OrganizationSettings from './pages/settings/OrganizationSettings'
 import BillingSettings from './pages/settings/BillingSettings'
 import MembersSettings from './pages/settings/MembersSettings'
+import { LoadingSpinner } from './components/ui/loading-spinner'
 import './App.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -16,7 +17,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
+        <LoadingSpinner />
       </div>
     )
   }

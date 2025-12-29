@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { StytchB2B, useStytchMemberSession } from '@stytch/react/b2b'
 import { B2BProducts, AuthFlowType } from '@stytch/vanilla-js/b2b'
+import { LoadingSpinner } from '../components/ui/loading-spinner'
 
 // Discovery config - let Stytch Dashboard handle redirect URLs
 const config = {
@@ -50,7 +51,7 @@ export default function Login() {
     if (!isInitialized || session) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-background">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
+                <LoadingSpinner />
             </div>
         )
     }
