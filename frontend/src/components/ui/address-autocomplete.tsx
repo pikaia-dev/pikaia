@@ -46,6 +46,7 @@ export function AddressAutocomplete({
     const [isOpen, setIsOpen] = useState(false)
     const [selectedIndex, setSelectedIndex] = useState(-1)
     const [isFetching, setIsFetching] = useState(false)
+    const [isFocused, setIsFocused] = useState(false)
 
     // Load Google Places
     useEffect(() => {
@@ -120,16 +121,16 @@ export function AddressAutocomplete({
         }
     }, [])
 
-    // Debounced fetch
+    // Debounced fetch - only when focused
     useEffect(() => {
-        if (!isLoaded || loadError) return
+        if (!isLoaded || loadError || !isFocused) return
 
         const timer = setTimeout(() => {
             fetchSuggestions(value)
         }, 300)
 
         return () => clearTimeout(timer)
-    }, [value, isLoaded, loadError, fetchSuggestions])
+    }, [value, isLoaded, loadError, isFocused, fetchSuggestions])
 
     // Handle suggestion selection
     const handleSelect = useCallback(async (suggestion: Suggestion) => {
@@ -228,7 +229,11 @@ export function AddressAutocomplete({
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    onFocus={() => suggestions.length > 0 && setIsOpen(true)}
+                    onFocus={() => {
+                        setIsFocused(true)
+                        if (suggestions.length > 0) setIsOpen(true)
+                    }}
+                    onBlur={() => setIsFocused(false)}
                     placeholder={loadError ? 'Enter address' : placeholder}
                     disabled={disabled}
                     autoComplete="off"
