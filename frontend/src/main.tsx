@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StytchB2BProvider } from '@stytch/react/b2b'
 import { StytchB2BUIClient } from '@stytch/vanilla-js/b2b'
 import { config } from './lib/env'
+import { Toaster } from './components/ui/sonner'
 import App from './App.tsx'
 import './index.css'
 
@@ -27,8 +28,10 @@ createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <App />
+          <Toaster richColors position="top-right" />
         </BrowserRouter>
       </QueryClientProvider>
     </StytchB2BProvider>
   </StrictMode>,
 )
+
