@@ -12,7 +12,6 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarSeparator,
 } from './ui/sidebar'
 
 const mainNavItems = [
@@ -80,8 +79,6 @@ export function AppSidebar() {
                     </SidebarGroupContent>
                 </SidebarGroup>
 
-                <SidebarSeparator />
-
                 {/* Settings Navigation */}
                 <SidebarGroup>
                     <SidebarGroupLabel>Settings</SidebarGroupLabel>
@@ -109,25 +106,21 @@ export function AppSidebar() {
                 </SidebarGroup>
             </SidebarContent>
 
-            <SidebarFooter className="border-t border-sidebar-border">
+            <SidebarFooter className="p-4">
+                <div className="flex items-center gap-3 mb-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-sm font-medium shrink-0">
+                        {member?.name?.[0]?.toUpperCase() || member?.email_address?.[0]?.toUpperCase() || '?'}
+                    </div>
+                    <div className="flex flex-1 flex-col text-left text-sm min-w-0">
+                        <span className="font-medium truncate">
+                            {member?.name || 'User'}
+                        </span>
+                        <span className="text-xs text-sidebar-foreground/70 truncate">
+                            {member?.email_address}
+                        </span>
+                    </div>
+                </div>
                 <SidebarMenu>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton asChild>
-                            <div className="flex items-center gap-2">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-sm font-medium">
-                                    {member?.name?.[0]?.toUpperCase() || member?.email_address?.[0]?.toUpperCase() || '?'}
-                                </div>
-                                <div className="flex flex-1 flex-col text-left text-sm">
-                                    <span className="font-medium truncate">
-                                        {member?.name || 'User'}
-                                    </span>
-                                    <span className="text-xs text-sidebar-foreground/70 truncate">
-                                        {member?.email_address}
-                                    </span>
-                                </div>
-                            </div>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
                     <SidebarMenuItem>
                         <SidebarMenuButton onClick={handleLogout}>
                             <LogOut className="h-4 w-4" />
