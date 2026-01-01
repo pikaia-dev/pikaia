@@ -35,6 +35,7 @@ class MediaStack(Stack):
         scope: Construct,
         construct_id: str,
         *,
+        cors_allowed_origins: list[str],
         enable_image_transformation: bool = True,
         **kwargs,
     ) -> None:
@@ -57,7 +58,7 @@ class MediaStack(Stack):
                         s3.HttpMethods.PUT,
                         s3.HttpMethods.POST,
                     ],
-                    allowed_origins=["*"],  # Restrict in production
+                    allowed_origins=cors_allowed_origins,
                     expose_headers=["ETag"],
                     max_age=3600,
                 )

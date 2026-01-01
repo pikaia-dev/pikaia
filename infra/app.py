@@ -20,9 +20,13 @@ env = cdk.Environment(
 network = NetworkStack(app, "TangoNetwork", env=env)
 
 # Media stack (S3 + CloudFront + image transformation)
+# CORS origins should be configured per environment via cdk.json or --context flag
+# Example: cdk deploy --context cors_origins='["https://app.yourdomain.com"]'
+cors_origins = app.node.try_get_context("cors_origins") or ["*"]
 media = MediaStack(
     app,
     "TangoMedia",
+    cors_allowed_origins=cors_origins,
     enable_image_transformation=True,
     env=env,
 )
