@@ -19,11 +19,16 @@ const mainNavItems = [
     { to: '/dashboard', label: 'Dashboard', icon: Home },
 ]
 
-const settingsNavItems = [
+// User-level settings (visible to all users)
+const accountNavItems = [
     { to: '/settings/profile', label: 'Profile', icon: User },
-    { to: '/settings/organization', label: 'Organization', icon: Building2, adminOnly: true },
-    { to: '/settings/members', label: 'Members', icon: Users, adminOnly: true },
-    { to: '/settings/billing', label: 'Billing', icon: CreditCard, adminOnly: true },
+]
+
+// Organization-level settings (admin-only)
+const organizationNavItems = [
+    { to: '/settings/organization', label: 'General', icon: Building2 },
+    { to: '/settings/members', label: 'Members', icon: Users },
+    { to: '/settings/billing', label: 'Billing', icon: CreditCard },
 ]
 
 export function AppSidebar() {
@@ -80,14 +85,37 @@ export function AppSidebar() {
                     </SidebarGroupContent>
                 </SidebarGroup>
 
-                {/* Settings Navigation */}
+                {/* Account Settings - visible to all users */}
                 <SidebarGroup>
-                    <SidebarGroupLabel>Settings</SidebarGroupLabel>
+                    <SidebarGroupLabel>Account</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
-                            {settingsNavItems
-                                .filter((item) => !item.adminOnly || isAdmin)
-                                .map((item) => (
+                            {accountNavItems.map((item) => (
+                                <SidebarMenuItem key={item.to}>
+                                    <SidebarMenuButton asChild>
+                                        <NavLink
+                                            to={item.to}
+                                            className={({ isActive }) =>
+                                                isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''
+                                            }
+                                        >
+                                            <item.icon className="h-4 w-4" />
+                                            <span>{item.label}</span>
+                                        </NavLink>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            ))}
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
+
+                {/* Organization Settings - admin only */}
+                {isAdmin && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel>Organization</SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                {organizationNavItems.map((item) => (
                                     <SidebarMenuItem key={item.to}>
                                         <SidebarMenuButton asChild>
                                             <NavLink
@@ -102,9 +130,10 @@ export function AppSidebar() {
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>
                                 ))}
-                        </SidebarMenu>
-                    </SidebarGroupContent>
-                </SidebarGroup>
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
             </SidebarContent>
 
             <SidebarFooter className="p-4">
