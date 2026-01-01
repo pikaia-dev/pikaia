@@ -67,7 +67,7 @@ def create_checkout(
         if existing.is_active:
             raise HttpError(400, "Already subscribed. Use the customer portal to manage.")
     except Subscription.DoesNotExist:
-        pass
+        pass  # No subscription yet - proceed with creation
 
     # Determine quantity
     if payload.quantity:
@@ -205,7 +205,7 @@ def create_subscription_intent_endpoint(
         if existing.is_active:
             raise HttpError(400, "Already subscribed. Use the customer portal to manage.")
     except Subscription.DoesNotExist:
-        pass
+        pass  # No subscription yet - proceed with creation
 
     # Determine quantity
     if payload.quantity:
