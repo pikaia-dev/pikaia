@@ -38,6 +38,11 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+
+def parse_comma_list(value: str) -> list[str]:
+    """Parse a comma-separated string into a list of stripped, non-empty values."""
+    return [item.strip() for item in value.split(",") if item.strip()]
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -47,7 +52,7 @@ SECRET_KEY = settings.SECRET_KEY
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = settings.DEBUG
 
-ALLOWED_HOSTS = [h.strip() for h in settings.ALLOWED_HOSTS.split(",") if h.strip()]
+ALLOWED_HOSTS = parse_comma_list(settings.ALLOWED_HOSTS)
 
 # Application definition
 INSTALLED_APPS = [
