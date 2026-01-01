@@ -20,13 +20,17 @@ env = cdk.Environment(
 network = NetworkStack(app, "TangoNetwork", env=env)
 
 # Media stack (S3 + CloudFront + image transformation)
-# CORS origins should be configured per environment via cdk.json or --context flag
-# Example: cdk deploy --context cors_origins='["https://app.yourdomain.com"]'
+# Configuration via cdk.json or --context flag:
+#   cors_origins: CORS allowed origins (default: ["*"])
+#   enable_versioning: Enable S3 versioning for data recovery (default: false)
+# Example: cdk deploy --context cors_origins='["https://app.yourdomain.com"]' --context enable_versioning=true
 cors_origins = app.node.try_get_context("cors_origins") or ["*"]
+enable_versioning = app.node.try_get_context("enable_versioning") or False
 media = MediaStack(
     app,
     "TangoMedia",
     cors_allowed_origins=cors_origins,
+    enable_versioning=enable_versioning,
     enable_image_transformation=True,
     env=env,
 )
