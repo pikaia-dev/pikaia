@@ -93,6 +93,7 @@ export interface UserInfo {
     id: number
     email: string
     name: string
+    avatar_url: string
 }
 
 export interface MemberInfo {
@@ -107,6 +108,7 @@ export interface OrganizationInfo {
     stytch_org_id: string
     name: string
     slug: string
+    logo_url: string
 }
 
 export interface MeResponse {
@@ -138,6 +140,7 @@ export interface OrganizationDetail {
     stytch_org_id: string
     name: string
     slug: string
+    logo_url: string
     billing: BillingInfo
 }
 

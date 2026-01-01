@@ -4,11 +4,13 @@ import { useApi } from '../../hooks/useApi'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { LoadingSpinner } from '../../components/ui/loading-spinner'
+import { ImageUploader } from '../../components/ui/image-uploader'
 
 export default function OrganizationSettings() {
     const { getOrganization, updateOrganization } = useApi()
     const [name, setName] = useState('')
     const [slug, setSlug] = useState('')
+    const [logoUrl, setLogoUrl] = useState('')
     const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -28,6 +30,7 @@ export default function OrganizationSettings() {
             .then((data) => {
                 setName(data.name)
                 setSlug(data.slug)
+                setLogoUrl(data.logo_url || '')
             })
             .finally(() => setLoading(false))
     }, [getOrganization])
@@ -78,50 +81,68 @@ export default function OrganizationSettings() {
                 <p className="text-muted-foreground">Manage your organization settings</p>
             </div>
 
-            <Card className="max-w-lg">
-                <CardHeader>
-                    <CardTitle className="text-base">Organization Details</CardTitle>
-                    <CardDescription>Update your organization information</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label htmlFor="name" className="block text-sm font-medium mb-1">
-                                Organization name
-                            </label>
-                            <input
-                                id="name"
-                                type="text"
-                                value={name}
-                                onChange={(e) => handleNameChange(e.target.value)}
-                                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                placeholder="Your organization name"
-                            />
-                        </div>
+            <div className="space-y-6 max-w-lg">
+                {/* Logo Card */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Organization Logo</CardTitle>
+                        <CardDescription>Upload a logo for your organization</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ImageUploader
+                            type="logo"
+                            value={logoUrl}
+                            onChange={setLogoUrl}
+                        />
+                    </CardContent>
+                </Card>
 
-                        <div>
-                            <label htmlFor="slug" className="block text-sm font-medium mb-1">
-                                Slug
-                            </label>
-                            <input
-                                id="slug"
-                                type="text"
-                                value={slug}
-                                onChange={(e) => handleSlugChange(e.target.value)}
-                                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                placeholder="your-organization"
-                            />
-                            <p className="text-xs text-muted-foreground mt-1">
-                                URL-friendly identifier (lowercase, hyphens, 2-128 chars)
-                            </p>
-                        </div>
+                {/* Organization Details Card */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Organization Details</CardTitle>
+                        <CardDescription>Update your organization information</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label htmlFor="name" className="block text-sm font-medium mb-1">
+                                    Organization name
+                                </label>
+                                <input
+                                    id="name"
+                                    type="text"
+                                    value={name}
+                                    onChange={(e) => handleNameChange(e.target.value)}
+                                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                    placeholder="Your organization name"
+                                />
+                            </div>
 
-                        <Button type="submit" disabled={saving}>
-                            {saving ? 'Saving...' : 'Save changes'}
-                        </Button>
-                    </form>
-                </CardContent>
-            </Card>
+                            <div>
+                                <label htmlFor="slug" className="block text-sm font-medium mb-1">
+                                    Slug
+                                </label>
+                                <input
+                                    id="slug"
+                                    type="text"
+                                    value={slug}
+                                    onChange={(e) => handleSlugChange(e.target.value)}
+                                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                    placeholder="your-organization"
+                                />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    URL-friendly identifier (lowercase, hyphens, 2-128 chars)
+                                </p>
+                            </div>
+
+                            <Button type="submit" disabled={saving}>
+                                {saving ? 'Saving...' : 'Save changes'}
+                            </Button>
+                        </form>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     )
 }

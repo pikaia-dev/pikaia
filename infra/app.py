@@ -5,6 +5,7 @@ AWS CDK app entry point for Tango infrastructure.
 
 import aws_cdk as cdk
 
+from stacks.media_stack import MediaStack
 from stacks.network_stack import NetworkStack
 
 app = cdk.App()
@@ -17,6 +18,14 @@ env = cdk.Environment(
 
 # Foundation stacks
 network = NetworkStack(app, "TangoNetwork", env=env)
+
+# Media stack (S3 + CloudFront + image transformation)
+media = MediaStack(
+    app,
+    "TangoMedia",
+    enable_image_transformation=True,
+    env=env,
+)
 
 # TODO: Add more stacks as needed
 # database = DatabaseStack(app, "TangoDatabase", vpc=network.vpc, env=env)
