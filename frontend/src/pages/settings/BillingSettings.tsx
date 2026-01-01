@@ -1,20 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import { useApi } from '../../hooks/useApi'
-import type { BillingAddress } from '../../lib/api'
+import type { BillingAddress, SubscriptionInfo } from '../../lib/api'
 import { AddressAutocomplete } from '../../components/ui/address-autocomplete'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { Checkbox } from '../../components/ui/checkbox'
 import { CountryCombobox } from '../../components/ui/country-combobox'
 import { LoadingSpinner } from '../../components/ui/loading-spinner'
+import { PaymentForm } from '../../components/PaymentForm'
 import { getVatPrefix, updateVatIdForCountryChange } from '../../lib/countries'
 import type { ParsedAddress } from '../../lib/google-places'
 
 
 
 export default function BillingSettings() {
-    const { getOrganization, updateBilling } = useApi()
+    const { getOrganization, updateBilling, getSubscription, createPortalSession } = useApi()
     const billingEmailRef = useRef<HTMLInputElement>(null)
     const [useBillingEmail, setUseBillingEmail] = useState(false)
     const [billingEmail, setBillingEmail] = useState('')
@@ -32,17 +33,52 @@ export default function BillingSettings() {
     const [savingDelivery, setSavingDelivery] = useState(false)
     const [savingAddress, setSavingAddress] = useState(false)
 
+    // Subscription state
+    const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
+    const [showUpgradeForm, setShowUpgradeForm] = useState(false)
+    const [loadingPortal, setLoadingPortal] = useState(false)
+
     useEffect(() => {
-        getOrganization()
-            .then((data) => {
-                setUseBillingEmail(data.billing.use_billing_email)
-                setBillingEmail(data.billing.billing_email)
-                setBillingName(data.billing.billing_name)
-                setAddress(data.billing.address)
-                setVatId(data.billing.vat_id)
+        Promise.all([
+            getOrganization(),
+            getSubscription(),
+        ])
+            .then(([orgData, subData]) => {
+                setUseBillingEmail(orgData.billing.use_billing_email)
+                setBillingEmail(orgData.billing.billing_email)
+                setBillingName(orgData.billing.billing_name)
+                setAddress(orgData.billing.address)
+                setVatId(orgData.billing.vat_id)
+                setSubscription(subData)
             })
             .finally(() => setLoading(false))
-    }, [getOrganization])
+    }, [getOrganization, getSubscription])
+
+    const handleUpgradeSuccess = async () => {
+        setShowUpgradeForm(false)
+        // Refetch subscription status
+        // PaymentForm has already synced the subscription via confirmSubscription
+        try {
+            const subData = await getSubscription()
+            setSubscription(subData)
+        } catch {
+            // Reload page as fallback
+            window.location.reload()
+        }
+    }
+
+    const handleManageSubscription = async () => {
+        setLoadingPortal(true)
+        try {
+            const { portal_url } = await createPortalSession({
+                return_url: `${window.location.origin}/settings/billing`,
+            })
+            window.location.href = portal_url
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to open billing portal')
+            setLoadingPortal(false)
+        }
+    }
 
     const handleDeliverySubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -115,6 +151,16 @@ export default function BillingSettings() {
     // Get current VAT prefix based on country
     const currentVatPrefix = getVatPrefix(address.country)
 
+    // Format date for display
+    const formatDate = (isoDate: string | null) => {
+        if (!isoDate) return null
+        return new Date(isoDate).toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+        })
+    }
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -122,6 +168,9 @@ export default function BillingSettings() {
             </div>
         )
     }
+
+    const isSubscribed = subscription && subscription.status !== 'none'
+    const memberCount = subscription?.quantity || 1
 
     return (
         <div className="p-6">
@@ -131,6 +180,86 @@ export default function BillingSettings() {
             </div>
 
             <div className="space-y-6 max-w-2xl">
+                {/* Subscription Status Card */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Subscription</CardTitle>
+                        <CardDescription>
+                            {isSubscribed
+                                ? 'Manage your subscription and billing'
+                                : 'Upgrade to unlock all features'}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {showUpgradeForm ? (
+                            <div className="space-y-4">
+                                <div className="border-b pb-4 mb-4">
+                                    <h3 className="font-medium">Subscribe to Pro Plan</h3>
+                                    <p className="text-sm text-muted-foreground">
+                                        ${10 * memberCount}/month for {memberCount} {memberCount === 1 ? 'seat' : 'seats'}
+                                    </p>
+                                </div>
+                                <PaymentForm
+                                    quantity={memberCount}
+                                    onSuccess={handleUpgradeSuccess}
+                                    onCancel={() => setShowUpgradeForm(false)}
+                                />
+                            </div>
+                        ) : isSubscribed ? (
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-medium">Pro Plan</span>
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${subscription.status === 'active'
+                                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                : subscription.status === 'past_due'
+                                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                                                }`}>
+                                                {subscription.status === 'active' ? 'Active' :
+                                                    subscription.status === 'past_due' ? 'Past Due' :
+                                                        subscription.status === 'trialing' ? 'Trial' :
+                                                            subscription.status}
+                                            </span>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground mt-1">
+                                            {subscription.quantity} {subscription.quantity === 1 ? 'seat' : 'seats'}
+                                            {subscription.current_period_end && (
+                                                <>
+                                                    {' · '}
+                                                    {subscription.cancel_at_period_end
+                                                        ? `Cancels ${formatDate(subscription.current_period_end)}`
+                                                        : `Renews ${formatDate(subscription.current_period_end)}`}
+                                                </>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleManageSubscription}
+                                        disabled={loadingPortal}
+                                    >
+                                        {loadingPortal ? 'Loading...' : 'Manage Subscription'}
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="font-medium">Free Plan</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {memberCount} {memberCount === 1 ? 'member' : 'members'}
+                                    </p>
+                                </div>
+                                <Button onClick={() => setShowUpgradeForm(true)}>
+                                    Upgrade to Pro
+                                </Button>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
                 {/* Invoice Delivery Card */}
                 <Card>
                     <CardHeader>
