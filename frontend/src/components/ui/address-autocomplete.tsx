@@ -112,7 +112,8 @@ export function AddressAutocomplete({
                     }
                 }
             )
-        } catch {
+        } catch (err) {
+            console.error('Failed to fetch address suggestions:', err)
             setSuggestions([])
         }
     }, [])
