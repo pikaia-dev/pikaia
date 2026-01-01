@@ -94,3 +94,21 @@ fetch("/api/v1/...", {
   headers: { Authorization: `Bearer ${session_jwt}` },
 });
 ```
+
+## Webhooks
+
+Stytch webhooks provide real-time synchronization when changes occur outside authentication:
+
+| Event | Action |
+|-------|--------|
+| `*.member.update` | Sync role changes, status updates |
+| `*.member.delete` | Soft delete local member |
+| `*.organization.update` | Sync name, slug, logo changes |
+
+### Setup
+
+1. Configure webhook endpoint in Stytch Dashboard: `https://yourapp.com/webhooks/stytch/`
+2. Copy the signing secret to `STYTCH_WEBHOOK_SECRET` environment variable
+3. Enable events: `member.update`, `member.delete`, `organization.update`
+
+> **Note:** Webhooks use Svix for delivery with automatic retries and signature verification.
