@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-const { handler, parseTransformUri, TRANSFORM_URL_PATTERN } = require('../index.js');
+import { handler, parseTransformUri, TRANSFORM_URL_PATTERN } from '../index.js';
 
 /**
  * Create a mock CloudFront Origin Request event.
