@@ -91,11 +91,16 @@ export default function ProfileSettings() {
         setVerifyingOtp(true)
         try {
             const updatedUser = await verifyPhoneOtp(pendingPhone, otpCode)
-            setPhoneNumber(updatedUser.phone_number)
-            setSavedPhoneNumber(updatedUser.phone_number)
+            // Close dialog first, then update state after animation
             setShowVerifyDialog(false)
-            setOtpCode('')
             toast.success('Phone number verified and saved!')
+            // Update phone state after dialog close animation (300ms is typical)
+            setTimeout(() => {
+                setPhoneNumber(updatedUser.phone_number)
+                setSavedPhoneNumber(updatedUser.phone_number)
+                setOtpCode('')
+                setPendingPhone('')
+            }, 150)
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Verification failed')
         } finally {
