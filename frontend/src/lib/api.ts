@@ -118,6 +118,12 @@ export interface MeResponse {
     organization: OrganizationInfo
 }
 
+// Phone verification types
+export interface PhoneOtpResponse {
+    success: boolean
+    message: string
+}
+
 // Organization settings types
 export interface BillingAddress {
     line1: string

@@ -25,6 +25,7 @@ import {
     type UploadResponse,
     type ConfirmUploadRequest,
     type ImageResponse,
+    type PhoneOtpResponse,
 } from '../lib/api'
 
 /**
@@ -49,8 +50,15 @@ export function useApi() {
         getCurrentUser: () => api.get<MeResponse>('/auth/me'),
 
         // Profile
-        updateProfile: (data: { name: string; phone_number?: string }) =>
+        updateProfile: (data: { name: string }) =>
             api.patch<UserInfo>('/auth/me/profile', data),
+
+        // Phone verification
+        sendPhoneOtp: (phone_number: string) =>
+            api.post<PhoneOtpResponse>('/auth/phone/send-otp', { phone_number }),
+
+        verifyPhoneOtp: (phone_number: string, otp_code: string) =>
+            api.post<UserInfo>('/auth/phone/verify-otp', { phone_number, otp_code }),
 
         // Organization
         getOrganization: () =>
