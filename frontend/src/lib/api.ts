@@ -223,6 +223,26 @@ export interface ConfirmSubscriptionResponse {
     is_active: boolean
 }
 
+// Invoice types
+export interface Invoice {
+    id: string
+    number: string | null
+    status: 'draft' | 'open' | 'paid' | 'uncollectible' | 'void'
+    amount_due: number  // cents
+    amount_paid: number  // cents
+    currency: string
+    created: string  // ISO timestamp
+    hosted_invoice_url: string | null
+    invoice_pdf: string | null
+    period_start: string | null
+    period_end: string | null
+}
+
+export interface InvoiceListResponse {
+    invoices: Invoice[]
+    has_more: boolean
+}
+
 // Media upload types
 export interface UploadRequest {
     filename: string
