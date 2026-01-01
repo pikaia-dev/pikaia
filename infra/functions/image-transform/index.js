@@ -34,17 +34,25 @@ const MIN_DIMENSION = 1;
 
 /**
  * Validate that dimensions are positive integers within reasonable bounds.
+ * Uses strict parsing to reject values like '123abc'.
  *
  * @param {string} width - Width as string
  * @param {string} height - Height as string
  * @returns {{ valid: boolean, width?: number, height?: number, error?: string }}
  */
 function validateDimensions(width, height) {
-    const w = parseInt(width, 10);
-    const h = parseInt(height, 10);
+    // Use Number() for strict parsing - unlike parseInt, it rejects '123abc'
+    const w = Number(width);
+    const h = Number(height);
 
-    if (isNaN(w) || isNaN(h)) {
+    // Check for NaN using Number.isNaN (more reliable than global isNaN)
+    if (Number.isNaN(w) || Number.isNaN(h)) {
         return { valid: false, error: 'Invalid dimensions: not a number' };
+    }
+
+    // Ensure they are integers (no decimals)
+    if (!Number.isInteger(w) || !Number.isInteger(h)) {
+        return { valid: false, error: 'Invalid dimensions: must be integers' };
     }
 
     if (w < MIN_DIMENSION || h < MIN_DIMENSION) {
