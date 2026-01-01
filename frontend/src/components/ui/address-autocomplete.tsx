@@ -107,7 +107,7 @@ export function AddressAutocomplete({
             const request: google.maps.places.AutocompletionRequest = {
                 input: query,
                 types: ['address'],
-                sessionToken: sessionTokenRef.current || undefined,
+                sessionToken: sessionTokenRef.current,
             }
 
             autocompleteServiceRef.current.getPlacePredictions(
@@ -156,7 +156,7 @@ export function AddressAutocomplete({
         const request: google.maps.places.PlaceDetailsRequest = {
             placeId: suggestion.placeId,
             fields: ['formatted_address', 'address_components'],
-            sessionToken: sessionTokenRef.current || undefined,
+            sessionToken: sessionTokenRef.current,
         }
 
         placesServiceRef.current.getDetails(request, (place, status) => {
