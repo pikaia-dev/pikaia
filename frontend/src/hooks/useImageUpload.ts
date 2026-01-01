@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useStytchB2BClient } from '@stytch/react/b2b'
 import { useApi } from './useApi'
 import type { UploadRequest, ImageResponse } from '../lib/api'
 
@@ -11,6 +12,7 @@ export function useImageUpload(
     imageType: 'avatar' | 'logo',
     options: UseImageUploadOptions = {}
 ) {
+    const stytch = useStytchB2BClient()
     const { requestUpload, confirmUpload } = useApi()
     const [isUploading, setIsUploading] = useState(false)
     const [progress, setProgress] = useState(0)
@@ -59,13 +61,21 @@ export function useImageUpload(
                     formData.append(key, value)
                 }
 
+                // Get auth token for the request
+                const tokens = stytch.session.getTokens()
+                const headers: HeadersInit = {}
+                if (tokens?.session_jwt) {
+                    headers['Authorization'] = `Bearer ${tokens.session_jwt}`
+                }
+
                 const response = await fetch(uploadInfo.upload_url, {
                     method: 'POST',
                     body: formData,
-                    credentials: 'include',
+                    headers,
                 })
                 if (!response.ok) {
-                    throw new Error('Upload failed')
+                    const errorText = await response.text()
+                    throw new Error(errorText || 'Upload failed')
                 }
             }
 
@@ -87,7 +97,7 @@ export function useImageUpload(
         } finally {
             setIsUploading(false)
         }
-    }, [imageType, requestUpload, confirmUpload, options])
+    }, [imageType, requestUpload, confirmUpload, options, stytch])
 
     const reset = useCallback(() => {
         setIsUploading(false)

@@ -269,6 +269,7 @@ def get_current_user(request: HttpRequest) -> MeResponse:
             id=user.id,
             email=user.email,
             name=user.name,
+            avatar_url=user.avatar_url,
         ),
         member=MemberInfo(
             id=member.id,
@@ -281,6 +282,7 @@ def get_current_user(request: HttpRequest) -> MeResponse:
             stytch_org_id=org.stytch_org_id,
             name=org.name,
             slug=org.slug,
+            logo_url=org.logo_url,
         ),
     )
 
@@ -357,6 +359,7 @@ def get_organization(request: HttpRequest) -> OrganizationDetailResponse:
         stytch_org_id=org.stytch_org_id,
         name=org.name,
         slug=org.slug,
+        logo_url=org.logo_url,
         billing=BillingInfoResponse(
             use_billing_email=org.use_billing_email,
             billing_email=org.billing_email,
