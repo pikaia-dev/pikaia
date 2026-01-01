@@ -64,3 +64,26 @@ class ConfirmSubscriptionResponse(Schema):
     """Response after confirming subscription."""
 
     is_active: bool
+
+
+class InvoiceResponse(Schema):
+    """Invoice data from Stripe."""
+
+    id: str
+    number: str | None
+    status: str  # 'draft', 'open', 'paid', 'uncollectible', 'void'
+    amount_due: int  # Amount in cents
+    amount_paid: int  # Amount in cents
+    currency: str  # e.g., 'usd'
+    created: str  # ISO timestamp
+    hosted_invoice_url: str | None  # URL to view invoice online
+    invoice_pdf: str | None  # URL to download PDF
+    period_start: str | None  # ISO timestamp
+    period_end: str | None  # ISO timestamp
+
+
+class InvoiceListResponse(Schema):
+    """List of invoices with pagination info."""
+
+    invoices: list[InvoiceResponse]
+    has_more: bool
