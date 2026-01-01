@@ -114,7 +114,7 @@ class TestUploadRequest:
         assert "content type" in str(exc_info.value.message).lower()
 
     def test_rejects_oversized_avatar(self, request_factory: RequestFactory) -> None:
-        """Should reject avatars larger than 2MB."""
+        """Should reject avatars larger than 10MB."""
         org = OrganizationFactory()
         user = UserFactory()
         member = MemberFactory(user=user, organization=org)
@@ -127,7 +127,7 @@ class TestUploadRequest:
         payload = UploadRequestSchema(
             filename="big_avatar.png",
             content_type="image/png",
-            size_bytes=5 * 1024 * 1024,  # 5MB - too large for avatar
+            size_bytes=15 * 1024 * 1024,  # 15MB - too large
             image_type="avatar",
         )
 
@@ -357,7 +357,7 @@ class TestStorageService:
         """Should reject oversized files."""
         errors = storage_service.validate_upload_request(
             content_type="image/png",
-            size_bytes=10 * 1024 * 1024,  # 10MB
+            size_bytes=15 * 1024 * 1024,  # 15MB - exceeds 10MB limit
             image_type="avatar",
         )
         assert len(errors) == 1
