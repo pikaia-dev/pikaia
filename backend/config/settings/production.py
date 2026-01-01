@@ -37,7 +37,7 @@ def _validate_production_secrets() -> None:
     insecure = []
 
     for name, value in _REQUIRED_SECRETS.items():
-        if not value or not value.strip():
+        if not value or (isinstance(value, str) and not value.strip()):
             missing.append(name)
         elif name in _INSECURE_DEFAULTS and value == _INSECURE_DEFAULTS[name]:
             insecure.append(name)
