@@ -59,6 +59,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         default="",
         help_text="URL to user's avatar image",
     )
+    phone_number = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="Phone number in E.164 format (e.g., +14155551234)",
+    )
 
     # Django auth compatibility
     is_active = models.BooleanField(default=True)
