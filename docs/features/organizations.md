@@ -60,7 +60,7 @@ stateDiagram-v2
     Upgraded --> Active: Subscription ends
     Active --> [*]: Org deleted
     
-    note right of Created: Stytch creates org
+    note right of Created: User creates org via Stytch
     note right of Active: Free tier
     note right of Upgraded: Paid subscription
 ```
