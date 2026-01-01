@@ -3,6 +3,13 @@ import { loadGooglePlacesScript, type ParsedAddress } from '@/lib/google-places'
 import { cn } from '@/lib/utils'
 import { Search, Keyboard } from 'lucide-react'
 
+/** Minimum characters before triggering autocomplete */
+const MIN_QUERY_LENGTH = 3
+/** Maximum number of address suggestions to display */
+const MAX_SUGGESTIONS = 5
+/** Debounce delay for fetching suggestions (ms) */
+const DEBOUNCE_DELAY_MS = 300
+
 interface AddressAutocompleteProps {
     value: string
     onChange: (value: string) => void
@@ -82,7 +89,7 @@ export function AddressAutocomplete({
 
     // Fetch suggestions when value changes
     const fetchSuggestions = useCallback(async (query: string) => {
-        if (!query || query.length < 3 || !autocompleteServiceRef.current) {
+        if (!query || query.length < MIN_QUERY_LENGTH || !autocompleteServiceRef.current) {
             setSuggestions([])
             return
         }
@@ -99,7 +106,7 @@ export function AddressAutocomplete({
                 (predictions, status) => {
                     if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
                         setSuggestions(
-                            predictions.slice(0, 5).map((p) => ({
+                            predictions.slice(0, MAX_SUGGESTIONS).map((p) => ({
                                 placeId: p.place_id,
                                 mainText: p.structured_formatting.main_text,
                                 secondaryText: p.structured_formatting.secondary_text || '',
@@ -124,7 +131,7 @@ export function AddressAutocomplete({
 
         const timer = setTimeout(() => {
             fetchSuggestions(value)
-        }, 300)
+        }, DEBOUNCE_DELAY_MS)
 
         return () => clearTimeout(timer)
     }, [value, isLoaded, loadError, isFocused, fetchSuggestions])
@@ -245,7 +252,7 @@ export function AddressAutocomplete({
             </div>
 
             {/* Dropdown */}
-            {isOpen && (suggestions.length > 0 || value.length >= 3) && (
+            {isOpen && (suggestions.length > 0 || value.length >= MIN_QUERY_LENGTH) && (
                 <div
                     ref={dropdownRef}
                     className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg overflow-hidden"
