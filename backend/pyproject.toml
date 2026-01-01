@@ -18,6 +18,8 @@ dependencies = [
     "django-storages[s3]>=1.14",
     "boto3>=1.35",
     "pillow>=11.0",
+    "defusedxml>=0.7",
+    "lxml>=5.0",
 ]
 
 [project.optional-dependencies]
