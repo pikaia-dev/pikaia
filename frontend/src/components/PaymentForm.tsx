@@ -189,8 +189,6 @@ export function PaymentForm({ quantity, onSuccess, onCancel }: PaymentFormProps)
                 borderRadius: '8px',
             },
         },
-        // Only show card payment method, disable Link
-        paymentMethodCreation: 'manual',
     }
 
     return (
