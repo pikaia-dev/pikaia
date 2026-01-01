@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # Resend
     RESEND_API_KEY: str = ""
 
+    # CORS (production only - local uses CORS_ALLOW_ALL_ORIGINS)
+    CORS_ALLOWED_ORIGINS: str = ""  # Comma-separated URLs, e.g. "https://app.example.com"
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
