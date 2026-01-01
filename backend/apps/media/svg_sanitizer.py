@@ -82,6 +82,10 @@ ALLOWED_ATTRIBUTES = frozenset([
     "baseProfile", "contentScriptType", "contentStyleType",
 ])
 
+# Pre-computed lowercase versions for efficient case-insensitive matching
+_ALLOWED_ELEMENTS_LOWER = frozenset(e.lower() for e in ALLOWED_ELEMENTS)
+_ALLOWED_ATTRIBUTES_LOWER = frozenset(a.lower() for a in ALLOWED_ATTRIBUTES)
+
 # Dangerous patterns in attribute values
 DANGEROUS_PATTERNS = [
     re.compile(r"javascript:", re.IGNORECASE),
@@ -153,7 +157,7 @@ def _sanitize_element(element: etree._Element) -> bool:
     local_name = etree.QName(element.tag).localname if element.tag else ""
 
     # Remove elements not in whitelist
-    if local_name.lower() not in ALLOWED_ELEMENTS:
+    if local_name.lower() not in _ALLOWED_ELEMENTS_LOWER:
         return False
 
     # Sanitize attributes
@@ -168,7 +172,7 @@ def _sanitize_element(element: etree._Element) -> bool:
             continue
 
         # Remove attributes not in whitelist
-        if local_attr.lower() not in ALLOWED_ATTRIBUTES:
+        if local_attr.lower() not in _ALLOWED_ATTRIBUTES_LOWER:
             attrs_to_remove.append(attr_name)
             continue
 
