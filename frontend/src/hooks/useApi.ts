@@ -20,6 +20,10 @@ import {
     type SubscriptionIntentResponse,
     type ConfirmSubscriptionRequest,
     type ConfirmSubscriptionResponse,
+    type UploadRequest,
+    type UploadResponse,
+    type ConfirmUploadRequest,
+    type ImageResponse,
 } from '../lib/api'
 
 /**
@@ -90,6 +94,16 @@ export function useApi() {
 
         confirmSubscription: (data: ConfirmSubscriptionRequest) =>
             api.post<ConfirmSubscriptionResponse>('/billing/confirm-subscription', data),
+
+        // Media
+        requestUpload: (data: UploadRequest) =>
+            api.post<UploadResponse>('/media/upload-request', data),
+
+        confirmUpload: (data: ConfirmUploadRequest) =>
+            api.post<ImageResponse>('/media/confirm', data),
+
+        deleteImage: (imageId: string) =>
+            api.delete<MessageResponse>(`/media/${imageId}`),
     }), [api])
 }
 

@@ -56,11 +56,13 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Third-party
     "corsheaders",
+    "storages",
     # Local apps
     "apps.core",
     "apps.accounts",
     "apps.organizations",
     "apps.billing",
+    "apps.media",
 ]
 
 MIDDLEWARE = [
@@ -129,6 +131,13 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "static/"
+
+# Media files (user uploads)
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# Storage backend - defaults to local filesystem
+USE_S3_STORAGE = False
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

@@ -29,6 +29,11 @@ class Organization(models.Model):
         unique=True,
         help_text="URL-safe identifier, e.g. 'acme-corp'",
     )
+    logo_url = models.URLField(
+        blank=True,
+        default="",
+        help_text="URL to organization's logo image",
+    )
 
     # Stripe integration (populated when org upgrades to paid)
     stripe_customer_id = models.CharField(
