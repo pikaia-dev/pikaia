@@ -108,7 +108,7 @@ sequenceDiagram
     participant Stripe
 
     Client->>Middleware: Request + JWT
-    Middleware->>Middleware: Validate JWT locally
+    Middleware->>Stytch: Validate JWT + get roles
     Middleware->>DB: Load User/Member/Org
     Middleware->>API: Attach to request
     API->>Service: Call business logic

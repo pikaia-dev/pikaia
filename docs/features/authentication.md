@@ -37,10 +37,13 @@ sequenceDiagram
 
     Stytch-->>Frontend: Session JWT
     Frontend->>Backend: API request + JWT
-    Backend->>Backend: Validate JWT locally
+    Backend->>Stytch: Validate JWT + get roles
+    Stytch-->>Backend: Member/roles
     Backend->>DB: Sync User/Member/Org
     Backend-->>Frontend: Authenticated response
 ```
+
+> **Note:** JWT validation uses Stytch API (not local JWKS) to ensure role changes reflect immediately.
 
 ## Key Concepts
 

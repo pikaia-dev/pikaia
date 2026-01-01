@@ -39,6 +39,16 @@ MEDIA_ALLOWED_IMAGE_TYPES = [
 USE_S3_STORAGE = False  # Set True in production
 ```
 
+### SVG Security
+
+SVG files are sanitized before storage to prevent XSS attacks:
+
+- Whitelist-based element/attribute filtering
+- Scripts, event handlers, and external references removed
+- Uses `defusedxml` + `lxml` for safe XML parsing
+
+See `apps/media/svg_sanitizer.py` for implementation.
+
 **Frontend** (`lib/constants.ts`):
 ```typescript
 export const MEDIA_UPLOAD = {
