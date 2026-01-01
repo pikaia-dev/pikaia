@@ -9,8 +9,19 @@ export default function OrganizationSettings() {
     const { getOrganization, updateOrganization } = useApi()
     const [name, setName] = useState('')
     const [slug, setSlug] = useState('')
+    const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+
+    // Derive slug from name: lowercase, replace spaces/special chars with hyphens
+    const deriveSlugFromName = (name: string): string => {
+        return name
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9]+/g, '-')  // Replace non-alphanumeric with hyphens
+            .replace(/^-+|-+$/g, '')       // Trim leading/trailing hyphens
+            .slice(0, 128)                 // Limit to 128 chars
+    }
 
     useEffect(() => {
         getOrganization()
@@ -20,6 +31,23 @@ export default function OrganizationSettings() {
             })
             .finally(() => setLoading(false))
     }, [getOrganization])
+
+    const handleNameChange = (newName: string) => {
+        setName(newName)
+        // Auto-update slug if user hasn't manually edited it
+        if (!slugManuallyEdited) {
+            setSlug(deriveSlugFromName(newName))
+        }
+    }
+
+    const handleSlugChange = (newSlug: string) => {
+        const normalized = newSlug.toLowerCase().replace(/\s+/g, '-')
+        setSlug(normalized)
+        // Mark as manually edited if different from auto-derived
+        if (normalized !== deriveSlugFromName(name)) {
+            setSlugManuallyEdited(true)
+        }
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -65,7 +93,7 @@ export default function OrganizationSettings() {
                                 id="name"
                                 type="text"
                                 value={name}
-                                onChange={(e) => setName(e.target.value)}
+                                onChange={(e) => handleNameChange(e.target.value)}
                                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                                 placeholder="Your organization name"
                             />
@@ -79,7 +107,7 @@ export default function OrganizationSettings() {
                                 id="slug"
                                 type="text"
                                 value={slug}
-                                onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
+                                onChange={(e) => handleSlugChange(e.target.value)}
                                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                                 placeholder="your-organization"
                             />
