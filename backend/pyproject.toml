@@ -20,6 +20,7 @@ dependencies = [
     "pillow>=11.0",
     "defusedxml>=0.7",
     "lxml>=5.0",
+    "svix>=1.84.1",
 ]
 
 [project.optional-dependencies]
