@@ -5,11 +5,13 @@ import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { LoadingSpinner } from '../../components/ui/loading-spinner'
 import { ImageUploader } from '../../components/ui/image-uploader'
+import { PhoneNumberInput } from '../../components/ui/phone-number-input'
 
 export default function ProfileSettings() {
     const { getCurrentUser, updateProfile } = useApi()
     const [name, setName] = useState('')
     const [email, setEmail] = useState('')
+    const [phoneNumber, setPhoneNumber] = useState('')
     const [avatarUrl, setAvatarUrl] = useState('')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -19,6 +21,7 @@ export default function ProfileSettings() {
             .then((data) => {
                 setName(data.user.name)
                 setEmail(data.user.email)
+                setPhoneNumber(data.user.phone_number || '')
                 setAvatarUrl(data.user.avatar_url || '')
             })
             .catch((err) => {
@@ -32,7 +35,7 @@ export default function ProfileSettings() {
         setSaving(true)
 
         try {
-            await updateProfile({ name })
+            await updateProfile({ name, phone_number: phoneNumber })
             toast.success('Profile updated successfully')
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Failed to update')
@@ -108,6 +111,19 @@ export default function ProfileSettings() {
                                     className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                                     placeholder="Your name"
                                 />
+                            </div>
+
+                            <div>
+                                <label htmlFor="phone" className="block text-sm font-medium mb-1">
+                                    Phone number
+                                </label>
+                                <PhoneNumberInput
+                                    value={phoneNumber}
+                                    onChange={setPhoneNumber}
+                                />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Used for account security and notifications
+                                </p>
                             </div>
 
                             <Button type="submit" disabled={saving}>

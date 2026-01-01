@@ -94,6 +94,7 @@ export interface UserInfo {
     email: string
     name: string
     avatar_url: string
+    phone_number: string
 }
 
 export interface MemberInfo {

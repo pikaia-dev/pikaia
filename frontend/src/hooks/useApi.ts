@@ -49,7 +49,7 @@ export function useApi() {
         getCurrentUser: () => api.get<MeResponse>('/auth/me'),
 
         // Profile
-        updateProfile: (data: { name: string }) =>
+        updateProfile: (data: { name: string; phone_number?: string }) =>
             api.patch<UserInfo>('/auth/me/profile', data),
 
         // Organization
