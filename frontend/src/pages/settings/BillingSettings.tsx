@@ -459,7 +459,7 @@ export default function BillingSettings() {
                                                 <input
                                                     id="vatId"
                                                     type="text"
-                                                    value={vatId.replace(new RegExp(`^${currentVatPrefix}`), '')}
+                                                    value={vatId.startsWith(currentVatPrefix) ? vatId.slice(currentVatPrefix.length) : vatId}
                                                     onChange={(e) => setVatId(currentVatPrefix + e.target.value)}
                                                     className="flex-1 px-3 py-2 border border-border rounded-r-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                                                     placeholder="123456789"
