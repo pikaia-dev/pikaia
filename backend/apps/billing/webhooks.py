@@ -105,7 +105,7 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
 
     except Exception as e:
         logger.exception("Error handling webhook: %s", e)
-        # Return 200 to acknowledge receipt even on errors
-        # Stripe will retry, and we don't want infinite retries
+        # Return 500 so Stripe will retry with exponential backoff
+        return HttpResponse(status=500)
 
     return HttpResponse(status=200)
