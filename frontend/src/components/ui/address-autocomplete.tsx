@@ -46,6 +46,7 @@ export function AddressAutocomplete({
     const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null)
     const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null)
     const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null)
+    const placesServiceElementRef = useRef<HTMLDivElement | null>(null)
 
     const [isLoaded, setIsLoaded] = useState(false)
     const [loadError, setLoadError] = useState(false)
@@ -76,6 +77,7 @@ export function AddressAutocomplete({
                 autocompleteServiceRef.current = new google.maps.places.AutocompleteService()
                 // Create a container element for PlacesService (required by API)
                 const placesServiceElement = document.createElement('div')
+                placesServiceElementRef.current = placesServiceElement
                 placesServiceRef.current = new google.maps.places.PlacesService(placesServiceElement)
                 sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken()
             } catch (err) {
@@ -84,6 +86,14 @@ export function AddressAutocomplete({
             }
         }
         initServices()
+
+        return () => {
+            // Clean up Google Places services and created DOM element
+            autocompleteServiceRef.current = null
+            placesServiceRef.current = null
+            sessionTokenRef.current = null
+            placesServiceElementRef.current = null
+        }
     }, [isLoaded])
 
     // Fetch suggestions when value changes
