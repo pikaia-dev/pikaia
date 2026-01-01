@@ -67,9 +67,9 @@ pnpm dlx shadcn@latest add button dialog  # Add components
 | **Authorized applications** | Domains | `localhost` |
 | **Authentication** | Magic Links | ✅ Enabled |
 | **Organization settings** | Create Organizations | ✅ Allow members to create |
-| **SDK Configuration** | HttpOnly cookies | ❌ Disabled (required for JS token access) |
+| **SDK Configuration** | HttpOnly cookies | ❌ Disabled (for local dev) |
 
-> **Important:** HttpOnly cookies must be disabled for the frontend to access session JWTs via the Stytch SDK's `session.getTokens()` method.
+> **⚠️ Security Note:** Disabling HttpOnly cookies allows JavaScript to read session JWTs, which increases XSS vulnerability impact. This is **for local development only**. In production, enable HttpOnly cookies and use server-side token handling.
 
 #### Stripe (Billing)
 
@@ -84,18 +84,14 @@ pnpm dlx shadcn@latest add button dialog  # Add components
 
 ### CORS
 
-In development, `CORS_ALLOW_ALL_ORIGINS = True` permits all cross-origin requests. For production, create `config/settings/production.py`:
+In development, CORS permits all origins. For production, `config/settings/production.py` reads allowed origins from environment:
 
-```python
-from .base import *  # noqa: F403
-
-CORS_ALLOWED_ORIGINS = [
-    "https://app.yourdomain.com",
-]
-
-# Optional: Allow credentials (cookies, auth headers)
-CORS_ALLOW_CREDENTIALS = True
+```bash
+# In production, set CORS_ALLOWED_ORIGINS as comma-separated URLs
+export CORS_ALLOWED_ORIGINS="https://app.yourdomain.com,https://www.yourdomain.com"
 ```
+
+> **Note:** Production settings validate that required secrets are configured at startup, crashing with clear errors if misconfigured.
 
 ---
 
@@ -133,7 +129,7 @@ Stytch (source of truth)
 └── Webhooks → Django (sync + extensions)
 ```
 
-- JWTs validated locally with Stytch public keys
+- JWTs validated via Stytch API (ensures role changes reflect immediately)
 - Org picker for users with multiple memberships
 
 > **Note:** Currently, local User/Member/Organization records sync **inline during auth flows** (login, org creation). Out-of-band changes (e.g., admin edits in Stytch dashboard, SCIM provisioning) require webhook handlers — a future enhancement.
