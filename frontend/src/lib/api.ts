@@ -176,4 +176,46 @@ export interface MessageResponse {
     message: string
 }
 
+// Billing/Subscription types
+export interface SubscriptionInfo {
+    status: 'active' | 'past_due' | 'canceled' | 'incomplete' | 'trialing' | 'none'
+    quantity: number
+    current_period_end: string | null
+    cancel_at_period_end: boolean
+    stripe_customer_id: string | null
+}
 
+export interface CheckoutSessionRequest {
+    success_url: string
+    cancel_url: string
+    quantity?: number
+}
+
+export interface CheckoutSessionResponse {
+    checkout_url: string
+}
+
+export interface PortalSessionRequest {
+    return_url: string
+}
+
+export interface PortalSessionResponse {
+    portal_url: string
+}
+
+export interface SubscriptionIntentRequest {
+    quantity?: number
+}
+
+export interface SubscriptionIntentResponse {
+    client_secret: string
+    subscription_id: string
+}
+
+export interface ConfirmSubscriptionRequest {
+    subscription_id: string
+}
+
+export interface ConfirmSubscriptionResponse {
+    is_active: boolean
+}
