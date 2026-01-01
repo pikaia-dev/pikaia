@@ -374,3 +374,134 @@ class TestConfirmSubscription:
             confirm_subscription_endpoint(request, payload)
 
         assert exc_info.value.status_code == 500
+
+
+@pytest.mark.django_db
+class TestListInvoices:
+    """Tests for list_invoices endpoint."""
+
+    @patch("apps.billing.api.get_stripe")
+    def test_admin_can_list_invoices(
+        self, mock_get_stripe, request_factory: RequestFactory
+    ) -> None:
+        """Admin should be able to list invoices."""
+        from apps.billing.api import list_invoices
+
+        # Mock Stripe response
+        mock_stripe = MagicMock()
+        mock_invoice = MagicMock()
+        mock_invoice.id = "in_test_123"
+        mock_invoice.number = "INV-0001"
+        mock_invoice.status = "paid"
+        mock_invoice.amount_due = 1000
+        mock_invoice.amount_paid = 1000
+        mock_invoice.currency = "usd"
+        mock_invoice.created = 1704067200  # 2024-01-01 00:00:00 UTC
+        mock_invoice.hosted_invoice_url = "https://invoice.stripe.com/test"
+        mock_invoice.invoice_pdf = "https://invoice.stripe.com/test.pdf"
+        mock_invoice.period_start = 1704067200
+        mock_invoice.period_end = 1706745600
+
+        mock_invoice_list = MagicMock()
+        mock_invoice_list.data = [mock_invoice]
+        mock_invoice_list.has_more = False
+        mock_stripe.Invoice.list.return_value = mock_invoice_list
+        mock_get_stripe.return_value = mock_stripe
+
+        org = OrganizationFactory(stripe_customer_id="cus_test")
+
+        request = _create_authenticated_request(
+            request_factory, "get", "/api/v1/billing/invoices", org=org, role="admin"
+        )
+
+        result = list_invoices(request)
+
+        assert len(result.invoices) == 1
+        assert result.invoices[0].id == "in_test_123"
+        assert result.invoices[0].number == "INV-0001"
+        assert result.invoices[0].status == "paid"
+        assert result.invoices[0].amount_paid == 1000
+        assert result.has_more is False
+
+    def test_returns_empty_when_no_customer(
+        self, request_factory: RequestFactory
+    ) -> None:
+        """Should return empty list when org has no Stripe customer."""
+        from apps.billing.api import list_invoices
+
+        org = OrganizationFactory(stripe_customer_id="")
+
+        request = _create_authenticated_request(
+            request_factory, "get", "/api/v1/billing/invoices", org=org, role="admin"
+        )
+
+        result = list_invoices(request)
+
+        assert result.invoices == []
+        assert result.has_more is False
+
+    @patch("apps.billing.api.get_stripe")
+    def test_pagination_params_passed_to_stripe(
+        self, mock_get_stripe, request_factory: RequestFactory
+    ) -> None:
+        """Should pass pagination params to Stripe API."""
+        from apps.billing.api import list_invoices
+
+        mock_stripe = MagicMock()
+        mock_invoice_list = MagicMock()
+        mock_invoice_list.data = []
+        mock_invoice_list.has_more = False
+        mock_stripe.Invoice.list.return_value = mock_invoice_list
+        mock_get_stripe.return_value = mock_stripe
+
+        org = OrganizationFactory(stripe_customer_id="cus_test")
+
+        request = _create_authenticated_request(
+            request_factory, "get", "/api/v1/billing/invoices", org=org, role="admin"
+        )
+
+        list_invoices(request, limit=5, starting_after="in_prev")
+
+        mock_stripe.Invoice.list.assert_called_once_with(
+            customer="cus_test",
+            limit=5,
+            starting_after="in_prev",
+        )
+
+    def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
+        """Non-admin should be rejected with 403."""
+        from apps.billing.api import list_invoices
+
+        org = OrganizationFactory(stripe_customer_id="cus_test")
+
+        request = _create_authenticated_request(
+            request_factory, "get", "/api/v1/billing/invoices", org=org, role="member"
+        )
+
+        with pytest.raises(HttpError) as exc_info:
+            list_invoices(request)
+
+        assert exc_info.value.status_code == 403
+
+    @patch("apps.billing.api.get_stripe")
+    def test_stripe_error_returns_500(
+        self, mock_get_stripe, request_factory: RequestFactory
+    ) -> None:
+        """Should return 500 on Stripe errors."""
+        from apps.billing.api import list_invoices
+
+        mock_stripe = MagicMock()
+        mock_stripe.Invoice.list.side_effect = Exception("Stripe API error")
+        mock_get_stripe.return_value = mock_stripe
+
+        org = OrganizationFactory(stripe_customer_id="cus_test")
+
+        request = _create_authenticated_request(
+            request_factory, "get", "/api/v1/billing/invoices", org=org, role="admin"
+        )
+
+        with pytest.raises(HttpError) as exc_info:
+            list_invoices(request)
+
+        assert exc_info.value.status_code == 500
+
