@@ -68,9 +68,9 @@ export function AddressAutocomplete({
             try {
                 await google.maps.importLibrary('places')
                 autocompleteServiceRef.current = new google.maps.places.AutocompleteService()
-                // Create a dummy div for PlacesService (required by API)
-                const dummyDiv = document.createElement('div')
-                placesServiceRef.current = new google.maps.places.PlacesService(dummyDiv)
+                // Create a container element for PlacesService (required by API)
+                const placesServiceElement = document.createElement('div')
+                placesServiceRef.current = new google.maps.places.PlacesService(placesServiceElement)
                 sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken()
             } catch (err) {
                 console.error('Failed to initialize Places services:', err)
