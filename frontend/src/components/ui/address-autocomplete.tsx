@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { loadGooglePlacesScript, parseAddressFromPlace, type ParsedAddress } from '@/lib/google-places'
+import { loadGooglePlacesScript, type ParsedAddress } from '@/lib/google-places'
 import { cn } from '@/lib/utils'
 import { Search, Keyboard } from 'lucide-react'
 
@@ -45,7 +45,6 @@ export function AddressAutocomplete({
     const [suggestions, setSuggestions] = useState<Suggestion[]>([])
     const [isOpen, setIsOpen] = useState(false)
     const [selectedIndex, setSelectedIndex] = useState(-1)
-    const [isFetching, setIsFetching] = useState(false)
     const [isFocused, setIsFocused] = useState(false)
 
     // Load Google Places
@@ -88,7 +87,6 @@ export function AddressAutocomplete({
             return
         }
 
-        setIsFetching(true)
         try {
             const request: google.maps.places.AutocompletionRequest = {
                 input: query,
@@ -99,7 +97,6 @@ export function AddressAutocomplete({
             autocompleteServiceRef.current.getPlacePredictions(
                 request,
                 (predictions, status) => {
-                    setIsFetching(false)
                     if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
                         setSuggestions(
                             predictions.slice(0, 5).map((p) => ({
@@ -116,7 +113,6 @@ export function AddressAutocomplete({
                 }
             )
         } catch {
-            setIsFetching(false)
             setSuggestions([])
         }
     }, [])
