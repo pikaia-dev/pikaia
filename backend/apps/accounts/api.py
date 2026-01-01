@@ -457,7 +457,15 @@ def update_billing(
 
     org.save()
 
-    # TODO: Sync to Stripe (customer address, tax_id)
+    # Sync billing info to Stripe
+    if org.stripe_customer_id:
+        try:
+            from apps.billing.services import sync_billing_to_stripe
+
+            sync_billing_to_stripe(org)
+        except Exception as e:
+            logger.warning("Failed to sync billing to Stripe: %s", e)
+            # Don't fail the request - local update succeeded
 
     return get_organization(request)
 

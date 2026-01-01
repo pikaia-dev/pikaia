@@ -302,6 +302,19 @@ def invite_member(
                 role=role,
             )
 
+    # Sync subscription quantity to Stripe (outside transaction - external call)
+    try:
+        from apps.billing.services import sync_subscription_quantity
+
+        sync_subscription_quantity(organization)
+    except Exception:
+        # Don't fail the invite if billing sync fails
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "Failed to sync subscription quantity for org %s", organization.id
+        )
+
     return member, invite_sent
 
 
@@ -353,14 +366,28 @@ def soft_delete_member(member: Member) -> None:
     from apps.accounts.stytch_client import get_stytch_client
 
     stytch = get_stytch_client()
+    organization = member.organization
 
     # Delete from Stytch first (prevents login)
     stytch.organizations.members.delete(
-        organization_id=member.organization.stytch_org_id,
+        organization_id=organization.stytch_org_id,
         member_id=member.stytch_member_id,
     )
 
     # Soft delete locally
     member.soft_delete()
+
+    # Sync subscription quantity to Stripe (outside transaction - external call)
+    try:
+        from apps.billing.services import sync_subscription_quantity
+
+        sync_subscription_quantity(organization)
+    except Exception:
+        # Don't fail the delete if billing sync fails
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "Failed to sync subscription quantity for org %s", organization.id
+        )
 
 
