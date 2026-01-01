@@ -1,0 +1,29 @@
+"""
+Stripe client configuration.
+
+Provides a configured Stripe client for billing operations.
+"""
+
+import stripe
+
+from config.settings.base import settings
+
+# API version required for billing_mode: flexible and confirmation_secret
+STRIPE_API_VERSION = "2025-06-30.basil"
+
+
+def configure_stripe() -> None:
+    """Configure Stripe API with settings."""
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    stripe.api_version = STRIPE_API_VERSION
+
+
+def get_stripe() -> stripe:
+    """
+    Get configured Stripe module.
+
+    Ensures Stripe is configured before use.
+    """
+    configure_stripe()
+    return stripe
+
