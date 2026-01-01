@@ -1,3 +1,5 @@
+/// <reference types="@types/google.maps" />
+
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { loadGooglePlacesScript, type ParsedAddress } from '@/lib/google-places'
 import { cn } from '@/lib/utils'
@@ -43,7 +45,7 @@ export function AddressAutocomplete({
 }: AddressAutocompleteProps) {
     const inputRef = useRef<HTMLInputElement>(null)
     const dropdownRef = useRef<HTMLDivElement>(null)
-    const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null)
+    const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | undefined>(undefined)
     const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null)
     const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null)
     const placesServiceElementRef = useRef<HTMLDivElement | null>(null)
@@ -91,7 +93,7 @@ export function AddressAutocomplete({
             // Clean up Google Places services and created DOM element
             autocompleteServiceRef.current = null
             placesServiceRef.current = null
-            sessionTokenRef.current = null
+            sessionTokenRef.current = undefined
             placesServiceElementRef.current = null
         }
     }, [isLoaded])

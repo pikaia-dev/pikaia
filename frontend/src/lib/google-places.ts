@@ -1,3 +1,5 @@
+/// <reference types="@types/google.maps" />
+
 /**
  * Google Places API utilities (New API - 2025)
  * Uses PlaceAutocompleteElement for address autocomplete
