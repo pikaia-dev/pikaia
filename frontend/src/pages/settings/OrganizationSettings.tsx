@@ -58,6 +58,20 @@ export default function OrganizationSettings() {
                 <CardContent>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
+                            <label htmlFor="name" className="block text-sm font-medium mb-1">
+                                Organization name
+                            </label>
+                            <input
+                                id="name"
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                placeholder="Your organization name"
+                            />
+                        </div>
+
+                        <div>
                             <label htmlFor="slug" className="block text-sm font-medium mb-1">
                                 Slug
                             </label>
@@ -71,20 +85,6 @@ export default function OrganizationSettings() {
                             <p className="text-xs text-muted-foreground mt-1">
                                 Organization slug is managed by Stytch and cannot be changed
                             </p>
-                        </div>
-
-                        <div>
-                            <label htmlFor="name" className="block text-sm font-medium mb-1">
-                                Organization name
-                            </label>
-                            <input
-                                id="name"
-                                type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                placeholder="Your organization name"
-                            />
                         </div>
 
                         <Button type="submit" disabled={saving}>
