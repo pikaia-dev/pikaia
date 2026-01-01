@@ -94,6 +94,17 @@ flowchart LR
 | `customer.subscription.deleted` | Mark as canceled |
 | `invoice.payment_failed` | Log failure |
 
+## Invoice History
+
+Admins can view past invoices directly in the Billing Settings page. Invoices are fetched from Stripe and include:
+
+- Invoice number and status (Paid, Open, etc.)
+- Amount and currency
+- Date issued
+- Links to view online or download PDF
+
+Pagination is supported for organizations with many invoices.
+
 ## Development Without Webhooks
 
 The `confirm-subscription` endpoint allows syncing status directly from Stripe, bypassing webhooks for local development.
