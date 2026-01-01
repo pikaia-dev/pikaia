@@ -29,7 +29,7 @@ from apps.billing.services import (
     sync_subscription_from_stripe,
 )
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth
+from apps.core.security import BearerAuth, require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,7 @@ bearer_auth = BearerAuth()
     operation_id="createCheckoutSession",
     summary="Create Stripe Checkout session",
 )
+@require_admin
 def create_checkout(
     request: HttpRequest, payload: CheckoutSessionRequest
 ) -> CheckoutSessionResponse:
@@ -52,13 +53,6 @@ def create_checkout(
 
     Admin only. Returns URL to redirect user to Stripe Checkout.
     """
-    if not hasattr(request, "auth_member") or request.auth_member is None:
-        raise HttpError(401, "Not authenticated")
-
-    member = request.auth_member
-    if not member.is_admin:
-        raise HttpError(403, "Admin access required")
-
     org = request.auth_organization
 
     # Check if already subscribed
@@ -101,6 +95,7 @@ def create_checkout(
     operation_id="createPortalSession",
     summary="Create Stripe Customer Portal session",
 )
+@require_admin
 def create_portal(
     request: HttpRequest, payload: PortalSessionRequest
 ) -> PortalSessionResponse:
@@ -109,13 +104,6 @@ def create_portal(
 
     Admin only. Returns URL to redirect user to manage their subscription.
     """
-    if not hasattr(request, "auth_member") or request.auth_member is None:
-        raise HttpError(401, "Not authenticated")
-
-    member = request.auth_member
-    if not member.is_admin:
-        raise HttpError(403, "Admin access required")
-
     org = request.auth_organization
 
     if not org.stripe_customer_id:
@@ -181,6 +169,7 @@ def get_subscription(request: HttpRequest) -> SubscriptionResponse:
     operation_id="createSubscriptionIntent",
     summary="Create subscription intent for Elements payment",
 )
+@require_admin
 def create_subscription_intent_endpoint(
     request: HttpRequest, payload: SubscriptionIntentRequest
 ) -> SubscriptionIntentResponse:
@@ -190,13 +179,6 @@ def create_subscription_intent_endpoint(
     Admin only. Returns client_secret for PaymentElement.
     Use this for embedded Stripe Elements payment flow.
     """
-    if not hasattr(request, "auth_member") or request.auth_member is None:
-        raise HttpError(401, "Not authenticated")
-
-    member = request.auth_member
-    if not member.is_admin:
-        raise HttpError(403, "Admin access required")
-
     org = request.auth_organization
 
     # Check if already subscribed
@@ -239,6 +221,7 @@ def create_subscription_intent_endpoint(
     operation_id="confirmSubscription",
     summary="Confirm subscription after payment",
 )
+@require_admin
 def confirm_subscription_endpoint(
     request: HttpRequest, payload: ConfirmSubscriptionRequest
 ) -> ConfirmSubscriptionResponse:
@@ -248,12 +231,6 @@ def confirm_subscription_endpoint(
     Call this after confirmPayment succeeds to update local database.
     Useful for development without Stripe CLI webhooks.
     """
-    if not hasattr(request, "auth_member") or request.auth_member is None:
-        raise HttpError(401, "Not authenticated")
-
-    member = request.auth_member
-    if not member.is_admin:
-        raise HttpError(403, "Admin access required")
 
     try:
         is_active = sync_subscription_from_stripe(payload.subscription_id)
