@@ -164,7 +164,7 @@ class MediaStack(Stack):
             handler="index.handler",
             code=lambda_.Code.from_asset(str(FUNCTIONS_DIR / "image-transform")),
             timeout=Duration.seconds(30),
-            memory_size=1024,
+            memory_size=512,  # Sufficient for URL parsing; increase when adding Sharp
             description="Image transformation Lambda@Edge for CloudFront",
         )
 
