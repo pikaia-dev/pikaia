@@ -33,12 +33,15 @@ from apps.accounts.schemas import (
     MessageResponse,
     OrganizationDetailResponse,
     OrganizationInfo,
+    PhoneOtpResponse,
+    SendPhoneOtpRequest,
     SessionResponse,
     UpdateBillingRequest,
     UpdateMemberRoleRequest,
     UpdateOrganizationRequest,
     UpdateProfileRequest,
     UserInfo,
+    VerifyPhoneOtpRequest,
 )
 from apps.accounts.services import (
     invite_member,
@@ -300,9 +303,10 @@ def get_current_user(request: HttpRequest) -> MeResponse:
 )
 def update_profile(request: HttpRequest, payload: UpdateProfileRequest) -> UserInfo:
     """
-    Update current user's profile (name and phone number).
+    Update current user's profile (name only).
 
     Updates local database and syncs to Stytch.
+    Phone number changes require OTP verification via /phone/verify-otp.
     """
     if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
         raise HttpError(401, "Not authenticated")
@@ -311,48 +315,20 @@ def update_profile(request: HttpRequest, payload: UpdateProfileRequest) -> UserI
     member = request.auth_member  # type: ignore[attr-defined]
     org = request.auth_organization  # type: ignore[attr-defined]
 
-    # Track what changed for efficient sync
-    old_phone = user.phone_number
-
-    # Update local database
+    # Update local database (name only - phone requires OTP verification)
     user.name = payload.name
-    user.phone_number = payload.phone_number
-    user.save(update_fields=["name", "phone_number", "updated_at"])
+    user.save(update_fields=["name", "updated_at"])
 
-    # Sync to Stytch
+    # Sync name to Stytch
     try:
         client = get_stytch_client()
-
-        # Update name
         client.organizations.members.update(
             organization_id=org.stytch_org_id,
             member_id=member.stytch_member_id,
             name=payload.name,
         )
-
-        # Handle phone number sync (Stytch requires delete-then-update)
-        phone_changed = old_phone != payload.phone_number
-        if phone_changed:
-            # Delete existing phone first (if any)
-            if old_phone:
-                try:
-                    client.organizations.members.delete_phone_number(
-                        organization_id=org.stytch_org_id,
-                        member_id=member.stytch_member_id,
-                    )
-                except StytchError:
-                    pass  # No phone to delete or already deleted
-
-            # Set new phone number (if provided)
-            if payload.phone_number:
-                client.organizations.members.update(
-                    organization_id=org.stytch_org_id,
-                    member_id=member.stytch_member_id,
-                    mfa_phone_number=payload.phone_number,
-                )
-
     except StytchError as e:
-        logger.warning("Failed to sync profile to Stytch: %s", e.details.error_message)
+        logger.warning("Failed to sync name to Stytch: %s", e.details.error_message)
         # Don't fail the request - local update succeeded
 
     return UserInfo(
@@ -363,6 +339,114 @@ def update_profile(request: HttpRequest, payload: UpdateProfileRequest) -> UserI
         phone_number=user.phone_number,
     )
 
+
+# --- Phone Verification ---
+
+
+@router.post(
+    "/phone/send-otp",
+    response={200: PhoneOtpResponse, 400: ErrorResponse, 401: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="sendPhoneOtp",
+    summary="Send OTP to phone for verification",
+)
+def send_phone_otp(request: HttpRequest, payload: SendPhoneOtpRequest) -> PhoneOtpResponse:
+    """
+    Send a one-time password (OTP) to the specified phone number.
+
+    The OTP is used to verify phone ownership before updating the user's profile.
+    Uses Stytch's SMS OTP service.
+    """
+    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+        raise HttpError(401, "Not authenticated")
+
+    member = request.auth_member  # type: ignore[attr-defined]
+    org = request.auth_organization  # type: ignore[attr-defined]
+
+    try:
+        client = get_stytch_client()
+        client.otps.sms.send(
+            organization_id=org.stytch_org_id,
+            member_id=member.stytch_member_id,
+            mfa_phone_number=payload.phone_number,
+        )
+        return PhoneOtpResponse(
+            success=True,
+            message=f"Verification code sent to {payload.phone_number}",
+        )
+    except StytchError as e:
+        logger.warning("Failed to send phone OTP: %s", e.details.error_message)
+        raise HttpError(400, e.details.error_message or "Failed to send verification code")
+
+
+@router.post(
+    "/phone/verify-otp",
+    response={200: UserInfo, 400: ErrorResponse, 401: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="verifyPhoneOtp",
+    summary="Verify phone OTP and update profile",
+)
+def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> UserInfo:
+    """
+    Verify the OTP sent to the phone number.
+
+    On success, updates the user's phone number in both local database and Stytch.
+    """
+    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+        raise HttpError(401, "Not authenticated")
+
+    user = request.auth_user  # type: ignore[attr-defined]
+    member = request.auth_member  # type: ignore[attr-defined]
+    org = request.auth_organization  # type: ignore[attr-defined]
+
+    try:
+        client = get_stytch_client()
+
+        # Verify the OTP with Stytch
+        client.otps.sms.authenticate(
+            organization_id=org.stytch_org_id,
+            member_id=member.stytch_member_id,
+            code=payload.otp_code,
+        )
+
+        # OTP verified - now update the phone number
+        old_phone = user.phone_number
+
+        # Handle Stytch phone update (delete-then-update pattern)
+        if old_phone:
+            try:
+                client.organizations.members.delete_phone_number(
+                    organization_id=org.stytch_org_id,
+                    member_id=member.stytch_member_id,
+                )
+            except StytchError:
+                pass  # No phone to delete
+
+        # Set new phone number in Stytch
+        client.organizations.members.update(
+            organization_id=org.stytch_org_id,
+            member_id=member.stytch_member_id,
+            mfa_phone_number=payload.phone_number,
+        )
+
+        # Update local database
+        user.phone_number = payload.phone_number
+        user.save(update_fields=["phone_number", "updated_at"])
+
+        return UserInfo(
+            id=user.id,
+            email=user.email,
+            name=user.name,
+            avatar_url=user.avatar_url,
+            phone_number=user.phone_number,
+        )
+
+    except StytchError as e:
+        error_msg = e.details.error_message or "Verification failed"
+        if "invalid" in error_msg.lower() or "expired" in error_msg.lower():
+            raise HttpError(400, "Invalid or expired verification code")
+        logger.warning("Phone OTP verification failed: %s", error_msg)
+        raise HttpError(400, error_msg)
 
 
 # --- Organization Settings (Admin Only) ---
