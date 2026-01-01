@@ -1,6 +1,6 @@
 # System Documentation
 
-Comprehensive technical documentation for the Tango Django SaaS Starter.
+Technical documentation for the Tango Django SaaS Starter.
 
 ## Contents
 
@@ -13,10 +13,10 @@ Comprehensive technical documentation for the Tango Django SaaS Starter.
 - [Organizations](./features/organizations.md) — Multi-tenancy and member management
 - [Billing](./features/billing.md) — Stripe integration and payment flows
 
-### API Reference
-- [Accounts API](./api/accounts.md) — Auth and user management endpoints
-- [Billing API](./api/billing.md) — Subscription and payment endpoints
-
 ### Guides
 - [Local Development](./guides/local-development.md) — Setup and common commands
 - [Testing](./guides/testing.md) — Test strategy and running tests
+
+## API Reference
+
+API documentation is auto-generated from OpenAPI spec at `/api/v1/docs`.

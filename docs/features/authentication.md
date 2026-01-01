@@ -2,15 +2,13 @@
 
 ## Overview
 
-Authentication is handled by [Stytch B2B](https://stytch.com/b2b), providing enterprise-ready features:
+Authentication is handled by [Stytch B2B](https://stytch.com/b2b):
 - Magic link email authentication
 - Organization discovery (multi-org access)
 - Role-based access control
-- SSO and SCIM ready (configuration only)
+- SSO and SCIM ready
 
 ## Authentication Flow
-
-### Magic Link Discovery Flow
 
 ```mermaid
 sequenceDiagram
@@ -37,166 +35,59 @@ sequenceDiagram
         Frontend->>Stytch: Create org + exchange IST
     end
 
-    Stytch-->>Frontend: Session JWT + tokens
+    Stytch-->>Frontend: Session JWT
     Frontend->>Backend: API request + JWT
-    Backend->>Backend: Validate JWT (local keys)
+    Backend->>Backend: Validate JWT locally
     Backend->>DB: Sync User/Member/Org
     Backend-->>Frontend: Authenticated response
 ```
 
-### Key Concepts
+## Key Concepts
 
 | Term | Description |
 |------|-------------|
-| **IST** | Intermediate Session Token - temporary token before org selection |
+| **IST** | Intermediate Session Token — temporary token before org selection |
 | **Session JWT** | Full authentication token after org selection |
-| **Discovery** | Process of finding orgs a user can access |
+| **Discovery** | Finding all orgs a user can access |
 | **Exchange** | Converting IST to session by selecting an org |
 
-## JWT Authentication Middleware
-
-Every API request (except public paths) goes through JWT validation:
+## JWT Middleware Flow
 
 ```mermaid
 flowchart TD
-    A[Request arrives] --> B{Is public path?}
-    B -->|Yes| C[Skip auth, continue]
-    B -->|No| D{Has Authorization header?}
-    D -->|No| E[Set auth attrs to None]
-    D -->|Yes| F[Extract JWT from Bearer token]
-    F --> G{Validate JWT with Stytch}
-    G -->|Invalid| E
-    G -->|Valid| H[Get Stytch member + org]
-    H --> I{Member exists locally?}
-    I -->|Yes| J[Load from DB]
-    I -->|No| K[JIT Sync from Stytch]
-    J --> L[Attach user/member/org to request]
-    K --> L
-    L --> M[Continue to endpoint]
-    E --> M
+    A[Request arrives] --> B{Public path?}
+    B -->|Yes| C[Skip auth]
+    B -->|No| D{Has JWT?}
+    D -->|No| E[Unauthenticated]
+    D -->|Yes| F[Validate JWT]
+    F -->|Invalid| E
+    F -->|Valid| G{Member exists?}
+    G -->|Yes| H[Load from DB]
+    G -->|No| I[JIT Sync from Stytch]
+    H --> J[Attach to request]
+    I --> J
 ```
 
-**Public Paths:**
-- `/api/v1/auth/magic-link/*` — Login initiation
-- `/api/v1/health` — Health check
-- `/admin/*` — Django admin
-- `/webhooks/stripe/` — Stripe webhooks
+**Public Paths:** `/api/v1/auth/magic-link/*`, `/api/v1/health`, `/admin/*`, `/webhooks/stripe/`
 
-## API Endpoints
+## Role-Based Access
 
-### Send Magic Link
-```
-POST /api/v1/auth/magic-link/send
-```
-Triggers magic link email for passwordless login.
+Roles synced from Stytch:
 
-**Request:**
-```json
-{ "email": "user@example.com" }
-```
-
-### Authenticate Magic Link
-```
-POST /api/v1/auth/magic-link/authenticate
-```
-Validates the magic link token, returns discovered organizations.
-
-**Request:**
-```json
-{ "token": "magic_link_token_from_email" }
-```
-
-**Response:**
-```json
-{
-  "intermediate_session_token": "ist_xxx",
-  "email": "user@example.com",
-  "discovered_organizations": [
-    {
-      "organization_id": "org-xxx",
-      "organization_name": "Acme Corp",
-      "organization_slug": "acme"
-    }
-  ]
-}
-```
-
-### Create Organization
-```
-POST /api/v1/auth/discovery/create-org
-```
-Creates a new organization and authenticates the user as admin.
-
-**Request:**
-```json
-{
-  "intermediate_session_token": "ist_xxx",
-  "organization_name": "New Corp",
-  "organization_slug": "new-corp"
-}
-```
-
-### Exchange Session
-```
-POST /api/v1/auth/discovery/exchange
-```
-Exchanges IST for a full session by selecting an existing organization.
-
-**Request:**
-```json
-{
-  "intermediate_session_token": "ist_xxx",
-  "organization_id": "org-xxx"
-}
-```
-
-### Get Current User
-```
-GET /api/v1/auth/me
-```
-Returns authenticated user, member, and organization info.
-
-**Requires:** Valid session JWT
-
-### Logout
-```
-POST /api/v1/auth/logout
-```
-Revokes the current session.
-
-**Requires:** Valid session JWT
+| Role | Permissions |
+|------|-------------|
+| `admin` | Full org management, billing, members |
+| `member` | Standard access |
+| `viewer` | Read-only |
 
 ## Frontend Integration
 
-The frontend uses `@stytch/react` SDK:
-
 ```typescript
-import { useStytchB2BClient } from "@stytch/react/b2b";
-
-// Get session tokens for API calls
 const stytch = useStytchB2BClient();
 const { session_jwt } = stytch.session.getTokens();
 
 // Use in API requests
-fetch("/api/v1/auth/me", {
-  headers: {
-    Authorization: `Bearer ${session_jwt}`,
-  },
+fetch("/api/v1/...", {
+  headers: { Authorization: `Bearer ${session_jwt}` },
 });
-```
-
-## Role-Based Access
-
-Roles are synced from Stytch:
-
-| Role | Permissions |
-|------|-------------|
-| `admin` | Full org management, billing, member management |
-| `member` | Standard access, no org settings |
-| `viewer` | Read-only access |
-
-Admin check in endpoints:
-```python
-if not request.auth_member.is_admin:
-    raise HttpError(403, "Admin access required")
 ```
