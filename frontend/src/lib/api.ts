@@ -219,3 +219,30 @@ export interface ConfirmSubscriptionRequest {
 export interface ConfirmSubscriptionResponse {
     is_active: boolean
 }
+
+// Media upload types
+export interface UploadRequest {
+    filename: string
+    content_type: string
+    size_bytes: number
+    image_type: 'avatar' | 'logo'
+}
+
+export interface UploadResponse {
+    upload_url: string
+    method: 'PUT' | 'POST'
+    key: string
+    fields: Record<string, string>
+}
+
+export interface ConfirmUploadRequest {
+    key: string
+    image_type: 'avatar' | 'logo'
+}
+
+export interface ImageResponse {
+    id: string
+    url: string
+    width: number | null
+    height: number | null
+}

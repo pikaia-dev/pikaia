@@ -8,6 +8,7 @@ from ninja.errors import HttpError
 
 from apps.accounts.api import router as auth_router
 from apps.billing.api import router as billing_router
+from apps.media.api import router as media_router
 
 api = NinjaAPI(
     title="B2B SaaS Starter API",
@@ -25,6 +26,10 @@ api = NinjaAPI(
             {
                 "name": "billing",
                 "description": "Subscription management and billing",
+            },
+            {
+                "name": "media",
+                "description": "Image uploads for avatars and logos",
             },
             {
                 "name": "health",
@@ -53,6 +58,7 @@ def http_error_handler(request: HttpRequest, exc: HttpError):
 # Register routers
 api.add_router("/auth", auth_router)
 api.add_router("/billing", billing_router)
+api.add_router("/media", media_router)
 
 
 @api.get("/health", tags=["health"], operation_id="healthCheck", summary="Health check")

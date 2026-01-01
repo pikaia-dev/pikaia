@@ -54,6 +54,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     # User info - email is the cross-org identifier
     email = models.EmailField(unique=True, db_index=True)
     name = models.CharField(max_length=255, blank=True)
+    avatar_url = models.URLField(
+        blank=True,
+        default="",
+        help_text="URL to user's avatar image",
+    )
 
     # Django auth compatibility
     is_active = models.BooleanField(default=True)
