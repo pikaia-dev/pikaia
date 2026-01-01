@@ -20,6 +20,7 @@ import {
     type SubscriptionIntentResponse,
     type ConfirmSubscriptionRequest,
     type ConfirmSubscriptionResponse,
+    type InvoiceListResponse,
     type UploadRequest,
     type UploadResponse,
     type ConfirmUploadRequest,
@@ -94,6 +95,14 @@ export function useApi() {
 
         confirmSubscription: (data: ConfirmSubscriptionRequest) =>
             api.post<ConfirmSubscriptionResponse>('/billing/confirm-subscription', data),
+
+        listInvoices: (params?: { limit?: number; starting_after?: string }) => {
+            const queryParams = new URLSearchParams()
+            if (params?.limit) queryParams.set('limit', params.limit.toString())
+            if (params?.starting_after) queryParams.set('starting_after', params.starting_after)
+            const query = queryParams.toString()
+            return api.get<InvoiceListResponse>(`/billing/invoices${query ? `?${query}` : ''}`)
+        },
 
         // Media
         requestUpload: (data: UploadRequest) =>
