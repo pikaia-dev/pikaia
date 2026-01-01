@@ -270,6 +270,7 @@ def get_current_user(request: HttpRequest) -> MeResponse:
             email=user.email,
             name=user.name,
             avatar_url=user.avatar_url,
+            phone_number=user.phone_number,
         ),
         member=MemberInfo(
             id=member.id,
@@ -299,7 +300,7 @@ def get_current_user(request: HttpRequest) -> MeResponse:
 )
 def update_profile(request: HttpRequest, payload: UpdateProfileRequest) -> UserInfo:
     """
-    Update current user's profile (name).
+    Update current user's profile (name and phone number).
 
     Updates local database and syncs to Stytch.
     """
@@ -310,27 +311,58 @@ def update_profile(request: HttpRequest, payload: UpdateProfileRequest) -> UserI
     member = request.auth_member  # type: ignore[attr-defined]
     org = request.auth_organization  # type: ignore[attr-defined]
 
+    # Track what changed for efficient sync
+    old_phone = user.phone_number
+
     # Update local database
     user.name = payload.name
-    user.save(update_fields=["name", "updated_at"])
+    user.phone_number = payload.phone_number
+    user.save(update_fields=["name", "phone_number", "updated_at"])
 
     # Sync to Stytch
     try:
         client = get_stytch_client()
+
+        # Update name
         client.organizations.members.update(
             organization_id=org.stytch_org_id,
             member_id=member.stytch_member_id,
             name=payload.name,
         )
+
+        # Handle phone number sync (Stytch requires delete-then-update)
+        phone_changed = old_phone != payload.phone_number
+        if phone_changed:
+            # Delete existing phone first (if any)
+            if old_phone:
+                try:
+                    client.organizations.members.delete_phone_number(
+                        organization_id=org.stytch_org_id,
+                        member_id=member.stytch_member_id,
+                    )
+                except StytchError:
+                    pass  # No phone to delete or already deleted
+
+            # Set new phone number (if provided)
+            if payload.phone_number:
+                client.organizations.members.update(
+                    organization_id=org.stytch_org_id,
+                    member_id=member.stytch_member_id,
+                    mfa_phone_number=payload.phone_number,
+                )
+
     except StytchError as e:
-        logger.warning("Failed to sync name to Stytch: %s", e.details.error_message)
+        logger.warning("Failed to sync profile to Stytch: %s", e.details.error_message)
         # Don't fail the request - local update succeeded
 
     return UserInfo(
         id=user.id,
         email=user.email,
         name=user.name,
+        avatar_url=user.avatar_url,
+        phone_number=user.phone_number,
     )
+
 
 
 # --- Organization Settings (Admin Only) ---
