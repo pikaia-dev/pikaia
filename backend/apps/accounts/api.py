@@ -363,12 +363,17 @@ def send_phone_otp(request: HttpRequest, payload: SendPhoneOtpRequest) -> PhoneO
     member = request.auth_member  # type: ignore[attr-defined]
     org = request.auth_organization  # type: ignore[attr-defined]
 
+    # Extract session JWT from auth header
+    auth_header = request.headers.get("Authorization", "")
+    session_jwt = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
+
     try:
         client = get_stytch_client()
         client.otps.sms.send(
             organization_id=org.stytch_org_id,
             member_id=member.stytch_member_id,
             mfa_phone_number=payload.phone_number,
+            session_jwt=session_jwt,
         )
         return PhoneOtpResponse(
             success=True,
@@ -399,6 +404,10 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
     member = request.auth_member  # type: ignore[attr-defined]
     org = request.auth_organization  # type: ignore[attr-defined]
 
+    # Extract session JWT from auth header
+    auth_header = request.headers.get("Authorization", "")
+    session_jwt = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
+
     try:
         client = get_stytch_client()
 
@@ -407,6 +416,7 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
             organization_id=org.stytch_org_id,
             member_id=member.stytch_member_id,
             code=payload.otp_code,
+            session_jwt=session_jwt,
         )
 
         # OTP verified - now update the phone number
