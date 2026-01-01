@@ -1,0 +1,17 @@
+{
+    "name": "@tango/image-transform-lambda",
+    "version": "1.0.0",
+    "description": "Lambda@Edge function for CloudFront image transformation",
+    "main": "index.js",
+    "type": "commonjs",
+    "scripts": {
+        "test": "vitest run",
+        "test:watch": "vitest"
+    },
+    "devDependencies": {
+        "vitest": "^2.0.0"
+    },
+    "engines": {
+        "node": ">=20.0.0"
+    }
+}

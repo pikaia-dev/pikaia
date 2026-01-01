@@ -5,6 +5,8 @@ This implements the AWS Dynamic Image Transformation pattern:
 https://aws.amazon.com/solutions/implementations/dynamic-image-transformation-for-amazon-cloudfront/
 """
 
+from pathlib import Path
+
 from aws_cdk import (
     CfnOutput,
     Duration,
@@ -17,6 +19,9 @@ from aws_cdk import (
     aws_s3 as s3,
 )
 from constructs import Construct
+
+# Path to Lambda functions directory
+FUNCTIONS_DIR = Path(__file__).parent.parent / "functions"
 
 
 class MediaStack(Stack):
@@ -153,7 +158,7 @@ class MediaStack(Stack):
             "ImageTransformLambda",
             runtime=lambda_.Runtime.NODEJS_20_X,
             handler="index.handler",
-            code=lambda_.Code.from_inline(self._get_transform_lambda_code()),
+            code=lambda_.Code.from_asset(str(FUNCTIONS_DIR / "image-transform")),
             timeout=Duration.seconds(30),
             memory_size=1024,
             description="Image transformation Lambda@Edge for CloudFront",
@@ -163,44 +168,3 @@ class MediaStack(Stack):
         self.bucket.grant_read(fn)
 
         return fn
-
-    def _get_transform_lambda_code(self) -> str:
-        """
-        Returns the Lambda@Edge code for image transformation.
-
-        Note: For production, use a bundled Lambda with Sharp installed.
-        This inline code provides the URL parsing logic; Sharp requires
-        a Lambda layer or custom deployment package.
-        """
-        return '''
-const https = require('https');
-const querystring = require('querystring');
-
-exports.handler = async (event) => {
-    const request = event.Records[0].cf.request;
-    const uri = request.uri;
-
-    // Parse transformation parameters from URI
-    // Format: /{fit}/{width}x{height}/{key} or /{width}x{height}/{key}
-    const transformMatch = uri.match(/^\\/(fit-in|cover|contain)?\\/?(\\d+)x(\\d+)\\/(.+)$/);
-
-    if (!transformMatch) {
-        // No transformation requested, pass through
-        return request;
-    }
-
-    const [, fit, width, height, key] = transformMatch;
-
-    // Rewrite URI to original image and add query params for origin
-    request.uri = '/' + key;
-
-    // Store transform params in custom header for origin response Lambda
-    request.headers['x-transform-width'] = [{ key: 'X-Transform-Width', value: width }];
-    request.headers['x-transform-height'] = [{ key: 'X-Transform-Height', value: height }];
-    if (fit) {
-        request.headers['x-transform-fit'] = [{ key: 'X-Transform-Fit', value: fit }];
-    }
-
-    return request;
-};
-'''
