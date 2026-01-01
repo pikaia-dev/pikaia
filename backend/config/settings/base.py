@@ -139,6 +139,16 @@ MEDIA_ROOT = BASE_DIR / "media"
 # Storage backend - defaults to local filesystem
 USE_S3_STORAGE = False
 
+# Media upload limits
+MEDIA_MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
+MEDIA_ALLOWED_IMAGE_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/svg+xml",
+    "image/avif",
+]
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
