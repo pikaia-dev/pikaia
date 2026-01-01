@@ -1,9 +1,16 @@
 """
-Core security - authentication classes for API.
+Core security - authentication and authorization for API.
 """
 
+from collections.abc import Callable
+from functools import wraps
+from typing import Any, TypeVar
+
 from django.http import HttpRequest
+from ninja.errors import HttpError
 from ninja.security import HttpBearer
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 
 class BearerAuth(HttpBearer):
@@ -27,3 +34,35 @@ class BearerAuth(HttpBearer):
 
         return token
 
+
+def require_admin(func: F) -> F:
+    """
+    Decorator that enforces admin role for an endpoint.
+
+    Use this on any endpoint that should be restricted to organization admins.
+    Must be applied AFTER @router.get/post/etc (decorators execute bottom-up).
+
+    Example:
+        @router.post("/billing/checkout")
+        @require_admin
+        def create_checkout(request: HttpRequest) -> CheckoutResponse:
+            ...
+
+    Raises:
+        HttpError(401): If user is not authenticated
+        HttpError(403): If user is not an admin
+    """
+
+    @wraps(func)
+    def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> Any:
+        # Check authentication
+        if not hasattr(request, "auth_member") or request.auth_member is None:
+            raise HttpError(401, "Not authenticated")
+
+        # Check admin role
+        if not request.auth_member.is_admin:
+            raise HttpError(403, "Admin access required")
+
+        return func(request, *args, **kwargs)
+
+    return wrapper  # type: ignore[return-value]

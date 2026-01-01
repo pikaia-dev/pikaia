@@ -49,7 +49,7 @@ from apps.accounts.services import (
 )
 from apps.accounts.stytch_client import get_stytch_client
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth
+from apps.core.security import BearerAuth, require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -384,6 +384,7 @@ def get_organization(request: HttpRequest) -> OrganizationDetailResponse:
     operation_id="updateOrganization",
     summary="Update organization settings",
 )
+@require_admin
 def update_organization(
     request: HttpRequest, payload: UpdateOrganizationRequest
 ) -> OrganizationDetailResponse:
@@ -392,13 +393,6 @@ def update_organization(
 
     Admin only. Updates local database and syncs to Stytch.
     """
-    if not hasattr(request, "auth_member") or request.auth_member is None:  # type: ignore[attr-defined]
-        raise HttpError(401, "Not authenticated")
-
-    member = request.auth_member  # type: ignore[attr-defined]
-    if not member.is_admin:
-        raise HttpError(403, "Admin access required")
-
     org = request.auth_organization  # type: ignore[attr-defined]
 
     # Update local database
@@ -433,6 +427,7 @@ def update_organization(
     operation_id="updateBilling",
     summary="Update organization billing info",
 )
+@require_admin
 def update_billing(
     request: HttpRequest, payload: UpdateBillingRequest
 ) -> OrganizationDetailResponse:
@@ -441,13 +436,6 @@ def update_billing(
 
     Admin only. This is our system's data - synced out to Stripe.
     """
-    if not hasattr(request, "auth_member") or request.auth_member is None:  # type: ignore[attr-defined]
-        raise HttpError(401, "Not authenticated")
-
-    member = request.auth_member  # type: ignore[attr-defined]
-    if not member.is_admin:
-        raise HttpError(403, "Admin access required")
-
     org = request.auth_organization  # type: ignore[attr-defined]
 
     # Update billing fields
@@ -490,19 +478,13 @@ def update_billing(
     operation_id="listMembers",
     summary="List organization members",
 )
+@require_admin
 def list_members(request: HttpRequest) -> MemberListResponse:
     """
     List all active members of the current organization.
 
     Admin only.
     """
-    if not hasattr(request, "auth_member") or request.auth_member is None:  # type: ignore[attr-defined]
-        raise HttpError(401, "Not authenticated")
-
-    member = request.auth_member  # type: ignore[attr-defined]
-    if not member.is_admin:
-        raise HttpError(403, "Admin access required")
-
     org = request.auth_organization  # type: ignore[attr-defined]
     members = list_organization_members(org)
 
@@ -546,6 +528,7 @@ def list_members(request: HttpRequest) -> MemberListResponse:
     operation_id="inviteMember",
     summary="Invite a new member",
 )
+@require_admin
 def invite_member_endpoint(
     request: HttpRequest, payload: InviteMemberRequest
 ) -> InviteMemberResponse:
@@ -554,12 +537,7 @@ def invite_member_endpoint(
 
     Admin only. Stytch sends the invite email with Magic Link.
     """
-    if not hasattr(request, "auth_member") or request.auth_member is None:  # type: ignore[attr-defined]
-        raise HttpError(401, "Not authenticated")
-
     member = request.auth_member  # type: ignore[attr-defined]
-    if not member.is_admin:
-        raise HttpError(403, "Admin access required")
 
     # Prevent inviting yourself
     if payload.email.lower() == member.user.email.lower():
@@ -598,6 +576,7 @@ def invite_member_endpoint(
     operation_id="updateMemberRole",
     summary="Update member role",
 )
+@require_admin
 def update_member_role_endpoint(
     request: HttpRequest, member_id: int, payload: UpdateMemberRoleRequest
 ) -> MessageResponse:
@@ -608,13 +587,7 @@ def update_member_role_endpoint(
     """
     from apps.accounts.models import Member
 
-    if not hasattr(request, "auth_member") or request.auth_member is None:  # type: ignore[attr-defined]
-        raise HttpError(401, "Not authenticated")
-
     current_member = request.auth_member  # type: ignore[attr-defined]
-    if not current_member.is_admin:
-        raise HttpError(403, "Admin access required")
-
     org = request.auth_organization  # type: ignore[attr-defined]
 
     # Find the target member
@@ -645,6 +618,7 @@ def update_member_role_endpoint(
     operation_id="deleteMember",
     summary="Remove member from organization",
 )
+@require_admin
 def delete_member_endpoint(request: HttpRequest, member_id: int) -> MessageResponse:
     """
     Remove a member from the organization.
@@ -654,13 +628,7 @@ def delete_member_endpoint(request: HttpRequest, member_id: int) -> MessageRespo
     """
     from apps.accounts.models import Member
 
-    if not hasattr(request, "auth_member") or request.auth_member is None:  # type: ignore[attr-defined]
-        raise HttpError(401, "Not authenticated")
-
     current_member = request.auth_member  # type: ignore[attr-defined]
-    if not current_member.is_admin:
-        raise HttpError(403, "Admin access required")
-
     org = request.auth_organization  # type: ignore[attr-defined]
 
     # Find the target member
