@@ -3,6 +3,7 @@ Tests for accounts services.
 """
 
 from dataclasses import dataclass
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -11,7 +12,11 @@ from apps.accounts.services import (
     get_or_create_member_from_stytch,
     get_or_create_organization_from_stytch,
     get_or_create_user_from_stytch,
+    invite_member,
+    list_organization_members,
+    soft_delete_member,
     sync_session_to_local,
+    update_member_role,
 )
 from apps.organizations.models import Organization
 
@@ -299,3 +304,365 @@ class TestUpdateExistingRecords:
         )
         assert updated_member.id == member.id
         assert updated_member.role == "admin"
+
+
+@pytest.mark.django_db
+class TestListOrganizationMembers:
+    """Tests for list_organization_members service."""
+
+    def test_returns_all_active_members(self) -> None:
+        """Should return all active members of the organization."""
+        org = OrganizationFactory()
+        member1 = MemberFactory(organization=org, role="admin")
+        member2 = MemberFactory(organization=org, role="member")
+
+        members = list_organization_members(org)
+
+        assert len(members) == 2
+        assert member1 in members
+        assert member2 in members
+
+    def test_returns_empty_list_for_org_with_no_members(self) -> None:
+        """Should return empty list when organization has no members."""
+        org = OrganizationFactory()
+
+        members = list_organization_members(org)
+
+        assert members == []
+
+    def test_excludes_members_from_other_orgs(self) -> None:
+        """Should only return members from the specified organization."""
+        org1 = OrganizationFactory()
+        org2 = OrganizationFactory()
+        member1 = MemberFactory(organization=org1)
+        MemberFactory(organization=org2)  # Should not be included
+
+        members = list_organization_members(org1)
+
+        assert len(members) == 1
+        assert members[0] == member1
+
+    def test_uses_select_related_for_user(self) -> None:
+        """Should prefetch user data to avoid N+1 queries."""
+        org = OrganizationFactory()
+        MemberFactory(organization=org)
+        MemberFactory(organization=org)
+
+        members = list_organization_members(org)
+
+        # Access user without triggering additional queries
+        for member in members:
+            assert member.user is not None
+            assert member.user.email is not None
+
+    def test_orders_by_created_at(self) -> None:
+        """Should return members ordered by creation time."""
+        org = OrganizationFactory()
+        member1 = MemberFactory(organization=org)
+        member2 = MemberFactory(organization=org)
+
+        members = list_organization_members(org)
+
+        # First member should come before second
+        assert members[0].id == member1.id
+        assert members[1].id == member2.id
+
+
+@pytest.mark.django_db
+class TestInviteMember:
+    """Tests for invite_member service."""
+
+    @patch("apps.accounts.stytch_client.get_stytch_client")
+    @patch("apps.billing.services.sync_subscription_quantity")
+    def test_invites_new_member(
+        self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
+    ) -> None:
+        """Should create a new member via Stytch and sync locally."""
+        org = OrganizationFactory()
+
+        # Configure mock Stytch client
+        mock_client = MagicMock()
+        mock_stytch.return_value = mock_client
+        mock_client.organizations.members.search.return_value = MagicMock(members=[])
+        mock_client.magic_links.email.invite.return_value = MagicMock(
+            member_id="stytch-member-new-123"
+        )
+
+        member, invite_sent = invite_member(
+            organization=org,
+            email="newuser@example.com",
+            name="New User",
+            role="member",
+        )
+
+        assert invite_sent is True
+        assert member.user.email == "newuser@example.com"
+        assert member.user.name == "New User"
+        assert member.organization == org
+        assert member.stytch_member_id == "stytch-member-new-123"
+        assert member.role == "member"
+
+        # Verify Stytch was called correctly
+        mock_client.magic_links.email.invite.assert_called_once_with(
+            organization_id=org.stytch_org_id,
+            email_address="newuser@example.com",
+        )
+
+    @patch("apps.accounts.stytch_client.get_stytch_client")
+    @patch("apps.billing.services.sync_subscription_quantity")
+    def test_invites_admin_member(
+        self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
+    ) -> None:
+        """Should create admin member and set role in Stytch."""
+        org = OrganizationFactory()
+
+        mock_client = MagicMock()
+        mock_stytch.return_value = mock_client
+        mock_client.organizations.members.search.return_value = MagicMock(members=[])
+        mock_client.magic_links.email.invite.return_value = MagicMock(
+            member_id="stytch-member-admin-123"
+        )
+
+        member, invite_sent = invite_member(
+            organization=org,
+            email="admin@example.com",
+            name="Admin User",
+            role="admin",
+        )
+
+        assert invite_sent is True
+        assert member.role == "admin"
+
+        # Should update role after invite
+        mock_client.organizations.members.update.assert_called_once()
+
+    @patch("apps.accounts.stytch_client.get_stytch_client")
+    @patch("apps.billing.services.sync_subscription_quantity")
+    def test_returns_false_for_active_member(
+        self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
+    ) -> None:
+        """Should return invite_sent=False for already active member."""
+        org = OrganizationFactory()
+        existing_user = UserFactory(email="existing@example.com")
+        MemberFactory(user=existing_user, organization=org, stytch_member_id="existing-123")
+
+        mock_client = MagicMock()
+        mock_stytch.return_value = mock_client
+
+        existing_stytch_member = MagicMock()
+        existing_stytch_member.member_id = "existing-123"
+        existing_stytch_member.status = "active"
+        mock_client.organizations.members.search.return_value = MagicMock(
+            members=[existing_stytch_member]
+        )
+
+        member, invite_sent = invite_member(
+            organization=org,
+            email="existing@example.com",
+        )
+
+        assert invite_sent is False
+        assert member.user.email == "existing@example.com"
+
+    @patch("apps.accounts.stytch_client.get_stytch_client")
+    @patch("apps.billing.services.sync_subscription_quantity")
+    def test_returns_pending_for_invited_member(
+        self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
+    ) -> None:
+        """Should return invite_sent='pending' for already invited member."""
+        org = OrganizationFactory()
+
+        mock_client = MagicMock()
+        mock_stytch.return_value = mock_client
+
+        invited_stytch_member = MagicMock()
+        invited_stytch_member.member_id = "invited-123"
+        invited_stytch_member.status = "invited"
+        mock_client.organizations.members.search.return_value = MagicMock(
+            members=[invited_stytch_member]
+        )
+
+        member, invite_sent = invite_member(
+            organization=org,
+            email="pending@example.com",
+        )
+
+        assert invite_sent == "pending"
+
+    @patch("apps.accounts.stytch_client.get_stytch_client")
+    @patch("apps.billing.services.sync_subscription_quantity")
+    def test_reactivates_deleted_member(
+        self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
+    ) -> None:
+        """Should reactivate a previously deleted member."""
+        org = OrganizationFactory()
+
+        mock_client = MagicMock()
+        mock_stytch.return_value = mock_client
+
+        deleted_stytch_member = MagicMock()
+        deleted_stytch_member.member_id = "deleted-123"
+        deleted_stytch_member.status = "deleted"
+        mock_client.organizations.members.search.return_value = MagicMock(
+            members=[deleted_stytch_member]
+        )
+
+        member, invite_sent = invite_member(
+            organization=org,
+            email="deleted@example.com",
+        )
+
+        assert invite_sent is True
+        mock_client.organizations.members.reactivate.assert_called_once()
+
+    @patch("apps.accounts.stytch_client.get_stytch_client")
+    @patch("apps.billing.services.sync_subscription_quantity")
+    def test_syncs_subscription_quantity(
+        self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
+    ) -> None:
+        """Should sync subscription quantity after invite."""
+        org = OrganizationFactory()
+
+        mock_client = MagicMock()
+        mock_stytch.return_value = mock_client
+        mock_client.organizations.members.search.return_value = MagicMock(members=[])
+        mock_client.magic_links.email.invite.return_value = MagicMock(
+            member_id="new-member-123"
+        )
+
+        invite_member(organization=org, email="sync@example.com")
+
+        mock_sync_qty.assert_called_once_with(org)
+
+
+@pytest.mark.django_db
+class TestUpdateMemberRole:
+    """Tests for update_member_role service."""
+
+    @patch("apps.accounts.stytch_client.get_stytch_client")
+    def test_updates_role_to_admin(self, mock_stytch: MagicMock) -> None:
+        """Should update member role to admin in both local DB and Stytch."""
+        member = MemberFactory(role="member")
+
+        mock_client = MagicMock()
+        mock_stytch.return_value = mock_client
+
+        updated = update_member_role(member, "admin")
+
+        assert updated.role == "admin"
+        mock_client.organizations.members.update.assert_called_once_with(
+            organization_id=member.organization.stytch_org_id,
+            member_id=member.stytch_member_id,
+            roles=["stytch_admin"],
+        )
+
+    @patch("apps.accounts.stytch_client.get_stytch_client")
+    def test_updates_role_to_member(self, mock_stytch: MagicMock) -> None:
+        """Should update member role from admin to member."""
+        member = MemberFactory(role="admin")
+
+        mock_client = MagicMock()
+        mock_stytch.return_value = mock_client
+
+        updated = update_member_role(member, "member")
+
+        assert updated.role == "member"
+        # Empty roles list for non-admin
+        mock_client.organizations.members.update.assert_called_once_with(
+            organization_id=member.organization.stytch_org_id,
+            member_id=member.stytch_member_id,
+            roles=[],
+        )
+
+    @patch("apps.accounts.stytch_client.get_stytch_client")
+    def test_returns_updated_member(self, mock_stytch: MagicMock) -> None:
+        """Should return the updated member object."""
+        member = MemberFactory(role="member")
+        original_id = member.id
+
+        mock_client = MagicMock()
+        mock_stytch.return_value = mock_client
+
+        updated = update_member_role(member, "admin")
+
+        assert updated.id == original_id
+        assert updated.role == "admin"
+
+
+@pytest.mark.django_db
+class TestSoftDeleteMember:
+    """Tests for soft_delete_member service."""
+
+    @patch("apps.accounts.stytch_client.get_stytch_client")
+    @patch("apps.billing.services.sync_subscription_quantity")
+    def test_soft_deletes_locally(
+        self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
+    ) -> None:
+        """Should soft delete member locally (set deleted_at)."""
+        member = MemberFactory()
+        member_id = member.id
+
+        mock_client = MagicMock()
+        mock_stytch.return_value = mock_client
+
+        soft_delete_member(member)
+
+        # Reload from database using all_objects manager
+        deleted_member = Member.all_objects.get(id=member_id)
+        assert deleted_member.deleted_at is not None
+
+    @patch("apps.accounts.stytch_client.get_stytch_client")
+    @patch("apps.billing.services.sync_subscription_quantity")
+    def test_deletes_from_stytch(
+        self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
+    ) -> None:
+        """Should delete member from Stytch."""
+        member = MemberFactory()
+        org_stytch_id = member.organization.stytch_org_id
+        stytch_member_id = member.stytch_member_id
+
+        mock_client = MagicMock()
+        mock_stytch.return_value = mock_client
+
+        soft_delete_member(member)
+
+        mock_client.organizations.members.delete.assert_called_once_with(
+            organization_id=org_stytch_id,
+            member_id=stytch_member_id,
+        )
+
+    @patch("apps.accounts.stytch_client.get_stytch_client")
+    @patch("apps.billing.services.sync_subscription_quantity")
+    def test_syncs_subscription_quantity(
+        self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
+    ) -> None:
+        """Should sync subscription quantity after delete."""
+        member = MemberFactory()
+        org = member.organization
+
+        mock_client = MagicMock()
+        mock_stytch.return_value = mock_client
+
+        soft_delete_member(member)
+
+        mock_sync_qty.assert_called_once_with(org)
+
+    @patch("apps.accounts.stytch_client.get_stytch_client")
+    @patch("apps.billing.services.sync_subscription_quantity")
+    def test_member_not_in_default_queryset(
+        self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
+    ) -> None:
+        """Deleted member should not appear in default queryset."""
+        member = MemberFactory()
+        org = member.organization
+
+        mock_client = MagicMock()
+        mock_stytch.return_value = mock_client
+
+        soft_delete_member(member)
+
+        # Should not appear in default queryset
+        assert Member.objects.filter(organization=org).count() == 0
+        # But should exist in all_objects
+        assert Member.all_objects.filter(organization=org).count() == 1
+
