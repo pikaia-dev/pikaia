@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { handler, parseTransformUri, TRANSFORM_URL_PATTERN } from '../index.js';
+import {
+    handler,
+    parseTransformUri,
+    validateDimensions,
+    TRANSFORM_URL_PATTERN,
+    MAX_DIMENSION,
+    MIN_DIMENSION,
+} from '../index.js';
 
 /**
  * Create a mock CloudFront Origin Request event.
@@ -87,6 +94,35 @@ describe('parseTransformUri', () => {
     });
 });
 
+describe('validateDimensions', () => {
+    it('accepts valid dimensions', () => {
+        const result = validateDimensions('200', '300');
+        expect(result).toEqual({ valid: true, width: 200, height: 300 });
+    });
+
+    it('rejects dimensions below minimum', () => {
+        const result = validateDimensions('0', '100');
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain(`at least ${MIN_DIMENSION}`);
+    });
+
+    it('rejects dimensions above maximum', () => {
+        const result = validateDimensions('5000', '100');
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain(`not exceed ${MAX_DIMENSION}`);
+    });
+
+    it('accepts maximum dimension', () => {
+        const result = validateDimensions(String(MAX_DIMENSION), String(MAX_DIMENSION));
+        expect(result.valid).toBe(true);
+    });
+
+    it('accepts minimum dimension', () => {
+        const result = validateDimensions(String(MIN_DIMENSION), String(MIN_DIMENSION));
+        expect(result.valid).toBe(true);
+    });
+});
+
 describe('handler', () => {
     it('rewrites transform URL and sets headers', async () => {
         const event = mockCloudFrontEvent('/200x300/avatars/1/photo.png');
@@ -123,5 +159,30 @@ describe('handler', () => {
         expect(result.headers['x-transform-width'][0].value).toBe('50');
         expect(result.headers['x-transform-height'][0].value).toBe('50');
         expect(result.headers['x-transform-fit'][0].value).toBe('cover');
+    });
+
+    it('returns 400 for dimensions exceeding maximum', async () => {
+        const event = mockCloudFrontEvent('/10000x10000/avatars/1/photo.png');
+        const result = await handler(event);
+
+        expect(result.status).toBe('400');
+        expect(result.statusDescription).toBe('Bad Request');
+        expect(result.body).toContain('not exceed');
+    });
+
+    it('returns 400 for zero dimensions', async () => {
+        const event = mockCloudFrontEvent('/0x100/avatars/1/photo.png');
+        const result = await handler(event);
+
+        expect(result.status).toBe('400');
+        expect(result.body).toContain('at least');
+    });
+
+    it('handles malformed events gracefully', async () => {
+        // Missing event structure
+        const result = await handler({});
+
+        expect(result.status).toBe('500');
+        expect(result.statusDescription).toBe('Internal Server Error');
     });
 });
