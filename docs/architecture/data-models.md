@@ -12,6 +12,7 @@ erDiagram
         int id PK
         string email UK
         string name
+        string avatar_url
         boolean is_active
         boolean is_staff
         datetime created_at
@@ -23,6 +24,7 @@ erDiagram
         string stytch_org_id UK
         string name
         string slug UK
+        string logo_url
         string stripe_customer_id
         string billing_email
         string billing_name
@@ -71,6 +73,7 @@ Cross-organization identity. A user can be a member of multiple organizations.
 |-------|------|-------------|
 | `email` | EmailField | Unique identifier, synced from Stytch |
 | `name` | CharField | Display name |
+| `avatar_url` | URLField | Profile picture URL |
 | `is_active` | BooleanField | Account active status |
 | `is_staff` | BooleanField | Django admin access |
 
@@ -82,6 +85,7 @@ Tenant/workspace. Each organization has its own members, settings, and subscript
 | `stytch_org_id` | CharField | Stytch organization ID |
 | `name` | CharField | Organization display name |
 | `slug` | SlugField | URL-safe identifier |
+| `logo_url` | URLField | Organization logo URL |
 | `stripe_customer_id` | CharField | Stripe customer for billing |
 | `billing_*` | Various | Billing address fields |
 | `vat_id` | CharField | EU VAT number |
