@@ -6,6 +6,48 @@ import re
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
+# Stytch slug requirements: 2-128 chars, lowercase alphanumeric + ._~-
+_SLUG_ALLOWED_CHARS = re.compile(r"[^a-z0-9._~-]+")
+_SLUG_VALID_PATTERN = re.compile(r"^[a-z0-9._~-]{2,128}$")
+
+
+def normalize_slug(value: str) -> str:
+    """
+    Normalize a slug to meet Stytch requirements.
+
+    Transformations:
+    1. Lowercase
+    2. Strip whitespace
+    3. Replace consecutive non-allowed chars with single hyphen
+    4. Remove leading/trailing hyphens
+    5. Truncate to 128 chars
+
+    Allowed characters: a-z, 0-9, hyphen, period, underscore, tilde
+    """
+    slug = value.strip().lower()
+    # Replace consecutive non-allowed chars with single hyphen
+    slug = _SLUG_ALLOWED_CHARS.sub("-", slug)
+    # Remove leading/trailing hyphens
+    slug = slug.strip("-")
+    # Truncate to max length
+    slug = slug[:128]
+    return slug
+
+
+def validate_slug(slug: str) -> str:
+    """
+    Validate a normalized slug meets Stytch requirements.
+
+    Raises ValueError if invalid.
+    """
+    if not _SLUG_VALID_PATTERN.match(slug):
+        raise ValueError(
+            "Slug must be 2-128 characters: lowercase letters, numbers, "
+            "hyphens, periods, underscores, or tildes only"
+        )
+    return slug
+
+
 # --- Request Schemas ---
 
 
@@ -69,15 +111,8 @@ class DiscoveryCreateOrgRequest(BaseModel):
         """Normalize slug and validate against Stytch requirements."""
         if not isinstance(v, str):
             raise ValueError("Slug must be a string")
-        # Normalize: strip, lowercase, spaces to hyphens
-        slug = v.strip().lower().replace(" ", "-")
-        # Validate: 2-128 chars, alphanumeric + hyphen/period/underscore/tilde
-        if not re.match(r"^[a-z0-9._~-]{2,128}$", slug):
-            raise ValueError(
-                "Slug must be 2-128 characters: lowercase letters, numbers, "
-                "hyphens, periods, underscores, or tildes only"
-            )
-        return slug
+        slug = normalize_slug(v)
+        return validate_slug(slug)
 
 
 # --- Response Schemas ---
@@ -247,15 +282,8 @@ class UpdateOrganizationRequest(BaseModel):
             return None
         if not isinstance(v, str):
             raise ValueError("Slug must be a string")
-        # Normalize: strip, lowercase, spaces to hyphens
-        slug = v.strip().lower().replace(" ", "-")
-        # Validate: 2-128 chars, alphanumeric + hyphen/period/underscore/tilde
-        if not re.match(r"^[a-z0-9._~-]{2,128}$", slug):
-            raise ValueError(
-                "Slug must be 2-128 characters: lowercase letters, numbers, "
-                "hyphens, periods, underscores, or tildes only"
-            )
-        return slug
+        slug = normalize_slug(v)
+        return validate_slug(slug)
 
 
 class BillingAddressSchema(BaseModel):
