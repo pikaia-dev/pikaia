@@ -8,7 +8,7 @@ import { LoadingSpinner } from '../components/ui/loading-spinner'
 const config = {
     products: [B2BProducts.emailMagicLinks],
     sessionOptions: {
-        sessionDurationMinutes: 60,
+        sessionDurationMinutes: 43200,
     },
     authFlowType: AuthFlowType.Discovery,
 }
