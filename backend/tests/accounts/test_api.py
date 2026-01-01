@@ -362,17 +362,14 @@ class TestSlugValidation:
             )
         assert "2-128 characters" in str(exc_info.value)
 
-    def test_slug_invalid_chars_rejected(self) -> None:
-        """Slugs with invalid characters should be rejected."""
-        from pydantic import ValidationError
-
-        with pytest.raises(ValidationError) as exc_info:
-            DiscoveryCreateOrgRequest(
-                intermediate_session_token="ist_abc",
-                organization_name="Test Corp",
-                organization_slug="acme@corp!",
-            )
-        assert "lowercase letters" in str(exc_info.value)
+    def test_slug_invalid_chars_normalized(self) -> None:
+        """Slugs with invalid characters should be normalized, not rejected."""
+        payload = DiscoveryCreateOrgRequest(
+            intermediate_session_token="ist_abc",
+            organization_name="Test Corp",
+            organization_slug="acme@corp!",
+        )
+        assert payload.organization_slug == "acme-corp"  # Normalized
 
     def test_valid_slug_with_special_chars(self) -> None:
         """Slugs with period, underscore, tilde should be accepted."""
@@ -750,14 +747,15 @@ class TestUpdateOrganization:
         call_kwargs = mock_client.organizations.update.call_args[1]
         assert call_kwargs["organization_slug"] == "new-slug"
 
-    def test_slug_validation_rejects_invalid(self, request_factory: RequestFactory) -> None:
-        """Invalid slug should be rejected by validation."""
-        from pydantic import ValidationError
+    def test_slug_is_normalized(self, request_factory: RequestFactory) -> None:
+        """Slugs with invalid characters should be normalized, not rejected."""
+        # Spaces, uppercase, and special chars get normalized
+        request = UpdateOrganizationRequest(name="Test", slug="Invalid Slug!")
+        assert request.slug == "invalid-slug"  # Normalized, not rejected
 
-        with pytest.raises(ValidationError) as exc_info:
-            UpdateOrganizationRequest(name="Test", slug="Invalid Slug!")
-
-        assert "slug" in str(exc_info.value).lower()
+        # Preserves allowed special chars (period, underscore, tilde)
+        request2 = UpdateOrganizationRequest(name="Test", slug="my_company.test~v2")
+        assert request2.slug == "my_company.test~v2"
 
 
 @pytest.mark.django_db

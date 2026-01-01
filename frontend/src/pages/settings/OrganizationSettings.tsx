@@ -15,14 +15,19 @@ export default function OrganizationSettings() {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
 
-    // Derive slug from name: lowercase, replace spaces/special chars with hyphens
-    const deriveSlugFromName = (name: string): string => {
-        return name
-            .toLowerCase()
+    /**
+     * Normalize a slug to meet Stytch requirements.
+     * Must match backend normalize_slug() in apps/accounts/schemas.py
+     * 
+     * Allowed characters: a-z, 0-9, hyphen, period, underscore, tilde
+     */
+    const normalizeSlug = (value: string): string => {
+        return value
             .trim()
-            .replace(/[^a-z0-9]+/g, '-')  // Replace non-alphanumeric with hyphens
-            .replace(/^-+|-+$/g, '')       // Trim leading/trailing hyphens
-            .slice(0, 128)                 // Limit to 128 chars
+            .toLowerCase()
+            .replace(/[^a-z0-9._~-]+/g, '-')  // Replace non-allowed chars with hyphen
+            .replace(/^-+|-+$/g, '')           // Remove leading/trailing hyphens
+            .slice(0, 128)                     // Truncate to max length
     }
 
     useEffect(() => {
@@ -39,15 +44,15 @@ export default function OrganizationSettings() {
         setName(newName)
         // Auto-update slug if user hasn't manually edited it
         if (!slugManuallyEdited) {
-            setSlug(deriveSlugFromName(newName))
+            setSlug(normalizeSlug(newName))
         }
     }
 
     const handleSlugChange = (newSlug: string) => {
-        const normalized = newSlug.toLowerCase().replace(/\s+/g, '-')
+        const normalized = normalizeSlug(newSlug)
         setSlug(normalized)
         // Mark as manually edited if different from auto-derived
-        if (normalized !== deriveSlugFromName(name)) {
+        if (normalized !== normalizeSlug(name)) {
             setSlugManuallyEdited(true)
         }
     }
