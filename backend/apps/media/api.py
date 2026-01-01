@@ -5,7 +5,7 @@ Media API endpoints for image uploads.
 import logging
 
 from django.http import HttpRequest
-from ninja import File, Router
+from ninja import File, Form, Router
 from ninja.errors import HttpError
 from ninja.files import UploadedFile
 
@@ -150,8 +150,8 @@ def confirm_upload(request: HttpRequest, payload: ConfirmUploadSchema) -> ImageR
 def direct_upload(
     request: HttpRequest,
     file: UploadedFile = File(...),  # noqa: B008
-    key: str = "",
-    content_type: str = "",
+    key: str = Form(""),  # noqa: B008
+    content_type: str = Form(""),  # noqa: B008
 ) -> DirectUploadResponseSchema:
     """
     Direct file upload endpoint for local development.
