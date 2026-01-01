@@ -41,6 +41,7 @@ class MediaStack(Stack):
         construct_id: str,
         *,
         cors_allowed_origins: list[str],
+        enable_versioning: bool = False,
         enable_image_transformation: bool = True,
         **kwargs,
     ) -> None:
@@ -53,11 +54,16 @@ class MediaStack(Stack):
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             encryption=s3.BucketEncryption.S3_MANAGED,
             enforce_ssl=True,
-            versioned=False,  # Enable for production if needed
+            versioned=enable_versioning,
             removal_policy=RemovalPolicy.RETAIN,
             cors=[
                 s3.CorsRule(
-                    allowed_headers=["*"],
+                    allowed_headers=[
+                        "Content-Type",
+                        "Content-Length",
+                        "Content-MD5",
+                        "x-amz-*",
+                    ],
                     allowed_methods=[
                         s3.HttpMethods.GET,
                         s3.HttpMethods.PUT,
