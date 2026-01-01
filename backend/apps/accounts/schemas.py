@@ -205,6 +205,7 @@ class UserInfo(BaseModel):
     email: str = Field(..., description="User's email address")
     name: str = Field(..., description="User's display name")
     avatar_url: str = Field("", description="URL to user's avatar image")
+    phone_number: str = Field("", description="Phone number in E.164 format")
 
 
 class MeResponse(BaseModel):
@@ -256,6 +257,27 @@ class UpdateProfileRequest(BaseModel):
         description="User's display name",
         examples=["Jane Doe"],
     )
+    phone_number: str = Field(
+        "",
+        max_length=20,
+        description="Phone number in E.164 format (e.g., +14155551234)",
+        examples=["+14155551234"],
+    )
+
+    @field_validator("phone_number", mode="before")
+    @classmethod
+    def validate_phone_number(cls, v: str) -> str:
+        """Validate phone number is in E.164 format."""
+        if not v:
+            return ""
+        v = v.strip()
+        if not v.startswith("+"):
+            raise ValueError("Phone number must start with +")
+        if not v[1:].isdigit():
+            raise ValueError("Phone number must contain only digits after +")
+        if len(v) < 8 or len(v) > 16:
+            raise ValueError("Phone number must be 8-16 characters")
+        return v
 
 
 class UpdateOrganizationRequest(BaseModel):
