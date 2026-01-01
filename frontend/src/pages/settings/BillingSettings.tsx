@@ -80,10 +80,11 @@ export default function BillingSettings() {
         }
     }
 
-    const handleDeliverySubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        setSavingDelivery(true)
-
+    const saveBillingInfo = async (
+        setLoading: (v: boolean) => void,
+        successMessage: string
+    ) => {
+        setLoading(true)
         try {
             await updateBilling({
                 use_billing_email: useBillingEmail,
@@ -92,32 +93,22 @@ export default function BillingSettings() {
                 address,
                 vat_id: vatId,
             })
-            toast.success('Invoice delivery settings saved')
+            toast.success(successMessage)
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Failed to update')
         } finally {
-            setSavingDelivery(false)
+            setLoading(false)
         }
+    }
+
+    const handleDeliverySubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        await saveBillingInfo(setSavingDelivery, 'Invoice delivery settings saved')
     }
 
     const handleAddressSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        setSavingAddress(true)
-
-        try {
-            await updateBilling({
-                use_billing_email: useBillingEmail,
-                billing_email: useBillingEmail ? billingEmail : undefined,
-                billing_name: billingName,
-                address,
-                vat_id: vatId,
-            })
-            toast.success('Billing address saved')
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to update')
-        } finally {
-            setSavingAddress(false)
-        }
+        await saveBillingInfo(setSavingAddress, 'Billing address saved')
     }
 
     const updateAddress = (field: keyof BillingAddress, value: string) => {
