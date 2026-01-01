@@ -11,6 +11,15 @@ import {
     type InviteMemberResponse,
     type UpdateMemberRoleRequest,
     type MessageResponse,
+    type SubscriptionInfo,
+    type CheckoutSessionRequest,
+    type CheckoutSessionResponse,
+    type PortalSessionRequest,
+    type PortalSessionResponse,
+    type SubscriptionIntentRequest,
+    type SubscriptionIntentResponse,
+    type ConfirmSubscriptionRequest,
+    type ConfirmSubscriptionResponse,
 } from '../lib/api'
 
 /**
@@ -65,5 +74,22 @@ export function useApi() {
 
         deleteMember: (memberId: number) =>
             api.delete<MessageResponse>(`/auth/organization/members/${memberId}`),
+
+        // Billing
+        getSubscription: () =>
+            api.get<SubscriptionInfo>('/billing/subscription'),
+
+        createCheckoutSession: (data: CheckoutSessionRequest) =>
+            api.post<CheckoutSessionResponse>('/billing/checkout', data),
+
+        createPortalSession: (data: PortalSessionRequest) =>
+            api.post<PortalSessionResponse>('/billing/portal', data),
+
+        createSubscriptionIntent: (data: SubscriptionIntentRequest) =>
+            api.post<SubscriptionIntentResponse>('/billing/subscription-intent', data),
+
+        confirmSubscription: (data: ConfirmSubscriptionRequest) =>
+            api.post<ConfirmSubscriptionResponse>('/billing/confirm-subscription', data),
     }), [api])
 }
+
