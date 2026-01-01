@@ -233,3 +233,4 @@ infra/cdk.out/
 .DS_Store
 Thumbs.db
 
+infra/functions/*/node_modules/

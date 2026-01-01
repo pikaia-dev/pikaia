@@ -1,6 +1,7 @@
 packages:
   - frontend
   - emails
+  - infra/functions/*
 
 onlyBuiltDependencies:
   - esbuild
