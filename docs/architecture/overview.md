@@ -56,7 +56,8 @@ backend/
 │   ├── accounts/      # User, Member models + auth API
 │   ├── organizations/ # Organization model + multi-tenancy
 │   ├── billing/       # Stripe subscriptions
-│   └── core/          # Shared middleware, base models
+│   ├── media/         # Image uploads, SVG sanitization
+│   └── core/          # Security, middleware, shared utilities
 ├── config/
 │   ├── api.py         # API router setup
 │   ├── urls.py        # URL routing
