@@ -275,6 +275,7 @@ export default function BillingSettings() {
                                     checked={useBillingEmail}
                                     onCheckedChange={async (checked) => {
                                         const isChecked = checked === true
+                                        const previousValue = useBillingEmail
                                         setUseBillingEmail(isChecked)
                                         if (!isChecked) {
                                             // Auto-save when unchecking since the form is hidden
@@ -289,7 +290,7 @@ export default function BillingSettings() {
                                                 toast.success('Invoice delivery settings saved')
                                             } catch (err) {
                                                 toast.error(err instanceof Error ? err.message : 'Failed to update')
-                                                setUseBillingEmail(true) // Revert on failure
+                                                setUseBillingEmail(previousValue) // Revert to original state on failure
                                             } finally {
                                                 setSavingDelivery(false)
                                             }
