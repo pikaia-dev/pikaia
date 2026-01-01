@@ -169,7 +169,7 @@ pnpm dlx shadcn@latest add button dialog card
 
 For local webhook testing:
 ```bash
-stripe listen --forward-to localhost:8000/api/v1/billing/webhook
+stripe listen --forward-to localhost:8000/webhooks/stripe
 ```
 
 Copy the webhook secret to `STRIPE_WEBHOOK_SECRET` in backend `.env`.

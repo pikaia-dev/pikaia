@@ -80,7 +80,7 @@ flowchart TD
 - `/api/v1/auth/magic-link/*` — Login initiation
 - `/api/v1/health` — Health check
 - `/admin/*` — Django admin
-- `/api/v1/billing/webhook` — Stripe webhooks
+- `/webhooks/stripe/` — Stripe webhooks
 
 ## API Endpoints
 

@@ -201,10 +201,10 @@ Create a Stripe Customer Portal session for self-service billing management.
 ## Webhook Endpoint
 
 ```
-POST /webhook
+POST /webhooks/stripe/
 ```
 
-Receives Stripe webhook events. Not for direct use.
+Receives Stripe webhook events. Defined outside Django Ninja at `/webhooks/stripe/` for raw request handling.
 
 **Authentication:** Stripe signature verification
 
