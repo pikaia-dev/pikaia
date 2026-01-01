@@ -54,18 +54,17 @@ export function AddressAutocomplete({
     const [selectedIndex, setSelectedIndex] = useState(-1)
     const [isFocused, setIsFocused] = useState(false)
 
-    // Load Google Places
+    // Check for API key at render time (not in effect)
+    const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY as string | undefined
+
+    // Load Google Places script
     useEffect(() => {
-        const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY
-        if (!apiKey) {
-            setLoadError(true)
-            return
-        }
+        if (!apiKey) return // No API key - component will show fallback
 
         loadGooglePlacesScript(apiKey)
             .then(() => setIsLoaded(true))
             .catch(() => setLoadError(true))
-    }, [])
+    }, [apiKey])
 
     // Initialize services when loaded
     useEffect(() => {
@@ -244,7 +243,7 @@ export function AddressAutocomplete({
                         if (suggestions.length > 0) setIsOpen(true)
                     }}
                     onBlur={() => setIsFocused(false)}
-                    placeholder={loadError ? 'Enter address' : placeholder}
+                    placeholder={loadError || !apiKey ? 'Enter address' : placeholder}
                     disabled={disabled}
                     autoComplete="off"
                     className={cn(inputClasses, 'pl-10')}
