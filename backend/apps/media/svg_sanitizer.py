@@ -233,4 +233,9 @@ def is_svg_content(content: bytes) -> bool:
     """Check if content appears to be SVG."""
     # Check for SVG signature in first 1KB
     header = content[:1024].lower()
-    return b"<svg" in header or b"<!doctype svg" in header
+    return (
+        b"<svg" in header
+        or b"<!doctype svg" in header
+        or b'xmlns="http://www.w3.org/2000/svg"' in header
+        or b"xmlns='http://www.w3.org/2000/svg'" in header
+    )
