@@ -51,7 +51,7 @@ export function useApi() {
         getOrganization: () =>
             api.get<OrganizationDetail>('/auth/organization'),
 
-        updateOrganization: (data: { name: string }) =>
+        updateOrganization: (data: { name: string; slug?: string }) =>
             api.patch<OrganizationDetail>('/auth/organization', data),
 
         updateBilling: (data: {

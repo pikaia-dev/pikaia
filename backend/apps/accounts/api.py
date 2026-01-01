@@ -399,18 +399,25 @@ def update_organization(
     org = request.auth_organization  # type: ignore[attr-defined]
 
     # Update local database
+    update_fields = ["name", "updated_at"]
     org.name = payload.name
-    org.save(update_fields=["name", "updated_at"])
+    if payload.slug is not None:
+        org.slug = payload.slug
+        update_fields.append("slug")
+    org.save(update_fields=update_fields)
 
     # Sync to Stytch
     try:
         client = get_stytch_client()
-        client.organizations.update(
-            organization_id=org.stytch_org_id,
-            organization_name=payload.name,
-        )
+        stytch_update_kwargs: dict[str, str] = {
+            "organization_id": org.stytch_org_id,
+            "organization_name": payload.name,
+        }
+        if payload.slug is not None:
+            stytch_update_kwargs["organization_slug"] = payload.slug
+        client.organizations.update(**stytch_update_kwargs)
     except StytchError as e:
-        logger.warning("Failed to sync org name to Stytch: %s", e.details.error_message)
+        logger.warning("Failed to sync org to Stytch: %s", e.details.error_message)
         # Don't fail the request - local update succeeded
 
     return get_organization(request)

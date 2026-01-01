@@ -231,6 +231,29 @@ class UpdateOrganizationRequest(BaseModel):
         description="Organization display name",
         examples=["Acme Corp"],
     )
+    slug: str | None = Field(
+        None,
+        description="URL-safe identifier for the organization (2-128 chars, lowercase)",
+        examples=["acme-corp"],
+    )
+
+    @field_validator("slug", mode="before")
+    @classmethod
+    def normalize_and_validate_slug(cls, v: str | None) -> str | None:
+        """Normalize slug and validate against Stytch requirements."""
+        if v is None:
+            return None
+        if not isinstance(v, str):
+            raise ValueError("Slug must be a string")
+        # Normalize: strip, lowercase, spaces to hyphens
+        slug = v.strip().lower().replace(" ", "-")
+        # Validate: 2-128 chars, alphanumeric + hyphen/period/underscore/tilde
+        if not re.match(r"^[a-z0-9._~-]{2,128}$", slug):
+            raise ValueError(
+                "Slug must be 2-128 characters: lowercase letters, numbers, "
+                "hyphens, periods, underscores, or tildes only"
+            )
+        return slug
 
 
 class BillingAddressSchema(BaseModel):
