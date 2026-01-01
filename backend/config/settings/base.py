@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     # Stytch
     STYTCH_PROJECT_ID: str = ""
     STYTCH_SECRET: str = ""
+    STYTCH_WEBHOOK_SECRET: str = ""  # Svix webhook signing secret
 
     # Stripe
     STRIPE_SECRET_KEY: str = ""
@@ -166,3 +167,4 @@ AUTH_USER_MODEL = "accounts.User"
 # Stytch B2B authentication
 STYTCH_PROJECT_ID = settings.STYTCH_PROJECT_ID
 STYTCH_SECRET = settings.STYTCH_SECRET
+STYTCH_WEBHOOK_SECRET = settings.STYTCH_WEBHOOK_SECRET
