@@ -9,7 +9,7 @@ import { Checkbox } from '../../components/ui/checkbox'
 import { CountryCombobox } from '../../components/ui/country-combobox'
 import { LoadingSpinner } from '../../components/ui/loading-spinner'
 import { PaymentForm } from '../../components/PaymentForm'
-import { getVatPrefix, updateVatIdForCountryChange } from '../../lib/countries'
+import { getVatPrefix, updateVatIdForCountryChange, shouldShowTaxId, getPostalCodeLabel, getStateLabel, DEFAULT_COUNTRY } from '../../lib/countries'
 import type { ParsedAddress } from '../../lib/google-places'
 
 
@@ -47,7 +47,9 @@ export default function BillingSettings() {
                 setUseBillingEmail(orgData.billing.use_billing_email)
                 setBillingEmail(orgData.billing.billing_email)
                 setBillingName(orgData.billing.billing_name)
-                setAddress(orgData.billing.address)
+                // Default country to US if not set
+                const country = orgData.billing.address.country || DEFAULT_COUNTRY
+                setAddress({ ...orgData.billing.address, country })
                 setVatId(orgData.billing.vat_id)
                 setSubscription(subData)
             })
@@ -400,7 +402,7 @@ export default function BillingSettings() {
 
                                 <div>
                                     <label htmlFor="state" className="block text-sm font-medium mb-1">
-                                        State / Province
+                                        {getStateLabel(address.country)}
                                     </label>
                                     <input
                                         id="state"
@@ -413,7 +415,7 @@ export default function BillingSettings() {
 
                                 <div>
                                     <label htmlFor="postalCode" className="block text-sm font-medium mb-1">
-                                        Postal code
+                                        {getPostalCodeLabel(address.country)}
                                     </label>
                                     <input
                                         id="postalCode"
@@ -437,38 +439,40 @@ export default function BillingSettings() {
                                     />
                                 </div>
 
-                                <div>
-                                    <label htmlFor="vatId" className="block text-sm font-medium mb-1">
-                                        VAT ID
-                                    </label>
-                                    {currentVatPrefix ? (
-                                        <div className="flex">
-                                            <span className="inline-flex items-center px-3 py-2 border border-r-0 border-border rounded-l-md bg-muted text-sm text-muted-foreground">
-                                                {currentVatPrefix}
-                                            </span>
+                                {shouldShowTaxId(address.country) && (
+                                    <div>
+                                        <label htmlFor="vatId" className="block text-sm font-medium mb-1">
+                                            VAT ID
+                                        </label>
+                                        {currentVatPrefix ? (
+                                            <div className="flex">
+                                                <span className="inline-flex items-center px-3 py-2 border border-r-0 border-border rounded-l-md bg-muted text-sm text-muted-foreground">
+                                                    {currentVatPrefix}
+                                                </span>
+                                                <input
+                                                    id="vatId"
+                                                    type="text"
+                                                    value={vatId.replace(new RegExp(`^${currentVatPrefix}`), '')}
+                                                    onChange={(e) => setVatId(currentVatPrefix + e.target.value)}
+                                                    className="flex-1 px-3 py-2 border border-border rounded-r-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                                    placeholder="123456789"
+                                                />
+                                            </div>
+                                        ) : (
                                             <input
                                                 id="vatId"
                                                 type="text"
-                                                value={vatId.replace(new RegExp(`^${currentVatPrefix}`), '')}
-                                                onChange={(e) => setVatId(currentVatPrefix + e.target.value)}
-                                                className="flex-1 px-3 py-2 border border-border rounded-r-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                                placeholder="123456789"
+                                                value={vatId}
+                                                onChange={(e) => setVatId(e.target.value)}
+                                                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                                placeholder="Enter VAT ID"
                                             />
-                                        </div>
-                                    ) : (
-                                        <input
-                                            id="vatId"
-                                            type="text"
-                                            value={vatId}
-                                            onChange={(e) => setVatId(e.target.value)}
-                                            className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                            placeholder="Enter VAT ID"
-                                        />
-                                    )}
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        {currentVatPrefix ? 'EU VAT number for tax exemption' : 'VAT ID (optional)'}
-                                    </p>
-                                </div>
+                                        )}
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            {currentVatPrefix ? 'EU VAT number for tax exemption' : 'VAT ID (optional)'}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             <Button type="submit" disabled={savingAddress}>
