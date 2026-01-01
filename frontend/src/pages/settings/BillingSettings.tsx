@@ -38,6 +38,13 @@ export default function BillingSettings() {
     const [showUpgradeForm, setShowUpgradeForm] = useState(false)
     const [loadingPortal, setLoadingPortal] = useState(false)
 
+    // Focus billing email input when checkbox is enabled
+    useEffect(() => {
+        if (useBillingEmail) {
+            billingEmailRef.current?.focus()
+        }
+    }, [useBillingEmail])
+
     useEffect(() => {
         Promise.all([
             getOrganization(),
@@ -268,9 +275,7 @@ export default function BillingSettings() {
                                     onCheckedChange={async (checked) => {
                                         const isChecked = checked === true
                                         setUseBillingEmail(isChecked)
-                                        if (isChecked) {
-                                            setTimeout(() => billingEmailRef.current?.focus(), 0)
-                                        } else {
+                                        if (!isChecked) {
                                             // Auto-save when unchecking since the form is hidden
                                             setSavingDelivery(true)
                                             try {
