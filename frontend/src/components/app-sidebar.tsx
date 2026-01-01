@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useStytchB2BClient, useStytchMember } from '@stytch/react/b2b'
+import { useState, useEffect } from 'react'
 import { Home, User, Users, Building2, CreditCard, LogOut, Settings } from 'lucide-react'
 import {
     Sidebar,
@@ -14,6 +15,7 @@ import {
     SidebarMenuItem,
 } from './ui/sidebar'
 import { STYTCH_ROLES } from '../lib/constants'
+import { useApi } from '../hooks/useApi'
 
 const mainNavItems = [
     { to: '/dashboard', label: 'Dashboard', icon: Home },
@@ -35,6 +37,15 @@ export function AppSidebar() {
     const stytch = useStytchB2BClient()
     const { member } = useStytchMember()
     const navigate = useNavigate()
+    const { getCurrentUser } = useApi()
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+
+    // Fetch avatar from backend
+    useEffect(() => {
+        getCurrentUser()
+            .then((data) => setAvatarUrl(data.user.avatar_url || null))
+            .catch(() => setAvatarUrl(null))
+    }, [getCurrentUser])
 
     // Check admin from Stytch roles
     const roles = member?.roles || []
@@ -138,9 +149,17 @@ export function AppSidebar() {
 
             <SidebarFooter className="p-4">
                 <div className="flex items-center gap-3 mb-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-sm font-medium shrink-0">
-                        {member?.name?.[0]?.toUpperCase() || member?.email_address?.[0]?.toUpperCase() || '?'}
-                    </div>
+                    {avatarUrl ? (
+                        <img
+                            src={avatarUrl}
+                            alt="Avatar"
+                            className="h-9 w-9 rounded-full object-cover shrink-0"
+                        />
+                    ) : (
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-sm font-medium shrink-0">
+                            {member?.name?.[0]?.toUpperCase() || member?.email_address?.[0]?.toUpperCase() || '?'}
+                        </div>
+                    )}
                     <div className="flex flex-1 flex-col text-left text-sm min-w-0">
                         <span className="font-medium truncate">
                             {member?.name || 'User'}
