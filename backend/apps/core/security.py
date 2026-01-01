@@ -55,11 +55,13 @@ def require_admin(func: F) -> F:
 
     @wraps(func)
     def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> Any:
-        # Check authentication
+        # Check authentication - middleware sets auth_user, auth_member, and
+        # auth_organization together, so checking any one of them is sufficient.
+        # We check auth_member since we need it for the admin role check anyway.
         if not hasattr(request, "auth_member") or request.auth_member is None:
             raise HttpError(401, "Not authenticated")
 
-        # Check admin role
+        # Check admin role (safe to access - we verified auth_member is not None above)
         if not request.auth_member.is_admin:
             raise HttpError(403, "Admin access required")
 
