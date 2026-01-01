@@ -425,7 +425,7 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
         # Handle Stytch phone update (delete-then-update pattern)
         if old_phone:
             try:
-                client.organizations.members.delete_phone_number(
+                client.organizations.members.delete_mfa_phone_number(
                     organization_id=org.stytch_org_id,
                     member_id=member.stytch_member_id,
                 )
