@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
 import { useApi } from '../../hooks/useApi'
-import type { BillingAddress, SubscriptionInfo } from '../../lib/api'
+import type { BillingAddress, SubscriptionInfo, Invoice } from '../../lib/api'
 import { AddressAutocomplete } from '../../components/ui/address-autocomplete'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
@@ -15,7 +15,7 @@ import type { ParsedAddress } from '../../lib/google-places'
 
 
 export default function BillingSettings() {
-    const { getOrganization, updateBilling, getSubscription, createPortalSession } = useApi()
+    const { getOrganization, updateBilling, getSubscription, createPortalSession, listInvoices } = useApi()
     const billingEmailRef = useRef<HTMLInputElement>(null)
     const [useBillingEmail, setUseBillingEmail] = useState(false)
     const [billingEmail, setBillingEmail] = useState('')
@@ -37,6 +37,12 @@ export default function BillingSettings() {
     const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
     const [showUpgradeForm, setShowUpgradeForm] = useState(false)
     const [loadingPortal, setLoadingPortal] = useState(false)
+
+    // Invoice state
+    const [invoices, setInvoices] = useState<Invoice[]>([])
+    const [invoicesLoading, setInvoicesLoading] = useState(false)
+    const [invoicesHasMore, setInvoicesHasMore] = useState(false)
+    const [loadingMoreInvoices, setLoadingMoreInvoices] = useState(false)
 
     // Focus billing email input when checkbox is enabled
     useEffect(() => {
@@ -62,6 +68,37 @@ export default function BillingSettings() {
             })
             .finally(() => setLoading(false))
     }, [getOrganization, getSubscription])
+
+    // Fetch invoices when subscription is active
+    useEffect(() => {
+        if (subscription && subscription.status !== 'none') {
+            setInvoicesLoading(true)
+            listInvoices({ limit: 6 })
+                .then((data) => {
+                    setInvoices(data.invoices)
+                    setInvoicesHasMore(data.has_more)
+                })
+                .catch((err) => {
+                    console.error('Failed to load invoices:', err)
+                })
+                .finally(() => setInvoicesLoading(false))
+        }
+    }, [subscription, listInvoices])
+
+    const loadMoreInvoices = async () => {
+        if (!invoices.length || loadingMoreInvoices) return
+        setLoadingMoreInvoices(true)
+        try {
+            const lastInvoice = invoices[invoices.length - 1]
+            const data = await listInvoices({ limit: 6, starting_after: lastInvoice.id })
+            setInvoices((prev) => [...prev, ...data.invoices])
+            setInvoicesHasMore(data.has_more)
+        } catch (err) {
+            toast.error('Failed to load more invoices')
+        } finally {
+            setLoadingMoreInvoices(false)
+        }
+    }
 
     const handleUpgradeSuccess = async () => {
         setShowUpgradeForm(false)
@@ -488,6 +525,111 @@ export default function BillingSettings() {
                         </CardContent>
                     </form>
                 </Card>
+
+                {/* Invoice History Card - show only when subscribed */}
+                {isSubscribed && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Invoice History</CardTitle>
+                            <CardDescription>View and download your past invoices</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {invoicesLoading ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <LoadingSpinner size="sm" />
+                                </div>
+                            ) : invoices.length === 0 ? (
+                                <p className="text-sm text-muted-foreground py-4">
+                                    No invoices yet. Your first invoice will appear here after your subscription renews.
+                                </p>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b">
+                                                    <th className="text-left py-2 font-medium">Invoice</th>
+                                                    <th className="text-left py-2 font-medium">Status</th>
+                                                    <th className="text-right py-2 font-medium">Amount</th>
+                                                    <th className="text-right py-2 font-medium">Date</th>
+                                                    <th className="text-right py-2 font-medium sr-only">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {invoices.map((invoice) => (
+                                                    <tr key={invoice.id} className="border-b last:border-0">
+                                                        <td className="py-3">
+                                                            <span className="font-mono text-xs">
+                                                                {invoice.number || invoice.id.slice(-8)}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-3">
+                                                            <span
+                                                                className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${invoice.status === 'paid'
+                                                                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                                        : invoice.status === 'open'
+                                                                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                                                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                                                                    }`}
+                                                            >
+                                                                {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-3 text-right">
+                                                            {new Intl.NumberFormat(undefined, {
+                                                                style: 'currency',
+                                                                currency: invoice.currency.toUpperCase(),
+                                                            }).format(invoice.amount_paid / 100)}
+                                                        </td>
+                                                        <td className="py-3 text-right text-muted-foreground">
+                                                            {formatDate(invoice.created)}
+                                                        </td>
+                                                        <td className="py-3 text-right">
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                {invoice.hosted_invoice_url && (
+                                                                    <a
+                                                                        href={invoice.hosted_invoice_url}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="text-xs text-primary hover:underline"
+                                                                    >
+                                                                        View
+                                                                    </a>
+                                                                )}
+                                                                {invoice.invoice_pdf && (
+                                                                    <a
+                                                                        href={invoice.invoice_pdf}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="text-xs text-primary hover:underline"
+                                                                    >
+                                                                        PDF
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {invoicesHasMore && (
+                                        <div className="flex justify-center pt-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={loadMoreInvoices}
+                                                disabled={loadingMoreInvoices}
+                                            >
+                                                {loadingMoreInvoices ? 'Loading...' : 'Load more'}
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
             </div>
         </div>
     )
