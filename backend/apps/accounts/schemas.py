@@ -160,6 +160,7 @@ class OrganizationInfo(BaseModel):
     stytch_org_id: str = Field(..., description="Stytch organization ID")
     name: str = Field(..., description="Organization display name")
     slug: str = Field(..., description="URL-safe organization identifier")
+    logo_url: str = Field("", description="URL to organization logo image")
 
 
 class UserInfo(BaseModel):
@@ -168,6 +169,7 @@ class UserInfo(BaseModel):
     id: int = Field(..., description="Local database user ID")
     email: str = Field(..., description="User's email address")
     name: str = Field(..., description="User's display name")
+    avatar_url: str = Field("", description="URL to user's avatar image")
 
 
 class MeResponse(BaseModel):
@@ -321,6 +323,7 @@ class OrganizationDetailResponse(BaseModel):
     stytch_org_id: str = Field(..., description="Stytch organization ID")
     name: str = Field(..., description="Organization display name")
     slug: str = Field(..., description="URL-safe identifier")
+    logo_url: str = Field("", description="URL to organization logo image")
     billing: BillingInfoResponse = Field(..., description="Billing information")
 
 

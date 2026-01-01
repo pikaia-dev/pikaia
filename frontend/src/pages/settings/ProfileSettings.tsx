@@ -4,11 +4,13 @@ import { useApi } from '../../hooks/useApi'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { LoadingSpinner } from '../../components/ui/loading-spinner'
+import { ImageUploader } from '../../components/ui/image-uploader'
 
 export default function ProfileSettings() {
     const { getCurrentUser, updateProfile } = useApi()
     const [name, setName] = useState('')
     const [email, setEmail] = useState('')
+    const [avatarUrl, setAvatarUrl] = useState('')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
 
@@ -17,6 +19,7 @@ export default function ProfileSettings() {
             .then((data) => {
                 setName(data.user.name)
                 setEmail(data.user.email)
+                setAvatarUrl(data.user.avatar_url || '')
             })
             .catch((err) => {
                 toast.error(err instanceof Error ? err.message : 'Failed to load profile')
@@ -53,49 +56,67 @@ export default function ProfileSettings() {
                 <p className="text-muted-foreground">Manage your personal information</p>
             </div>
 
-            <Card className="max-w-lg">
-                <CardHeader>
-                    <CardTitle className="text-base">Personal Details</CardTitle>
-                    <CardDescription>Update your profile information</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium mb-1">
-                                Email
-                            </label>
-                            <input
-                                id="email"
-                                type="email"
-                                value={email}
-                                disabled
-                                className="w-full px-3 py-2 border border-border rounded-md bg-muted text-muted-foreground text-sm"
-                            />
-                            <p className="text-xs text-muted-foreground mt-1">
-                                Email is managed by Stytch and cannot be changed here
-                            </p>
-                        </div>
+            <div className="space-y-6 max-w-lg">
+                {/* Avatar Card */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Profile Picture</CardTitle>
+                        <CardDescription>Upload a photo to personalize your account</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ImageUploader
+                            type="avatar"
+                            value={avatarUrl}
+                            onChange={setAvatarUrl}
+                        />
+                    </CardContent>
+                </Card>
 
-                        <div>
-                            <label htmlFor="name" className="block text-sm font-medium mb-1">
-                                Display name
-                            </label>
-                            <input
-                                id="name"
-                                type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                placeholder="Your name"
-                            />
-                        </div>
+                {/* Personal Details Card */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Personal Details</CardTitle>
+                        <CardDescription>Update your profile information</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label htmlFor="email" className="block text-sm font-medium mb-1">
+                                    Email
+                                </label>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    value={email}
+                                    disabled
+                                    className="w-full px-3 py-2 border border-border rounded-md bg-muted text-muted-foreground text-sm"
+                                />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Email is managed by Stytch and cannot be changed here
+                                </p>
+                            </div>
 
-                        <Button type="submit" disabled={saving}>
-                            {saving ? 'Saving...' : 'Save changes'}
-                        </Button>
-                    </form>
-                </CardContent>
-            </Card>
+                            <div>
+                                <label htmlFor="name" className="block text-sm font-medium mb-1">
+                                    Display name
+                                </label>
+                                <input
+                                    id="name"
+                                    type="text"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                    placeholder="Your name"
+                                />
+                            </div>
+
+                            <Button type="submit" disabled={saving}>
+                                {saving ? 'Saving...' : 'Save changes'}
+                            </Button>
+                        </form>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     )
 }

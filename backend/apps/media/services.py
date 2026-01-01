@@ -240,7 +240,49 @@ class StorageService:
             logger.warning("Failed to delete file %s: %s", key, e)
 
     def get_public_url(self, key: str) -> str:
-        """Get public URL for a file."""
+        """Get public URL for a file (original size)."""
+        return self.get_image_url(key)
+
+    def get_image_url(
+        self,
+        key: str,
+        width: int | None = None,
+        height: int | None = None,
+        fit: str | None = None,
+    ) -> str:
+        """
+        Get URL for an image with optional transformations.
+
+        Compatible with AWS Dynamic Image Transformation for CloudFront:
+        https://aws.amazon.com/solutions/implementations/dynamic-image-transformation-for-amazon-cloudfront/
+
+        When IMAGE_TRANSFORM_URL is configured, generates URLs like:
+            https://transform.example.com/fit-in/200x200/avatars/123/abc.png
+
+        Transformation parameters:
+        - width: Desired width in pixels
+        - height: Desired height in pixels
+        - fit: Fit mode ('cover', 'contain', 'fill', 'inside', 'outside')
+
+        Without IMAGE_TRANSFORM_URL, returns the original image URL.
+        """
+        # Check if dynamic image transformation is configured
+        transform_url = getattr(settings, "IMAGE_TRANSFORM_URL", None)
+
+        if transform_url and (width or height):
+            # Build transformation path (Thumbor-compatible format)
+            # Format: /fit-in/WIDTHxHEIGHT/key or /WIDTHxHEIGHT/key
+            w = width or 0
+            h = height or 0
+            size_spec = f"{w}x{h}"
+
+            if fit:
+                # Thumbor-style fit modes: fit-in, adaptive-fit-in, etc.
+                return f"{transform_url.rstrip('/')}/{fit}/{size_spec}/{key}"
+            else:
+                return f"{transform_url.rstrip('/')}/{size_spec}/{key}"
+
+        # Return original URL (no transformation)
         if self.use_s3:
             custom_domain = getattr(settings, "AWS_S3_CUSTOM_DOMAIN", None)
             if custom_domain:
