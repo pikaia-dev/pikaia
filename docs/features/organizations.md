@@ -36,7 +36,7 @@ A single user (identified by email) can be a member of multiple organizations wi
 ```mermaid
 flowchart LR
     subgraph User
-        email[alice@example.com]
+        email["alice@example.com"]
     end
     
     subgraph Memberships
