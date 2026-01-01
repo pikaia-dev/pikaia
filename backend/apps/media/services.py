@@ -245,6 +245,42 @@ class StorageService:
         except Exception as e:
             logger.warning("Failed to delete file %s: %s", key, e)
 
+    def sanitize_svg_in_storage(self, key: str) -> bytes | None:
+        """
+        Sanitize an SVG file that's already in storage.
+
+        Downloads the file, sanitizes it, and re-uploads.
+        Used for S3 presigned uploads where we can't sanitize on the way in.
+
+        Returns the sanitized content bytes, or None if not an SVG.
+        Raises SVGSanitizationError if sanitization fails.
+        """
+        from apps.media.svg_sanitizer import sanitize_svg
+
+        # Download the file
+        if self.use_s3:
+            obj = self.s3_client.get_object(Bucket=self.bucket_name, Key=key)
+            content = obj["Body"].read()
+            content_type = obj.get("ContentType", "")
+        else:
+            if not default_storage.exists(key):
+                return None
+            with default_storage.open(key, "rb") as f:
+                content = f.read()
+            content_type = mimetypes.guess_type(key)[0] or ""
+
+        # Only sanitize SVGs
+        if content_type != "image/svg+xml" and not key.lower().endswith(".svg"):
+            return None
+
+        # Sanitize (may raise SVGSanitizationError)
+        sanitized_content = sanitize_svg(content)
+
+        # Re-upload sanitized version
+        self.save_file(key, sanitized_content, "image/svg+xml")
+
+        return sanitized_content
+
     def get_public_url(self, key: str) -> str:
         """Get public URL for a file (original size)."""
         return self.get_image_url(key)

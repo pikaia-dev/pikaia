@@ -109,6 +109,21 @@ def confirm_upload(request: HttpRequest, payload: ConfirmUploadSchema) -> ImageR
     if metadata is None:
         raise HttpError(404, "File not found. The upload may have failed.")
 
+    # Sanitize SVG files to prevent XSS (for S3 presigned uploads)
+    if metadata.content_type == "image/svg+xml":
+        from apps.media.svg_sanitizer import SVGSanitizationError, sanitize_svg
+
+        try:
+            # Download, sanitize, and re-upload
+            sanitized_content = storage.sanitize_svg_in_storage(payload.key)
+            if sanitized_content:
+                # Update size after sanitization (content may have changed)
+                metadata.size_bytes = len(sanitized_content)
+        except SVGSanitizationError as e:
+            # Delete the dangerous file
+            storage.delete(payload.key)
+            raise HttpError(400, f"Invalid SVG file: {e}") from e
+
     # Create database record
     image = UploadedImage.objects.create(
         storage_key=payload.key,
@@ -172,6 +187,15 @@ def direct_upload(
 
     # Determine content type
     actual_content_type = content_type or file.content_type or "application/octet-stream"
+
+    # Sanitize SVG files to prevent XSS
+    if actual_content_type == "image/svg+xml":
+        from apps.media.svg_sanitizer import SVGSanitizationError, sanitize_svg
+
+        try:
+            content = sanitize_svg(content)
+        except SVGSanitizationError as e:
+            raise HttpError(400, f"Invalid SVG file: {e}") from e
 
     # Save to storage
     storage.save_file(key, content, actual_content_type)
