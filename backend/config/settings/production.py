@@ -9,8 +9,10 @@ Missing secrets will cause the application to crash immediately with a clear err
 rather than failing silently at runtime.
 """
 
+import logging
+
 from .base import *  # noqa: F403
-from .base import settings
+from .base import parse_comma_list, settings
 
 # =============================================================================
 # Required Secrets Validation
@@ -65,7 +67,7 @@ _validate_production_secrets()
 # =============================================================================
 
 DEBUG = False
-ALLOWED_HOSTS = [h.strip() for h in settings.ALLOWED_HOSTS.split(",") if h.strip()]
+ALLOWED_HOSTS = parse_comma_list(settings.ALLOWED_HOSTS)
 
 if not ALLOWED_HOSTS:
     raise ValueError(
@@ -83,14 +85,9 @@ CSRF_COOKIE_SECURE = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # CORS - read from environment, required for frontend to work
-CORS_ALLOWED_ORIGINS = [
-    origin.strip()
-    for origin in (settings.CORS_ALLOWED_ORIGINS or "").split(",")
-    if origin.strip()
-]
+CORS_ALLOWED_ORIGINS = parse_comma_list(settings.CORS_ALLOWED_ORIGINS or "")
 
 if not CORS_ALLOWED_ORIGINS:
-    import logging
     logging.getLogger(__name__).warning(
         "CORS_ALLOWED_ORIGINS is empty. Frontend API calls may be blocked."
     )
