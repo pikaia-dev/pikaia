@@ -44,10 +44,17 @@ class StorageService:
     In development, provides a direct upload endpoint.
     """
 
-    # Upload limits
-    MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024  # 2MB
-    MAX_LOGO_SIZE_BYTES = 5 * 1024 * 1024  # 5MB
-    ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+    # Upload limits from settings
+    MAX_IMAGE_SIZE_BYTES: int = getattr(
+        settings, "MEDIA_MAX_IMAGE_SIZE_BYTES", 10 * 1024 * 1024
+    )
+    ALLOWED_CONTENT_TYPES: set[str] = set(
+        getattr(
+            settings,
+            "MEDIA_ALLOWED_IMAGE_TYPES",
+            ["image/jpeg", "image/png", "image/webp", "image/svg+xml", "image/avif"],
+        )
+    )
     PRESIGNED_URL_EXPIRY = 300  # 5 minutes
 
     def __init__(self) -> None:
@@ -71,9 +78,8 @@ class StorageService:
 
     def get_max_size(self, image_type: str) -> int:
         """Get maximum allowed size for an image type."""
-        if image_type == "avatar":
-            return self.MAX_AVATAR_SIZE_BYTES
-        return self.MAX_LOGO_SIZE_BYTES
+        # Unified 10MB limit for all image types
+        return self.MAX_IMAGE_SIZE_BYTES
 
     def validate_upload_request(
         self, content_type: str, size_bytes: int, image_type: str
@@ -289,7 +295,9 @@ class StorageService:
                 return f"https://{custom_domain}/{key}"
             return f"https://{self.bucket_name}.s3.amazonaws.com/{key}"
         else:
-            return f"{settings.MEDIA_URL}{key}"
+            # Local development: return absolute URL to backend
+            backend_url = getattr(settings, "BACKEND_URL", "http://localhost:8000")
+            return f"{backend_url}{settings.MEDIA_URL}{key}"
 
 
 # Singleton instance
