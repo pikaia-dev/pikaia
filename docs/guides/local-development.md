@@ -154,9 +154,9 @@ pnpm dlx shadcn@latest add button dialog card
 | Authorized apps | Domains | `localhost` |
 | Authentication | Magic Links | ✅ Enabled |
 | Organization settings | Create Organizations | ✅ Allow members |
-| SDK Configuration | HttpOnly cookies | ❌ **Disabled** |
+| SDK Configuration | HttpOnly cookies | ❌ **Disabled** (local dev only) |
 
-> **Important:** HttpOnly cookies must be disabled for the frontend to access session JWTs.
+> **⚠️ Security Note:** Disabling HttpOnly cookies allows JavaScript to read session JWTs, increasing XSS vulnerability impact. This is for **local development only**. In **production**, enable HttpOnly cookies and update auth flows to avoid direct JWT access from JavaScript.
 
 ### Stripe
 
