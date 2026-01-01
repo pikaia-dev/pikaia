@@ -33,7 +33,7 @@ uv run python manage.py runserver  # http://localhost:8000
 
 # Frontend (new terminal)
 cd frontend
-cp .env.example .env  # Edit with Stytch public token
+cp .env.example .env  # Edit with your API keys
 pnpm install
 pnpm dev  # http://localhost:5173
 ```
@@ -41,57 +41,61 @@ pnpm dev  # http://localhost:5173
 ### Common Commands
 
 ```bash
-# Backend (always use uv run)
-uv run pytest                      # Tests
-uv run ruff check . && uv run ruff format .  # Lint & format
+# Backend
+uv run pytest                              # Tests
+uv run ruff check . && uv run ruff format . # Lint & format
 
 # Frontend
-pnpm dlx shadcn@latest add button dialog  # Add components
+pnpm dlx shadcn@latest add button dialog   # Add components
 ```
 
-### Third-Party Services
+---
 
-#### Stytch (Authentication)
+## Third-Party Services
 
-1. Create a **B2B project** at [stytch.com](https://stytch.com/dashboard)
-2. Copy **Project ID** and **Secret** to `.env` (backend)
-3. Copy **Public Token** from **SDK Configuration** to `frontend/.env`
+This project requires the following external services. Configure them before running.
+
+| Service | Purpose | Required |
+|---------|---------|----------|
+| [Stytch](https://stytch.com) | B2B Authentication (magic links, SSO, SCIM) | ✅ Yes |
+| [Stripe](https://stripe.com) | Billing & subscriptions | ✅ Yes |
+| [Google Places](https://console.cloud.google.com) | Address autocomplete | Optional |
+
+### Stytch Setup
+
+1. Create a **B2B project** at [stytch.com/dashboard](https://stytch.com/dashboard)
+2. Add credentials to env files:
+   - `backend/.env`: `STYTCH_PROJECT_ID`, `STYTCH_SECRET`
+   - `frontend/.env`: `VITE_STYTCH_PUBLIC_TOKEN`
 
 **Dashboard Configuration:**
 
 | Section | Setting | Value |
 |---------|---------|-------|
-| **Redirect URLs** | Add URL | `http://localhost:5173/auth/callback` |
-| | Enable | Login, Signup, Invite, Reset password, Discovery |
-| | Set Default | All (for local dev) |
-| **Authorized applications** | Domains | `localhost` |
-| **Authentication** | Magic Links | ✅ Enabled |
-| **Organization settings** | Create Organizations | ✅ Allow members to create |
-| **SDK Configuration** | HttpOnly cookies | ❌ Disabled (for local dev) |
+| Redirect URLs | Add URL | `http://localhost:5173/auth/callback` |
+| | Enable | Login, Signup, Invite, Discovery |
+| Authorized applications | Domains | `localhost` |
+| Authentication | Magic Links | ✅ Enabled |
+| Organization settings | Create Organizations | ✅ Allow members |
+| SDK Configuration | HttpOnly cookies | ❌ Disabled (local dev only) |
 
-> **⚠️ Security Note:** Disabling HttpOnly cookies allows JavaScript to read session JWTs, which increases XSS vulnerability impact. This is **for local development only**. In production, enable HttpOnly cookies and use server-side token handling.
+> **⚠️ Security:** HttpOnly cookies must be **enabled in production**. Disabling is for local development only.
 
-#### Stripe (Billing)
+### Stripe Setup
 
 1. Create account at [stripe.com](https://dashboard.stripe.com)
-2. Go to **Developers** → **API keys** → Copy **Secret key** to `backend/.env`
-3. Webhook secret: Set up later when implementing billing
+2. Add credentials to `backend/.env`:
+   - `STRIPE_SECRET_KEY` (from Developers → API keys)
+   - `STRIPE_WEBHOOK_SECRET` (from webhook setup)
+   - `STRIPE_PRICE_ID` (after running `setup_stripe` command)
+3. Create products: `uv run python manage.py setup_stripe`
 
+### Google Places (Optional)
 
----
+For address autocomplete in billing settings:
 
-## Production Configuration
-
-### CORS
-
-In development, CORS permits all origins. For production, `config/settings/production.py` reads allowed origins from environment:
-
-```bash
-# In production, set CORS_ALLOWED_ORIGINS as comma-separated URLs
-export CORS_ALLOWED_ORIGINS="https://app.yourdomain.com,https://www.yourdomain.com"
-```
-
-> **Note:** Production settings validate that required secrets are configured at startup, crashing with clear errors if misconfigured.
+1. Enable **Places API** in [Google Cloud Console](https://console.cloud.google.com)
+2. Add `VITE_GOOGLE_PLACES_API_KEY` to `frontend/.env`
 
 ---
 
@@ -109,45 +113,22 @@ export CORS_ALLOWED_ORIGINS="https://app.yourdomain.com,https://www.yourdomain.c
 
 ### Multi-Tenancy
 
-- **Shared database** with organization-scoped data
-- **Custom User model** synced from Stytch
-- **Member model** for org-level roles (admin, member, viewer)
-
 ```
 User (cross-org identity)
   └── memberships → Member[]
                       └── organization
-                      └── role
+                      └── role (admin, member)
 ```
 
-### Authentication Flow
+Shared database with organization-scoped data. User/Member models sync from Stytch.
+
+### Key Flows
 
 ```
-Stytch (source of truth)
-├── Organizations, Members, Roles
-├── SSO/SCIM provisioning
-└── Webhooks → Django (sync + extensions)
+Auth:    Magic Link → Org Picker → JWT → Middleware → API
+Billing: Upgrade → Stripe Checkout → Webhook → Subscription Active
+Tasks:   Webhook → EventBridge → SQS → Lambda (no Celery/Redis)
 ```
-
-- JWTs validated via Stytch API (ensures role changes reflect immediately)
-- Org picker for users with multiple memberships
-
-> **Note:** Currently, local User/Member/Organization records sync **inline during auth flows** (login, org creation). Out-of-band changes (e.g., admin edits in Stytch dashboard, SCIM provisioning) require webhook handlers — a future enhancement.
-
-### Billing Flow
-
-```
-User signs up → Creates org → Stripe Customer
-             → Upgrade → Checkout → Webhook → Subscription active
-```
-
-### Background Tasks
-
-```
-Webhook → EventBridge → SQS → Lambda
-```
-
-No Celery/Redis — fully serverless on AWS.
 
 ---
 
@@ -159,25 +140,32 @@ No Celery/Redis — fully serverless on AWS.
 │   │   ├── accounts/     # User, Member, auth flows
 │   │   ├── organizations/# Organization model
 │   │   ├── billing/      # Stripe integration
-│   │   ├── media/        # Image/file uploads, SVG sanitization
-│   │   └── core/         # Security, middleware, shared utilities
+│   │   ├── media/        # Image uploads, SVG sanitization
+│   │   └── core/         # Security, middleware
 │   └── config/settings/  # base.py, local.py, production.py
 │
 ├── frontend/             # Vite + React + shadcn-ui
 │   └── src/
-│       ├── components/ui/
-│       ├── features/
-│       └── pages/
 │
 ├── infra/                # AWS CDK (Python)
-│   └── stacks/
-│
-├── docs/                 # Architecture and feature docs
-│
+├── docs/                 # Documentation
 └── emails/               # React Email templates
 ```
 
-**Tooling**: uv (Python), pnpm (Node), ruff (lint/format)
+---
+
+## Production
+
+Production settings (`config/settings/production.py`) validate required secrets at startup.
+
+```bash
+# Required environment variables
+export SECRET_KEY="..."
+export STYTCH_PROJECT_ID="..." STYTCH_SECRET="..."
+export STRIPE_SECRET_KEY="..." STRIPE_WEBHOOK_SECRET="..."
+export ALLOWED_HOSTS="api.yourdomain.com"
+export CORS_ALLOWED_ORIGINS="https://app.yourdomain.com"
+```
 
 ---
 
