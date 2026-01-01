@@ -112,16 +112,18 @@ export default function BillingSettings() {
     }
 
     const updateAddress = (field: keyof BillingAddress, value: string) => {
+        const previousCountry = address.country
         setAddress((prev) => ({ ...prev, [field]: value }))
 
         // When country changes, update VAT prefix if EU country
         if (field === 'country') {
-            setVatId((currentVat) => updateVatIdForCountryChange(currentVat, address.country, value))
+            setVatId((currentVat) => updateVatIdForCountryChange(currentVat, previousCountry, value))
         }
     }
 
     // Handle address selection from Google Places autocomplete
     const handleAddressSelect = useCallback((parsed: ParsedAddress) => {
+        const previousCountry = address.country
         // Update address fields from parsed Google Places result
         setAddress({
             line1: parsed.street_address || parsed.formatted_address,
@@ -134,10 +136,8 @@ export default function BillingSettings() {
 
         // Trigger VAT prefix update for the new country
         const countryCode = parsed.country_code.toUpperCase()
-        // Note: address.country intentionally captures the OLD value before setAddress runs,
-        // which is needed for computing the correct VAT prefix transition
-        setVatId((currentVat) => updateVatIdForCountryChange(currentVat, address.country, countryCode))
-    }, [])
+        setVatId((currentVat) => updateVatIdForCountryChange(currentVat, previousCountry, countryCode))
+    }, [address.country])
 
     // Get current VAT prefix based on country
     const currentVatPrefix = getVatPrefix(address.country)
