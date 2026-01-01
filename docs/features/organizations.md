@@ -67,7 +67,7 @@ stateDiagram-v2
 
 ## Data Isolation
 
-All queries are scoped to the current organization via the authenticated member's org:
+All queries are scoped to the authenticated member's organization:
 
 ```python
 def get_resources(org: Organization):
