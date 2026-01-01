@@ -248,7 +248,10 @@ class MessageResponse(BaseModel):
 
 
 class UpdateProfileRequest(BaseModel):
-    """Request to update user profile."""
+    """Request to update user profile (name only).
+
+    Phone number changes require OTP verification via /phone/verify-otp.
+    """
 
     name: str = Field(
         ...,
@@ -257,10 +260,16 @@ class UpdateProfileRequest(BaseModel):
         description="User's display name",
         examples=["Jane Doe"],
     )
+
+
+class SendPhoneOtpRequest(BaseModel):
+    """Request to send OTP to a phone number for verification."""
+
     phone_number: str = Field(
-        "",
+        ...,
+        min_length=8,
         max_length=20,
-        description="Phone number in E.164 format (e.g., +14155551234)",
+        description="Phone number in E.164 format",
         examples=["+14155551234"],
     )
 
@@ -268,8 +277,6 @@ class UpdateProfileRequest(BaseModel):
     @classmethod
     def validate_phone_number(cls, v: str) -> str:
         """Validate phone number is in E.164 format."""
-        if not v:
-            return ""
         v = v.strip()
         if not v.startswith("+"):
             raise ValueError("Phone number must start with +")
@@ -278,6 +285,29 @@ class UpdateProfileRequest(BaseModel):
         if len(v) < 8 or len(v) > 16:
             raise ValueError("Phone number must be 8-16 characters")
         return v
+
+
+class VerifyPhoneOtpRequest(BaseModel):
+    """Request to verify a phone OTP."""
+
+    phone_number: str = Field(
+        ...,
+        description="Phone number that received the OTP",
+    )
+    otp_code: str = Field(
+        ...,
+        min_length=6,
+        max_length=6,
+        description="6-digit OTP code",
+        examples=["123456"],
+    )
+
+
+class PhoneOtpResponse(BaseModel):
+    """Response for phone OTP operations."""
+
+    success: bool = Field(..., description="Whether the operation succeeded")
+    message: str = Field(..., description="Status message")
 
 
 class UpdateOrganizationRequest(BaseModel):
