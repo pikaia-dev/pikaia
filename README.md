@@ -156,17 +156,23 @@ No Celery/Redis — fully serverless on AWS.
 ```
 ├── backend/              # Django Ninja API
 │   ├── apps/
-│   │   ├── accounts/     # User, Member models
+│   │   ├── accounts/     # User, Member, auth flows
 │   │   ├── organizations/# Organization model
 │   │   ├── billing/      # Stripe integration
-│   │   └── core/         # Shared base models
+│   │   ├── media/        # Image/file uploads, SVG sanitization
+│   │   └── core/         # Security, middleware, shared utilities
 │   └── config/settings/  # base.py, local.py, production.py
 │
 ├── frontend/             # Vite + React + shadcn-ui
-│   └── src/components/ui/
+│   └── src/
+│       ├── components/ui/
+│       ├── features/
+│       └── pages/
 │
 ├── infra/                # AWS CDK (Python)
 │   └── stacks/
+│
+├── docs/                 # Architecture and feature docs
 │
 └── emails/               # React Email templates
 ```
@@ -177,5 +183,7 @@ No Celery/Redis — fully serverless on AWS.
 
 ## Documentation
 
+- [Architecture](./docs/architecture/) — System design, data models
+- [Guides](./docs/guides/) — Local development, deployment
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — Git workflow, commit format
 - [RULES.md](./RULES.md) — Coding standards
