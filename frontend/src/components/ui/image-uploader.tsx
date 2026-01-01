@@ -2,9 +2,20 @@ import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Upload, X, User, Building2 } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from './alert-dialog'
 import { ImageCropper } from './image-cropper'
 import { useImageUpload } from '../../hooks/useImageUpload'
 import { cn } from '../../lib/utils'
+import { MEDIA_UPLOAD } from '../../lib/constants'
 
 interface ImageUploaderProps {
     type: 'avatar' | 'logo'
@@ -13,15 +24,6 @@ interface ImageUploaderProps {
     onError?: (error: Error) => void
     disabled?: boolean
     className?: string
-}
-
-// Size limits in bytes
-const MAX_AVATAR_SIZE = 2 * 1024 * 1024 // 2MB
-const MAX_LOGO_SIZE = 5 * 1024 * 1024 // 5MB
-const ACCEPTED_TYPES = {
-    'image/jpeg': ['.jpg', '.jpeg'],
-    'image/png': ['.png'],
-    'image/webp': ['.webp'],
 }
 
 export function ImageUploader({
@@ -35,6 +37,7 @@ export function ImageUploader({
     const [selectedFile, setSelectedFile] = useState<string | null>(null)
     const [showCropper, setShowCropper] = useState(false)
     const [originalFilename, setOriginalFilename] = useState('')
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
     const { upload, isUploading, progress } = useImageUpload(type, {
         onSuccess: (result) => {
@@ -47,17 +50,23 @@ export function ImageUploader({
         },
     })
 
-    const maxSize = type === 'avatar' ? MAX_AVATAR_SIZE : MAX_LOGO_SIZE
     const isCircular = type === 'avatar'
+    const label = type === 'avatar' ? 'profile picture' : 'logo'
 
-    const onDrop = useCallback((acceptedFiles: File[]) => {
+    const onDrop = useCallback(async (acceptedFiles: File[]) => {
         const file = acceptedFiles[0]
         if (!file) return
 
         // Validate file size
-        if (file.size > maxSize) {
-            const maxMb = maxSize / (1024 * 1024)
-            toast.error(`File too large. Maximum size is ${maxMb}MB`)
+        if (file.size > MEDIA_UPLOAD.MAX_SIZE_BYTES) {
+            toast.error(`File too large. Maximum size is ${MEDIA_UPLOAD.MAX_SIZE_MB}MB`)
+            return
+        }
+
+        // SVG files can't be cropped - upload directly
+        if (file.type === 'image/svg+xml') {
+            const filename = `${type}-${Date.now()}.svg`
+            await upload(file, filename)
             return
         }
 
@@ -66,11 +75,11 @@ export function ImageUploader({
         setSelectedFile(objectUrl)
         setOriginalFilename(file.name)
         setShowCropper(true)
-    }, [maxSize])
+    }, [type, upload])
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
-        accept: ACCEPTED_TYPES,
+        accept: MEDIA_UPLOAD.ACCEPTED_TYPES,
         maxFiles: 1,
         disabled: disabled || isUploading,
     })
@@ -98,8 +107,9 @@ export function ImageUploader({
         }
     }
 
-    const handleRemove = () => {
+    const handleRemoveConfirm = () => {
         onChange('')
+        setDeleteDialogOpen(false)
     }
 
     const PlaceholderIcon = type === 'avatar' ? User : Building2
@@ -108,40 +118,42 @@ export function ImageUploader({
         <>
             <div className={cn("flex items-center gap-4", className)}>
                 {/* Preview */}
-                <div
-                    className={cn(
-                        "relative flex items-center justify-center bg-muted border-2 border-dashed border-border overflow-hidden",
-                        isCircular ? "rounded-full w-20 h-20" : "rounded-lg w-24 h-24"
-                    )}
-                >
-                    {value ? (
-                        <>
+                <div className="relative">
+                    <div
+                        className={cn(
+                            "flex items-center justify-center bg-muted border-2 border-dashed border-border overflow-hidden",
+                            isCircular ? "rounded-full w-20 h-20" : "rounded-lg w-24 h-24"
+                        )}
+                    >
+                        {value ? (
                             <img
                                 src={value}
                                 alt={type}
                                 className="w-full h-full object-cover"
                             />
-                            {!disabled && !isUploading && (
-                                <button
-                                    type="button"
-                                    onClick={handleRemove}
-                                    className="absolute -top-1 -right-1 p-1 bg-destructive text-destructive-foreground rounded-full hover:bg-destructive/90 transition-colors"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            )}
-                        </>
-                    ) : (
-                        <PlaceholderIcon className="w-8 h-8 text-muted-foreground" />
-                    )}
+                        ) : (
+                            <PlaceholderIcon className="w-8 h-8 text-muted-foreground" />
+                        )}
 
-                    {/* Upload progress overlay */}
-                    {isUploading && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                            <div className="text-white text-xs font-medium">
-                                {progress}%
+                        {/* Upload progress overlay */}
+                        {isUploading && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                                <div className="text-white text-xs font-medium">
+                                    {progress}%
+                                </div>
                             </div>
-                        </div>
+                        )}
+                    </div>
+
+                    {/* Delete button - positioned outside overflow container */}
+                    {value && !disabled && !isUploading && (
+                        <button
+                            type="button"
+                            onClick={() => setDeleteDialogOpen(true)}
+                            className="absolute -top-1 -right-1 z-10 p-1 bg-muted-foreground/80 text-background rounded-full hover:bg-muted-foreground transition-colors shadow-sm cursor-pointer"
+                        >
+                            <X className="w-3 h-3" />
+                        </button>
                     )}
                 </div>
 
@@ -169,7 +181,7 @@ export function ImageUploader({
                                 )}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                                PNG, JPG or WebP (max {maxSize / (1024 * 1024)}MB)
+                                PNG, JPG, WebP, SVG, AVIF (max {MEDIA_UPLOAD.MAX_SIZE_MB}MB)
                             </p>
                         </div>
                     </div>
@@ -186,6 +198,24 @@ export function ImageUploader({
                     onCancel={handleCropCancel}
                 />
             )}
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Remove {label}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to remove this {label}? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleRemoveConfirm}>
+                            Remove
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     )
 }
