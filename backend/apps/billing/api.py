@@ -5,6 +5,7 @@ Handles Stripe checkout, subscription management, and customer portal.
 """
 
 import logging
+from datetime import UTC, datetime
 
 from django.http import HttpRequest
 from ninja import Router
@@ -16,6 +17,8 @@ from apps.billing.schemas import (
     CheckoutSessionResponse,
     ConfirmSubscriptionRequest,
     ConfirmSubscriptionResponse,
+    InvoiceListResponse,
+    InvoiceResponse,
     PortalSessionRequest,
     PortalSessionResponse,
     SubscriptionIntentRequest,
@@ -28,6 +31,7 @@ from apps.billing.services import (
     create_subscription_intent,
     sync_subscription_from_stripe,
 )
+from apps.billing.stripe_client import get_stripe
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth, require_admin
 
@@ -239,3 +243,85 @@ def confirm_subscription_endpoint(
         raise HttpError(500, "Failed to confirm subscription") from e
 
     return ConfirmSubscriptionResponse(is_active=is_active)
+
+
+@router.get(
+    "/invoices",
+    response={200: InvoiceListResponse, 401: ErrorResponse, 403: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="listInvoices",
+    summary="List organization invoices",
+)
+@require_admin
+def list_invoices(
+    request: HttpRequest,
+    limit: int = 12,
+    starting_after: str | None = None,
+) -> InvoiceListResponse:
+    """
+    List invoices from Stripe for the current organization.
+
+    Admin only. Returns invoices sorted by date (newest first).
+    Use starting_after with an invoice ID for pagination.
+    """
+    if not hasattr(request, "auth_organization") or request.auth_organization is None:
+        raise HttpError(401, "Not authenticated")
+
+    org = request.auth_organization
+
+    if not org.stripe_customer_id:
+        return InvoiceListResponse(invoices=[], has_more=False)
+
+    try:
+        stripe = get_stripe()
+
+        # Build params for Stripe API
+        params: dict = {
+            "customer": org.stripe_customer_id,
+            "limit": min(limit, 100),  # Stripe max is 100
+        }
+        if starting_after:
+            params["starting_after"] = starting_after
+
+        # Fetch invoices from Stripe
+        invoice_list = stripe.Invoice.list(**params)
+
+        invoices = []
+        for inv in invoice_list.data:
+            # Convert Unix timestamps to ISO format
+            created = datetime.fromtimestamp(inv.created, tz=UTC).isoformat()
+            period_start = (
+                datetime.fromtimestamp(inv.period_start, tz=UTC).isoformat()
+                if inv.period_start
+                else None
+            )
+            period_end = (
+                datetime.fromtimestamp(inv.period_end, tz=UTC).isoformat()
+                if inv.period_end
+                else None
+            )
+
+            invoices.append(
+                InvoiceResponse(
+                    id=inv.id,
+                    number=inv.number,
+                    status=inv.status or "unknown",
+                    amount_due=inv.amount_due,
+                    amount_paid=inv.amount_paid,
+                    currency=inv.currency,
+                    created=created,
+                    hosted_invoice_url=inv.hosted_invoice_url,
+                    invoice_pdf=inv.invoice_pdf,
+                    period_start=period_start,
+                    period_end=period_end,
+                )
+            )
+
+        return InvoiceListResponse(
+            invoices=invoices,
+            has_more=invoice_list.has_more,
+        )
+
+    except Exception as e:
+        logger.error("Failed to list invoices: %s", e)
+        raise HttpError(500, "Failed to retrieve invoices") from e
