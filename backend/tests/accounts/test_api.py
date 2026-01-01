@@ -723,6 +723,42 @@ class TestUpdateOrganization:
         with pytest.raises(HttpError):
             update_organization(request, payload)
 
+    def test_admin_can_update_slug(self, request_factory: RequestFactory) -> None:
+        """Admin should be able to update organization slug."""
+        org = OrganizationFactory(name="Test Org", slug="old-slug")
+        user = UserFactory()
+        member = MemberFactory(user=user, organization=org, role="admin")
+
+        request = request_factory.patch("/api/v1/auth/organization")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = UpdateOrganizationRequest(name="Test Org", slug="new-slug")
+
+        with patch("apps.accounts.api.get_stytch_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_get_client.return_value = mock_client
+
+            result = update_organization(request, payload)
+
+        assert result.slug == "new-slug"
+        org.refresh_from_db()
+        assert org.slug == "new-slug"
+        # Verify Stytch was called with both name and slug
+        mock_client.organizations.update.assert_called_once()
+        call_kwargs = mock_client.organizations.update.call_args[1]
+        assert call_kwargs["organization_slug"] == "new-slug"
+
+    def test_slug_validation_rejects_invalid(self, request_factory: RequestFactory) -> None:
+        """Invalid slug should be rejected by validation."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError) as exc_info:
+            UpdateOrganizationRequest(name="Test", slug="Invalid Slug!")
+
+        assert "slug" in str(exc_info.value).lower()
+
 
 @pytest.mark.django_db
 class TestUpdateBilling:

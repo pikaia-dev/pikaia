@@ -26,7 +26,7 @@ export default function OrganizationSettings() {
         setSaving(true)
 
         try {
-            await updateOrganization({ name })
+            await updateOrganization({ name, slug })
             toast.success('Organization updated successfully')
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Failed to update')
@@ -79,11 +79,12 @@ export default function OrganizationSettings() {
                                 id="slug"
                                 type="text"
                                 value={slug}
-                                disabled
-                                className="w-full px-3 py-2 border border-border rounded-md bg-muted text-muted-foreground text-sm"
+                                onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
+                                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                placeholder="your-organization"
                             />
                             <p className="text-xs text-muted-foreground mt-1">
-                                Organization slug is managed by Stytch and cannot be changed
+                                URL-friendly identifier (lowercase, hyphens, 2-128 chars)
                             </p>
                         </div>
 
