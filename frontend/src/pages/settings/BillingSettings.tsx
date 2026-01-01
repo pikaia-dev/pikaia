@@ -70,7 +70,8 @@ export default function BillingSettings() {
         try {
             const subData = await getSubscription()
             setSubscription(subData)
-        } catch {
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to refresh subscription')
             // Reload page as fallback
             window.location.reload()
         }
