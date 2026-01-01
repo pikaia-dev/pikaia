@@ -84,15 +84,13 @@ class MediaStack(Stack):
         )
         self.bucket.grant_read(origin_access_identity)
 
-        # Create CloudFront behaviors
-        behaviors: dict = {}
-
+        # Configure default CloudFront behavior
         if enable_image_transformation:
             # Lambda@Edge for image transformation
             transform_lambda = self._create_transform_lambda()
 
             # Add Lambda@Edge to default behavior for image paths
-            behaviors["default_behavior"] = cloudfront.BehaviorOptions(
+            default_behavior_config = cloudfront.BehaviorOptions(
                 origin=origins.S3Origin(
                     self.bucket,
                     origin_access_identity=origin_access_identity,
@@ -107,7 +105,7 @@ class MediaStack(Stack):
                 ],
             )
         else:
-            behaviors["default_behavior"] = cloudfront.BehaviorOptions(
+            default_behavior_config = cloudfront.BehaviorOptions(
                 origin=origins.S3Origin(
                     self.bucket,
                     origin_access_identity=origin_access_identity,
@@ -120,7 +118,7 @@ class MediaStack(Stack):
         self.distribution = cloudfront.Distribution(
             self,
             "MediaDistribution",
-            default_behavior=behaviors["default_behavior"],
+            default_behavior=default_behavior_config,
             comment="Tango Media CDN with image transformation",
             price_class=cloudfront.PriceClass.PRICE_CLASS_100,  # US, Canada, Europe
         )
