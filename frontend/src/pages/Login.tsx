@@ -11,6 +11,12 @@ const config = {
         sessionDurationMinutes: 43200,
     },
     authFlowType: AuthFlowType.Discovery,
+    // Auto-login users who belong to exactly one organization
+    directLoginForSingleMembership: {
+        status: true,
+        ignoreInvites: true, // Skip org picker even with pending invites
+        ignoreJitProvisioning: true, // Skip org picker even with JIT-joinable orgs
+    },
 }
 
 // Stytch styles aligned with shadcn/ui default theme (neutral/zinc)
