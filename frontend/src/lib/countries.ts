@@ -288,3 +288,66 @@ export function updateVatIdForCountryChange(
     }
     return currentVatId
 }
+
+// Default country code for billing (used when no country is set)
+export const DEFAULT_COUNTRY = 'US'
+
+/**
+ * Countries where Tax ID (VAT/GST) is not typically required on B2B invoices.
+ * - US: No federal VAT; state sales tax doesn't require tax ID on invoices
+ * - CA: GST/HST exists but typically handled by payment processor
+ * - HK: No VAT/GST system
+ * - SG: GST registered, but optional for foreign SaaS providers
+ */
+const COUNTRIES_WITHOUT_TAX_ID = new Set(['US', 'CA', 'HK', 'SG'])
+
+/**
+ * Determines whether the Tax ID field should be shown for a given country.
+ * Returns true for EU countries (VAT) and other countries that use tax IDs.
+ */
+export function shouldShowTaxId(countryCode: string): boolean {
+    if (!countryCode) return false
+    // Show for EU countries (have VAT prefix) or any country not in the exempt list
+    return isEuCountry(countryCode) || !COUNTRIES_WITHOUT_TAX_ID.has(countryCode)
+}
+
+/**
+ * Returns the localized label for postal code based on country.
+ * - US: "ZIP code"
+ * - GB, AU, NZ: "Postcode"
+ * - Default: "Postal code"
+ */
+export function getPostalCodeLabel(countryCode: string): string {
+    switch (countryCode) {
+        case 'US':
+            return 'ZIP code'
+        case 'GB':
+        case 'AU':
+        case 'NZ':
+            return 'Postcode'
+        default:
+            return 'Postal code'
+    }
+}
+
+/**
+ * Returns the localized label for state/province based on country.
+ * - US, AU: "State"
+ * - CA: "Province"
+ * - GB, IE: "County"
+ * - Default: "State / Province"
+ */
+export function getStateLabel(countryCode: string): string {
+    switch (countryCode) {
+        case 'US':
+        case 'AU':
+            return 'State'
+        case 'CA':
+            return 'Province'
+        case 'GB':
+        case 'IE':
+            return 'County'
+        default:
+            return 'State / Province'
+    }
+}
