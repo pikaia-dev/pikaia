@@ -473,10 +473,294 @@ POST /api/v1/integrations/deliveries/{delivery_id}/replay
 
 ---
 
+## Rate Limiting & Tenant Isolation
+
+### Per-Tenant Rate Limiting
+
+Prevent noisy neighbors from overwhelming the delivery infrastructure:
+
+```python
+class TenantRateLimiter:
+    """
+    Token bucket rate limiter per workspace.
+    Uses DynamoDB for distributed state.
+    """
+    
+    def __init__(self, table_name: str = "rate-limits"):
+        self.table = boto3.resource("dynamodb").Table(table_name)
+    
+    def check_and_consume(self, workspace_id: str, tokens: int = 1) -> bool:
+        """
+        Check rate limit and consume tokens.
+        Default: 100 webhooks/minute per workspace.
+        """
+        now = int(time.time())
+        bucket_key = f"webhook:{workspace_id}:{now // 60}"  # Per-minute bucket
+        
+        try:
+            response = self.table.update_item(
+                Key={"pk": bucket_key},
+                UpdateExpression="ADD tokens :t",
+                ExpressionAttributeValues={":t": tokens, ":max": 100},
+                ConditionExpression="attribute_not_exists(tokens) OR tokens < :max",
+                ReturnValues="UPDATED_NEW",
+            )
+            return True
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
+                return False  # Rate limited
+            raise
+```
+
+### Per-Endpoint Concurrency
+
+Limit in-flight requests to prevent overwhelming slow endpoints:
+
+```python
+MAX_IN_FLIGHT_PER_ENDPOINT = 10
+
+async def deliver_with_concurrency_limit(endpoint_id: str, event: dict):
+    semaphore = get_endpoint_semaphore(endpoint_id, MAX_IN_FLIGHT_PER_ENDPOINT)
+    
+    async with semaphore:
+        await deliver_webhook(endpoint_id, event)
+```
+
+---
+
+## Circuit Breaker
+
+Auto-disable endpoints after repeated failures to protect delivery infrastructure:
+
+### Circuit States
+
+```
+CLOSED → failures exceed threshold → OPEN → cooldown expires → HALF_OPEN → success → CLOSED
+                                              ↓ failure
+                                            OPEN
+```
+
+### Implementation
+
+```python
+class EndpointCircuitBreaker:
+    """
+    Circuit breaker per endpoint.
+    """
+    FAILURE_THRESHOLD = 5  # consecutive failures
+    COOLDOWN_SECONDS = 300  # 5 minutes
+    
+    def record_failure(self, endpoint: IntegrationEndpoint):
+        endpoint.consecutive_failures += 1
+        
+        if endpoint.consecutive_failures >= self.FAILURE_THRESHOLD:
+            endpoint.is_active = False
+            endpoint.disabled_at = timezone.now()
+            endpoint.disabled_reason = "circuit_breaker: consecutive failures"
+            logger.warning(f"Circuit opened for endpoint {endpoint.id}")
+        
+        endpoint.save()
+    
+    def record_success(self, endpoint: IntegrationEndpoint):
+        endpoint.consecutive_failures = 0
+        endpoint.save()
+    
+    def maybe_retry(self, endpoint: IntegrationEndpoint) -> bool:
+        """Check if disabled endpoint should be retried (half-open)."""
+        if not endpoint.disabled_at:
+            return True
+        
+        cooldown_expired = timezone.now() > endpoint.disabled_at + timedelta(
+            seconds=self.COOLDOWN_SECONDS
+        )
+        return cooldown_expired
+```
+
+### Model Updates
+
+Add to `IntegrationEndpoint`:
+
+```python
+consecutive_failures = models.PositiveIntegerField(default=0)
+```
+
+---
+
+## Secret Management
+
+### AWS Secrets Manager
+
+Store signing secrets in Secrets Manager, not in the database:
+
+```python
+import boto3
+
+secrets_client = boto3.client("secretsmanager")
+
+def get_signing_secret(endpoint_id: str) -> str:
+    """Retrieve signing secret from Secrets Manager."""
+    secret_id = f"webhook/{endpoint_id}/signing-secret"
+    response = secrets_client.get_secret_value(SecretId=secret_id)
+    return response["SecretString"]
+
+def create_signing_secret(endpoint_id: str) -> str:
+    """Create new signing secret in Secrets Manager."""
+    secret = secrets.token_urlsafe(32)
+    secrets_client.create_secret(
+        Name=f"webhook/{endpoint_id}/signing-secret",
+        SecretString=secret,
+    )
+    return secret
+```
+
+### Scheduled Rotation
+
+```python
+# Lambda triggered by CloudWatch Events (every 90 days)
+def rotate_signing_secret(event, context):
+    """Rotate signing secrets with dual-secret verification window."""
+    endpoint_id = event["endpoint_id"]
+    
+    # 1. Generate new secret
+    new_secret = secrets.token_urlsafe(32)
+    
+    # 2. Update Secrets Manager with staged secret
+    secrets_client.put_secret_value(
+        SecretId=f"webhook/{endpoint_id}/signing-secret",
+        SecretString=new_secret,
+        VersionStages=["AWSPENDING"],
+    )
+    
+    # 3. During transition period, accept signatures from both secrets
+    # (Already supported via signing_secret_rotated field)
+```
+
+---
+
+## Replay Tooling
+
+### Replay from DLQ
+
+```python
+# Lambda: Replay failed deliveries with rate limiting
+def replay_from_dlq(event, context):
+    """
+    Replay deliveries from DLQ with selective filtering.
+    """
+    filters = event.get("filters", {})
+    rate_limit = event.get("rate_limit", 10)  # per second
+    
+    dlq = sqs.Queue(DELIVERY_DLQ_URL)
+    replayed = 0
+    
+    for message in dlq.receive_messages(MaxNumberOfMessages=10):
+        delivery = json.loads(message.body)
+        
+        # Apply filters
+        if filters.get("workspace_id") and delivery["workspace_id"] != filters["workspace_id"]:
+            continue
+        if filters.get("event_type") and delivery["event_type"] != filters["event_type"]:
+            continue
+        
+        # Re-queue for delivery
+        deliver_webhook.delay(
+            subscription_id=delivery["subscription_id"],
+            event_data=delivery["event_data"],
+        )
+        
+        message.delete()
+        replayed += 1
+        
+        # Rate limiting
+        time.sleep(1 / rate_limit)
+    
+    return {"replayed": replayed}
+```
+
+### API Endpoint
+
+```
+POST /api/v1/integrations/deliveries/replay
+{
+  "filters": {
+    "workspace_id": "org_01HN...",
+    "status": "failed",
+    "since": "2025-01-01T00:00:00Z"
+  },
+  "rate_limit": 10
+}
+```
+
+---
+
+## Observability
+
+### Delivery Metrics
+
+Emit structured metrics for every delivery attempt:
+
+```python
+def emit_delivery_metrics(delivery: IntegrationDelivery, duration_ms: int):
+    """Emit CloudWatch metrics for delivery."""
+    dimensions = [
+        {"Name": "EventType", "Value": delivery.event_type},
+        {"Name": "WorkspaceId", "Value": delivery.subscription.endpoint.workspace_id},
+        {"Name": "Status", "Value": "success" if delivery.status == "success" else "failure"},
+    ]
+    
+    cloudwatch.put_metric_data(
+        Namespace="Integrations",
+        MetricData=[
+            {
+                "MetricName": "DeliveryCount",
+                "Value": 1,
+                "Unit": "Count",
+                "Dimensions": dimensions,
+            },
+            {
+                "MetricName": "DeliveryLatency",
+                "Value": duration_ms,
+                "Unit": "Milliseconds",
+                "Dimensions": dimensions,
+            },
+        ],
+    )
+```
+
+### Structured Logging
+
+```python
+import structlog
+
+logger = structlog.get_logger()
+
+def log_delivery_attempt(delivery: IntegrationDelivery, response: httpx.Response):
+    logger.info(
+        "webhook_delivery",
+        event_id=str(delivery.event_id),
+        subscription_id=delivery.subscription_id,
+        endpoint_id=delivery.subscription.endpoint_id,
+        status_code=response.status_code,
+        duration_ms=delivery.response_time_ms,
+        attempt=delivery.attempts,
+        correlation_id=delivery.event_data.get("correlation_id"),
+    )
+```
+
+### Dashboards & Alerts
+
+| Metric | Alert Threshold |
+|--------|-----------------|
+| Delivery success rate | < 95% over 15 min |
+| P99 delivery latency | > 5s |
+| DLQ depth | > 100 messages |
+| Circuit breaker trips | > 3 per hour |
+
+---
+
 ## Future Considerations
 
-- **Delivery Dashboard**: UI for viewing delivery logs, retrying failed webhooks
+- **Delivery Dashboard UI**: Customer-facing UI for viewing delivery logs and retrying
 - **Event Filtering DSL**: More expressive filters (greater than, contains, etc.)
 - **Batch Delivery**: Combine multiple events into single webhook for high-volume scenarios
 - **Native Slack App**: Rich Slack integration with interactive messages
-- **Per-Tenant Rate Limits**: Prevent single customer from overwhelming the system

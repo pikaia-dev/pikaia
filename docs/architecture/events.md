@@ -380,8 +380,371 @@ class AuditLog(models.Model):
 
 ---
 
-## Future Considerations
+## Transactional Outbox
 
-- **Transactional Outbox**: If event loss becomes an issue, implement outbox pattern with `OutboxEvent` table
-- **Schema Registry**: For complex multi-team scenarios, consider AWS Glue Schema Registry or Confluent
-- **Event Replay UI**: Admin interface to replay failed events from DLQ
+> [!IMPORTANT]
+> The transactional outbox pattern is **required** for guaranteed event delivery. Events are persisted atomically with business data, then published by a background worker.
+
+### Why Outbox?
+
+Without outbox:
+```python
+# ❌ Dangerous: EventBridge call can fail after DB commit
+with transaction.atomic():
+    entry.status = "approved"
+    entry.save()
+eventbridge.put_events(...)  # Network failure = lost event
+```
+
+With outbox:
+```python
+# ✅ Safe: Event persisted in same transaction
+with transaction.atomic():
+    entry.status = "approved"
+    entry.save()
+    OutboxEvent.objects.create(event_type="time_entry.approved", ...)
+
+# Background worker publishes, retries on failure
+```
+
+### Outbox Model
+
+```python
+class OutboxEvent(models.Model):
+    """
+    Transactional outbox for guaranteed event delivery.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    
+    # Event data
+    event_type = models.CharField(max_length=100, db_index=True)
+    aggregate_type = models.CharField(max_length=50)
+    aggregate_id = models.CharField(max_length=100)
+    workspace_id = models.CharField(max_length=100, db_index=True)
+    
+    payload = models.JSONField()
+    
+    # Publishing state
+    published_at = models.DateTimeField(null=True, db_index=True)
+    publish_attempts = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=["published_at", "created_at"]),  # Publisher query
+        ]
+```
+
+### Publisher Worker
+
+```python
+def publish_pending_events():
+    """
+    Idempotent publisher - safe to run concurrently.
+    Run via cron (every 5s) or triggered by transaction.on_commit().
+    """
+    pending = OutboxEvent.objects.filter(
+        published_at__isnull=True,
+        publish_attempts__lt=5,
+    ).select_for_update(skip_locked=True)[:100]
+    
+    for event in pending:
+        try:
+            eventbridge.put_events(Entries=[{
+                "Source": "app.outbox",
+                "DetailType": event.event_type,
+                "Detail": json.dumps(event.payload),
+                "EventBusName": settings.EVENT_BUS_NAME,
+            }])
+            event.published_at = timezone.now()
+        except Exception as e:
+            event.publish_attempts += 1
+            event.last_error = str(e)
+        event.save()
+```
+
+### Alternative: Debezium + EventBridge Pipes
+
+For higher throughput, use CDC (Change Data Capture):
+
+```
+PostgreSQL → Debezium → Kafka/Kinesis → EventBridge Pipes → EventBridge
+```
+
+This eliminates polling and provides sub-second latency.
+
+---
+
+## FIFO Ordering
+
+For consumers that require per-aggregate ordering (e.g., state machines), use SQS FIFO with `MessageGroupId`:
+
+### EventBridge Pipes → SQS FIFO
+
+```python
+# CDK example
+from aws_cdk import aws_sqs as sqs, aws_pipes as pipes
+
+fifo_queue = sqs.Queue(
+    self, "OrderedEventsQueue",
+    queue_name="ordered-events.fifo",
+    fifo=True,
+    content_based_deduplication=True,
+)
+
+# Pipe: EventBridge → SQS FIFO with MessageGroupId = aggregate_id
+pipe = pipes.CfnPipe(
+    self, "OrderedEventsPipe",
+    source=event_bus.event_bus_arn,
+    target=fifo_queue.queue_arn,
+    target_parameters=pipes.CfnPipe.PipeTargetParametersProperty(
+        sqs_queue_parameters=pipes.CfnPipe.PipeTargetSqsQueueParametersProperty(
+            message_group_id="$.detail.aggregate_id",
+        )
+    ),
+)
+```
+
+### When to Use FIFO
+
+| Scenario | Use FIFO? |
+|----------|-----------|
+| Webhook delivery | No (order doesn't matter) |
+| Notification sending | No |
+| Aggregate state rebuilding | **Yes** |
+| Workflow state machines | **Yes** |
+| Analytics ingestion | No (usually) |
+
+---
+
+## Schema Validation
+
+### In-Repo JSON Schemas
+
+Store schemas in `/schemas/events/` and validate on publish:
+
+```
+schemas/events/
+├── time_entry.created.v1.json
+├── time_entry.approved.v1.json
+└── public.time_entry.created.v1.json
+```
+
+### Example Schema
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "time_entry.created.v1",
+  "type": "object",
+  "required": ["event_id", "event_type", "schema_version", "workspace_id", "data"],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "event_type": { "const": "time_entry.created" },
+    "schema_version": { "const": 1 },
+    "workspace_id": { "type": "string", "pattern": "^org_" },
+    "data": {
+      "type": "object",
+      "required": ["id", "description"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^te_" },
+        "description": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  }
+}
+```
+
+### Validation on Publish
+
+```python
+import jsonschema
+
+def publish_event(event: dict):
+    """Validate schema before publishing."""
+    schema = load_schema(event["event_type"], event["schema_version"])
+    jsonschema.validate(event, schema)
+    
+    # Guard: workspace_id required for all public events
+    if event["event_type"].startswith("public."):
+        assert event.get("workspace_id"), "workspace_id required for public events"
+    
+    OutboxEvent.objects.create(
+        event_type=event["event_type"],
+        payload=event,
+        ...
+    )
+```
+
+### Enforcing Additive Changes
+
+CI check to prevent breaking schema changes:
+
+```bash
+# .github/workflows/schema-check.yml
+- name: Check schema compatibility
+  run: |
+    python scripts/check_schema_compatibility.py \
+      --old origin/main:schemas/events/ \
+      --new schemas/events/
+```
+
+---
+
+## Tenant Scoping Guards
+
+> [!CAUTION]
+> All public events **must** include `workspace_id`. Reject events without it to prevent data leakage.
+
+### Publishing Guard
+
+```python
+def create_public_event(internal_event: dict) -> dict:
+    """Transform internal event to public event with guards."""
+    
+    # REQUIRED: workspace_id
+    workspace_id = internal_event.get("workspace_id")
+    if not workspace_id:
+        raise ValueError("Cannot publish public event without workspace_id")
+    
+    # Strip PII by default (explicit allowlist)
+    allowed_fields = PUBLIC_EVENT_ALLOWLIST.get(internal_event["event_type"], set())
+    
+    public_data = {
+        k: v for k, v in internal_event["data"].items()
+        if k in allowed_fields
+    }
+    
+    return {
+        "event_type": f"public.{internal_event['event_type']}",
+        "workspace_id": workspace_id,
+        "data": public_data,
+        ...
+    }
+```
+
+### Public Event Allowlist
+
+```python
+PUBLIC_EVENT_ALLOWLIST = {
+    "time_entry.created": {"id", "description", "project_id", "duration_minutes", "created_at"},
+    "time_entry.approved": {"id", "approved_by_id", "approved_at"},
+    # Explicitly exclude: user emails, internal IDs, etc.
+}
+```
+
+---
+
+## Observability
+
+### Tracing
+
+Propagate `correlation_id` through all systems:
+
+```python
+# Django middleware
+class CorrelationIdMiddleware:
+    def __call__(self, request):
+        correlation_id = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
+        request.correlation_id = correlation_id
+        
+        # Set in logging context
+        structlog.contextvars.bind_contextvars(correlation_id=correlation_id)
+        
+        # Propagate to AWS X-Ray
+        xray_recorder.put_annotation("correlation_id", correlation_id)
+        
+        response = self.get_response(request)
+        response["X-Correlation-ID"] = correlation_id
+        return response
+```
+
+### SLOs
+
+| Metric | Target | Alert Threshold |
+|--------|--------|-----------------|
+| Outbox publish latency (p99) | < 5s | > 10s |
+| EventBridge delivery success | > 99.9% | < 99.5% |
+| DLQ depth | 0 | > 10 messages |
+| Webhook delivery success | > 99% | < 95% |
+
+### Metrics to Emit
+
+```python
+# Using CloudWatch EMF or StatsD
+metrics.count("events.published", tags={"event_type": event_type})
+metrics.count("events.delivery.success", tags={"consumer": consumer_name})
+metrics.count("events.delivery.failure", tags={"consumer": consumer_name, "error": error_type})
+metrics.gauge("events.dlq.depth", dlq.approximate_number_of_messages)
+```
+
+---
+
+## High Availability
+
+### Multi-AZ Configuration
+
+| Component | HA Strategy |
+|-----------|-------------|
+| EventBridge | Regional service, inherently HA |
+| SQS | Cross-AZ, automatic |
+| RDS/Aurora | Multi-AZ deployment, automatic failover |
+| Lambda | Multi-AZ by default |
+| ECS/Django | Multi-AZ ALB + task placement |
+
+### DLQ Redrive Policy
+
+```python
+from aws_cdk import aws_sqs as sqs
+
+main_queue = sqs.Queue(
+    self, "IntegrationQueue",
+    visibility_timeout=Duration.seconds(300),  # Match Lambda timeout
+    dead_letter_queue=sqs.DeadLetterQueue(
+        max_receive_count=3,  # Move to DLQ after 3 failures
+        queue=dlq,
+    ),
+)
+
+# Parking queue for poison messages (after DLQ redrive fails)
+parking_queue = sqs.Queue(
+    self, "ParkingQueue",
+    queue_name="integration-parking",
+    retention_period=Duration.days(14),
+)
+```
+
+### RDS Connection Management
+
+For Lambda accessing RDS:
+
+```python
+# CDK: Use RDS Proxy
+rds_proxy = rds.DatabaseProxy(
+    self, "RDSProxy",
+    vpc=vpc,
+    secrets=[db_secret],
+    db_proxy_name="app-proxy",
+    require_tls=True,
+)
+
+# Lambda connects to proxy, not directly to RDS
+lambda_fn.add_environment("DATABASE_HOST", rds_proxy.endpoint)
+```
+
+### Cross-Region (Future)
+
+For disaster recovery:
+
+```
+Primary Region (us-east-1)          Backup Region (us-west-2)
+┌─────────────────────┐              ┌─────────────────────┐
+│ EventBridge         │──replicate──▶│ EventBridge         │
+│ Aurora (primary)    │──replicate──▶│ Aurora (replica)    │
+└─────────────────────┘              └─────────────────────┘
+```
+
+Use EventBridge global endpoints for automatic failover.
