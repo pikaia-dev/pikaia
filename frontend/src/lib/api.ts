@@ -276,3 +276,10 @@ export interface ImageResponse {
     width: number | null
     height: number | null
 }
+
+// Directory search types (Google Workspace)
+export interface DirectoryUser {
+    email: string
+    name: string
+    avatar_url: string
+}

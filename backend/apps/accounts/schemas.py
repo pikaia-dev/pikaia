@@ -471,3 +471,12 @@ class InviteMemberResponse(BaseModel):
     stytch_member_id: str = Field(..., description="Stytch member ID of invited member")
 
 
+# --- Directory Search Schemas ---
+
+
+class DirectoryUserSchema(BaseModel):
+    """A user from Google Workspace directory search."""
+
+    email: str = Field(..., description="User's email address")
+    name: str = Field(..., description="User's display name")
+    avatar_url: str = Field("", description="URL to user's avatar image")

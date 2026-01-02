@@ -26,6 +26,7 @@ import {
     type ConfirmUploadRequest,
     type ImageResponse,
     type PhoneOtpResponse,
+    type DirectoryUser,
 } from '../lib/api'
 
 /**
@@ -121,6 +122,10 @@ export function useApi() {
 
         deleteImage: (imageId: string) =>
             api.delete<MessageResponse>(`/media/${imageId}`),
+
+        // Directory search (Google Workspace)
+        searchDirectory: (q: string) =>
+            api.get<DirectoryUser[]>(`/auth/directory/search?q=${encodeURIComponent(q)}`),
     }), [api])
 }
 
