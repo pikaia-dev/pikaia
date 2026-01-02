@@ -126,6 +126,16 @@ export function useApi() {
         // Directory search (Google Workspace)
         searchDirectory: (q: string) =>
             api.get<DirectoryUser[]>(`/auth/directory/search?q=${encodeURIComponent(q)}`),
+
+        // Directory avatar (fetch via authenticated request, return blob URL)
+        getDirectoryAvatar: async (googleUrl: string): Promise<string | null> => {
+            try {
+                const response = await api.getBlob(`/auth/directory/avatar?url=${encodeURIComponent(googleUrl)}`)
+                return URL.createObjectURL(response)
+            } catch {
+                return null
+            }
+        },
     }), [api])
 }
 

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { Search, Keyboard, User } from 'lucide-react'
 import { useApi } from '@/hooks/useApi'
-import { config } from '@/lib/env'
 import type { DirectoryUser } from '@/lib/api'
 
 /** Minimum characters before triggering autocomplete */
@@ -23,19 +22,7 @@ interface EmailAutocompleteProps {
 }
 
 /**
- * Get proxied avatar URL that passes through our backend with OAuth token.
- */
-function getProxiedAvatarUrl(originalUrl: string): string {
-    if (!originalUrl) return ''
-    return `${config.apiUrl}/auth/directory/avatar?url=${encodeURIComponent(originalUrl)}`
-}
-
-/**
  * Email autocomplete with Google Workspace directory suggestions.
- * 
- * Shows coworker suggestions from the user's Google Workspace domain
- * when they start typing. Gracefully degrades to manual input if
- * Directory API is not available.
  */
 export function EmailAutocomplete({
     value,
@@ -49,15 +36,16 @@ export function EmailAutocomplete({
     const inputRef = useRef<HTMLInputElement>(null)
     const dropdownRef = useRef<HTMLDivElement>(null)
 
-    const { searchDirectory } = useApi()
+    const { searchDirectory, getDirectoryAvatar } = useApi()
 
     const [suggestions, setSuggestions] = useState<DirectoryUser[]>([])
+    const [avatarUrls, setAvatarUrls] = useState<Record<string, string>>({})
     const [isOpen, setIsOpen] = useState(false)
     const [selectedIndex, setSelectedIndex] = useState(-1)
     const [isFocused, setIsFocused] = useState(false)
     const [isSearching, setIsSearching] = useState(false)
 
-    // Fetch suggestions when value changes
+    // Fetch suggestions when value changes (debounced)
     const fetchSuggestions = useCallback(async (query: string) => {
         if (!query || query.length < MIN_QUERY_LENGTH) {
             setSuggestions([])
@@ -72,14 +60,13 @@ export function EmailAutocomplete({
                 setIsOpen(true)
             }
         } catch {
-            // Directory API not available - gracefully degrade
             setSuggestions([])
         } finally {
             setIsSearching(false)
         }
     }, [searchDirectory])
 
-    // Debounced fetch - only when focused
+    // Debounced fetch
     useEffect(() => {
         if (!isFocused) return
 
@@ -90,28 +77,45 @@ export function EmailAutocomplete({
         return () => clearTimeout(timer)
     }, [value, isFocused, fetchSuggestions])
 
+    // Fetch avatars for suggestions (in background)
+    useEffect(() => {
+        if (!suggestions.length) return
+
+        suggestions.forEach(async (user) => {
+            if (!user.avatar_url || avatarUrls[user.email]) return
+
+            try {
+                const blobUrl = await getDirectoryAvatar(user.avatar_url)
+                if (blobUrl) {
+                    setAvatarUrls(prev => ({ ...prev, [user.email]: blobUrl }))
+                }
+            } catch {
+                // Ignore avatar fetch errors
+            }
+        })
+    }, [suggestions, avatarUrls, getDirectoryAvatar])
+
     // Handle suggestion selection
     const handleSelect = useCallback((user: DirectoryUser) => {
-        setSuggestions([])
         setIsOpen(false)
+        setSuggestions([])
         setSelectedIndex(-1)
         onChange(user.email)
         onSelect?.(user)
-        // Blur the input to prevent dropdown reopening
         inputRef.current?.blur()
     }, [onChange, onSelect])
 
     // Handle "continue manually" option
     const handleManualInput = useCallback(() => {
-        setSuggestions([])
         setIsOpen(false)
+        setSuggestions([])
         setSelectedIndex(-1)
         inputRef.current?.focus()
     }, [])
 
     // Keyboard navigation
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-        const totalItems = suggestions.length + 1 // +1 for "continue manually" option
+        const totalItems = suggestions.length + 1
 
         if (e.key === 'ArrowDown') {
             e.preventDefault()
@@ -172,12 +176,7 @@ export function EmailAutocomplete({
                     }}
                     onBlur={() => {
                         setIsFocused(false)
-                        // Delay closing to allow click events on dropdown to fire
-                        setTimeout(() => {
-                            if (!dropdownRef.current?.contains(document.activeElement)) {
-                                setIsOpen(false)
-                            }
-                        }, 150)
+                        setTimeout(() => setIsOpen(false), 150)
                     }}
                     placeholder={placeholder}
                     disabled={disabled}
@@ -198,7 +197,7 @@ export function EmailAutocomplete({
                             key={user.email}
                             type="button"
                             onMouseDown={(e) => {
-                                e.preventDefault() // Prevent blur
+                                e.preventDefault()
                                 handleSelect(user)
                             }}
                             className={cn(
@@ -207,18 +206,14 @@ export function EmailAutocomplete({
                                 selectedIndex === index && 'bg-accent'
                             )}
                         >
-                            {user.avatar_url ? (
+                            {avatarUrls[user.email] ? (
                                 <img
-                                    src={getProxiedAvatarUrl(user.avatar_url)}
+                                    src={avatarUrls[user.email]}
                                     alt=""
-                                    className="h-8 w-8 rounded-full object-cover"
-                                    onError={(e) => {
-                                        // Hide broken images
-                                        e.currentTarget.style.display = 'none'
-                                    }}
+                                    className="h-8 w-8 rounded-full object-cover flex-shrink-0"
                                 />
                             ) : (
-                                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
                                     <User className="h-4 w-4 text-muted-foreground" />
                                 </div>
                             )}
@@ -235,7 +230,7 @@ export function EmailAutocomplete({
                     <button
                         type="button"
                         onMouseDown={(e) => {
-                            e.preventDefault() // Prevent blur
+                            e.preventDefault()
                             handleManualInput()
                         }}
                         className={cn(

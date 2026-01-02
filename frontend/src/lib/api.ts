@@ -85,6 +85,22 @@ export function createApiClient(getToken: TokenProvider) {
                 body: data ? JSON.stringify(data) : undefined,
             })
         },
+
+        async getBlob(endpoint: string): Promise<Blob> {
+            const token = getToken()
+            const headers: Record<string, string> = {}
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`
+            }
+            const response = await fetch(`${API_URL}${endpoint}`, {
+                method: 'GET',
+                headers,
+            })
+            if (!response.ok) {
+                throw new Error('Failed to fetch blob')
+            }
+            return response.blob()
+        },
     }
 }
 
