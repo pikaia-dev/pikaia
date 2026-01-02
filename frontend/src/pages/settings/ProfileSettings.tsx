@@ -14,6 +14,9 @@ import {
     DialogTitle,
 } from '../../components/ui/dialog'
 
+// Delay before updating state after dialog close animation
+const DIALOG_CLOSE_DELAY_MS = 150
+
 export default function ProfileSettings() {
     const { getCurrentUser, updateProfile, sendPhoneOtp, verifyPhoneOtp } = useApi()
     const [name, setName] = useState('')
@@ -94,13 +97,13 @@ export default function ProfileSettings() {
             // Close dialog first, then update state after animation
             setShowVerifyDialog(false)
             toast.success('Phone number verified and saved!')
-            // Update phone state after dialog close animation (300ms is typical)
+            // Update phone state after dialog close animation
             setTimeout(() => {
                 setPhoneNumber(updatedUser.phone_number)
                 setSavedPhoneNumber(updatedUser.phone_number)
                 setOtpCode('')
                 setPendingPhone('')
-            }, 150)
+            }, DIALOG_CLOSE_DELAY_MS)
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Verification failed')
         } finally {
