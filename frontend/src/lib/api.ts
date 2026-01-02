@@ -140,6 +140,12 @@ export interface PhoneOtpResponse {
     message: string
 }
 
+// Email update types
+export interface EmailUpdateResponse {
+    success: boolean
+    message: string
+}
+
 // Organization settings types
 export interface BillingAddress {
     line1: string

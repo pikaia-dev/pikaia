@@ -35,8 +35,10 @@ from apps.accounts.schemas import (
     MessageResponse,
     OrganizationDetailResponse,
     OrganizationInfo,
+    EmailUpdateResponse,
     PhoneOtpResponse,
     SendPhoneOtpRequest,
+    StartEmailUpdateRequest,
     SessionResponse,
     UpdateBillingRequest,
     UpdateMemberRoleRequest,
@@ -459,6 +461,52 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
         if "invalid" in error_msg.lower() or "expired" in error_msg.lower():
             raise HttpError(400, "Invalid or expired verification code")
         logger.warning("Phone OTP verification failed: %s", error_msg)
+        raise HttpError(400, error_msg)
+
+
+# --- Email Update ---
+
+
+@router.post(
+    "/email/start-update",
+    response={200: EmailUpdateResponse, 400: ErrorResponse, 401: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="startEmailUpdate",
+    summary="Start email address update flow",
+)
+def start_email_update(request: HttpRequest, payload: StartEmailUpdateRequest) -> EmailUpdateResponse:
+    """
+    Initiate email address change.
+
+    Sends a verification to the new email address. User must verify the new
+    email to complete the change. The update is finalized via Stytch.
+    """
+    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+        raise HttpError(401, "Not authenticated")
+
+    user = request.auth_user  # type: ignore[attr-defined]
+    member = request.auth_member  # type: ignore[attr-defined]
+    org = request.auth_organization  # type: ignore[attr-defined]
+
+    # Check if new email is the same as current
+    if payload.new_email.lower() == user.email.lower():
+        raise HttpError(400, "New email is the same as current email")
+
+    try:
+        client = get_stytch_client()
+        # Update member email in Stytch - this triggers verification email
+        client.organizations.members.update(
+            organization_id=org.stytch_org_id,
+            member_id=member.stytch_member_id,
+            email_address=payload.new_email,
+        )
+        return EmailUpdateResponse(
+            success=True,
+            message=f"Verification email sent to {payload.new_email}. Check your inbox to complete the change.",
+        )
+    except StytchError as e:
+        error_msg = e.details.error_message or "Failed to initiate email update"
+        logger.warning("Failed to start email update: %s", error_msg)
         raise HttpError(400, error_msg)
 
 
