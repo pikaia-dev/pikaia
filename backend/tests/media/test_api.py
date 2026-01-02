@@ -331,7 +331,132 @@ class TestDeleteImage:
 
 
 @pytest.mark.django_db
+class TestLogoStytchSync:
+    """Tests for syncing organization logos to Stytch."""
+
+    def test_confirm_logo_upload_syncs_to_stytch(self, request_factory: RequestFactory) -> None:
+        """Should sync logo URL to Stytch after confirming logo upload."""
+        org = OrganizationFactory()
+        user = UserFactory()
+        member = MemberFactory(user=user, organization=org)
+
+        request = request_factory.post("/api/v1/media/confirm")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        key = f"logos/{org.id}/logo123.png"
+        payload = ConfirmUploadSchema(key=key, image_type="logo")
+
+        with patch("apps.media.api.get_storage_service") as mock_get_storage, \
+             patch("apps.accounts.stytch_client.get_stytch_client") as mock_stytch:
+            mock_storage = MagicMock()
+            mock_storage.confirm_upload.return_value = MagicMock(
+                content_type="image/png",
+                size_bytes=100000,
+                width=400,
+                height=400,
+            )
+            mock_storage.get_public_url.return_value = f"/media/{key}"
+            mock_get_storage.return_value = mock_storage
+
+            mock_client = MagicMock()
+            mock_stytch.return_value = mock_client
+
+            confirm_upload(request, payload)
+
+        # Verify Stytch was called with the logo URL
+        mock_client.organizations.update.assert_called_once_with(
+            organization_id=org.stytch_org_id,
+            organization_logo_url=f"/media/{key}",
+        )
+
+    def test_delete_logo_syncs_to_stytch(self, request_factory: RequestFactory) -> None:
+        """Should sync empty logo URL to Stytch after deleting logo."""
+        org = OrganizationFactory(logo_url="/media/logos/1/test.png")
+        user = UserFactory()
+        member = MemberFactory(user=user, organization=org, role="admin")
+
+        image = UploadedImage.objects.create(
+            storage_key="logos/1/test.png",
+            image_type="logo",
+            content_type="image/png",
+            size_bytes=100000,
+            organization=org,
+            uploaded_by=user,
+        )
+
+        request = request_factory.delete(f"/api/v1/media/{image.id}")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        with patch("apps.media.api.get_storage_service") as mock_get_storage, \
+             patch("apps.accounts.stytch_client.get_stytch_client") as mock_stytch:
+            mock_storage = MagicMock()
+            mock_get_storage.return_value = mock_storage
+
+            mock_client = MagicMock()
+            mock_stytch.return_value = mock_client
+
+            delete_image(request, str(image.id))
+
+        # Verify Stytch was called with empty logo URL
+        mock_client.organizations.update.assert_called_once_with(
+            organization_id=org.stytch_org_id,
+            organization_logo_url="",
+        )
+
+    def test_stytch_sync_failure_does_not_break_upload(self, request_factory: RequestFactory) -> None:
+        """Logo upload should succeed even if Stytch sync fails."""
+        from stytch.core.response_base import StytchError
+
+        org = OrganizationFactory()
+        user = UserFactory()
+        member = MemberFactory(user=user, organization=org)
+
+        request = request_factory.post("/api/v1/media/confirm")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        key = f"logos/{org.id}/logo123.png"
+        payload = ConfirmUploadSchema(key=key, image_type="logo")
+
+        with patch("apps.media.api.get_storage_service") as mock_get_storage, \
+             patch("apps.accounts.stytch_client.get_stytch_client") as mock_stytch:
+            mock_storage = MagicMock()
+            mock_storage.confirm_upload.return_value = MagicMock(
+                content_type="image/png",
+                size_bytes=100000,
+                width=400,
+                height=400,
+            )
+            mock_storage.get_public_url.return_value = f"/media/{key}"
+            mock_get_storage.return_value = mock_storage
+
+            # Simulate Stytch API failure
+            mock_client = MagicMock()
+            mock_error = MagicMock()
+            mock_error.error_message = "API temporarily unavailable"
+            mock_client.organizations.update.side_effect = StytchError(mock_error)
+            mock_stytch.return_value = mock_client
+
+            # Should not raise - graceful degradation
+            result = confirm_upload(request, payload)
+
+        # Upload should still succeed
+        assert result.url == f"/media/{key}"
+        assert UploadedImage.objects.filter(storage_key=key).exists()
+
+        # Org logo_url should be updated locally
+        org.refresh_from_db()
+        assert org.logo_url == f"/media/{key}"
+
+
+@pytest.mark.django_db
 class TestStorageService:
+
     """Tests for the storage service."""
 
     def test_validate_upload_request_valid(self, storage_service: StorageService) -> None:
