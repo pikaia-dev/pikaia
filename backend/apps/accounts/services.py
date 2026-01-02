@@ -16,6 +16,7 @@ from apps.organizations.models import Organization
 def get_or_create_user_from_stytch(
     email: str,
     name: str = "",
+    avatar_url: str = "",
 ) -> User:
     """
     Get or create a User from Stytch data.
@@ -23,16 +24,26 @@ def get_or_create_user_from_stytch(
     Email is the cross-org identifier in Stytch B2B.
     Called during authentication to sync user data.
 
+    Args:
+        email: User's email address
+        name: User's display name
+        avatar_url: User's profile picture URL (e.g., from Google OAuth)
+
     Uses select_for_update for explicit row locking under concurrent requests.
     """
     try:
         user = User.objects.select_for_update().get(email=email)
         user.name = name
-        user.save(update_fields=["name", "updated_at"])
+        update_fields = ["name", "updated_at"]
+        # Only update avatar if provided and user doesn't have one
+        if avatar_url and not user.avatar_url:
+            user.avatar_url = avatar_url
+            update_fields.append("avatar_url")
+        user.save(update_fields=update_fields)
         return user
     except User.DoesNotExist:
         try:
-            return User.objects.create(email=email, name=name)
+            return User.objects.create(email=email, name=name, avatar_url=avatar_url)
         except IntegrityError:
             # Concurrent insert won the race, fetch the winner
             return User.objects.get(email=email)
@@ -128,9 +139,11 @@ def sync_session_to_local(
         )
 
         # Sync user - email is the cross-org identifier
+        # profile_picture_url is set when user logs in via Google OAuth
         user = get_or_create_user_from_stytch(
             email=stytch_member.email_address,
             name=stytch_member.name or "",
+            avatar_url=getattr(stytch_member, "profile_picture_url", "") or "",
         )
 
         # Determine role from Stytch RBAC
