@@ -391,3 +391,30 @@ def soft_delete_member(member: Member) -> None:
         )
 
 
+def sync_logo_to_stytch(organization: Organization) -> None:
+    """
+    Sync organization logo URL to Stytch.
+
+    Called after logo upload/delete in media API.
+    Fails silently with a warning log on error to not break the upload flow.
+    """
+    import logging
+
+    from stytch.core.response_base import StytchError
+
+    from apps.accounts.stytch_client import get_stytch_client
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        client = get_stytch_client()
+        client.organizations.update(
+            organization_id=organization.stytch_org_id,
+            organization_logo_url=organization.logo_url,
+        )
+    except StytchError as e:
+        logger.warning(
+            "Failed to sync logo to Stytch for org %s: %s",
+            organization.stytch_org_id,
+            e.details.error_message,
+        )
