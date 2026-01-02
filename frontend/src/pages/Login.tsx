@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { StytchB2B, useStytchMemberSession } from '@stytch/react/b2b'
-import { B2BProducts, AuthFlowType } from '@stytch/vanilla-js/b2b'
+import { B2BProducts, AuthFlowType, B2BOAuthProviders } from '@stytch/vanilla-js/b2b'
 import { LoadingSpinner } from '../components/ui/loading-spinner'
 
 // Session duration: 30 days
@@ -9,11 +9,14 @@ const SESSION_DURATION_MINUTES = 30 * 24 * 60
 
 // Discovery config - let Stytch Dashboard handle redirect URLs
 const stytchDiscoveryConfig = {
-    products: [B2BProducts.emailMagicLinks],
+    products: [B2BProducts.emailMagicLinks, B2BProducts.oauth],
     sessionOptions: {
         sessionDurationMinutes: SESSION_DURATION_MINUTES,
     },
     authFlowType: AuthFlowType.Discovery,
+    oauthOptions: {
+        providers: [{ type: B2BOAuthProviders.Google }],
+    },
     // Auto-login users who belong to exactly one organization
     directLoginForSingleMembership: {
         status: true,
@@ -71,7 +74,7 @@ export default function Login() {
                 <div className="text-center mb-6">
                     <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
                     <p className="text-sm text-muted-foreground mt-2">
-                        Enter your email to sign in to your account
+                        Sign in with Google or enter your email
                     </p>
                 </div>
                 <StytchB2B config={stytchDiscoveryConfig} styles={stytchStyles} />
