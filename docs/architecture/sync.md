@@ -491,6 +491,288 @@ class SyncScheduler {
 
 ---
 
+## Client-Side Reliability
+
+> [!IMPORTANT]
+> Mobile sync must survive app crashes, network failures, and partial batch failures. The operation queue is the client's "outbox"—treat it with the same rigor as server-side event delivery.
+
+### Queue Persistence
+
+Operations must be persisted to local storage **before** showing success to the user:
+
+```typescript
+// SQLite schema for operation queue
+CREATE TABLE sync_operations (
+  idempotency_key TEXT PRIMARY KEY,
+  entity_type TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  intent TEXT NOT NULL,  -- create, update, delete
+  payload TEXT NOT NULL, -- JSON
+  created_at TEXT NOT NULL,
+  status TEXT DEFAULT 'pending',  -- pending, syncing, failed
+  attempts INTEGER DEFAULT 0,
+  last_error TEXT,
+  next_retry_at TEXT
+);
+
+CREATE INDEX idx_ops_status ON sync_operations(status, next_retry_at);
+```
+
+```typescript
+class PersistentOperationQueue {
+  private db: SQLiteDatabase;
+  
+  async enqueue(operation: Operation): Promise<void> {
+    // Persist BEFORE returning to caller
+    await this.db.run(`
+      INSERT INTO sync_operations 
+      (idempotency_key, entity_type, entity_id, intent, payload, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [
+      operation.idempotency_key,
+      operation.entity_type,
+      operation.entity_id,
+      operation.intent,
+      JSON.stringify(operation.data),
+      new Date().toISOString(),
+    ]);
+  }
+  
+  async getPending(): Promise<Operation[]> {
+    return this.db.query(`
+      SELECT * FROM sync_operations 
+      WHERE status = 'pending' 
+         OR (status = 'failed' AND next_retry_at <= datetime('now'))
+      ORDER BY created_at
+      LIMIT 100
+    `);
+  }
+  
+  async markSynced(idempotencyKey: string): Promise<void> {
+    await this.db.run(`
+      DELETE FROM sync_operations WHERE idempotency_key = ?
+    `, [idempotencyKey]);
+  }
+}
+```
+
+### Retry Logic with Exponential Backoff
+
+```typescript
+class SyncRetryPolicy {
+  private readonly MAX_ATTEMPTS = 10;
+  private readonly BASE_DELAY_MS = 1000;
+  private readonly MAX_DELAY_MS = 300000; // 5 minutes
+  
+  calculateNextRetry(attempts: number): Date {
+    // Exponential backoff with jitter
+    const delay = Math.min(
+      this.BASE_DELAY_MS * Math.pow(2, attempts),
+      this.MAX_DELAY_MS
+    );
+    const jitter = delay * 0.2 * Math.random();
+    
+    return new Date(Date.now() + delay + jitter);
+  }
+  
+  shouldRetry(operation: Operation, error: SyncError): boolean {
+    if (operation.attempts >= this.MAX_ATTEMPTS) {
+      return false; // Move to failed permanently
+    }
+    
+    // Retry on network/server errors, not validation errors
+    return error.isRetryable();
+  }
+}
+
+class SyncError {
+  constructor(
+    public readonly code: string,
+    public readonly message: string,
+    public readonly statusCode?: number
+  ) {}
+  
+  isRetryable(): boolean {
+    // Network errors
+    if (!this.statusCode) return true;
+    
+    // Server errors (5xx) are retryable
+    if (this.statusCode >= 500) return true;
+    
+    // Rate limiting
+    if (this.statusCode === 429) return true;
+    
+    // Client errors (4xx except 429) are NOT retryable
+    return false;
+  }
+}
+```
+
+### Partial Batch Failure Handling
+
+A batch push may have mixed results—handle each operation independently:
+
+```typescript
+interface PushResult {
+  idempotency_key: string;
+  status: 'applied' | 'duplicate' | 'rejected';
+  error_code?: string;
+  error_message?: string;
+}
+
+async function handlePushResults(results: PushResult[]): Promise<void> {
+  for (const result of results) {
+    switch (result.status) {
+      case 'applied':
+      case 'duplicate':
+        // Success - remove from queue
+        await queue.markSynced(result.idempotency_key);
+        break;
+        
+      case 'rejected':
+        if (isRetryableError(result.error_code)) {
+          // Transient error - schedule retry
+          await queue.scheduleRetry(result.idempotency_key);
+        } else {
+          // Permanent failure - mark as failed, notify user
+          await queue.markPermanentlyFailed(result.idempotency_key, result.error_message);
+          notifyUserOfFailure(result);
+        }
+        break;
+    }
+  }
+}
+
+function isRetryableError(code: string | undefined): boolean {
+  const permanentErrors = [
+    'PROJECT_ARCHIVED',
+    'ENTITY_NOT_FOUND', 
+    'PERMISSION_DENIED',
+    'VALIDATION_ERROR',
+  ];
+  return !permanentErrors.includes(code || '');
+}
+```
+
+### Network State Detection
+
+```typescript
+import NetInfo from '@react-native-community/netinfo';
+
+class NetworkAwareSyncScheduler {
+  private isOnline = true;
+  private syncInProgress = false;
+  
+  constructor() {
+    // Listen for connectivity changes
+    NetInfo.addEventListener(state => {
+      const wasOffline = !this.isOnline;
+      this.isOnline = state.isConnected && state.isInternetReachable;
+      
+      // Trigger sync when coming back online
+      if (wasOffline && this.isOnline) {
+        this.scheduleSync(0); // Immediate sync
+      }
+    });
+  }
+  
+  async scheduleSync(delayMs: number = 30000): Promise<void> {
+    if (!this.isOnline || this.syncInProgress) return;
+    
+    await delay(delayMs);
+    
+    if (!this.isOnline) return; // Re-check after delay
+    
+    this.syncInProgress = true;
+    try {
+      await this.sync();
+    } finally {
+      this.syncInProgress = false;
+    }
+  }
+  
+  private async sync(): Promise<void> {
+    try {
+      await this.pushPendingOperations();
+      await this.pullServerChanges();
+      
+      // Schedule next sync
+      this.scheduleSync(30000);
+    } catch (error) {
+      if (error instanceof NetworkError) {
+        // Back off on network errors
+        this.scheduleSync(60000);
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+```
+
+### Pull Failure Recovery
+
+```typescript
+class SyncCursorManager {
+  private readonly CURSOR_KEY = 'sync_cursor';
+  
+  async getCursor(): Promise<string | null> {
+    return AsyncStorage.getItem(this.CURSOR_KEY);
+  }
+  
+  async setCursor(cursor: string): Promise<void> {
+    await AsyncStorage.setItem(this.CURSOR_KEY, cursor);
+  }
+  
+  async resetCursor(): Promise<void> {
+    // Full re-sync from beginning
+    await AsyncStorage.removeItem(this.CURSOR_KEY);
+  }
+}
+
+async function pullWithRecovery(): Promise<void> {
+  const cursor = await cursorManager.getCursor();
+  
+  try {
+    const { changes, cursor: newCursor, hasMore } = await api.pull(cursor);
+    
+    // Apply changes in transaction
+    await db.transaction(async () => {
+      for (const change of changes) {
+        await applyChange(change);
+      }
+    });
+    
+    // Only update cursor after successful apply
+    await cursorManager.setCursor(newCursor);
+    
+  } catch (error) {
+    if (error instanceof CursorInvalidError) {
+      // Server says cursor is stale/invalid - full re-sync
+      console.warn('Cursor invalid, triggering full re-sync');
+      await cursorManager.resetCursor();
+      await clearLocalData();
+      await pullWithRecovery(); // Retry from beginning
+    } else {
+      throw error;
+    }
+  }
+}
+```
+
+### Reliability Guarantees Summary
+
+| Scenario | Guarantee |
+|----------|-----------|
+| App crashes after user action | ✅ Operation persisted in SQLite, synced on restart |
+| Network fails mid-push | ✅ Retried with exponential backoff |
+| 3/10 operations rejected | ✅ Each handled independently |
+| Server returns 500 | ✅ Retried up to 10 times over ~5 hours |
+| Validation error (4xx) | ⚠️ Marked failed, user notified |
+| Cursor becomes invalid | ✅ Full re-sync triggered |
+
+---
+
 ## Scale Considerations
 
 ### Current Design Capacity
