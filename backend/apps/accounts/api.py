@@ -15,6 +15,7 @@ from ninja import Router
 from ninja.errors import HttpError
 from stytch.core.response_base import StytchError
 
+from apps.accounts.models import Member
 from apps.accounts.schemas import (
     BillingAddressSchema,
     BillingInfoResponse,
@@ -51,6 +52,7 @@ from apps.accounts.services import (
     update_member_role,
 )
 from apps.accounts.stytch_client import get_stytch_client
+from apps.billing.services import sync_billing_to_stripe
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth, require_admin
 
@@ -584,8 +586,6 @@ def update_billing(
     # Sync billing info to Stripe
     if org.stripe_customer_id:
         try:
-            from apps.billing.services import sync_billing_to_stripe
-
             sync_billing_to_stripe(org)
         except Exception as e:
             logger.warning("Failed to sync billing to Stripe: %s", e)
@@ -615,8 +615,6 @@ def list_members(request: HttpRequest) -> MemberListResponse:
     members = list_organization_members(org)
 
     # Fetch member statuses from Stytch
-    from apps.accounts.stytch_client import get_stytch_client
-
     stytch = get_stytch_client()
     stytch_statuses: dict[str, str] = {}
     try:
@@ -711,8 +709,6 @@ def update_member_role_endpoint(
 
     Admin only. Cannot change your own role.
     """
-    from apps.accounts.models import Member
-
     current_member = request.auth_member  # type: ignore[attr-defined]
     org = request.auth_organization  # type: ignore[attr-defined]
 
@@ -752,8 +748,6 @@ def delete_member_endpoint(request: HttpRequest, member_id: int) -> MessageRespo
     Admin only. Cannot remove yourself. Soft deletes locally
     and removes from Stytch.
     """
-    from apps.accounts.models import Member
-
     current_member = request.auth_member  # type: ignore[attr-defined]
     org = request.auth_organization  # type: ignore[attr-defined]
 
