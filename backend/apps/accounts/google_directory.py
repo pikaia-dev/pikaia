@@ -41,7 +41,8 @@ def get_google_access_token(organization_id: str, member_id: str) -> str | None:
             organization_id=organization_id,
             member_id=member_id,
         )
-        return response.provider_values.access_token
+        # access_token is directly on the response (Optional field)
+        return response.access_token
     except StytchError as e:
         # No Google OAuth tokens for this member
         logger.debug(
