@@ -18,8 +18,9 @@ import {
 const DIALOG_CLOSE_DELAY_MS = 150
 
 export default function ProfileSettings() {
-    const { getCurrentUser, updateProfile, sendPhoneOtp, verifyPhoneOtp } = useApi()
+    const { getCurrentUser, updateProfile, sendPhoneOtp, verifyPhoneOtp, startEmailUpdate } = useApi()
     const [name, setName] = useState('')
+    const [savedName, setSavedName] = useState('')
     const [email, setEmail] = useState('')
     const [phoneNumber, setPhoneNumber] = useState('')
     const [savedPhoneNumber, setSavedPhoneNumber] = useState('')
@@ -35,11 +36,17 @@ export default function ProfileSettings() {
     const [pendingPhone, setPendingPhone] = useState('')
     const otpInputRef = useRef<HTMLInputElement>(null)
 
+    // Email update state
+    const [newEmail, setNewEmail] = useState('')
+    const [sendingEmailUpdate, setSendingEmailUpdate] = useState(false)
+
     useEffect(() => {
         getCurrentUser()
             .then((data) => {
                 setName(data.user.name)
+                setSavedName(data.user.name)
                 setEmail(data.user.email)
+                setNewEmail(data.user.email) // Initialize newEmail with current email
                 setPhoneNumber(data.user.phone_number || '')
                 setSavedPhoneNumber(data.user.phone_number || '')
                 setAvatarUrl(data.user.avatar_url || '')
@@ -50,13 +57,13 @@ export default function ProfileSettings() {
             .finally(() => setLoading(false))
     }, [getCurrentUser])
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
+    const handleSubmit = async () => {
         setSaving(true)
 
         try {
             await updateProfile({ name })
-            toast.success('Profile updated successfully')
+            setSavedName(name) // Update saved name on success
+            toast.success('Name updated successfully')
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Failed to update')
         } finally {
@@ -64,7 +71,27 @@ export default function ProfileSettings() {
         }
     }
 
+    const isNameChanged = name !== savedName
+
     const isPhoneChanged = phoneNumber !== savedPhoneNumber
+
+    const handleStartEmailUpdate = async () => {
+        if (!newEmail || newEmail.toLowerCase() === email.toLowerCase()) return
+
+        setSendingEmailUpdate(true)
+        try {
+            await startEmailUpdate(newEmail)
+            toast.success(`Verification email sent to ${newEmail}. Check your inbox to complete the change.`)
+            // Reset newEmail to current email (change won't take effect until verified)
+            setNewEmail(email)
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to start email update')
+        } finally {
+            setSendingEmailUpdate(false)
+        }
+    }
+
+    const isEmailChanged = newEmail.toLowerCase() !== email.toLowerCase()
 
     const handleVerifyPhone = async () => {
         if (!phoneNumber) return
@@ -162,56 +189,79 @@ export default function ProfileSettings() {
                         <CardTitle className="text-base">Personal Details</CardTitle>
                         <CardDescription>Update your profile information</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label htmlFor="email" className="block text-sm font-medium mb-1">
-                                    Email
-                                </label>
-                                <input
-                                    id="email"
-                                    type="email"
-                                    value={email}
-                                    disabled
-                                    className="w-full px-3 py-2 border border-border rounded-md bg-muted text-muted-foreground text-sm"
-                                />
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Email is managed by Stytch and cannot be changed here
-                                </p>
-                            </div>
-
-                            <div>
-                                <label htmlFor="name" className="block text-sm font-medium mb-1">
-                                    Display name
-                                </label>
-                                <input
-                                    id="name"
-                                    type="text"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                    placeholder="Your name"
-                                />
-                            </div>
-
-                            <Button type="submit" disabled={saving}>
-                                {saving ? 'Saving...' : 'Save changes'}
-                            </Button>
-                        </form>
-                    </CardContent>
-                </Card>
-
-                {/* Phone Number Card - Separate because it requires verification */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Phone Number</CardTitle>
-                        <CardDescription>
-                            Used for account security and notifications.
-                            {!savedPhoneNumber && ' Add a phone number and verify it via SMS.'}
-                        </CardDescription>
-                    </CardHeader>
                     <CardContent className="space-y-4">
+                        {/* Name */}
                         <div>
+                            <label htmlFor="name" className="block text-sm font-medium mb-1">
+                                Display name
+                            </label>
+                            <input
+                                id="name"
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                className="w-full h-10 px-3 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                placeholder="Your name"
+                            />
+                            {isNameChanged && (
+                                <Button
+                                    type="button"
+                                    onClick={handleSubmit}
+                                    disabled={saving}
+                                    className="mt-2 h-10"
+                                >
+                                    {saving ? 'Saving...' : 'Save name'}
+                                </Button>
+                            )}
+                        </div>
+
+                        {/* Email */}
+                        <div>
+                            <label htmlFor="email" className="block text-sm font-medium mb-1">
+                                Email
+                            </label>
+                            <input
+                                id="email"
+                                type="email"
+                                value={newEmail}
+                                onChange={(e) => setNewEmail(e.target.value)}
+                                className="w-full h-10 px-3 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                placeholder="your@email.com"
+                            />
+                            {/* Show status based on current state */}
+                            {!isEmailChanged && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Changing your email requires verification via magic link
+                                </p>
+                            )}
+                            {isEmailChanged && newEmail && (
+                                <>
+                                    <p className="text-xs text-amber-600 mt-2 flex items-center gap-1.5">
+                                        <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
+                                        </svg>
+                                        A verification link will be sent to {newEmail}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        If you signed in with Google, changing email will disconnect that login method.
+                                    </p>
+                                    <Button
+                                        type="button"
+                                        onClick={handleStartEmailUpdate}
+                                        disabled={sendingEmailUpdate}
+                                        className="mt-2 h-10"
+                                    >
+                                        {sendingEmailUpdate ? 'Sending...' : 'Send verification link'}
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Phone Number */}
+                        <div>
+                            <label className="block text-sm font-medium mb-1">
+                                Phone number
+                            </label>
                             <PhoneNumberInput
                                 value={phoneNumber}
                                 onChange={setPhoneNumber}
@@ -226,31 +276,29 @@ export default function ProfileSettings() {
                                 </p>
                             )}
                             {isPhoneChanged && phoneNumber && (
-                                <p className="text-xs text-amber-600 mt-2 flex items-center gap-1.5">
-                                    <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
-                                    </svg>
-                                    Verification required
+                                <>
+                                    <p className="text-xs text-amber-600 mt-2 flex items-center gap-1.5">
+                                        <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
+                                        </svg>
+                                        Verification required
+                                    </p>
+                                    <Button
+                                        type="button"
+                                        onClick={handleVerifyPhone}
+                                        disabled={sendingOtp}
+                                        className="mt-2 h-10"
+                                    >
+                                        {sendingOtp ? 'Sending...' : 'Send verification code'}
+                                    </Button>
+                                </>
+                            )}
+                            {!savedPhoneNumber && !phoneNumber && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Add a phone number for account security
                                 </p>
                             )}
                         </div>
-
-                        {isPhoneChanged && phoneNumber && (
-                            <Button
-                                type="button"
-                                onClick={handleVerifyPhone}
-                                disabled={sendingOtp}
-                            >
-                                {sendingOtp ? (
-                                    <>
-                                        <LoadingSpinner size="sm" className="mr-2" />
-                                        Sending code...
-                                    </>
-                                ) : (
-                                    'Send verification code'
-                                )}
-                            </Button>
-                        )}
                     </CardContent>
                 </Card>
             </div>
@@ -317,6 +365,6 @@ export default function ProfileSettings() {
                     </div>
                 </DialogContent>
             </Dialog>
-        </div>
+        </div >
     )
 }

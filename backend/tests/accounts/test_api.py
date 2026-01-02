@@ -22,6 +22,7 @@ from apps.accounts.api import (
     list_members,
     logout,
     send_magic_link,
+    start_email_update,
     update_billing,
     update_member_role_endpoint,
     update_organization,
@@ -34,6 +35,7 @@ from apps.accounts.schemas import (
     InviteMemberRequest,
     MagicLinkAuthenticateRequest,
     MagicLinkSendRequest,
+    StartEmailUpdateRequest,
     UpdateBillingRequest,
     UpdateMemberRoleRequest,
     UpdateOrganizationRequest,
@@ -623,6 +625,106 @@ class TestUpdateProfile:
 
         with pytest.raises(HttpError):
             update_profile(request, payload)
+
+
+@pytest.mark.django_db
+class TestStartEmailUpdate:
+    """Tests for start_email_update endpoint."""
+
+    def test_success_initiates_email_update(self, request_factory: RequestFactory) -> None:
+        """Should call Stytch and return success."""
+        user = UserFactory(email="old@example.com")
+        org = OrganizationFactory()
+        member = MemberFactory(user=user, organization=org)
+
+        request = request_factory.post("/api/v1/auth/email/start-update")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = StartEmailUpdateRequest(new_email="new@example.com")
+
+        with patch("apps.accounts.api.get_stytch_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_get_client.return_value = mock_client
+
+            result = start_email_update(request, payload)
+
+        assert result.success is True
+        assert "new@example.com" in result.message
+        mock_client.organizations.members.update.assert_called_once_with(
+            organization_id=org.stytch_org_id,
+            member_id=member.stytch_member_id,
+            email_address="new@example.com",
+        )
+
+    def test_same_email_returns_400(self, request_factory: RequestFactory) -> None:
+        """Should return 400 if new email is same as current."""
+        user = UserFactory(email="same@example.com")
+        org = OrganizationFactory()
+        member = MemberFactory(user=user, organization=org)
+
+        request = request_factory.post("/api/v1/auth/email/start-update")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = StartEmailUpdateRequest(new_email="same@example.com")
+
+        with pytest.raises(HttpError) as exc_info:
+            start_email_update(request, payload)
+
+        assert exc_info.value.status_code == 400
+        assert "same as current" in str(exc_info.value.message).lower()
+
+    def test_stytch_error_returns_400(self, request_factory: RequestFactory) -> None:
+        """Should return 400 on Stytch API failure."""
+        from stytch.core.response_base import StytchError, StytchErrorDetails
+
+        user = UserFactory(email="old@example.com")
+        org = OrganizationFactory()
+        member = MemberFactory(user=user, organization=org)
+
+        request = request_factory.post("/api/v1/auth/email/start-update")
+        request.auth_user = user  # type: ignore[attr-defined]
+        request.auth_member = member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        payload = StartEmailUpdateRequest(new_email="new@example.com")
+
+        with patch("apps.accounts.api.get_stytch_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.organizations.members.update.side_effect = StytchError(
+                StytchErrorDetails(
+                    error_type="duplicate_email",
+                    error_message="Email already in use",
+                    status_code=400,
+                    request_id="req-123",
+                )
+            )
+            mock_get_client.return_value = mock_client
+
+            with pytest.raises(HttpError) as exc_info:
+                start_email_update(request, payload)
+
+        assert exc_info.value.status_code == 400
+
+    def test_unauthenticated_returns_401(self, request_factory: RequestFactory) -> None:
+        """Should require authentication."""
+        request = request_factory.post("/api/v1/auth/email/start-update")
+        payload = StartEmailUpdateRequest(new_email="new@example.com")
+
+        with pytest.raises(HttpError) as exc_info:
+            start_email_update(request, payload)
+
+        assert exc_info.value.status_code == 401
+
+    def test_invalid_email_rejected_by_schema(self) -> None:
+        """Schema should reject invalid email format."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            StartEmailUpdateRequest(new_email="not-an-email")
 
 
 @pytest.mark.django_db

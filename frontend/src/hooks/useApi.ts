@@ -26,6 +26,7 @@ import {
     type ConfirmUploadRequest,
     type ImageResponse,
     type PhoneOtpResponse,
+    type EmailUpdateResponse,
     type DirectoryUser,
 } from '../lib/api'
 
@@ -60,6 +61,10 @@ export function useApi() {
 
         verifyPhoneOtp: (phone_number: string, otp_code: string) =>
             api.post<UserInfo>('/auth/phone/verify-otp', { phone_number, otp_code }),
+
+        // Email update
+        startEmailUpdate: (new_email: string) =>
+            api.post<EmailUpdateResponse>('/auth/email/start-update', { new_email }),
 
         // Organization
         getOrganization: () =>

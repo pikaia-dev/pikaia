@@ -310,6 +310,23 @@ class PhoneOtpResponse(BaseModel):
     message: str = Field(..., description="Status message")
 
 
+class StartEmailUpdateRequest(BaseModel):
+    """Request to start email update flow."""
+
+    new_email: EmailStr = Field(
+        ...,
+        description="New email address to change to",
+        examples=["newemail@example.com"],
+    )
+
+
+class EmailUpdateResponse(BaseModel):
+    """Response for email update initiation."""
+
+    success: bool = Field(..., description="Whether the update was initiated")
+    message: str = Field(..., description="Status message")
+
+
 class UpdateOrganizationRequest(BaseModel):
     """Request to update organization settings (admin only)."""
 
