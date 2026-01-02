@@ -206,6 +206,45 @@ The cursor is an opaque token encoding position in the changeset:
 - Combined value ensures stable ordering
 - Opaque to client—can change encoding without breaking clients
 
+**Monotonicity Guarantees:**
+
+> [!IMPORTANT]
+> The cursor must be monotonic from the database, not client clocks. Use `server_timestamp` (assigned on write) as the primary cursor component.
+
+```python
+# Pull query: Pin to snapshot semantics
+def get_changes_since(workspace_id: str, cursor: str, limit: int = 100):
+    """
+    Fetch changes since cursor with snapshot consistency.
+    """
+    cursor_ts, cursor_id = parse_cursor(cursor)
+    
+    # Use server-assigned updated_at, not client timestamp
+    # Composite index: (workspace, updated_at, id) ensures monotonic ordering
+    changes = (
+        SyncableModel.objects
+        .filter(workspace_id=workspace_id)
+        .filter(
+            Q(updated_at__gt=cursor_ts) |
+            Q(updated_at=cursor_ts, id__gt=cursor_id)
+        )
+        .order_by("updated_at", "id")
+        [:limit]
+    )
+    
+    return changes
+```
+
+**Required Index:**
+
+```python
+class Meta:
+    indexes = [
+        # Composite index for cursor pagination
+        models.Index(fields=["workspace", "updated_at", "id"]),
+    ]
+```
+
 ### Operation Intents
 
 | Intent | Meaning |
@@ -514,9 +553,105 @@ def sync_push(request):
 
 ---
 
+## Compression & Batching
+
+### Response Compression
+
+Enable gzip for sync responses to reduce bandwidth on mobile:
+
+```python
+# Django middleware (or nginx/ALB config)
+MIDDLEWARE = [
+    "django.middleware.gzip.GZipMiddleware",
+    ...
+]
+
+# Or in nginx
+location /api/v1/sync/ {
+    gzip on;
+    gzip_types application/json;
+    gzip_min_length 1000;
+}
+```
+
+### Request Batching
+
+Clients should batch operations in push requests:
+
+```typescript
+class SyncScheduler {
+  private readonly BATCH_SIZE = 50;
+  private readonly BATCH_DELAY_MS = 100;
+  
+  async pushWithBatching(operations: Operation[]) {
+    // Batch operations to reduce round-trips
+    for (let i = 0; i < operations.length; i += this.BATCH_SIZE) {
+      const batch = operations.slice(i, i + this.BATCH_SIZE);
+      await api.push(batch);
+    }
+  }
+}
+```
+
+### Payload Size Limits
+
+| Config | Value | Rationale |
+|--------|-------|-----------|
+| Max operations per push | 100 | Prevent timeout |
+| Max payload size | 1MB | Mobile-friendly |
+| Max changes per pull | 500 | Pagination |
+
+---
+
+## Background Notifications
+
+Reduce polling when online by notifying clients of server changes:
+
+### Push Notification Flow
+
+```
+Server Change → EventBridge → SNS → Mobile Push → Client pulls
+```
+
+### Implementation Options
+
+| Option | Latency | Complexity | Use Case |
+|--------|---------|------------|----------|
+| Polling | 30s-5min | Low | Default |
+| SNS Push | <1s | Medium | Mobile (iOS/Android) |
+| WebSocket | <100ms | High | Desktop, always-on clients |
+| SSE | <100ms | Medium | Web fallback |
+
+### SNS Nudge Pattern
+
+```python
+# Lambda: Send push notification on sync-relevant events
+def notify_client_to_sync(event, context):
+    """
+    Send silent push notification to trigger client sync.
+    """
+    workspace_id = event["detail"]["workspace_id"]
+    
+    # Get device tokens for workspace members
+    tokens = get_device_tokens_for_workspace(workspace_id)
+    
+    for token in tokens:
+        sns.publish(
+            TargetArn=token.sns_endpoint_arn,
+            Message=json.dumps({"type": "sync_nudge"}),
+            MessageAttributes={
+                "AWS.SNS.MOBILE.APNS.PUSH_TYPE": {
+                    "DataType": "String",
+                    "StringValue": "background",
+                },
+            },
+        )
+```
+
+---
+
 ## Future Considerations
 
-- **WebSocket for Push Notifications**: Notify clients of server changes without polling
 - **Selective Sync**: Allow clients to sync only specific entity types or date ranges
-- **Compression**: gzip payloads for large sync batches
-- **Background Sync**: Mobile OS-specific background sync (WorkManager, BGTaskScheduler)
+- **Partial Sync Recovery**: Resume interrupted syncs without re-fetching
+- **Conflict UI Components**: Reusable UI for manual conflict resolution
