@@ -93,7 +93,7 @@ export default function BillingSettings() {
             const data = await listInvoices({ limit: 6, starting_after: lastInvoice.id })
             setInvoices((prev) => [...prev, ...data.invoices])
             setInvoicesHasMore(data.has_more)
-        } catch (err) {
+        } catch {
             toast.error('Failed to load more invoices')
         } finally {
             setLoadingMoreInvoices(false)
@@ -566,10 +566,10 @@ export default function BillingSettings() {
                                                         <td className="py-3">
                                                             <span
                                                                 className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${invoice.status === 'paid'
-                                                                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                                                        : invoice.status === 'open'
-                                                                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                                                                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                                    : invoice.status === 'open'
+                                                                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                                                        : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
                                                                     }`}
                                                             >
                                                                 {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
