@@ -500,9 +500,10 @@ class TenantRateLimiter:
         try:
             response = self.table.update_item(
                 Key={"pk": bucket_key},
-                UpdateExpression="ADD tokens :t",
+                UpdateExpression="ADD #tokens :t",
+                ExpressionAttributeNames={"#tokens": "tokens"},
                 ExpressionAttributeValues={":t": tokens, ":max": 100},
-                ConditionExpression="attribute_not_exists(tokens) OR tokens < :max",
+                ConditionExpression="attribute_not_exists(#tokens) OR #tokens < :max",
                 ReturnValues="UPDATED_NEW",
             )
             return True
