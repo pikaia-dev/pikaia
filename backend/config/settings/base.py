@@ -34,10 +34,6 @@ class Settings(BaseSettings):
     # CORS (production only - local uses CORS_ALLOW_ALL_ORIGINS)
     CORS_ALLOWED_ORIGINS: str = ""  # Comma-separated URLs, e.g. "https://app.example.com"
 
-    # Google OAuth (for Directory API)
-    GOOGLE_OAUTH_CLIENT_ID: str = ""
-    GOOGLE_OAUTH_CLIENT_SECRET: str = ""
-
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
@@ -172,7 +168,3 @@ AUTH_USER_MODEL = "accounts.User"
 STYTCH_PROJECT_ID = settings.STYTCH_PROJECT_ID
 STYTCH_SECRET = settings.STYTCH_SECRET
 STYTCH_WEBHOOK_SECRET = settings.STYTCH_WEBHOOK_SECRET
-
-# Google OAuth (for Directory API)
-GOOGLE_OAUTH_CLIENT_ID = settings.GOOGLE_OAUTH_CLIENT_ID
-GOOGLE_OAUTH_CLIENT_SECRET = settings.GOOGLE_OAUTH_CLIENT_SECRET
