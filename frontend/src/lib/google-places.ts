@@ -100,7 +100,6 @@ export async function loadGooglePlacesScript(apiKey: string): Promise<void> {
     if (typeof google !== 'undefined' &&
         typeof google.maps !== 'undefined' &&
         typeof google.maps.importLibrary === 'function') {
-        console.log('Google Maps already loaded')
         return
     }
 
@@ -110,18 +109,15 @@ export async function loadGooglePlacesScript(apiKey: string): Promise<void> {
     )
 
     if (existingScript) {
-        console.log('Google Maps script already exists, waiting for initialization...')
         await waitForGoogleMaps()
         return
     }
 
-    console.log('Loading Google Maps script...')
 
     // Create a promise for the callback
     const callbackPromise = new Promise<void>((resolve) => {
         (window as unknown as Record<string, unknown>)[CALLBACK_NAME] = () => {
             delete (window as unknown as Record<string, unknown>)[CALLBACK_NAME]
-            console.log('Google Maps callback executed')
             resolve()
         }
     })
@@ -148,7 +144,6 @@ export async function loadGooglePlacesScript(apiKey: string): Promise<void> {
     // After callback, wait for full initialization
     await waitForGoogleMaps()
 
-    console.log('Google Maps fully loaded and ready')
 }
 
 // Extend window for google types
