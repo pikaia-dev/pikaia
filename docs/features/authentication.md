@@ -4,6 +4,7 @@
 
 Authentication is handled by [Stytch B2B](https://stytch.com/b2b):
 - Magic link email authentication
+- Google OAuth sign-in
 - Organization discovery (multi-org access)
 - Role-based access control
 - SSO and SCIM ready
@@ -112,3 +113,39 @@ Stytch webhooks provide real-time synchronization when changes occur outside aut
 3. Enable events: `member.update`, `member.delete`, `organization.update`
 
 > **Note:** Webhooks use Svix for delivery with automatic retries and signature verification.
+
+## Google OAuth
+
+Optional Google sign-in alongside magic links.
+
+### Setup
+
+**Google Cloud Console:**
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com) → **APIs & Services** → **Credentials**
+2. Create **OAuth Client ID** (Web Application)
+3. Add authorized redirect URI from Stytch Dashboard (under OAuth → Google)
+4. Set OAuth consent screen **User type** to **External** (or Internal for Workspace-only)
+
+**Stytch Dashboard:**
+
+1. Go to **Authentication** → **OAuth** → **Google**
+2. Enable Google and paste Client ID + Secret
+
+**Environment Variables** (`backend/.env`):
+```
+GOOGLE_OAUTH_CLIENT_ID=your-client-id
+GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
+```
+
+### Directory API (Coworker Suggestions)
+
+When inviting members, suggestions from the user's Google Workspace directory can appear.
+
+**Additional Setup:**
+
+1. Enable **Admin SDK API** in Google Cloud Console
+2. Add OAuth scope: `https://www.googleapis.com/auth/admin.directory.user.readonly`
+3. Users must re-authenticate to grant the new scope
+
+> **Note:** Only works for Google Workspace accounts. Personal Gmail users see no suggestions (graceful degradation).
