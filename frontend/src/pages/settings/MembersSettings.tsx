@@ -15,7 +15,8 @@ import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { LoadingSpinner } from '../../components/ui/loading-spinner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
-import type { MemberListItem } from '../../lib/api'
+import { EmailAutocomplete } from '../../components/ui/email-autocomplete'
+import type { MemberListItem, DirectoryUser } from '../../lib/api'
 
 export default function MembersSettings() {
     const { listMembers, inviteMember, updateMemberRole, deleteMember } = useApi()
@@ -67,6 +68,14 @@ export default function MembersSettings() {
             toast.error(err instanceof Error ? err.message : 'Failed to send invite')
         } finally {
             setInviting(false)
+        }
+    }
+
+    // Handle directory user selection
+    const handleDirectoryUserSelect = (user: DirectoryUser) => {
+        setInviteEmail(user.email)
+        if (user.name) {
+            setInviteName(user.name)
         }
     }
 
@@ -125,14 +134,12 @@ export default function MembersSettings() {
                     <form onSubmit={handleInvite} className="flex flex-wrap gap-3 items-end">
                         <div className="flex-1 min-w-[200px]">
                             <label htmlFor="email" className="block text-sm font-medium mb-1">Email</label>
-                            <input
+                            <EmailAutocomplete
                                 id="email"
-                                type="email"
                                 value={inviteEmail}
-                                onChange={(e) => setInviteEmail(e.target.value)}
+                                onChange={setInviteEmail}
+                                onSelect={handleDirectoryUserSelect}
                                 placeholder="user@example.com"
-                                required
-                                className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                         </div>
                         <div className="w-40">

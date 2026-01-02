@@ -19,6 +19,7 @@ from apps.accounts.models import Member
 from apps.accounts.schemas import (
     BillingAddressSchema,
     BillingInfoResponse,
+    DirectoryUserSchema,
     DiscoveredOrganization,
     DiscoveryCreateOrgRequest,
     DiscoveryExchangeRequest,
@@ -774,3 +775,42 @@ def delete_member_endpoint(request: HttpRequest, member_id: int) -> MessageRespo
     return MessageResponse(message=f"Member {email} removed from organization")
 
 
+# --- Google Directory Search ---
+
+
+@router.get(
+    "/directory/search",
+    response={200: list[DirectoryUserSchema], 401: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="searchDirectory",
+    summary="Search Google Workspace directory for users",
+)
+def search_directory(request: HttpRequest, q: str = "") -> list[DirectoryUserSchema]:
+    """
+    Search Google Workspace directory for coworkers.
+
+    Returns matching users from the authenticated user's Google Workspace domain.
+    Only works if the user has signed in with Google OAuth and granted
+    the Directory API scope. Returns empty list if not available.
+    """
+    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+        raise HttpError(401, "Not authenticated")
+
+    if not q or len(q) < 2:
+        return []
+
+    user = request.auth_user  # type: ignore[attr-defined]
+
+    # Import here to avoid circular imports
+    from apps.accounts.google_directory import search_directory_users
+
+    directory_users = search_directory_users(user, q, limit=10)
+
+    return [
+        DirectoryUserSchema(
+            email=u.email,
+            name=u.name,
+            avatar_url=u.avatar_url,
+        )
+        for u in directory_users
+    ]

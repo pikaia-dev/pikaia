@@ -15,7 +15,10 @@ const stytchDiscoveryConfig = {
     },
     authFlowType: AuthFlowType.Discovery,
     oauthOptions: {
-        providers: [{ type: B2BOAuthProviders.Google }],
+        providers: [{
+            type: B2BOAuthProviders.Google,
+            customScopes: ['https://www.googleapis.com/auth/admin.directory.user.readonly'],
+        }],
     },
     // Auto-login users who belong to exactly one organization
     directLoginForSingleMembership: {
