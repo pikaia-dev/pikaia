@@ -59,6 +59,7 @@ This project requires the following external services. Configure them before run
 |---------|---------|----------|
 | [Stytch](https://stytch.com) | B2B Authentication (magic links, SSO, SCIM) | ✅ Yes |
 | [Stripe](https://stripe.com) | Billing & subscriptions | ✅ Yes |
+| [Google OAuth](https://console.cloud.google.com) | Google sign-in, coworker suggestions | Optional |
 | [Google Places](https://console.cloud.google.com) | Address autocomplete | Optional |
 
 ### Stytch Setup
@@ -90,12 +91,44 @@ This project requires the following external services. Configure them before run
    - `STRIPE_PRICE_ID` (after running `setup_stripe` command)
 3. Create products: `uv run python manage.py setup_stripe`
 
+### Google OAuth (Optional)
+
+Enables "Sign in with Google" and coworker suggestions when inviting members.
+
+**Google Cloud Console:**
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com) → **APIs & Services** → **Credentials**
+2. Create **OAuth Client ID** (Web Application)
+3. Add authorized redirect URI from Stytch Dashboard (under OAuth → Google)
+4. Copy **Client ID** and **Client Secret**
+
+**Stytch Dashboard:**
+
+1. Go to **Authentication** → **OAuth** → **Google**
+2. Enable Google and paste the credentials
+
+**Environment Variables** (`backend/.env`):
+```
+GOOGLE_OAUTH_CLIENT_ID=your-client-id
+GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
+```
+
+**For Directory API (coworker suggestions):**
+
+1. In Google Cloud Console → **APIs & Services** → **Enabled APIs**
+2. Enable **Admin SDK API**
+3. Go to **OAuth consent screen** → **Add or Remove Scopes**
+4. Add scope: `https://www.googleapis.com/auth/admin.directory.user.readonly`
+
+> **Note:** Directory API only works for Google Workspace accounts, not personal Gmail.
+
 ### Google Places (Optional)
 
 For address autocomplete in billing settings:
 
 1. Enable **Places API** in [Google Cloud Console](https://console.cloud.google.com)
 2. Add `VITE_GOOGLE_PLACES_API_KEY` to `frontend/.env`
+
 
 ---
 
