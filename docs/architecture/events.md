@@ -563,13 +563,22 @@ schemas/events/
 ```python
 import jsonschema
 
+PUBLIC_EVENT_PREFIX = "public."
+
+def is_public_event(event_type: str) -> bool:
+    """
+    Determine whether an event type should be treated as public.
+    Centralizes classification logic instead of ad-hoc string checks.
+    """
+    return event_type.strip().startswith(PUBLIC_EVENT_PREFIX)
+
 def publish_event(event: dict):
     """Validate schema before publishing."""
     schema = load_schema(event["event_type"], event["schema_version"])
     jsonschema.validate(event, schema)
     
     # Guard: workspace_id required for all public events
-    if event["event_type"].startswith("public."):
+    if is_public_event(event["event_type"]):
         assert event.get("workspace_id"), "workspace_id required for public events"
     
     OutboxEvent.objects.create(
