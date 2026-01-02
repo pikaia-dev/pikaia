@@ -350,10 +350,22 @@ Client apps maintain:
 Default for most entities:
 
 ```python
+from datetime import datetime, timezone
+
+def normalize_to_utc(dt: datetime) -> datetime:
+    """Ensure datetime is UTC for safe comparison."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
 def apply_operation(op: SyncOperation, entity: SyncableModel):
     """Apply operation using LWW based on server timestamp."""
     
-    if entity.updated_at > op.server_timestamp:
+    # Normalize timestamps to UTC for safe comparison
+    entity_ts = normalize_to_utc(entity.updated_at)
+    op_ts = normalize_to_utc(op.server_timestamp)
+    
+    if entity_ts > op_ts:
         # Server already has newer data
         return "skipped"
     
