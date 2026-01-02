@@ -241,7 +241,7 @@ def get_changes_since(workspace_id: str, cursor: str, limit: int = 100):
 class Meta:
     indexes = [
         # Composite index for cursor pagination
-        models.Index(fields=["workspace", "updated_at", "id"]),
+        models.Index(fields=["workspace_id", "updated_at", "id"]),
     ]
 ```
 
@@ -286,7 +286,7 @@ class SyncOperation(models.Model):
     
     class Meta:
         indexes = [
-            models.Index(fields=["workspace", "server_timestamp"]),
+            models.Index(fields=["workspace_id", "server_timestamp"]),
             models.Index(fields=["idempotency_key"]),
         ]
 ```
@@ -315,7 +315,7 @@ class SyncableModel(models.Model):
     class Meta:
         abstract = True
         indexes = [
-            models.Index(fields=["workspace", "updated_at"]),
+            models.Index(fields=["workspace_id", "updated_at"]),
         ]
     
     @property
@@ -812,7 +812,7 @@ Critical indexes for sync performance:
 class Meta:
     indexes = [
         # Pull query: changes since cursor
-        models.Index(fields=["workspace", "updated_at"]),
+        models.Index(fields=["workspace_id", "updated_at"]),
         
         # Idempotency check
         models.Index(fields=["idempotency_key"]),
