@@ -238,7 +238,7 @@ def delete_image(request: HttpRequest, image_id: str) -> dict:
 
     # Check ownership
     can_delete = False
-    if image.user_id == user.id or image.organization_id == org.id and member.is_admin:
+    if (image.user_id == user.id) or (image.organization_id == org.id and member.is_admin):
         can_delete = True
 
     if not can_delete:
