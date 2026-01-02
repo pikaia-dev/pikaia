@@ -117,7 +117,7 @@ export default function ProfileSettings() {
             await sendPhoneOtp(pendingPhone)
             setOtpCode('')
             toast.success('New verification code sent!')
-            otpInputRef.current?.focus()
+            setTimeout(() => otpInputRef.current?.focus(), 100)
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Failed to resend code')
         } finally {
