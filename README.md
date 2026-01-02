@@ -107,12 +107,6 @@ Enables "Sign in with Google" and coworker suggestions when inviting members.
 1. Go to **Authentication** → **OAuth** → **Google**
 2. Enable Google and paste the credentials
 
-**Environment Variables** (`backend/.env`):
-```
-GOOGLE_OAUTH_CLIENT_ID=your-client-id
-GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
-```
-
 **For Directory API (coworker suggestions):**
 
 1. In Google Cloud Console → **APIs & Services** → **Enabled APIs**
@@ -121,6 +115,7 @@ GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
 4. Add scope: `https://www.googleapis.com/auth/admin.directory.user.readonly`
 
 > **Note:** Directory API only works for Google Workspace accounts, not personal Gmail.
+
 
 ### Google Places (Optional)
 

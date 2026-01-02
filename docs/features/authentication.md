@@ -132,12 +132,6 @@ Optional Google sign-in alongside magic links.
 1. Go to **Authentication** → **OAuth** → **Google**
 2. Enable Google and paste Client ID + Secret
 
-**Environment Variables** (`backend/.env`):
-```
-GOOGLE_OAUTH_CLIENT_ID=your-client-id
-GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
-```
-
 ### Directory API (Coworker Suggestions)
 
 When inviting members, suggestions from the user's Google Workspace directory can appear.
