@@ -1,20 +1,21 @@
 """
 Google Directory API client for searching workspace users.
+
+Uses Stytch's stored OAuth tokens - no local token storage needed.
+Stytch automatically refreshes tokens when calling their API.
 """
 
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
 
 import httpx
-from django.conf import settings
+from stytch.core.response_base import StytchError
 
-from apps.accounts.models import User
+from apps.accounts.stytch_client import get_stytch_client
 
 logger = logging.getLogger(__name__)
 
-# Google OAuth endpoints
-GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+# Google Directory API endpoint
 GOOGLE_DIRECTORY_API_URL = "https://admin.googleapis.com/admin/directory/v1"
 
 
@@ -27,62 +28,64 @@ class DirectoryUser:
     avatar_url: str = ""
 
 
-def refresh_google_token(user: User) -> str | None:
+def get_google_access_token(organization_id: str, member_id: str) -> str | None:
     """
-    Refresh the user's Google access token if expired.
+    Get Google access token from Stytch for a member.
 
-    Returns the valid access token or None if refresh fails.
+    Stytch stores and auto-refreshes Google OAuth tokens.
+    Returns None if no Google OAuth tokens are available.
     """
-    if not user.google_refresh_token:
-        return None
-
-    # Check if token is still valid (with 5 minute buffer)
-    if user.google_token_expires_at and user.google_token_expires_at > datetime.now(
-        UTC
-    ) + timedelta(minutes=5):
-        return user.google_access_token
-
-    # Refresh the token
     try:
-        response = httpx.post(
-            GOOGLE_TOKEN_URL,
-            data={
-                "client_id": settings.GOOGLE_OAUTH_CLIENT_ID,
-                "client_secret": settings.GOOGLE_OAUTH_CLIENT_SECRET,
-                "refresh_token": user.google_refresh_token,
-                "grant_type": "refresh_token",
-            },
-            timeout=10.0,
+        client = get_stytch_client()
+        response = client.organizations.members.oauth_providers.google(
+            organization_id=organization_id,
+            member_id=member_id,
         )
-        response.raise_for_status()
-        data = response.json()
-
-        # Update user tokens
-        user.google_access_token = data["access_token"]
-        user.google_token_expires_at = datetime.now(UTC) + timedelta(
-            seconds=data.get("expires_in", 3600)
+        return response.provider_values.access_token
+    except StytchError as e:
+        # No Google OAuth tokens for this member
+        logger.debug(
+            "No Google OAuth tokens for member %s: %s",
+            member_id,
+            e.details.error_message if e.details else str(e),
         )
-        user.save(update_fields=["google_access_token", "google_token_expires_at"])
-
-        return user.google_access_token
-    except httpx.HTTPError as e:
-        logger.warning("Failed to refresh Google token for user %s: %s", user.email, e)
         return None
 
 
-def search_directory_users(user: User, query: str, limit: int = 10) -> list[DirectoryUser]:
+def search_directory_users(
+    user: "User",  # noqa: F821 - forward reference
+    query: str,
+    limit: int = 10,
+) -> list[DirectoryUser]:
     """
     Search Google Workspace directory for users matching query.
 
     Args:
-        user: The authenticated user (must have Directory API tokens)
+        user: The authenticated user (must have Google OAuth)
         query: Search query (matches name or email)
         limit: Maximum results to return
 
     Returns:
         List of matching DirectoryUser objects
     """
-    access_token = refresh_google_token(user)
+    # Import here to avoid circular imports
+    from apps.accounts.models import Member
+
+    # Find the member for this user to get Stytch IDs
+    member = (
+        Member.objects.filter(user=user, deleted_at__isnull=True)
+        .select_related("organization")
+        .first()
+    )
+
+    if not member:
+        return []
+
+    access_token = get_google_access_token(
+        organization_id=member.organization.stytch_org_id,
+        member_id=member.stytch_member_id,
+    )
+
     if not access_token:
         return []
 
@@ -106,7 +109,7 @@ def search_directory_users(user: User, query: str, limit: int = 10) -> list[Dire
         )
 
         if response.status_code == 403:
-            # User doesn't have admin access to directory
+            # User doesn't have admin access to directory or scope not granted
             logger.debug(
                 "User %s doesn't have Directory API access (403)", user.email
             )
@@ -134,26 +137,3 @@ def search_directory_users(user: User, query: str, limit: int = 10) -> list[Dire
     except httpx.HTTPError as e:
         logger.warning("Directory API search failed for user %s: %s", user.email, e)
         return []
-
-
-def store_google_tokens(
-    user: User,
-    access_token: str,
-    refresh_token: str | None,
-    expires_in: int,
-) -> None:
-    """
-    Store Google OAuth tokens for a user.
-
-    Called after successful OAuth authentication.
-    """
-    user.google_access_token = access_token
-    if refresh_token:
-        user.google_refresh_token = refresh_token
-    user.google_token_expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
-
-    update_fields = ["google_access_token", "google_token_expires_at"]
-    if refresh_token:
-        update_fields.append("google_refresh_token")
-
-    user.save(update_fields=update_fields)
