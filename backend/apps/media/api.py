@@ -146,6 +146,10 @@ def confirm_upload(request: HttpRequest, payload: ConfirmUploadSchema) -> ImageR
     else:  # logo
         org.logo_url = url
         org.save(update_fields=["logo_url", "updated_at"])
+        # Sync logo to Stytch
+        from apps.accounts.services import sync_logo_to_stytch
+
+        sync_logo_to_stytch(org)
 
     return ImageResponseSchema(
         id=str(image.id),
@@ -251,6 +255,10 @@ def delete_image(request: HttpRequest, image_id: str) -> dict:
     elif image.image_type == "logo" and org.logo_url and image.storage_key in org.logo_url:
         org.logo_url = ""
         org.save(update_fields=["logo_url", "updated_at"])
+        # Sync logo removal to Stytch
+        from apps.accounts.services import sync_logo_to_stytch
+
+        sync_logo_to_stytch(org)
 
     # Delete database record
     image.delete()
