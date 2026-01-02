@@ -119,3 +119,63 @@ sequenceDiagram
     Service-->>API: Result
     API-->>Client: JSON Response
 ```
+
+## Event-Driven Architecture
+
+The bootstrap includes an event-driven spine for async workflows, integrations, and offline-first mobile sync.
+
+```mermaid
+graph LR
+    subgraph Clients
+        Web[Web SPA]
+        Mobile[Mobile App]
+    end
+
+    subgraph Backend
+        Django[Django API]
+        Sync[Sync Engine]
+    end
+
+    subgraph EventBus
+        EB[EventBridge]
+    end
+
+    subgraph Consumers
+        IR[Integration Router]
+        NL[Notification Lambda]
+    end
+
+    Web --> Django
+    Mobile --> Sync
+    Sync --> Django
+    Django --> EB
+    EB --> IR
+    EB --> NL
+    IR --> Webhooks[External Webhooks]
+```
+
+### Key Components
+
+| Component | Purpose | Details |
+|-----------|---------|---------|
+| **Event Model** | Standardized event structure | [events.md](./events.md) |
+| **Sync Engine** | Offline-first mobile/desktop sync | [sync.md](./sync.md) |
+| **Integration Router** | Outbound webhooks to external systems | [integrations.md](./integrations.md) |
+
+### Design Decisions
+
+- **Django as gatekeeper**: Mobile sync flows through Django for auth and validation
+- **EventBridge as fan-out**: Single event bus distributes events to consumers
+- **Public events for integrations**: Curated subset of internal events exposed to customers
+- **Idempotency everywhere**: All handlers tolerate duplicates and replays
+
+---
+
+## Related Documents
+
+| Document | Description |
+|----------|-------------|
+| [Data Models](./data-models.md) | Entity relationships and model details |
+| [Events](./events.md) | Event architecture, naming, schema versioning |
+| [Sync](./sync.md) | Offline-first sync engine for mobile/desktop |
+| [Integrations](./integrations.md) | Webhook delivery and external integrations |
