@@ -24,7 +24,7 @@ sequenceDiagram
     Stytch->>User: Email with link
     User->>Frontend: Click link
     Frontend->>Stytch: Authenticate token
-    Stytch-->>Frontend: IST + Discovered orgs
+    Stytch-->>Frontend: IST (Intermediate Session Token) + Discovered orgs
 
     alt User has existing orgs
         Frontend->>User: Show org picker
@@ -72,7 +72,7 @@ flowchart TD
     I --> J
 ```
 
-**Public Paths:** `/api/v1/auth/magic-link/*`, `/api/v1/health`, `/admin/*`, `/webhooks/stripe/`
+**Public Paths:** `/api/v1/auth/magic-link/*`, `/api/v1/health`, `/admin/*`, `/webhooks/stripe/`, `/webhooks/stytch/`
 
 ## Role-Based Access
 
@@ -82,7 +82,7 @@ Roles synced from Stytch:
 |------|-------------|
 | `admin` | Full org management, billing, members |
 | `member` | Standard access |
-| `viewer` | Read-only |
+| `viewer` | Read-only (planned, not yet enforced by backend) |
 
 ## Frontend Integration
 
