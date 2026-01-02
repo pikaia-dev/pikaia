@@ -66,23 +66,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         help_text="Phone number in E.164 format (e.g., +14155551234)",
     )
 
-    # Google OAuth tokens for Directory API (optional, encrypted)
-    google_access_token = models.TextField(
-        blank=True,
-        default="",
-        help_text="Encrypted Google access token for Directory API",
-    )
-    google_refresh_token = models.TextField(
-        blank=True,
-        default="",
-        help_text="Encrypted Google refresh token",
-    )
-    google_token_expires_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text="When the Google access token expires",
-    )
-
     # Django auth compatibility
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(
