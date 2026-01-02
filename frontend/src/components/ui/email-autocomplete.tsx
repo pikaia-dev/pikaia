@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { Search, Keyboard, User } from 'lucide-react'
 import { useApi } from '@/hooks/useApi'
+import { config } from '@/lib/env'
 import type { DirectoryUser } from '@/lib/api'
 
 /** Minimum characters before triggering autocomplete */
@@ -19,6 +20,14 @@ interface EmailAutocompleteProps {
     disabled?: boolean
     className?: string
     id?: string
+}
+
+/**
+ * Get proxied avatar URL that passes through our backend with OAuth token.
+ */
+function getProxiedAvatarUrl(originalUrl: string): string {
+    if (!originalUrl) return ''
+    return `${config.apiUrl}/auth/directory/avatar?url=${encodeURIComponent(originalUrl)}`
 }
 
 /**
@@ -83,16 +92,20 @@ export function EmailAutocomplete({
 
     // Handle suggestion selection
     const handleSelect = useCallback((user: DirectoryUser) => {
-        setIsOpen(false)
         setSuggestions([])
+        setIsOpen(false)
+        setSelectedIndex(-1)
         onChange(user.email)
         onSelect?.(user)
+        // Blur the input to prevent dropdown reopening
+        inputRef.current?.blur()
     }, [onChange, onSelect])
 
     // Handle "continue manually" option
     const handleManualInput = useCallback(() => {
-        setIsOpen(false)
         setSuggestions([])
+        setIsOpen(false)
+        setSelectedIndex(-1)
         inputRef.current?.focus()
     }, [])
 
@@ -157,7 +170,15 @@ export function EmailAutocomplete({
                         setIsFocused(true)
                         if (suggestions.length > 0) setIsOpen(true)
                     }}
-                    onBlur={() => setIsFocused(false)}
+                    onBlur={() => {
+                        setIsFocused(false)
+                        // Delay closing to allow click events on dropdown to fire
+                        setTimeout(() => {
+                            if (!dropdownRef.current?.contains(document.activeElement)) {
+                                setIsOpen(false)
+                            }
+                        }, 150)
+                    }}
                     placeholder={placeholder}
                     disabled={disabled}
                     autoComplete="off"
@@ -176,7 +197,10 @@ export function EmailAutocomplete({
                         <button
                             key={user.email}
                             type="button"
-                            onClick={() => handleSelect(user)}
+                            onMouseDown={(e) => {
+                                e.preventDefault() // Prevent blur
+                                handleSelect(user)
+                            }}
                             className={cn(
                                 'w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors',
                                 'flex items-center gap-3',
@@ -185,9 +209,13 @@ export function EmailAutocomplete({
                         >
                             {user.avatar_url ? (
                                 <img
-                                    src={user.avatar_url}
+                                    src={getProxiedAvatarUrl(user.avatar_url)}
                                     alt=""
                                     className="h-8 w-8 rounded-full object-cover"
+                                    onError={(e) => {
+                                        // Hide broken images
+                                        e.currentTarget.style.display = 'none'
+                                    }}
                                 />
                             ) : (
                                 <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
@@ -206,7 +234,10 @@ export function EmailAutocomplete({
                     {/* "Continue manually" option */}
                     <button
                         type="button"
-                        onClick={handleManualInput}
+                        onMouseDown={(e) => {
+                            e.preventDefault() // Prevent blur
+                            handleManualInput()
+                        }}
                         className={cn(
                             'w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors',
                             'flex items-center gap-2 border-t border-border text-muted-foreground',

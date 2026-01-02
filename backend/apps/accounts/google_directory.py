@@ -123,6 +123,7 @@ def search_directory_users(
         for u in data.get("users", []):
             primary_email = u.get("primaryEmail", "")
             full_name = u.get("name", {}).get("fullName", "")
+            # thumbnailPhotoUrl requires OAuth auth - frontend will use our proxy
             photo_url = u.get("thumbnailPhotoUrl", "")
 
             users.append(
