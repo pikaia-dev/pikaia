@@ -814,3 +814,67 @@ def search_directory(request: HttpRequest, q: str = "") -> list[DirectoryUserSch
         )
         for u in directory_users
     ]
+
+
+@router.get(
+    "/directory/avatar",
+    response={200: bytes, 401: ErrorResponse, 404: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="getDirectoryAvatar",
+    summary="Proxy Google Workspace avatar image",
+)
+def get_directory_avatar(request: HttpRequest, url: str = ""):
+    """
+    Proxy a Google Workspace avatar image.
+
+    Google Directory API avatar URLs require OAuth authentication.
+    This endpoint fetches the image server-side and returns it.
+    """
+    import httpx
+    from django.http import HttpResponse as DjangoHttpResponse
+
+    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+        raise HttpError(401, "Not authenticated")
+
+    if not url or not url.startswith("https://"):
+        raise HttpError(404, "Invalid avatar URL")
+
+    # Import here to avoid circular imports
+    from apps.accounts.google_directory import get_google_access_token
+    from apps.accounts.models import Member
+
+    user = request.auth_user  # type: ignore[attr-defined]
+
+    # Get member to find Stytch IDs
+    member = (
+        Member.objects.filter(user=user, deleted_at__isnull=True)
+        .select_related("organization")
+        .first()
+    )
+
+    if not member:
+        raise HttpError(404, "No member found")
+
+    access_token = get_google_access_token(
+        organization_id=member.organization.stytch_org_id,
+        member_id=member.stytch_member_id,
+    )
+
+    if not access_token:
+        raise HttpError(404, "No Google OAuth token")
+
+    try:
+        response = httpx.get(
+            url,
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10.0,
+            follow_redirects=True,
+        )
+        response.raise_for_status()
+
+        return DjangoHttpResponse(
+            response.content,
+            content_type=response.headers.get("content-type", "image/jpeg"),
+        )
+    except httpx.HTTPError:
+        raise HttpError(404, "Failed to fetch avatar") from None
