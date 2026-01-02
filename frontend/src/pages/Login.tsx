@@ -4,11 +4,14 @@ import { StytchB2B, useStytchMemberSession } from '@stytch/react/b2b'
 import { B2BProducts, AuthFlowType } from '@stytch/vanilla-js/b2b'
 import { LoadingSpinner } from '../components/ui/loading-spinner'
 
+// Session duration: 30 days
+const SESSION_DURATION_MINUTES = 30 * 24 * 60
+
 // Discovery config - let Stytch Dashboard handle redirect URLs
-const config = {
+const stytchDiscoveryConfig = {
     products: [B2BProducts.emailMagicLinks],
     sessionOptions: {
-        sessionDurationMinutes: 43200,
+        sessionDurationMinutes: SESSION_DURATION_MINUTES,
     },
     authFlowType: AuthFlowType.Discovery,
     // Auto-login users who belong to exactly one organization
@@ -20,7 +23,7 @@ const config = {
 }
 
 // Stytch styles aligned with shadcn/ui default theme (neutral/zinc)
-const styles = {
+const stytchStyles = {
     container: {
         width: '100%',
     },
@@ -71,7 +74,7 @@ export default function Login() {
                         Enter your email to sign in to your account
                     </p>
                 </div>
-                <StytchB2B config={config} styles={styles} />
+                <StytchB2B config={stytchDiscoveryConfig} styles={stytchStyles} />
             </div>
         </div>
     )
