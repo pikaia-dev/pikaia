@@ -12,6 +12,7 @@ import stripe
 
 from apps.billing.models import Subscription
 from apps.billing.stripe_client import get_stripe
+from apps.events.services import publish_event
 from apps.organizations.models import Organization
 from config.settings.base import settings
 
@@ -364,7 +365,7 @@ def handle_subscription_created(stripe_subscription: dict) -> None:
     quantity = items[0]["quantity"] if items else 1
 
     # Create or update subscription
-    Subscription.objects.update_or_create(
+    subscription, created = Subscription.objects.update_or_create(
         stripe_subscription_id=stripe_subscription["id"],
         defaults={
             "organization": org,
@@ -376,6 +377,21 @@ def handle_subscription_created(stripe_subscription: dict) -> None:
             "cancel_at_period_end": stripe_subscription.get("cancel_at_period_end", False),
         },
     )
+
+    # Emit subscription.activated event (system actor - webhook triggered)
+    if created or stripe_subscription["status"] in ("active", "trialing"):
+        publish_event(
+            event_type="subscription.activated",
+            aggregate=subscription,
+            data={
+                "stripe_subscription_id": stripe_subscription["id"],
+                "status": stripe_subscription["status"],
+                "quantity": quantity,
+                "price_id": price_id,
+            },
+            actor=None,  # System/webhook event
+            organization_id=str(org.id),
+        )
 
     logger.info("Created/updated subscription for org %s", org.id)
 
@@ -415,12 +431,31 @@ def handle_subscription_updated(stripe_subscription: dict) -> None:
     items = stripe_subscription.get("items", {}).get("data", [])
     quantity = items[0]["quantity"] if items else subscription.quantity
 
+    old_status = subscription.status
+    old_quantity = subscription.quantity
+
     subscription.status = stripe_subscription["status"]
     subscription.quantity = quantity
     subscription.current_period_start = period_start
     subscription.current_period_end = period_end
     subscription.cancel_at_period_end = stripe_subscription.get("cancel_at_period_end", False)
     subscription.save()
+
+    # Emit subscription.updated event if there are meaningful changes
+    if old_status != subscription.status or old_quantity != subscription.quantity:
+        publish_event(
+            event_type="subscription.updated",
+            aggregate=subscription,
+            data={
+                "old_status": old_status,
+                "new_status": subscription.status,
+                "old_quantity": old_quantity,
+                "new_quantity": subscription.quantity,
+                "cancel_at_period_end": subscription.cancel_at_period_end,
+            },
+            actor=None,  # System/webhook event
+            organization_id=str(subscription.organization_id),
+        )
 
     logger.info("Updated subscription %s", subscription.stripe_subscription_id)
 
@@ -440,6 +475,17 @@ def handle_subscription_deleted(stripe_subscription: dict) -> None:
 
     subscription.status = Subscription.Status.CANCELED
     subscription.save(update_fields=["status", "updated_at"])
+
+    # Emit subscription.canceled event
+    publish_event(
+        event_type="subscription.canceled",
+        aggregate=subscription,
+        data={
+            "stripe_subscription_id": stripe_subscription["id"],
+        },
+        actor=None,  # System/webhook event
+        organization_id=str(subscription.organization_id),
+    )
 
     logger.info("Marked subscription %s as canceled", subscription.stripe_subscription_id)
 

@@ -15,6 +15,7 @@ from django.views.decorators.http import require_POST
 from svix.webhooks import Webhook, WebhookVerificationError
 
 from apps.accounts.models import Member
+from apps.events.services import publish_event
 from apps.organizations.models import Organization
 from config.settings.base import settings
 
@@ -94,7 +95,19 @@ def handle_member_deleted(data: dict) -> None:
 
     if member.deleted_at is None:
         logger.info("Soft deleting member %s from Stytch webhook", member_id)
+        email = member.user.email if member.user else "unknown"
         member.soft_delete()
+
+        # Emit member.removed event (system actor - webhook triggered)
+        publish_event(
+            event_type="member.removed",
+            aggregate=member,
+            data={
+                "email": email,
+                "removed_via": "stytch_webhook",
+            },
+            actor=None,  # System/webhook event
+        )
 
 
 def handle_organization_updated(data: dict) -> None:

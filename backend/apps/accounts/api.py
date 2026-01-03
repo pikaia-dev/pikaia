@@ -58,6 +58,7 @@ from apps.accounts.stytch_client import get_stytch_client
 from apps.billing.services import sync_billing_to_stripe
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth, require_admin
+from apps.events.services import publish_event
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +172,19 @@ def create_organization(
         stytch_organization=response.organization,
     )
 
+    # Emit organization.created event
+    publish_event(
+        event_type="organization.created",
+        aggregate=org,
+        data={
+            "name": org.name,
+            "slug": org.slug,
+            "stytch_org_id": org.stytch_org_id,
+            "created_by_member_id": str(member.id),
+        },
+        actor=user,
+    )
+
     return SessionResponse(
         session_token=response.session_token,
         session_jwt=response.session_jwt,
@@ -207,6 +221,17 @@ def exchange_session(
     user, member, org = sync_session_to_local(
         stytch_member=response.member,
         stytch_organization=response.organization,
+    )
+
+    # Emit member.joined event (user joining existing org)
+    publish_event(
+        event_type="member.joined",
+        aggregate=member,
+        data={
+            "email": user.email,
+            "organization_name": org.name,
+        },
+        actor=user,
     )
 
     return SessionResponse(
@@ -448,6 +473,18 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
         user.phone_number = payload.phone_number
         user.save(update_fields=["phone_number", "updated_at"])
 
+        # Emit user.phone_changed event
+        publish_event(
+            event_type="user.phone_changed",
+            aggregate=user,
+            data={
+                "old_phone": old_phone or "",
+                "new_phone": payload.phone_number,
+            },
+            actor=user,
+            organization_id=str(org.id),
+        )
+
         return UserInfo(
             id=user.id,
             email=user.email,
@@ -640,6 +677,19 @@ def update_billing(
             logger.warning("Failed to sync billing to Stripe: %s", e)
             # Don't fail the request - local update succeeded
 
+    # Emit organization.billing_updated event
+    publish_event(
+        event_type="organization.billing_updated",
+        aggregate=org,
+        data={
+            "billing_email": org.billing_email,
+            "billing_name": org.billing_name,
+            "vat_id": org.vat_id,
+            "country": org.billing_country,
+        },
+        actor=request.auth_user,  # type: ignore[attr-defined]
+    )
+
     return get_organization(request)
 
 
@@ -736,6 +786,19 @@ def invite_member_endpoint(
     else:
         message = f"{payload.email} is already an active member (role updated)"
 
+    # Emit member.invited event (only for new invites)
+    if invite_sent is True:
+        publish_event(
+            event_type="member.invited",
+            aggregate=new_member,
+            data={
+                "email": payload.email,
+                "role": payload.role,
+                "invited_by_member_id": str(member.id),
+            },
+            actor=member.user,
+        )
+
     return InviteMemberResponse(
         message=message,
         stytch_member_id=new_member.stytch_member_id,
@@ -773,11 +836,26 @@ def update_member_role_endpoint(
     if target_member.id == current_member.id:
         raise HttpError(400, "Cannot change your own role")
 
+    # Capture old role before update
+    old_role = target_member.role
+
     try:
         update_member_role(target_member, payload.role)
     except StytchError as e:
         logger.warning("Failed to update member role: %s", e.details.error_message)
         raise HttpError(400, f"Failed to update role: {e.details.error_message}") from e
+
+    # Emit member.role_changed event
+    publish_event(
+        event_type="member.role_changed",
+        aggregate=target_member,
+        data={
+            "old_role": old_role,
+            "new_role": payload.role,
+            "changed_by_member_id": str(current_member.id),
+        },
+        actor=current_member.user,
+    )
 
     return MessageResponse(message=f"Role updated to {payload.role}")
 
@@ -819,6 +897,17 @@ def delete_member_endpoint(request: HttpRequest, member_id: int) -> MessageRespo
     except StytchError as e:
         logger.warning("Failed to delete member: %s", e.details.error_message)
         raise HttpError(400, f"Failed to remove member: {e.details.error_message}") from e
+
+    # Emit member.removed event
+    publish_event(
+        event_type="member.removed",
+        aggregate=target_member,
+        data={
+            "email": email,
+            "removed_by_member_id": str(current_member.id),
+        },
+        actor=current_member.user,
+    )
 
     return MessageResponse(message=f"Member {email} removed from organization")
 
