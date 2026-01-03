@@ -5,15 +5,63 @@ Core middleware.
 import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
+from uuid import UUID, uuid4
 
 from django.http import HttpRequest, HttpResponse
 from stytch.core.response_base import StytchError
+
+from apps.events.services import set_correlation_id
 
 if TYPE_CHECKING:
     from apps.accounts.models import Member, User
     from apps.organizations.models import Organization
 
 logger = logging.getLogger(__name__)
+
+
+class CorrelationIdMiddleware:
+    """
+    Generate or extract correlation ID for request tracing.
+
+    If X-Correlation-ID header is present, uses that value.
+    Otherwise generates a new UUID4.
+    Stores in context for event publishing and logging.
+    """
+
+    HEADER_NAME = "X-Correlation-ID"
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        # Extract from header or generate new
+        correlation_id_str = request.headers.get(self.HEADER_NAME)
+
+        if correlation_id_str:
+            try:
+                correlation_id = UUID(correlation_id_str)
+            except ValueError:
+                correlation_id = uuid4()
+        else:
+            correlation_id = uuid4()
+
+        # Store on request for access in views
+        request.correlation_id = correlation_id  # type: ignore[attr-defined]
+
+        # Set in event services context
+        set_correlation_id(correlation_id)
+
+        response = self.get_response(request)
+
+        # Add to response headers
+        response[self.HEADER_NAME] = str(correlation_id)
+
+        # Clear context after request
+        set_correlation_id(None)
+
+        return response
+
+
 
 
 class StytchAuthMiddleware:

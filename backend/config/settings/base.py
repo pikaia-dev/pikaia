@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     # CORS (production only - local uses CORS_ALLOW_ALL_ORIGINS)
     CORS_ALLOWED_ORIGINS: str = ""  # Comma-separated URLs, e.g. "https://app.example.com"
 
+    # Events
+    EVENT_BACKEND: str = "local"  # "local" or "eventbridge"
+    EVENT_BUS_NAME: str = ""  # AWS EventBridge bus name (required for eventbridge backend)
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
@@ -68,6 +72,7 @@ INSTALLED_APPS = [
     "storages",
     # Local apps
     "apps.core",
+    "apps.events",
     "apps.accounts",
     "apps.organizations",
     "apps.billing",
@@ -78,6 +83,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    "apps.core.middleware.CorrelationIdMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -168,3 +174,7 @@ AUTH_USER_MODEL = "accounts.User"
 STYTCH_PROJECT_ID = settings.STYTCH_PROJECT_ID
 STYTCH_SECRET = settings.STYTCH_SECRET
 STYTCH_WEBHOOK_SECRET = settings.STYTCH_WEBHOOK_SECRET
+
+# Event-driven architecture
+EVENT_BACKEND = settings.EVENT_BACKEND
+EVENT_BUS_NAME = settings.EVENT_BUS_NAME
