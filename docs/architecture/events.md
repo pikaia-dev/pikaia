@@ -56,14 +56,14 @@ Every event **must** include these fields:
 | Field | Type | Purpose | Example |
 |-------|------|---------|---------|
 | `event_id` | UUID | Unique identity for idempotency | `"550e8400-e29b-41d4-a716-446655440000"` |
-| `event_type` | string | Semantic event name | `"time_entry.created"` |
+| `event_type` | string | Semantic event name | `"member.invited"` |
 | `schema_version` | integer | Payload version | `1` |
 | `occurred_at` | ISO 8601 | When the event happened (business time) | `"2025-01-02T23:00:00Z"` |
-| `aggregate_id` | string | Entity identity | `"te_01HN8J9K..."` |
-| `aggregate_type` | string | Entity type | `"time_entry"` |
+| `aggregate_id` | string | Entity identity | `"123"` |
+| `aggregate_type` | string | Entity type | `"member"` |
 | `correlation_id` | UUID | Request trace ID | `"req_01HN8J..."` |
-| `actor` | object | Who caused the event | `{"type": "user", "id": "usr_01HN..."}` |
-| `workspace_id` | string | Organization/tenant ID | `"org_01HN..."` |
+| `actor` | object | Who caused the event | `{"type": "user", "id": "42"}` |
+| `organization_id` | string | Organization/tenant ID | `"1"` |
 
 ### Optional Fields
 
@@ -78,25 +78,56 @@ Every event **must** include these fields:
 ```json
 {
   "event_id": "550e8400-e29b-41d4-a716-446655440000",
-  "event_type": "time_entry.created",
+  "event_type": "member.invited",
   "schema_version": 1,
   "occurred_at": "2025-01-02T23:00:00Z",
-  "aggregate_id": "te_01HN8J9K2M3N4P5Q6R7S8T9U0V",
-  "aggregate_type": "time_entry",
-  "workspace_id": "org_01HN8J9K2M3N4P5Q6R7S8T9U0V",
+  "aggregate_id": "123",
+  "aggregate_type": "member",
+  "organization_id": "1",
   "correlation_id": "req_01HN8J9K2M3N4P5Q6R7S8T9U0V",
   "actor": {
     "type": "user",
-    "id": "usr_01HN8J9K2M3N4P5Q6R7S8T9U0V",
-    "email": "user@example.com"
+    "id": "42",
+    "email": "admin@example.com"
   },
   "data": {
-    "description": "Working on feature X",
-    "project_id": "prj_01HN...",
-    "duration_minutes": 45
+    "email": "newuser@example.com",
+    "role": "member",
+    "invited_by_member_id": "45"
   }
 }
 ```
+
+---
+
+## Implemented Events
+
+The following events are currently integrated into the codebase:
+
+### Tier 1: Core Business Events
+
+| Event Type | Aggregate | Trigger Location |
+|------------|-----------|------------------|
+| `organization.created` | Organization | `accounts/api.py` - create_organization |
+| `member.invited` | Member | `accounts/api.py` - invite_member_endpoint |
+| `member.joined` | Member | `accounts/api.py` - exchange_session |
+| `member.removed` | Member | `accounts/api.py` + `accounts/webhooks.py` |
+
+### Tier 2: Billing Events
+
+| Event Type | Aggregate | Trigger Location |
+|------------|-----------|------------------|
+| `subscription.activated` | Subscription | `billing/services.py` - handle_subscription_created |
+| `subscription.updated` | Subscription | `billing/services.py` - handle_subscription_updated |
+| `subscription.canceled` | Subscription | `billing/services.py` - handle_subscription_deleted |
+
+### Tier 3: Security/Audit Events
+
+| Event Type | Aggregate | Trigger Location |
+|------------|-----------|------------------|
+| `member.role_changed` | Member | `accounts/api.py` - update_member_role_endpoint |
+| `user.phone_changed` | User | `accounts/api.py` - verify_phone_otp |
+| `organization.billing_updated` | Organization | `accounts/api.py` - update_billing |
 
 ---
 
@@ -414,26 +445,40 @@ class OutboxEvent(models.Model):
     """
     Transactional outbox for guaranteed event delivery.
     """
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    class Status(models.TextChoices):
+        PENDING = "pending"
+        PUBLISHED = "published"
+        FAILED = "failed"
+
+    # Primary key - BigAutoField for B-tree locality on write-heavy table
+    id = models.BigAutoField(primary_key=True)
     
-    # Event data
+    # Idempotency key - consumers use this to dedupe
+    event_id = models.UUIDField(unique=True, default=uuid.uuid4, db_index=True)
+    
+    # Event identity
     event_type = models.CharField(max_length=100, db_index=True)
     aggregate_type = models.CharField(max_length=50)
     aggregate_id = models.CharField(max_length=100)
-    workspace_id = models.CharField(max_length=100, db_index=True)
+    organization_id = models.CharField(max_length=100, db_index=True)
+    schema_version = models.PositiveIntegerField(default=1)
     
+    # Full event payload (JSON)
     payload = models.JSONField()
     
-    # Publishing state
-    published_at = models.DateTimeField(null=True, db_index=True)
-    publish_attempts = models.PositiveIntegerField(default=0)
-    last_error = models.TextField(blank=True)
-    
+    # Publishing lifecycle
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    
+    # Retry tracking
+    attempts = models.PositiveIntegerField(default=0)
+    next_attempt_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    last_error = models.TextField(blank=True)
     
     class Meta:
         indexes = [
-            models.Index(fields=["published_at", "created_at"]),  # Publisher query
+            models.Index(fields=["status", "next_attempt_at"]),  # Publisher query
         ]
 ```
 
