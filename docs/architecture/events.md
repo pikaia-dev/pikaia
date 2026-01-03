@@ -475,6 +475,94 @@ PostgreSQL → Debezium → Kafka/Kinesis → EventBridge Pipes → EventBridge
 
 This eliminates polling and provides sub-second latency.
 
+### Publisher Deployment
+
+The publisher can be triggered in multiple ways depending on environment:
+
+#### Local Development
+
+Run the management command manually or on a schedule:
+
+```bash
+# One-shot (useful for testing)
+python manage.py publish_events --once
+
+# Continuous polling (5s interval)
+python manage.py publish_events --poll-interval=5
+```
+
+#### Production: Aurora Trigger → Lambda
+
+For sub-second event delivery, use Aurora PostgreSQL triggers to invoke Lambda directly on INSERT:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ INSERT INTO events_outboxevent                              │
+│         ↓                                                   │
+│ Aurora PostgreSQL Trigger                                   │
+│         ↓                                                   │
+│ aws_lambda.invoke('publish-events-lambda')                  │
+│         ↓                                                   │
+│ Lambda runs: publish_events --once                          │
+│         ↓                                                   │
+│ Events published to EventBridge                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Aurora Trigger Setup (SQL):**
+
+```sql
+-- Enable aws_lambda extension
+CREATE EXTENSION IF NOT EXISTS aws_lambda CASCADE;
+
+-- Grant Lambda invoke permission (via IAM role attached to Aurora)
+-- Create trigger function
+CREATE OR REPLACE FUNCTION notify_event_published()
+RETURNS TRIGGER AS $$
+BEGIN
+    PERFORM aws_lambda.invoke(
+        aws_commons.create_lambda_function_arn(
+            'publish-events-lambda',
+            'us-east-1'  -- your region
+        ),
+        '{"source": "aurora-trigger"}'::json,
+        'Event'  -- async invocation
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Attach trigger to outbox table
+CREATE TRIGGER outbox_insert_trigger
+AFTER INSERT ON events_outboxevent
+FOR EACH STATEMENT  -- Per-statement, not per-row (batches are efficient)
+EXECUTE FUNCTION notify_event_published();
+```
+
+**Lambda Handler:**
+
+```python
+# lambda_handler.py
+import os
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.production")
+
+import django
+django.setup()
+
+from django.core.management import call_command
+
+def handler(event, context):
+    """
+    Invoked by Aurora trigger or CloudWatch schedule.
+    Processes pending events in the outbox.
+    """
+    call_command("publish_events", "--once", "--batch-size=100")
+    return {"statusCode": 200}
+```
+
+> [!NOTE]  
+> The Lambda code is the same regardless of trigger source. Aurora triggers provide sub-second delivery; a CloudWatch schedule can serve as a fallback if needed.
+
 ---
 
 ## FIFO Ordering
