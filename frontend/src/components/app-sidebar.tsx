@@ -1,7 +1,14 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useStytchB2BClient, useStytchMember } from '@stytch/react/b2b'
 import { useState, useEffect } from 'react'
-import { Home, User, Users, Building2, CreditCard, LogOut, Settings } from 'lucide-react'
+import { Home, User, Users, Building2, CreditCard, LogOut, Settings, ChevronsUpDown } from 'lucide-react'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from './ui/dropdown-menu'
 import {
     Sidebar,
     SidebarContent,
@@ -19,11 +26,6 @@ import { useApi } from '../hooks/useApi'
 
 const mainNavItems = [
     { to: '/dashboard', label: 'Dashboard', icon: Home },
-]
-
-// User-level settings (visible to all users)
-const accountNavItems = [
-    { to: '/settings/profile', label: 'Profile', icon: User },
 ]
 
 // Organization-level settings (admin-only)
@@ -96,30 +98,6 @@ export function AppSidebar() {
                     </SidebarGroupContent>
                 </SidebarGroup>
 
-                {/* Account Settings - visible to all users */}
-                <SidebarGroup>
-                    <SidebarGroupLabel>Account</SidebarGroupLabel>
-                    <SidebarGroupContent>
-                        <SidebarMenu>
-                            {accountNavItems.map((item) => (
-                                <SidebarMenuItem key={item.to}>
-                                    <SidebarMenuButton asChild>
-                                        <NavLink
-                                            to={item.to}
-                                            className={({ isActive }) =>
-                                                isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''
-                                            }
-                                        >
-                                            <item.icon className="h-4 w-4" />
-                                            <span>{item.label}</span>
-                                        </NavLink>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-                            ))}
-                        </SidebarMenu>
-                    </SidebarGroupContent>
-                </SidebarGroup>
-
                 {/* Organization Settings - admin only */}
                 {isAdmin && (
                     <SidebarGroup>
@@ -147,34 +125,56 @@ export function AppSidebar() {
                 )}
             </SidebarContent>
 
-            <SidebarFooter className="p-4">
-                <div className="flex items-center gap-3 mb-3">
-                    {avatarUrl ? (
-                        <img
-                            src={avatarUrl}
-                            alt="Avatar"
-                            className="h-9 w-9 rounded-full object-cover shrink-0"
-                        />
-                    ) : (
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-sm font-medium shrink-0">
-                            {member?.name?.[0]?.toUpperCase() || member?.email_address?.[0]?.toUpperCase() || '?'}
-                        </div>
-                    )}
-                    <div className="flex flex-1 flex-col text-left text-sm min-w-0">
-                        <span className="font-medium truncate">
-                            {member?.name || 'User'}
-                        </span>
-                        <span className="text-xs text-sidebar-foreground/70 truncate">
-                            {member?.email_address}
-                        </span>
-                    </div>
-                </div>
+            <SidebarFooter className="p-2">
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton onClick={handleLogout}>
-                            <LogOut className="h-4 w-4" />
-                            <span>Log out</span>
-                        </SidebarMenuButton>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <SidebarMenuButton
+                                    size="lg"
+                                    className="w-full data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                                >
+                                    {avatarUrl ? (
+                                        <img
+                                            src={avatarUrl}
+                                            alt="Avatar"
+                                            className="h-8 w-8 rounded-full object-cover shrink-0"
+                                        />
+                                    ) : (
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-sm font-medium shrink-0">
+                                            {member?.name?.[0]?.toUpperCase() || member?.email_address?.[0]?.toUpperCase() || '?'}
+                                        </div>
+                                    )}
+                                    <div className="flex flex-1 flex-col text-left text-sm min-w-0">
+                                        <span className="font-medium truncate">
+                                            {member?.name || 'User'}
+                                        </span>
+                                        <span className="text-xs text-sidebar-foreground/70 truncate">
+                                            {member?.email_address}
+                                        </span>
+                                    </div>
+                                    <ChevronsUpDown className="ml-auto h-4 w-4 opacity-50" />
+                                </SidebarMenuButton>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                                className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
+                                side="top"
+                                align="start"
+                                sideOffset={4}
+                            >
+                                <DropdownMenuItem asChild>
+                                    <NavLink to="/settings/profile" className="cursor-pointer">
+                                        <User className="h-4 w-4" />
+                                        <span>Profile</span>
+                                    </NavLink>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                                    <LogOut className="h-4 w-4" />
+                                    <span>Log out</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarFooter>
