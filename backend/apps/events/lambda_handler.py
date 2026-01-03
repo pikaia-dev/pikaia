@@ -48,14 +48,18 @@ def publish_pending_events() -> int:
     """
     Fetch pending events and publish to EventBridge.
 
-    Uses SELECT FOR UPDATE SKIP LOCKED for safe concurrent execution.
+    Uses FOR UPDATE SKIP LOCKED for safe concurrent execution:
+    - Row locks prevent duplicate publishes from concurrent Lambdas
+    - SKIP LOCKED allows other Lambdas to process different events
+    - Lock held during EventBridge call (~100-500ms) is acceptable
+
     Returns number of successfully published events.
     """
     eventbridge = boto3.client("events")
 
     with psycopg2.connect(DATABASE_URL) as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Fetch pending events ready to publish
+            # Fetch and lock pending events
             cur.execute(
                 """
                 SELECT id, event_type, payload
@@ -76,7 +80,7 @@ def publish_pending_events() -> int:
 
             logger.info("Publishing %d events", len(events))
 
-            # Prepare EventBridge entries (max 10 per PutEvents call)
+            # Publish to EventBridge (max 10 per PutEvents call)
             published_ids = []
             failed_events = []
 
@@ -85,7 +89,6 @@ def publish_pending_events() -> int:
                 entries = []
 
                 for event in batch:
-                    # Payload is already the complete EventEnvelope
                     payload = event["payload"]
                     if isinstance(payload, str):
                         payload = json.loads(payload)
@@ -102,7 +105,6 @@ def publish_pending_events() -> int:
                 try:
                     response = eventbridge.put_events(Entries=entries)
 
-                    # Process results
                     for i, result in enumerate(response.get("Entries", [])):
                         event_row = batch[i]
                         if "EventId" in result:
@@ -117,7 +119,6 @@ def publish_pending_events() -> int:
                             )
 
                 except Exception as e:
-                    # Entire batch failed
                     logger.error("Batch publish failed: %s", e)
                     for event_row in batch:
                         failed_events.append((event_row["id"], str(e)))
@@ -159,3 +160,4 @@ def publish_pending_events() -> int:
                 len(failed_events),
             )
             return len(published_ids)
+
