@@ -13,11 +13,11 @@ import {
   AsYouType,
   type CountryCode,
   getExampleNumber,
-  parsePhoneNumber,
+  parsePhoneNumberWithError,
 } from "libphonenumber-js"
 import examples from "libphonenumber-js/mobile/examples"
-import { Check,ChevronDown } from "lucide-react"
-import { useCallback,useEffect, useMemo, useState } from "react"
+import { Check, ChevronDown } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { COUNTRIES, getCountryByCode } from "../../lib/countries"
 import { cn } from "../../lib/utils"
@@ -71,12 +71,10 @@ function parseE164(value: string): {
   }
 
   try {
-    const parsed = parsePhoneNumber(value)
-    if (parsed && parsed.country) {
-      return {
-        countryCode: parsed.country,
-        nationalNumber: parsed.nationalNumber,
-      }
+    const parsed = parsePhoneNumberWithError(value)
+    return {
+      countryCode: parsed.country ?? getDefaultCountryCode(),
+      nationalNumber: parsed.nationalNumber,
     }
   } catch {
     // If parsing fails, try to find country by dial code
@@ -140,8 +138,9 @@ export function PhoneNumberInput({
 
   const country = useMemo(
     () =>
-      getCountryByCode(selectedCountry) ||
-      COUNTRIES.find((c) => c.code === "US")!,
+      getCountryByCode(selectedCountry) ??
+      COUNTRIES.find((c) => c.code === "US") ??
+      COUNTRIES[0],
     [selectedCountry]
   )
 
