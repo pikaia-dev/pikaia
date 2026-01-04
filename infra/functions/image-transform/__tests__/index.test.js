@@ -1,23 +1,76 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
-    handler,
     parseTransformUri,
     validateDimensions,
+    getOutputFormat,
     TRANSFORM_URL_PATTERN,
     MAX_DIMENSION,
     MIN_DIMENSION,
+    FIT_MODE_MAP,
 } from '../index.js';
+
+// Mock AWS SDK and Sharp for handler tests
+vi.mock('@aws-sdk/client-s3', () => ({
+    S3Client: vi.fn(() => ({
+        send: vi.fn(),
+    })),
+    GetObjectCommand: vi.fn(),
+}));
+
+vi.mock('sharp', () => ({
+    default: vi.fn(() => ({
+        resize: vi.fn().mockReturnThis(),
+        jpeg: vi.fn().mockReturnThis(),
+        png: vi.fn().mockReturnThis(),
+        webp: vi.fn().mockReturnThis(),
+        avif: vi.fn().mockReturnThis(),
+        toBuffer: vi.fn().mockResolvedValue(Buffer.from('transformed')),
+    })),
+}));
 
 /**
  * Create a mock CloudFront Origin Request event.
  */
-function mockCloudFrontEvent(uri) {
+function mockCloudFrontRequest(uri, headers = {}) {
     return {
         Records: [
             {
                 cf: {
                     request: {
                         uri,
+                        headers,
+                        origin: {
+                            s3: {
+                                domainName: 'test-bucket.s3.us-east-1.amazonaws.com',
+                            },
+                        },
+                    },
+                },
+            },
+        ],
+    };
+}
+
+/**
+ * Create a mock CloudFront Origin Response event.
+ */
+function mockCloudFrontResponse(uri, status = '200', headers = {}) {
+    return {
+        Records: [
+            {
+                cf: {
+                    request: {
+                        uri,
+                        headers,
+                        origin: {
+                            s3: {
+                                domainName: 'test-bucket.s3.us-east-1.amazonaws.com',
+                            },
+                        },
+                    },
+                    response: {
+                        status,
+                        statusDescription: status === '200' ? 'OK' : 'Error',
                         headers: {},
                     },
                 },
@@ -121,12 +174,80 @@ describe('validateDimensions', () => {
         const result = validateDimensions(String(MIN_DIMENSION), String(MIN_DIMENSION));
         expect(result.valid).toBe(true);
     });
+
+    it('rejects non-integer dimensions', () => {
+        const result = validateDimensions('100.5', '200');
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain('must be integers');
+    });
+
+    it('rejects non-numeric dimensions', () => {
+        const result = validateDimensions('abc', '200');
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain('not a number');
+    });
 });
 
-describe('handler', () => {
+describe('getOutputFormat', () => {
+    it('returns jpeg for .jpg files', () => {
+        expect(getOutputFormat('image.jpg')).toBe('jpeg');
+    });
+
+    it('returns jpeg for .jpeg files', () => {
+        expect(getOutputFormat('image.jpeg')).toBe('jpeg');
+    });
+
+    it('returns png for .png files', () => {
+        expect(getOutputFormat('image.png')).toBe('png');
+    });
+
+    it('returns webp for .webp files', () => {
+        expect(getOutputFormat('image.webp')).toBe('webp');
+    });
+
+    it('returns avif for .avif files', () => {
+        expect(getOutputFormat('image.avif')).toBe('avif');
+    });
+
+    it('returns jpeg for unknown extensions', () => {
+        expect(getOutputFormat('image.bmp')).toBe('jpeg');
+    });
+
+    it('handles uppercase extensions', () => {
+        expect(getOutputFormat('image.PNG')).toBe('png');
+    });
+});
+
+describe('FIT_MODE_MAP', () => {
+    it('maps fit-in to inside', () => {
+        expect(FIT_MODE_MAP['fit-in']).toBe('inside');
+    });
+
+    it('maps cover to cover', () => {
+        expect(FIT_MODE_MAP['cover']).toBe('cover');
+    });
+
+    it('maps contain to contain', () => {
+        expect(FIT_MODE_MAP['contain']).toBe('contain');
+    });
+
+    it('maps null to fill (default)', () => {
+        expect(FIT_MODE_MAP[null]).toBe('fill');
+    });
+});
+
+describe('originRequestHandler', () => {
+    let originRequestHandler;
+
+    beforeEach(async () => {
+        // Re-import to get fresh instance
+        const module = await import('../index.js');
+        originRequestHandler = module.originRequestHandler;
+    });
+
     it('rewrites transform URL and sets headers', async () => {
-        const event = mockCloudFrontEvent('/200x300/avatars/1/photo.png');
-        const result = await handler(event);
+        const event = mockCloudFrontRequest('/200x300/avatars/1/photo.png');
+        const result = await originRequestHandler(event);
 
         expect(result.uri).toBe('/avatars/1/photo.png');
         expect(result.headers['x-transform-width'][0].value).toBe('200');
@@ -135,16 +256,16 @@ describe('handler', () => {
     });
 
     it('sets fit header for fit-in URL', async () => {
-        const event = mockCloudFrontEvent('/fit-in/100x100/logos/1/logo.svg');
-        const result = await handler(event);
+        const event = mockCloudFrontRequest('/fit-in/100x100/logos/1/logo.png');
+        const result = await originRequestHandler(event);
 
-        expect(result.uri).toBe('/logos/1/logo.svg');
+        expect(result.uri).toBe('/logos/1/logo.png');
         expect(result.headers['x-transform-fit'][0].value).toBe('fit-in');
     });
 
     it('passes through non-transform URL unchanged', async () => {
-        const event = mockCloudFrontEvent('/avatars/1/photo.png');
-        const result = await handler(event);
+        const event = mockCloudFrontRequest('/avatars/1/photo.png');
+        const result = await originRequestHandler(event);
 
         expect(result.uri).toBe('/avatars/1/photo.png');
         expect(result.headers['x-transform-width']).toBeUndefined();
@@ -152,8 +273,8 @@ describe('handler', () => {
     });
 
     it('handles nested paths correctly', async () => {
-        const event = mockCloudFrontEvent('/cover/50x50/deep/nested/path/to/image.avif');
-        const result = await handler(event);
+        const event = mockCloudFrontRequest('/cover/50x50/deep/nested/path/to/image.avif');
+        const result = await originRequestHandler(event);
 
         expect(result.uri).toBe('/deep/nested/path/to/image.avif');
         expect(result.headers['x-transform-width'][0].value).toBe('50');
@@ -162,8 +283,8 @@ describe('handler', () => {
     });
 
     it('returns 400 for dimensions exceeding maximum', async () => {
-        const event = mockCloudFrontEvent('/10000x10000/avatars/1/photo.png');
-        const result = await handler(event);
+        const event = mockCloudFrontRequest('/10000x10000/avatars/1/photo.png');
+        const result = await originRequestHandler(event);
 
         expect(result.status).toBe('400');
         expect(result.statusDescription).toBe('Bad Request');
@@ -171,15 +292,42 @@ describe('handler', () => {
     });
 
     it('returns 400 for zero dimensions', async () => {
-        const event = mockCloudFrontEvent('/0x100/avatars/1/photo.png');
-        const result = await handler(event);
+        const event = mockCloudFrontRequest('/0x100/avatars/1/photo.png');
+        const result = await originRequestHandler(event);
 
         expect(result.status).toBe('400');
         expect(result.body).toContain('at least');
     });
+});
+
+describe('handler (Origin Response)', () => {
+    let handler;
+
+    beforeEach(async () => {
+        vi.clearAllMocks();
+        const module = await import('../index.js');
+        handler = module.handler;
+    });
+
+    it('passes through response without transform headers', async () => {
+        const event = mockCloudFrontResponse('/avatars/1/photo.png', '200', {});
+        const result = await handler(event);
+
+        // Should return original response
+        expect(result.status).toBe('200');
+    });
+
+    it('passes through non-200 responses', async () => {
+        const event = mockCloudFrontResponse('/avatars/1/photo.png', '404', {
+            'x-transform-width': [{ value: '200' }],
+            'x-transform-height': [{ value: '300' }],
+        });
+        const result = await handler(event);
+
+        expect(result.status).toBe('404');
+    });
 
     it('handles malformed events gracefully', async () => {
-        // Missing event structure
         const result = await handler({});
 
         expect(result.status).toBe('500');
