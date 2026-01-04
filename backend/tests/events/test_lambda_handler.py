@@ -2,11 +2,14 @@
 Tests for standalone Lambda event publisher.
 """
 
+import importlib
 import json
 import pytest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
+
+import apps.events.lambda_handler as lh
 
 
 @pytest.fixture
@@ -16,6 +19,8 @@ def mock_env(monkeypatch):
     monkeypatch.setenv("EVENT_BUS_NAME", "test-bus")
     monkeypatch.setenv("BATCH_SIZE", "10")
     monkeypatch.setenv("MAX_ATTEMPTS", "10")
+    # Reload to pick up env vars
+    importlib.reload(lh)
 
 
 @pytest.fixture
@@ -65,9 +70,7 @@ class TestLambdaPublishPendingEvents:
                 "Entries": [{"EventId": "eb-1"}, {"EventId": "eb-2"}]
             }
 
-            from apps.events.lambda_handler import publish_pending_events
-
-            count = publish_pending_events()
+            count = lh.publish_pending_events()
 
             assert count == 2
             mock_eb.put_events.assert_called_once()
@@ -85,9 +88,7 @@ class TestLambdaPublishPendingEvents:
             mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
             mock_cursor.fetchall.return_value = []
 
-            from apps.events.lambda_handler import publish_pending_events
-
-            count = publish_pending_events()
+            count = lh.publish_pending_events()
 
             assert count == 0
 
@@ -112,9 +113,7 @@ class TestLambdaPublishPendingEvents:
                 ]
             }
 
-            from apps.events.lambda_handler import publish_pending_events
-
-            count = publish_pending_events()
+            count = lh.publish_pending_events()
 
             # Only 1 succeeded
             assert count == 1
@@ -140,9 +139,7 @@ class TestLambdaHandler:
                 "Entries": [{"EventId": "eb-1"}, {"EventId": "eb-2"}]
             }
 
-            from apps.events.lambda_handler import handler
-
-            result = handler({}, None)
+            result = lh.handler({}, None)
 
             assert result["statusCode"] == 200
             assert "2 events" in result["body"]
@@ -158,9 +155,7 @@ class TestLambdaHandler:
             mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
             mock_cursor.fetchall.return_value = []
 
-            from apps.events.lambda_handler import handler
-
-            result = handler({}, None)
+            result = lh.handler({}, None)
 
             assert result["statusCode"] == 200
             assert "0 events" in result["body"]
@@ -170,8 +165,6 @@ class TestLambdaHandler:
         monkeypatch.delenv("DATABASE_URL", raising=False)
 
         # Reimport to pick up cleared env
-        import importlib
-        import apps.events.lambda_handler as lh
         importlib.reload(lh)
 
         result = lh.handler({}, None)
@@ -188,9 +181,7 @@ class TestLambdaHandler:
         with patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2:
             mock_psycopg2.connect.side_effect = Exception("Connection refused")
 
-            from apps.events.lambda_handler import handler
-
-            result = handler({}, None)
+            result = lh.handler({}, None)
 
             assert result["statusCode"] == 500
             assert "Connection refused" in result["body"]
