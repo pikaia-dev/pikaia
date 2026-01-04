@@ -1,4 +1,4 @@
-import { useEffect, useRef,useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "../../components/ui/button"
@@ -54,7 +54,7 @@ export default function ProfileSettings() {
   const [sendingEmailUpdate, setSendingEmailUpdate] = useState(false)
 
   useEffect(() => {
-    getCurrentUser()
+    void getCurrentUser()
       .then((data) => {
         setName(data.user.name)
         setSavedName(data.user.name)
@@ -64,7 +64,7 @@ export default function ProfileSettings() {
         setSavedPhoneNumber(data.user.phone_number || "")
         setAvatarUrl(data.user.avatar_url || "")
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         toast.error(
           err instanceof Error ? err.message : "Failed to load profile"
         )

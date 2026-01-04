@@ -1,4 +1,4 @@
-import { useCallback,useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import {
@@ -29,7 +29,7 @@ import {
   SelectValue,
 } from "../../components/ui/select"
 import { useApi } from "../../hooks/useApi"
-import type { DirectoryUser,MemberListItem } from "../../lib/api"
+import type { DirectoryUser, MemberListItem } from "../../lib/api"
 
 export default function MembersSettings() {
   const { listMembers, inviteMember, updateMemberRole, deleteMember } = useApi()
@@ -67,7 +67,7 @@ export default function MembersSettings() {
   }, [listMembers])
 
   useEffect(() => {
-    loadMembers()
+    void loadMembers()
   }, [loadMembers])
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -86,7 +86,7 @@ export default function MembersSettings() {
       setInviteEmail("")
       setInviteName("")
       setInviteRole("member")
-      loadMembers()
+      void loadMembers()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to send invite")
     } finally {
@@ -109,7 +109,7 @@ export default function MembersSettings() {
     try {
       await updateMemberRole(memberId, { role: newRole })
       toast.success("Role updated")
-      loadMembers()
+      void loadMembers()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update role")
     }
@@ -126,7 +126,7 @@ export default function MembersSettings() {
     try {
       await deleteMember(memberToDelete.id)
       toast.success(`${memberToDelete.email} removed`)
-      loadMembers()
+      void loadMembers()
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to remove member"
@@ -198,8 +198,7 @@ export default function MembersSettings() {
               </label>
               <Select
                 value={inviteRole}
-                onValueChange={(value) =>
-                  { setInviteRole(value as "admin" | "member"); }
+                onValueChange={(value) => { setInviteRole(value as "admin" | "member"); }
                 }
               >
                 <SelectTrigger className="w-full">
@@ -282,8 +281,7 @@ export default function MembersSettings() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() =>
-                          { openDeleteDialog(member.id, member.email); }
+                        onClick={() => { openDeleteDialog(member.id, member.email); }
                         }
                         className="text-destructive hover:text-destructive"
                       >

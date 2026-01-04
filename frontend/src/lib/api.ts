@@ -47,13 +47,13 @@ export function createApiClient(getToken: TokenProvider) {
     })
 
     if (!response.ok) {
-      const error: ApiError = await response.json().catch(() => ({
+      const error = await response.json().catch((): ApiError => ({
         detail: "An error occurred",
-      }))
+      })) as ApiError
       throw new Error(error.detail)
     }
 
-    return response.json()
+    return response.json() as Promise<T>
   }
 
   return {
@@ -211,12 +211,12 @@ export interface MessageResponse {
 // Billing/Subscription types
 export interface SubscriptionInfo {
   status:
-    | "active"
-    | "past_due"
-    | "canceled"
-    | "incomplete"
-    | "trialing"
-    | "none"
+  | "active"
+  | "past_due"
+  | "canceled"
+  | "incomplete"
+  | "trialing"
+  | "none"
   quantity: number
   current_period_end: string | null
   cancel_at_period_end: boolean

@@ -1,4 +1,4 @@
-import { useEffect,useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "../../components/ui/button"
@@ -38,7 +38,7 @@ export default function OrganizationSettings() {
   }
 
   useEffect(() => {
-    getOrganization()
+    void getOrganization()
       .then((data) => {
         setName(data.name)
         setSlug(data.slug)
