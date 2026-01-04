@@ -231,8 +231,8 @@ describe('FIT_MODE_MAP', () => {
         expect(FIT_MODE_MAP['contain']).toBe('contain');
     });
 
-    it('maps null to fill (default)', () => {
-        expect(FIT_MODE_MAP[null]).toBe('fill');
+    it('maps default to fill', () => {
+        expect(FIT_MODE_MAP['default']).toBe('fill');
     });
 });
 

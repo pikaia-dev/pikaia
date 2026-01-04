@@ -49,7 +49,7 @@ const FIT_MODE_MAP = {
     'fit-in': 'inside',
     'cover': 'cover',
     'contain': 'contain',
-    null: 'fill', // Default: exact resize
+    'default': 'fill', // Default: exact resize
 };
 
 // Lazy-initialized S3 client (reused across invocations)
@@ -222,7 +222,7 @@ exports.handler = async (event) => {
         }
 
         // Transform image using Sharp
-        const sharpFit = FIT_MODE_MAP[transformFit] || 'fill';
+        const sharpFit = FIT_MODE_MAP[transformFit] || FIT_MODE_MAP['default'];
         let transformer = sharp(Buffer.from(originalImage))
             .resize(validation.width, validation.height, {
                 fit: sharpFit,
