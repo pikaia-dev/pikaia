@@ -1,5 +1,4 @@
 import { useStytchMemberSession } from "@stytch/react/b2b"
-import { useEffect, useState } from "react"
 
 import {
   Card,
@@ -9,36 +8,24 @@ import {
   CardTitle,
 } from "../components/ui/card"
 import { LoadingSpinner } from "../components/ui/loading-spinner"
-import { useApi } from "../hooks/useApi"
-import type { MeResponse } from "../lib/api"
+import { useCurrentUser } from "../features/auth/queries"
 
 export default function Dashboard() {
   const { session } = useStytchMemberSession()
-  const { getCurrentUser } = useApi()
-  const [userData, setUserData] = useState<MeResponse | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { data: userData, isLoading, error } = useCurrentUser()
 
-  useEffect(() => {
-    async function fetchUser() {
-      try {
-        const data = await getCurrentUser()
-        setUserData(data)
-      } catch (err) {
-        console.error("Failed to load user:", err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (session) {
-      void fetchUser()
-    }
-  }, [session, getCurrentUser])
-
-  if (loading) {
+  if (isLoading || !session) {
     return (
       <div className="flex items-center justify-center h-64">
         <LoadingSpinner />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-destructive">Failed to load user data</p>
       </div>
     )
   }

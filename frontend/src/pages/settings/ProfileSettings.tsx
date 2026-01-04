@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "../../components/ui/button"
@@ -19,164 +19,132 @@ import {
 import { ImageUploader } from "../../components/ui/image-uploader"
 import { LoadingSpinner } from "../../components/ui/loading-spinner"
 import { PhoneNumberInput } from "../../components/ui/phone-number-input"
-import { useApi } from "../../hooks/useApi"
+import { useCurrentUser } from "../../features/auth/queries"
+import {
+  useSendPhoneOtp,
+  useStartEmailUpdate,
+  useUpdateProfile,
+  useVerifyPhoneOtp,
+} from "../../features/profile/queries"
 
 // Delay before updating state after dialog close animation
 const DIALOG_CLOSE_DELAY_MS = 150
 
 export default function ProfileSettings() {
-  const {
-    getCurrentUser,
-    updateProfile,
-    sendPhoneOtp,
-    verifyPhoneOtp,
-    startEmailUpdate,
-  } = useApi()
-  const [name, setName] = useState("")
-  const [savedName, setSavedName] = useState("")
-  const [email, setEmail] = useState("")
-  const [phoneNumber, setPhoneNumber] = useState("")
-  const [savedPhoneNumber, setSavedPhoneNumber] = useState("")
-  const [avatarUrl, setAvatarUrl] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const { data: userData, isLoading, error } = useCurrentUser()
+  const updateProfileMutation = useUpdateProfile()
+  const sendPhoneOtpMutation = useSendPhoneOtp()
+  const verifyPhoneOtpMutation = useVerifyPhoneOtp()
+  const startEmailUpdateMutation = useStartEmailUpdate()
 
-  // Phone verification state
+  // Edited values (null = use server value)
+  const [editedName, setEditedName] = useState<string | null>(null)
+  const [editedPhoneNumber, setEditedPhoneNumber] = useState<string | null>(
+    null
+  )
+  const [editedEmail, setEditedEmail] = useState<string | null>(null)
+  const [editedAvatarUrl, setEditedAvatarUrl] = useState<string | null>(null)
+
+  // Phone verification dialog state
   const [showVerifyDialog, setShowVerifyDialog] = useState(false)
   const [otpCode, setOtpCode] = useState("")
-  const [sendingOtp, setSendingOtp] = useState(false)
-  const [verifyingOtp, setVerifyingOtp] = useState(false)
   const [pendingPhone, setPendingPhone] = useState("")
   const otpInputRef = useRef<HTMLInputElement>(null)
 
-  // Email update state
-  const [newEmail, setNewEmail] = useState("")
-  const [sendingEmailUpdate, setSendingEmailUpdate] = useState(false)
+  // Derive current values
+  const name = editedName ?? userData?.user.name ?? ""
+  const email = userData?.user.email ?? ""
+  const newEmail = editedEmail ?? email
+  const phoneNumber = editedPhoneNumber ?? userData?.user.phone_number ?? ""
+  const savedPhoneNumber = userData?.user.phone_number ?? ""
+  const avatarUrl = editedAvatarUrl ?? userData?.user.avatar_url ?? ""
 
-  useEffect(() => {
-    void getCurrentUser()
-      .then((data) => {
-        setName(data.user.name)
-        setSavedName(data.user.name)
-        setEmail(data.user.email)
-        setNewEmail(data.user.email) // Initialize newEmail with current email
-        setPhoneNumber(data.user.phone_number || "")
-        setSavedPhoneNumber(data.user.phone_number || "")
-        setAvatarUrl(data.user.avatar_url || "")
-      })
-      .catch((err: unknown) => {
-        toast.error(
-          err instanceof Error ? err.message : "Failed to load profile"
-        )
-      })
-      .finally(() => { setLoading(false); })
-  }, [getCurrentUser])
-
-  const handleSubmit = async () => {
-    setSaving(true)
-
-    try {
-      await updateProfile({ name })
-      setSavedName(name) // Update saved name on success
-      toast.success("Name updated successfully")
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const isNameChanged = name !== savedName
-
+  const isNameChanged = editedName !== null && editedName !== userData?.user.name
   const isPhoneChanged = phoneNumber !== savedPhoneNumber
-
-  const handleStartEmailUpdate = async () => {
-    if (!newEmail || newEmail.toLowerCase() === email.toLowerCase()) return
-
-    setSendingEmailUpdate(true)
-    try {
-      await startEmailUpdate(newEmail)
-      toast.success(
-        `Verification email sent to ${newEmail}. Check your inbox to complete the change.`
-      )
-      // Reset newEmail to current email (change won't take effect until verified)
-      setNewEmail(email)
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to start email update"
-      )
-    } finally {
-      setSendingEmailUpdate(false)
-    }
-  }
-
   const isEmailChanged = newEmail.toLowerCase() !== email.toLowerCase()
 
-  const handleVerifyPhone = async () => {
-    if (!phoneNumber) return
-
-    setSendingOtp(true)
-    try {
-      await sendPhoneOtp(phoneNumber)
-      setPendingPhone(phoneNumber)
-      setOtpCode("")
-      setShowVerifyDialog(true)
-      toast.success("Verification code sent!")
-      // Focus OTP input after dialog opens
-      setTimeout(() => otpInputRef.current?.focus(), 100)
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to send verification code"
-      )
-    } finally {
-      setSendingOtp(false)
-    }
+  const handleSubmit = () => {
+    updateProfileMutation.mutate(
+      { name },
+      {
+        onSuccess: () => {
+          setEditedName(null)
+        },
+      }
+    )
   }
 
-  const handleVerifyOtp = async () => {
+  const handleStartEmailUpdate = () => {
+    if (!newEmail || !isEmailChanged) return
+
+    startEmailUpdateMutation.mutate(newEmail, {
+      onSuccess: () => {
+        // Reset to current email (change won't take effect until verified)
+        setEditedEmail(null)
+      },
+    })
+  }
+
+  const handleVerifyPhone = () => {
+    if (!phoneNumber) return
+
+    sendPhoneOtpMutation.mutate(phoneNumber, {
+      onSuccess: () => {
+        setPendingPhone(phoneNumber)
+        setOtpCode("")
+        setShowVerifyDialog(true)
+        toast.success("Verification code sent!")
+        // Focus OTP input after dialog opens
+        setTimeout(() => otpInputRef.current?.focus(), 100)
+      },
+    })
+  }
+
+  const handleVerifyOtp = () => {
     if (!otpCode || otpCode.length !== 6) {
       toast.error("Please enter a 6-digit code")
       return
     }
 
-    setVerifyingOtp(true)
-    try {
-      const updatedUser = await verifyPhoneOtp(pendingPhone, otpCode)
-      // Close dialog first, then update state after animation
-      setShowVerifyDialog(false)
-      toast.success("Phone number verified and saved!")
-      // Update phone state after dialog close animation
-      setTimeout(() => {
-        setPhoneNumber(updatedUser.phone_number)
-        setSavedPhoneNumber(updatedUser.phone_number)
+    verifyPhoneOtpMutation.mutate(
+      { phone_number: pendingPhone, otp_code: otpCode },
+      {
+        onSuccess: (updatedUser) => {
+          // Close dialog first, then update state after animation
+          setShowVerifyDialog(false)
+          // Update phone state after dialog close animation
+          setTimeout(() => {
+            setEditedPhoneNumber(updatedUser.phone_number)
+            setOtpCode("")
+            setPendingPhone("")
+          }, DIALOG_CLOSE_DELAY_MS)
+        },
+      }
+    )
+  }
+
+  const handleResendOtp = () => {
+    sendPhoneOtpMutation.mutate(pendingPhone, {
+      onSuccess: () => {
         setOtpCode("")
-        setPendingPhone("")
-      }, DIALOG_CLOSE_DELAY_MS)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Verification failed")
-    } finally {
-      setVerifyingOtp(false)
-    }
+        toast.success("New verification code sent!")
+        setTimeout(() => otpInputRef.current?.focus(), 100)
+      },
+    })
   }
 
-  const handleResendOtp = async () => {
-    setSendingOtp(true)
-    try {
-      await sendPhoneOtp(pendingPhone)
-      setOtpCode("")
-      toast.success("New verification code sent!")
-      setTimeout(() => otpInputRef.current?.focus(), 100)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to resend code")
-    } finally {
-      setSendingOtp(false)
-    }
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <LoadingSpinner size="sm" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-destructive">Failed to load profile</p>
       </div>
     )
   }
@@ -203,7 +171,7 @@ export default function ProfileSettings() {
             <ImageUploader
               type="avatar"
               value={avatarUrl}
-              onChange={setAvatarUrl}
+              onChange={setEditedAvatarUrl}
             />
           </CardContent>
         </Card>
@@ -224,7 +192,9 @@ export default function ProfileSettings() {
                 id="name"
                 type="text"
                 value={name}
-                onChange={(e) => { setName(e.target.value); }}
+                onChange={(e) => {
+                  setEditedName(e.target.value)
+                }}
                 className="w-full h-10 px-3 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 placeholder="Your name"
               />
@@ -232,10 +202,10 @@ export default function ProfileSettings() {
                 <Button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={saving}
+                  disabled={updateProfileMutation.isPending}
                   className="mt-2 h-10"
                 >
-                  {saving ? "Saving..." : "Save name"}
+                  {updateProfileMutation.isPending ? "Saving..." : "Save name"}
                 </Button>
               )}
             </div>
@@ -249,7 +219,9 @@ export default function ProfileSettings() {
                 id="email"
                 type="email"
                 value={newEmail}
-                onChange={(e) => { setNewEmail(e.target.value); }}
+                onChange={(e) => {
+                  setEditedEmail(e.target.value)
+                }}
                 className="w-full h-10 px-3 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 placeholder="your@email.com"
               />
@@ -282,10 +254,10 @@ export default function ProfileSettings() {
                   <Button
                     type="button"
                     onClick={handleStartEmailUpdate}
-                    disabled={sendingEmailUpdate}
+                    disabled={startEmailUpdateMutation.isPending}
                     className="mt-2 h-10"
                   >
-                    {sendingEmailUpdate
+                    {startEmailUpdateMutation.isPending
                       ? "Sending..."
                       : "Send verification link"}
                   </Button>
@@ -298,7 +270,10 @@ export default function ProfileSettings() {
               <label className="block text-sm font-medium mb-1">
                 Phone number
               </label>
-              <PhoneNumberInput value={phoneNumber} onChange={setPhoneNumber} />
+              <PhoneNumberInput
+                value={phoneNumber}
+                onChange={setEditedPhoneNumber}
+              />
               {/* Show status based on current state */}
               {savedPhoneNumber && !isPhoneChanged && (
                 <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1.5">
@@ -335,10 +310,12 @@ export default function ProfileSettings() {
                   <Button
                     type="button"
                     onClick={handleVerifyPhone}
-                    disabled={sendingOtp}
+                    disabled={sendPhoneOtpMutation.isPending}
                     className="mt-2 h-10"
                   >
-                    {sendingOtp ? "Sending..." : "Send verification code"}
+                    {sendPhoneOtpMutation.isPending
+                      ? "Sending..."
+                      : "Send verification code"}
                   </Button>
                 </>
               )}
@@ -376,7 +353,9 @@ export default function ProfileSettings() {
                 autoComplete="one-time-code"
                 maxLength={6}
                 value={otpCode}
-                onChange={(e) => { setOtpCode(e.target.value.replace(/\D/g, "")); }}
+                onChange={(e) => {
+                  setOtpCode(e.target.value.replace(/\D/g, ""))
+                }}
                 placeholder="123456"
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm text-center text-2xl tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-ring"
               />
@@ -386,10 +365,12 @@ export default function ProfileSettings() {
               <Button
                 type="button"
                 onClick={handleVerifyOtp}
-                disabled={verifyingOtp || otpCode.length !== 6}
+                disabled={
+                  verifyPhoneOtpMutation.isPending || otpCode.length !== 6
+                }
                 className="flex-1"
               >
-                {verifyingOtp ? (
+                {verifyPhoneOtpMutation.isPending ? (
                   <>
                     <LoadingSpinner size="sm" className="mr-2" />
                     Verifying...
@@ -402,7 +383,7 @@ export default function ProfileSettings() {
                 type="button"
                 variant="outline"
                 onClick={handleResendOtp}
-                disabled={sendingOtp}
+                disabled={sendPhoneOtpMutation.isPending}
               >
                 Resend
               </Button>

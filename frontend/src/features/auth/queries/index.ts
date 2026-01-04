@@ -1,6 +1,20 @@
-/**
- * Auth feature - user authentication and session state.
- */
+import { useQuery } from "@tanstack/react-query"
 
-// Queries will be added in Phase 2 (TanStack Query adoption)
-export { }
+import { useApi } from "../../../hooks/useApi"
+import type { MeResponse } from "../../../lib/api"
+import { queryKeys } from "../../shared/query-keys"
+
+/**
+ * Query hook for fetching the current authenticated user.
+ *
+ * Returns user, member, and organization data from /auth/me endpoint.
+ * Automatically caches and deduplicates requests.
+ */
+export function useCurrentUser() {
+    const { getCurrentUser } = useApi()
+
+    return useQuery<MeResponse>({
+        queryKey: queryKeys.auth.me(),
+        queryFn: getCurrentUser,
+    })
+}
