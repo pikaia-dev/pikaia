@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react"
 import { useStytchMemberSession } from "@stytch/react/b2b"
-import { useApi } from "../hooks/useApi"
-import type { MeResponse } from "../lib/api"
+import { useEffect, useState } from "react"
+
 import {
   Card,
   CardContent,
@@ -10,6 +9,8 @@ import {
   CardTitle,
 } from "../components/ui/card"
 import { LoadingSpinner } from "../components/ui/loading-spinner"
+import { useApi } from "../hooks/useApi"
+import type { MeResponse } from "../lib/api"
 
 export default function Dashboard() {
   const { session } = useStytchMemberSession()

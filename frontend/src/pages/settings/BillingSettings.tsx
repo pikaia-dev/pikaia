@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useCallback,useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { useApi } from "../../hooks/useApi"
-import type { BillingAddress, SubscriptionInfo, Invoice } from "../../lib/api"
+
+import { PaymentForm } from "../../components/PaymentForm"
 import { AddressAutocomplete } from "../../components/ui/address-autocomplete"
 import { Button } from "../../components/ui/button"
 import {
@@ -14,14 +14,15 @@ import {
 import { Checkbox } from "../../components/ui/checkbox"
 import { CountryCombobox } from "../../components/ui/country-combobox"
 import { LoadingSpinner } from "../../components/ui/loading-spinner"
-import { PaymentForm } from "../../components/PaymentForm"
+import { useApi } from "../../hooks/useApi"
+import type { BillingAddress, Invoice,SubscriptionInfo } from "../../lib/api"
 import {
-  getVatPrefix,
-  updateVatIdForCountryChange,
-  shouldShowTaxId,
+  DEFAULT_COUNTRY,
   getPostalCodeLabel,
   getStateLabel,
-  DEFAULT_COUNTRY,
+  getVatPrefix,
+  shouldShowTaxId,
+  updateVatIdForCountryChange,
 } from "../../lib/countries"
 import type { ParsedAddress } from "../../lib/google-places"
 

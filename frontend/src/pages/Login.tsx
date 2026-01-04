@@ -1,11 +1,12 @@
-import { useEffect } from "react"
-import { useNavigate } from "react-router-dom"
 import { StytchB2B, useStytchMemberSession } from "@stytch/react/b2b"
 import {
-  B2BProducts,
   AuthFlowType,
   B2BOAuthProviders,
+  B2BProducts,
 } from "@stytch/vanilla-js/b2b"
+import { useEffect } from "react"
+import { useNavigate } from "react-router-dom"
+
 import { LoadingSpinner } from "../components/ui/loading-spinner"
 
 // Session duration: 30 days

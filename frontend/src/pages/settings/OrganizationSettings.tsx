@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react"
+import { useEffect,useState } from "react"
 import { toast } from "sonner"
-import { useApi } from "../../hooks/useApi"
+
 import { Button } from "../../components/ui/button"
 import {
   Card,
@@ -9,8 +9,9 @@ import {
   CardHeader,
   CardTitle,
 } from "../../components/ui/card"
-import { LoadingSpinner } from "../../components/ui/loading-spinner"
 import { ImageUploader } from "../../components/ui/image-uploader"
+import { LoadingSpinner } from "../../components/ui/loading-spinner"
+import { useApi } from "../../hooks/useApi"
 
 export default function OrganizationSettings() {
   const { getOrganization, updateOrganization } = useApi()

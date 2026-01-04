@@ -1,7 +1,8 @@
-import { useState, useCallback } from "react"
 import { useStytchB2BClient } from "@stytch/react/b2b"
+import { useCallback,useState } from "react"
+
+import type { ImageResponse,UploadRequest } from "../lib/api"
 import { useApi } from "./useApi"
-import type { UploadRequest, ImageResponse } from "../lib/api"
 
 interface UseImageUploadOptions {
   onSuccess?: (result: ImageResponse) => void

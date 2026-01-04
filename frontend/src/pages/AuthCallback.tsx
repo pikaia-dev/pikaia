@@ -1,6 +1,7 @@
+import { useStytchMemberSession } from "@stytch/react/b2b"
 import { useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { useStytchMemberSession } from "@stytch/react/b2b"
+
 import { LoadingSpinner } from "../components/ui/loading-spinner"
 
 /**

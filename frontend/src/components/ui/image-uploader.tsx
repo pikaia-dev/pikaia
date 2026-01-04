@@ -1,7 +1,11 @@
-import { useState, useCallback } from "react"
+import { Building2,Upload, User, X } from "lucide-react"
+import { useCallback,useState } from "react"
 import { useDropzone } from "react-dropzone"
-import { Upload, X, User, Building2 } from "lucide-react"
 import { toast } from "sonner"
+
+import { useImageUpload } from "../../hooks/useImageUpload"
+import { MEDIA_UPLOAD } from "../../lib/constants"
+import { cn } from "../../lib/utils"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,9 +17,6 @@ import {
   AlertDialogTitle,
 } from "./alert-dialog"
 import { ImageCropper } from "./image-cropper"
-import { useImageUpload } from "../../hooks/useImageUpload"
-import { cn } from "../../lib/utils"
-import { MEDIA_UPLOAD } from "../../lib/constants"
 
 interface ImageUploaderProps {
   type: "avatar" | "logo"

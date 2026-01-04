@@ -1,16 +1,19 @@
-import { NavLink, useNavigate } from "react-router-dom"
 import { useStytchB2BClient, useStytchMember } from "@stytch/react/b2b"
-import { useState, useEffect } from "react"
 import {
-  Home,
-  User,
-  Users,
   Building2,
+  ChevronsUpDown,
   CreditCard,
+  Home,
   LogOut,
   Settings,
-  ChevronsUpDown,
+  User,
+  Users,
 } from "lucide-react"
+import { useEffect,useState } from "react"
+import { NavLink, useNavigate } from "react-router-dom"
+
+import { useApi } from "../hooks/useApi"
+import { STYTCH_ROLES } from "../lib/constants"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,8 +33,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "./ui/sidebar"
-import { STYTCH_ROLES } from "../lib/constants"
-import { useApi } from "../hooks/useApi"
 
 const mainNavItems = [{ to: "/dashboard", label: "Dashboard", icon: Home }]
 

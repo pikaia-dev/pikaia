@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react"
+import { useCallback,useEffect, useState } from "react"
 import { toast } from "sonner"
-import { useApi } from "../../hooks/useApi"
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +19,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../../components/ui/card"
+import { EmailAutocomplete } from "../../components/ui/email-autocomplete"
 import { LoadingSpinner } from "../../components/ui/loading-spinner"
 import {
   Select,
@@ -27,8 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select"
-import { EmailAutocomplete } from "../../components/ui/email-autocomplete"
-import type { MemberListItem, DirectoryUser } from "../../lib/api"
+import { useApi } from "../../hooks/useApi"
+import type { DirectoryUser,MemberListItem } from "../../lib/api"
 
 export default function MembersSettings() {
   const { listMembers, inviteMember, updateMemberRole, deleteMember } = useApi()
