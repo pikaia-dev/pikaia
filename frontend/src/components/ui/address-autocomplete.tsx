@@ -1,7 +1,7 @@
 /// <reference types="@types/google.maps" />
 
-import { Keyboard,Search } from "lucide-react"
-import { useCallback,useEffect, useRef, useState } from "react"
+import { Keyboard, Search } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import { loadGooglePlacesScript, type ParsedAddress } from "@/lib/google-places"
 import { cn } from "@/lib/utils"
@@ -77,19 +77,23 @@ export function AddressAutocomplete({
   useEffect(() => {
     if (!isLoaded) return
 
-    const initServices = async () => {
+    const initServices = () => {
       try {
-        await google.maps.importLibrary("places")
-        autocompleteServiceRef.current =
-          new google.maps.places.AutocompleteService()
-        // Create a container element for PlacesService (required by API)
-        const placesServiceElement = document.createElement("div")
-        placesServiceElementRef.current = placesServiceElement
-        placesServiceRef.current = new google.maps.places.PlacesService(
-          placesServiceElement
-        )
-        sessionTokenRef.current =
-          new google.maps.places.AutocompleteSessionToken()
+        void google.maps.importLibrary("places").then(() => {
+          autocompleteServiceRef.current =
+            new google.maps.places.AutocompleteService()
+          // Create a container element for PlacesService (required by API)
+          const placesServiceElement = document.createElement("div")
+          placesServiceElementRef.current = placesServiceElement
+          placesServiceRef.current = new google.maps.places.PlacesService(
+            placesServiceElement
+          )
+          sessionTokenRef.current =
+            new google.maps.places.AutocompleteSessionToken()
+        }).catch((err: unknown) => {
+          console.error("Failed to initialize Places services:", err)
+          setLoadError(true)
+        })
       } catch (err) {
         console.error("Failed to initialize Places services:", err)
         setLoadError(true)
@@ -107,7 +111,7 @@ export function AddressAutocomplete({
   }, [isLoaded])
 
   // Fetch suggestions when value changes
-  const fetchSuggestions = useCallback(async (query: string) => {
+  const fetchSuggestions = useCallback((query: string) => {
     if (
       !query ||
       query.length < MIN_QUERY_LENGTH ||
@@ -164,7 +168,7 @@ export function AddressAutocomplete({
 
   // Handle suggestion selection
   const handleSelect = useCallback(
-    async (suggestion: Suggestion) => {
+    (suggestion: Suggestion) => {
       if (!placesServiceRef.current) return
 
       setIsOpen(false)
@@ -295,7 +299,7 @@ export function AddressAutocomplete({
               <button
                 key={suggestion.placeId}
                 type="button"
-                onClick={() => handleSelect(suggestion)}
+                onClick={() => { handleSelect(suggestion) }}
                 className={cn(
                   "w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors",
                   "flex flex-col",
