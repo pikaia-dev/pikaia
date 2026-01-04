@@ -2,7 +2,6 @@
 Tests for CorrelationIdMiddleware.
 """
 
-import pytest
 from uuid import UUID
 from django.test import RequestFactory
 
@@ -25,6 +24,7 @@ class TestCorrelationIdMiddleware:
             nonlocal captured_id
             captured_id = req.correlation_id
             from django.http import HttpResponse
+
             return HttpResponse("OK")
 
         middleware = CorrelationIdMiddleware(get_response)
@@ -49,6 +49,7 @@ class TestCorrelationIdMiddleware:
             nonlocal captured_id
             captured_id = req.correlation_id
             from django.http import HttpResponse
+
             return HttpResponse("OK")
 
         middleware = CorrelationIdMiddleware(get_response)
@@ -68,6 +69,7 @@ class TestCorrelationIdMiddleware:
             nonlocal captured_id
             captured_id = req.correlation_id
             from django.http import HttpResponse
+
             return HttpResponse("OK")
 
         middleware = CorrelationIdMiddleware(get_response)
@@ -87,6 +89,7 @@ class TestCorrelationIdMiddleware:
             # Verify it's set during request
             assert get_correlation_id() is not None
             from django.http import HttpResponse
+
             return HttpResponse("OK")
 
         middleware = CorrelationIdMiddleware(get_response)
@@ -106,6 +109,7 @@ class TestCorrelationIdMiddleware:
             nonlocal service_correlation_id
             service_correlation_id = get_correlation_id()
             from django.http import HttpResponse
+
             return HttpResponse("OK")
 
         middleware = CorrelationIdMiddleware(get_response)

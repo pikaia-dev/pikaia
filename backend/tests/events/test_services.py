@@ -5,7 +5,7 @@ Tests for event services.
 import pytest
 from django.db import transaction
 
-from apps.events.models import AuditLog, OutboxEvent
+from apps.events.models import OutboxEvent
 from apps.events.schemas import MAX_PAYLOAD_SIZE_BYTES
 from apps.events.services import (
     create_audit_log,

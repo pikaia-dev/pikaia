@@ -4,15 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0004_user_avatar_url'),
+        ("accounts", "0004_user_avatar_url"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='user',
-            name='phone_number',
-            field=models.CharField(blank=True, default='', help_text='Phone number in E.164 format (e.g., +14155551234)', max_length=20),
+            model_name="user",
+            name="phone_number",
+            field=models.CharField(
+                blank=True,
+                default="",
+                help_text="Phone number in E.164 format (e.g., +14155551234)",
+                max_length=20,
+            ),
         ),
     ]

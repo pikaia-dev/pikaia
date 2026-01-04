@@ -41,9 +41,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if not settings.STRIPE_SECRET_KEY:
-            raise CommandError(
-                "STRIPE_SECRET_KEY not set. Add it to your .env file first."
-            )
+            raise CommandError("STRIPE_SECRET_KEY not set. Add it to your .env file first.")
 
         stripe = get_stripe()
         product_name = options["product_name"]
@@ -59,15 +57,11 @@ class Command(BaseCommand):
 
         if not options["force"]:
             # Search for existing product by metadata
-            products = stripe.Product.search(
-                query="metadata['app']:'tango' AND active:'true'"
-            )
+            products = stripe.Product.search(query="metadata['app']:'tango' AND active:'true'")
             if products.data:
                 existing_product = products.data[0]
                 self.stdout.write(
-                    self.style.WARNING(
-                        f"Found existing product: {existing_product.id}"
-                    )
+                    self.style.WARNING(f"Found existing product: {existing_product.id}")
                 )
 
                 # Find active price for this product
@@ -79,9 +73,7 @@ class Command(BaseCommand):
                 if prices.data:
                     existing_price = prices.data[0]
                     self.stdout.write(
-                        self.style.WARNING(
-                            f"Found existing price: {existing_price.id}"
-                        )
+                        self.style.WARNING(f"Found existing price: {existing_price.id}")
                     )
 
         if existing_price and not options["force"]:

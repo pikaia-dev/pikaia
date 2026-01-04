@@ -4,20 +4,26 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('organizations', '0002_add_billing_fields'),
+        ("organizations", "0002_add_billing_fields"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='organization',
-            name='use_billing_email',
-            field=models.BooleanField(default=False, help_text='If True, send invoices to billing_email; otherwise send to admin'),
+            model_name="organization",
+            name="use_billing_email",
+            field=models.BooleanField(
+                default=False,
+                help_text="If True, send invoices to billing_email; otherwise send to admin",
+            ),
         ),
         migrations.AlterField(
-            model_name='organization',
-            name='billing_email',
-            field=models.EmailField(blank=True, help_text='Email for invoices (used only if use_billing_email is True)', max_length=254),
+            model_name="organization",
+            name="billing_email",
+            field=models.EmailField(
+                blank=True,
+                help_text="Email for invoices (used only if use_billing_email is True)",
+                max_length=254,
+            ),
         ),
     ]

@@ -36,9 +36,7 @@ def build_webhook_payload(event_type: str, data_object: dict) -> dict:
 class TestStripeWebhookSignatureVerification:
     """Tests for webhook signature verification."""
 
-    def test_missing_signature_header_returns_400(
-        self, client: Client, webhook_url: str
-    ) -> None:
+    def test_missing_signature_header_returns_400(self, client: Client, webhook_url: str) -> None:
         """Should return 400 when Stripe-Signature header is missing."""
         response = client.post(
             webhook_url,

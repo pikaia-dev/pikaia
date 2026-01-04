@@ -48,6 +48,7 @@ def parse_comma_list(value: str) -> list[str]:
     """Parse a comma-separated string into a list of stripped, non-empty values."""
     return [item.strip() for item in value.split(",") if item.strip()]
 
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -112,6 +113,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "config.wsgi.application"
+
 
 # Database - parsed from DATABASE_URL
 def _parse_postgres_dsn(dsn: PostgresDsn) -> dict:

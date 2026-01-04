@@ -7,16 +7,13 @@ Dedicated service layer tests (beyond API-level tests in test_api.py).
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
-import pytest
 from django.test import override_settings
 from PIL import Image
 
 from apps.media.services import ImageMetadata, StorageService, UploadInfo
 
 
-def create_test_image_bytes(
-    width: int = 100, height: int = 100, format: str = "PNG"
-) -> bytes:
+def create_test_image_bytes(width: int = 100, height: int = 100, format: str = "PNG") -> bytes:
     """Create a test image as bytes."""
     img = Image.new("RGB", (width, height), color="red")
     buffer = BytesIO()
@@ -266,9 +263,7 @@ class TestGetImageUrl:
         ):
             service = StorageService()
 
-            url = service.get_image_url(
-                "avatars/123/test.png", width=200, height=200, fit="fit-in"
-            )
+            url = service.get_image_url("avatars/123/test.png", width=200, height=200, fit="fit-in")
 
             assert url == "https://transform.example.com/fit-in/200x200/avatars/123/test.png"
 
@@ -305,9 +300,10 @@ class TestSanitizeSVGInStorage:
         with override_settings(USE_S3_STORAGE=False):
             service = StorageService()
 
-            with patch.object(service, "save_file") as mock_save, patch(
-                "apps.media.services.default_storage"
-            ) as mock_storage:
+            with (
+                patch.object(service, "save_file") as mock_save,
+                patch("apps.media.services.default_storage") as mock_storage,
+            ):
                 mock_storage.exists.return_value = True
                 mock_file = MagicMock()
                 mock_file.read.return_value = svg_content

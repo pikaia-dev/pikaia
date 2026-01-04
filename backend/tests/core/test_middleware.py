@@ -77,7 +77,7 @@ class TestPublicPaths:
     def test_public_path_skips_auth(self, middleware: StytchAuthMiddleware) -> None:
         """Public paths should not attempt JWT authentication."""
         request = make_request("/api/v1/health")
-        
+
         with patch.object(middleware, "_authenticate_jwt") as mock_auth:
             middleware(request)
             mock_auth.assert_not_called()
@@ -85,7 +85,7 @@ class TestPublicPaths:
     def test_admin_path_is_public(self, middleware: StytchAuthMiddleware) -> None:
         """Admin paths should be public."""
         request = make_request("/admin/login/")
-        
+
         with patch.object(middleware, "_authenticate_jwt") as mock_auth:
             middleware(request)
             mock_auth.assert_not_called()
@@ -93,7 +93,7 @@ class TestPublicPaths:
     def test_non_public_path_attempts_auth(self, middleware: StytchAuthMiddleware) -> None:
         """Non-public paths with Bearer token should attempt auth."""
         request = make_request("/api/v1/protected", "Bearer test-jwt")
-        
+
         with patch.object(middleware, "_authenticate_jwt") as mock_auth:
             middleware(request)
             mock_auth.assert_called_once_with(request, "test-jwt")
@@ -107,7 +107,7 @@ class TestJWTAuthentication:
         """Request without Authorization header gets None auth context."""
         request = make_request("/api/v1/test")
         middleware(request)
-        
+
         assert request.auth_user is None
         assert request.auth_member is None
         assert request.auth_organization is None
@@ -200,7 +200,7 @@ class TestJITSync:
         mock_client.sessions.authenticate_jwt.return_value = MockJWTAuthResponse(
             member_session=MockMemberSession(member_id="member-new-456")
         )
-        
+
         # Mock full authenticate for JIT sync
         mock_client.sessions.authenticate.return_value = MockFullAuthResponse(
             member=MockStytchMember(
@@ -266,7 +266,7 @@ class TestJITSync:
         request1 = make_request("/api/v1/test", "Bearer jwt1")
         middleware(request1)
 
-        # Second request - should reuse same records  
+        # Second request - should reuse same records
         request2 = make_request("/api/v1/test", "Bearer jwt2")
         middleware(request2)
 

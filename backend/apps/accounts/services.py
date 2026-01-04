@@ -152,7 +152,9 @@ def sync_session_to_local(
         # See StytchRoles for valid role IDs
         roles = getattr(stytch_member, "roles", []) or []
         role_ids = [
-            getattr(r, "role_id", None) or r.get("role_id") if hasattr(r, "get") else getattr(r, "role_id", None)
+            getattr(r, "role_id", None) or r.get("role_id")
+            if hasattr(r, "get")
+            else getattr(r, "role_id", None)
             for r in roles
         ]
         role = "admin" if StytchRoles.ADMIN in role_ids else "member"
@@ -229,9 +231,7 @@ def invite_member(
         organization_ids=[organization.stytch_org_id],
         query={
             "operator": "AND",
-            "operands": [
-                {"filter_name": "member_emails", "filter_value": [email]}
-            ],
+            "operands": [{"filter_name": "member_emails", "filter_value": [email]}],
         },
     )
 
@@ -293,9 +293,7 @@ def invite_member(
 
         # Check if this user was previously a member (soft-deleted)
         # Use all_objects to include soft-deleted members
-        existing_member = Member.all_objects.filter(
-            user=user, organization=organization
-        ).first()
+        existing_member = Member.all_objects.filter(user=user, organization=organization).first()
 
         if existing_member:
             # Reactivate the soft-deleted member with new Stytch ID

@@ -100,9 +100,7 @@ def create_checkout(
     summary="Create Stripe Customer Portal session",
 )
 @require_admin
-def create_portal(
-    request: HttpRequest, payload: PortalSessionRequest
-) -> PortalSessionResponse:
+def create_portal(request: HttpRequest, payload: PortalSessionRequest) -> PortalSessionResponse:
     """
     Create a Stripe Customer Portal session.
 
@@ -168,7 +166,12 @@ def get_subscription(request: HttpRequest) -> SubscriptionResponse:
 
 @router.post(
     "/subscription-intent",
-    response={200: SubscriptionIntentResponse, 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse},
+    response={
+        200: SubscriptionIntentResponse,
+        400: ErrorResponse,
+        401: ErrorResponse,
+        403: ErrorResponse,
+    },
     auth=bearer_auth,
     operation_id="createSubscriptionIntent",
     summary="Create subscription intent for Elements payment",
@@ -220,7 +223,12 @@ def create_subscription_intent_endpoint(
 
 @router.post(
     "/confirm-subscription",
-    response={200: ConfirmSubscriptionResponse, 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse},
+    response={
+        200: ConfirmSubscriptionResponse,
+        400: ErrorResponse,
+        401: ErrorResponse,
+        403: ErrorResponse,
+    },
     auth=bearer_auth,
     operation_id="confirmSubscription",
     summary="Confirm subscription after payment",

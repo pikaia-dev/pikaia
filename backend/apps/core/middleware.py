@@ -62,8 +62,6 @@ class CorrelationIdMiddleware:
         return response
 
 
-
-
 class StytchAuthMiddleware:
     """
     Validates Stytch session JWT from Authorization header.

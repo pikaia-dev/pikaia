@@ -469,9 +469,7 @@ class TestLogout:
         mock_client.sessions.authenticate_jwt.assert_called_once_with(
             session_jwt="valid_session_jwt"
         )
-        mock_client.sessions.revoke.assert_called_once_with(
-            member_session_id="member_session_123"
-        )
+        mock_client.sessions.revoke.assert_called_once_with(member_session_id="member_session_123")
 
     def test_missing_token(self, request_factory: RequestFactory) -> None:
         """Should error when no session JWT provided."""
@@ -582,9 +580,7 @@ class TestUpdateProfile:
         assert user.name == "New Name"
         mock_client.organizations.members.update.assert_called_once()
 
-    def test_stytch_sync_failure_doesnt_fail_request(
-        self, request_factory: RequestFactory
-    ) -> None:
+    def test_stytch_sync_failure_doesnt_fail_request(self, request_factory: RequestFactory) -> None:
         """Should succeed even if Stytch sync fails."""
         from stytch.core.response_base import StytchError, StytchErrorDetails
 
@@ -731,9 +727,7 @@ class TestStartEmailUpdate:
 class TestGetOrganization:
     """Tests for get_organization endpoint."""
 
-    def test_success_returns_org_with_billing(
-        self, request_factory: RequestFactory
-    ) -> None:
+    def test_success_returns_org_with_billing(self, request_factory: RequestFactory) -> None:
         """Should return organization details including billing info."""
         org = OrganizationFactory(
             billing_email="billing@example.com",
@@ -1093,7 +1087,9 @@ class TestInviteMember:
         request.auth_member = admin_member  # type: ignore[attr-defined]
         request.auth_organization = org  # type: ignore[attr-defined]
 
-        payload = InviteMemberRequest(email="deleted@example.com", name="Deleted User", role="member")
+        payload = InviteMemberRequest(
+            email="deleted@example.com", name="Deleted User", role="member"
+        )
 
         with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
             result = invite_member_endpoint(request, payload)
@@ -1124,7 +1120,9 @@ class TestInviteMember:
         assert exc_info.value.status_code == 400
         assert "yourself" in str(exc_info.value.message).lower()
 
-    def test_invite_active_member_updates_role_no_email(self, request_factory: RequestFactory) -> None:
+    def test_invite_active_member_updates_role_no_email(
+        self, request_factory: RequestFactory
+    ) -> None:
         """Inviting an already-active member should update their role but not send invite email."""
         from stytch.core.response_base import StytchError, StytchErrorDetails
 
@@ -1135,7 +1133,10 @@ class TestInviteMember:
         # Create an existing active member
         existing_user = UserFactory(email="existing@example.com")
         existing_member = MemberFactory(
-            user=existing_user, organization=org, role="member", stytch_member_id="existing-stytch-id"
+            user=existing_user,
+            organization=org,
+            role="member",
+            stytch_member_id="existing-stytch-id",
         )
 
         mock_client = MagicMock()
@@ -1175,7 +1176,9 @@ class TestInviteMember:
         # Verify NO reactivation was attempted
         mock_client.organizations.members.reactivate.assert_not_called()
 
-    def test_invite_pending_member_shows_pending_message(self, request_factory: RequestFactory) -> None:
+    def test_invite_pending_member_shows_pending_message(
+        self, request_factory: RequestFactory
+    ) -> None:
         """Inviting an already-invited member should show pending message."""
         org = OrganizationFactory()
         admin_user = UserFactory()
@@ -1364,5 +1367,3 @@ class TestDeleteMember:
 
         assert len(result.members) == 1
         assert result.members[0].email == "admin@example.com"
-
-

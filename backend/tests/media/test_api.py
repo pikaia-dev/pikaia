@@ -348,8 +348,10 @@ class TestLogoStytchSync:
         key = f"logos/{org.id}/logo123.png"
         payload = ConfirmUploadSchema(key=key, image_type="logo")
 
-        with patch("apps.media.api.get_storage_service") as mock_get_storage, \
-             patch("apps.accounts.stytch_client.get_stytch_client") as mock_stytch:
+        with (
+            patch("apps.media.api.get_storage_service") as mock_get_storage,
+            patch("apps.accounts.stytch_client.get_stytch_client") as mock_stytch,
+        ):
             mock_storage = MagicMock()
             mock_storage.confirm_upload.return_value = MagicMock(
                 content_type="image/png",
@@ -391,8 +393,10 @@ class TestLogoStytchSync:
         request.auth_member = member  # type: ignore[attr-defined]
         request.auth_organization = org  # type: ignore[attr-defined]
 
-        with patch("apps.media.api.get_storage_service") as mock_get_storage, \
-             patch("apps.accounts.stytch_client.get_stytch_client") as mock_stytch:
+        with (
+            patch("apps.media.api.get_storage_service") as mock_get_storage,
+            patch("apps.accounts.stytch_client.get_stytch_client") as mock_stytch,
+        ):
             mock_storage = MagicMock()
             mock_get_storage.return_value = mock_storage
 
@@ -407,7 +411,9 @@ class TestLogoStytchSync:
             organization_logo_url="",
         )
 
-    def test_stytch_sync_failure_does_not_break_upload(self, request_factory: RequestFactory) -> None:
+    def test_stytch_sync_failure_does_not_break_upload(
+        self, request_factory: RequestFactory
+    ) -> None:
         """Logo upload should succeed even if Stytch sync fails."""
         from stytch.core.response_base import StytchError
 
@@ -423,8 +429,10 @@ class TestLogoStytchSync:
         key = f"logos/{org.id}/logo123.png"
         payload = ConfirmUploadSchema(key=key, image_type="logo")
 
-        with patch("apps.media.api.get_storage_service") as mock_get_storage, \
-             patch("apps.accounts.stytch_client.get_stytch_client") as mock_stytch:
+        with (
+            patch("apps.media.api.get_storage_service") as mock_get_storage,
+            patch("apps.accounts.stytch_client.get_stytch_client") as mock_stytch,
+        ):
             mock_storage = MagicMock()
             mock_storage.confirm_upload.return_value = MagicMock(
                 content_type="image/png",
@@ -456,7 +464,6 @@ class TestLogoStytchSync:
 
 @pytest.mark.django_db
 class TestStorageService:
-
     """Tests for the storage service."""
 
     def test_validate_upload_request_valid(self, storage_service: StorageService) -> None:

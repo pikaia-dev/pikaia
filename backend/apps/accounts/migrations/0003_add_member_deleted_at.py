@@ -4,15 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0002_remove_stytch_user_id'),
+        ("accounts", "0002_remove_stytch_user_id"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='member',
-            name='deleted_at',
-            field=models.DateTimeField(blank=True, db_index=True, help_text='Soft delete timestamp. NULL = active member.', null=True),
+            model_name="member",
+            name="deleted_at",
+            field=models.DateTimeField(
+                blank=True,
+                db_index=True,
+                help_text="Soft delete timestamp. NULL = active member.",
+                null=True,
+            ),
         ),
     ]

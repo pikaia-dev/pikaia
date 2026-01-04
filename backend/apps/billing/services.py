@@ -8,7 +8,6 @@ External calls must NOT be inside database transactions.
 import logging
 from datetime import datetime, timedelta, timezone
 
-import stripe
 
 from apps.billing.models import Subscription
 from apps.billing.stripe_client import get_stripe
@@ -250,6 +249,7 @@ def sync_subscription_from_stripe(subscription_id: str) -> bool:
     # Return whether subscription is now active
     return stripe_sub.status in ("active", "trialing")
 
+
 def sync_subscription_quantity(org: Organization) -> None:
     """
     Sync subscription quantity to match active member count.
@@ -346,13 +346,13 @@ def handle_subscription_created(stripe_subscription: dict) -> None:
     current_period = stripe_subscription.get("current_period", {})
     period_start_ts = current_period.get("start") or stripe_subscription.get("current_period_start")
     period_end_ts = current_period.get("end") or stripe_subscription.get("current_period_end")
-    
+
     # Default to now if not available (shouldn't happen but be safe)
     if period_start_ts:
         period_start = datetime.fromtimestamp(period_start_ts, tz=timezone.utc)
     else:
         period_start = datetime.now(tz=timezone.utc)
-    
+
     if period_end_ts:
         period_end = datetime.fromtimestamp(period_end_ts, tz=timezone.utc)
     else:
@@ -396,7 +396,6 @@ def handle_subscription_created(stripe_subscription: dict) -> None:
     logger.info("Created/updated subscription for org %s", org.id)
 
 
-
 def handle_subscription_updated(stripe_subscription: dict) -> None:
     """
     Handle customer.subscription.updated webhook.
@@ -404,9 +403,7 @@ def handle_subscription_updated(stripe_subscription: dict) -> None:
     Updates local Subscription record.
     """
     try:
-        subscription = Subscription.objects.get(
-            stripe_subscription_id=stripe_subscription["id"]
-        )
+        subscription = Subscription.objects.get(stripe_subscription_id=stripe_subscription["id"])
     except Subscription.DoesNotExist:
         # Might be a new subscription - try to create
         handle_subscription_created(stripe_subscription)
@@ -416,12 +413,12 @@ def handle_subscription_updated(stripe_subscription: dict) -> None:
     current_period = stripe_subscription.get("current_period", {})
     period_start_ts = current_period.get("start") or stripe_subscription.get("current_period_start")
     period_end_ts = current_period.get("end") or stripe_subscription.get("current_period_end")
-    
+
     if period_start_ts:
         period_start = datetime.fromtimestamp(period_start_ts, tz=timezone.utc)
     else:
         period_start = subscription.current_period_start  # Keep existing
-    
+
     if period_end_ts:
         period_end = datetime.fromtimestamp(period_end_ts, tz=timezone.utc)
     else:
@@ -467,9 +464,7 @@ def handle_subscription_deleted(stripe_subscription: dict) -> None:
     Marks subscription as canceled.
     """
     try:
-        subscription = Subscription.objects.get(
-            stripe_subscription_id=stripe_subscription["id"]
-        )
+        subscription = Subscription.objects.get(stripe_subscription_id=stripe_subscription["id"])
     except Subscription.DoesNotExist:
         return
 
@@ -498,9 +493,33 @@ def _get_tax_id_type(country_code: str, vat_id: str) -> str | None:
     """
     # EU VAT numbers
     eu_countries = {
-        "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR",
-        "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL",
-        "PL", "PT", "RO", "SK", "SI", "ES", "SE",
+        "AT",
+        "BE",
+        "BG",
+        "HR",
+        "CY",
+        "CZ",
+        "DK",
+        "EE",
+        "FI",
+        "FR",
+        "DE",
+        "GR",
+        "HU",
+        "IE",
+        "IT",
+        "LV",
+        "LT",
+        "LU",
+        "MT",
+        "NL",
+        "PL",
+        "PT",
+        "RO",
+        "SK",
+        "SI",
+        "ES",
+        "SE",
     }
 
     if country_code in eu_countries:

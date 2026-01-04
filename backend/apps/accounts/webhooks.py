@@ -192,7 +192,9 @@ def stytch_webhook(request: HttpRequest) -> HttpResponse:
     action = event.get("action", "")
     object_type = event.get("object_type", "")
 
-    logger.info("Received Stytch webhook: %s (action=%s, object=%s)", event_type, action, object_type)
+    logger.info(
+        "Received Stytch webhook: %s (action=%s, object=%s)", event_type, action, object_type
+    )
 
     # Dispatch to handlers based on object_type and action
     try:
