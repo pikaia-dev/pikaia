@@ -47,7 +47,10 @@ uv run ruff check . && uv run ruff format . # Lint & format
 
 # Frontend
 pnpm dlx shadcn@latest add button dialog   # Add components
+pnpm generate-types                        # Regenerate API types from OpenAPI
 ```
+
+> **📌 Keep types updated:** Run `pnpm generate-types` in `frontend/` after any backend API changes to regenerate `src/lib/api-types.ts` from the Django Ninja OpenAPI spec.
 
 ---
 
