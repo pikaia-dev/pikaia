@@ -286,7 +286,7 @@ class AppStack(Stack):
 
         # Health check configuration
         self.fargate_service.target_group.configure_health_check(
-            path="/api/v1/health",
+            path="/api/v1/health/",
             healthy_http_codes="200",
             interval=Duration.seconds(30),
             timeout=Duration.seconds(5),

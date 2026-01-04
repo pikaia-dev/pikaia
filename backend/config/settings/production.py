@@ -77,6 +77,7 @@ if not ALLOWED_HOSTS:
 
 # Security settings (non-negotiables from RULES.md)
 SECURE_SSL_REDIRECT = True
+SECURE_REDIRECT_EXEMPT = [r"^api/v1/health$"]  # ALB health checks use HTTP
 SECURE_HSTS_SECONDS = 31536000  # 1 year
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
