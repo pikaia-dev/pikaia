@@ -1,7 +1,7 @@
 import "./App.css"
 
 import { useStytchMemberSession } from "@stytch/react/b2b"
-import { Navigate,Route, Routes } from "react-router-dom"
+import { Navigate, Route, Routes } from "react-router-dom"
 
 import { LoadingSpinner } from "./components/ui/loading-spinner"
 import AppLayout from "./layouts/AppLayout"
@@ -16,6 +16,7 @@ import ProfileSettings from "./pages/settings/ProfileSettings"
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, isInitialized } = useStytchMemberSession()
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isInitialized can be false
   if (!isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">

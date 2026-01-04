@@ -25,6 +25,11 @@ export default tseslint.config(
       ],
       "simple-import-sort/imports": "error",
       "simple-import-sort/exports": "error",
+      // Allow async functions in React event handlers (onClick, onSubmit, etc.)
+      "@typescript-eslint/no-misused-promises": [
+        "error",
+        { checksVoidReturn: { attributes: false } },
+      ],
     },
     languageOptions: {
       ecmaVersion: 2020,

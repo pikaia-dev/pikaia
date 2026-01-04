@@ -128,6 +128,7 @@ export function AddressAutocomplete({
         sessionToken: sessionTokenRef.current,
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- callback-based API
       autocompleteServiceRef.current.getPlacePredictions(
         request,
         (predictions, status) => {

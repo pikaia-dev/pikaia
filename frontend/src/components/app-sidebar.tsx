@@ -66,6 +66,7 @@ export function AppSidebar() {
   const handleLogout = async () => {
     try {
       await stytch.session.revoke()
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- navigate returns void
       navigate("/login", { replace: true })
     } catch (err) {
       console.error("Logout error:", err)
@@ -156,9 +157,11 @@ export function AppSidebar() {
                     />
                   ) : (
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-sm font-medium shrink-0">
+                      {/* eslint-disable @typescript-eslint/no-unnecessary-condition -- member properties can be undefined */}
                       {member?.name?.[0]?.toUpperCase() ||
                         member?.email_address?.[0]?.toUpperCase() ||
                         "?"}
+                      {/* eslint-enable @typescript-eslint/no-unnecessary-condition */}
                     </div>
                   )}
                   <div className="flex flex-1 flex-col text-left text-sm min-w-0">

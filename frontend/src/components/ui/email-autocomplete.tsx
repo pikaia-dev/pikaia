@@ -85,6 +85,7 @@ export function EmailAutocomplete({
   useEffect(() => {
     if (!suggestions.length) return
 
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- intentional fire-and-forget
     suggestions.forEach(async (user) => {
       if (!user.avatar_url || avatarUrls[user.email]) return
 

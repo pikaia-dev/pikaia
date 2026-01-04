@@ -12,12 +12,15 @@ export default function AuthCallback() {
   const navigate = useNavigate()
 
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isInitialized can be false
     if (!isInitialized) return
 
     if (session) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- navigate returns void
       navigate("/dashboard", { replace: true })
     } else {
       const currentUrl = new URL(window.location.href)
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- navigate returns void
       navigate(`/login${currentUrl.search}`, { replace: true })
     }
   }, [session, isInitialized, navigate])
