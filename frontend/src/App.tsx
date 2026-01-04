@@ -1,17 +1,23 @@
 import "./App.css"
 
 import { useStytchMemberSession } from "@stytch/react/b2b"
+import { lazy, Suspense } from "react"
 import { Navigate, Route, Routes } from "react-router-dom"
 
 import { LoadingSpinner } from "./components/ui/loading-spinner"
+import { SettingsSkeleton } from "./components/ui/skeleton"
 import AppLayout from "./layouts/AppLayout"
 import AuthCallback from "./pages/AuthCallback"
 import Dashboard from "./pages/Dashboard"
 import Login from "./pages/Login"
-import BillingSettings from "./pages/settings/BillingSettings"
-import MembersSettings from "./pages/settings/MembersSettings"
-import OrganizationSettings from "./pages/settings/OrganizationSettings"
-import ProfileSettings from "./pages/settings/ProfileSettings"
+
+// Lazy-load settings pages for code splitting
+const ProfileSettings = lazy(() => import("./pages/settings/ProfileSettings"))
+const OrganizationSettings = lazy(
+  () => import("./pages/settings/OrganizationSettings")
+)
+const MembersSettings = lazy(() => import("./pages/settings/MembersSettings"))
+const BillingSettings = lazy(() => import("./pages/settings/BillingSettings"))
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, isInitialized } = useStytchMemberSession()
@@ -47,13 +53,38 @@ function App() {
         }
       >
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/settings/profile" element={<ProfileSettings />} />
+        <Route
+          path="/settings/profile"
+          element={
+            <Suspense fallback={<SettingsSkeleton />}>
+              <ProfileSettings />
+            </Suspense>
+          }
+        />
         <Route
           path="/settings/organization"
-          element={<OrganizationSettings />}
+          element={
+            <Suspense fallback={<SettingsSkeleton />}>
+              <OrganizationSettings />
+            </Suspense>
+          }
         />
-        <Route path="/settings/members" element={<MembersSettings />} />
-        <Route path="/settings/billing" element={<BillingSettings />} />
+        <Route
+          path="/settings/members"
+          element={
+            <Suspense fallback={<SettingsSkeleton />}>
+              <MembersSettings />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/settings/billing"
+          element={
+            <Suspense fallback={<SettingsSkeleton />}>
+              <BillingSettings />
+            </Suspense>
+          }
+        />
         <Route
           path="/settings"
           element={<Navigate to="/settings/profile" replace />}
