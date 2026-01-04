@@ -9,7 +9,7 @@ import {
   User,
   Users,
 } from "lucide-react"
-import { useEffect,useState } from "react"
+import { useEffect, useState } from "react"
 import { NavLink, useNavigate } from "react-router-dom"
 
 import { useApi } from "../hooks/useApi"
@@ -52,7 +52,7 @@ export function AppSidebar() {
 
   // Fetch avatar from backend
   useEffect(() => {
-    getCurrentUser()
+    void getCurrentUser()
       .then((data) => { setAvatarUrl(data.user.avatar_url || null); })
       .catch(() => { setAvatarUrl(null); })
   }, [getCurrentUser])

@@ -285,10 +285,10 @@ export default function BillingSettings() {
                       <span className="font-medium">Pro Plan</span>
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${subscription.status === "active"
-                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                            : subscription.status === "past_due"
-                              ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                              : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
+                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                          : subscription.status === "past_due"
+                            ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                            : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
                           }`}
                       >
                         {subscription.status === "active"
@@ -307,8 +307,8 @@ export default function BillingSettings() {
                         <>
                           {" · "}
                           {subscription.cancel_at_period_end
-                            ? `Cancels ${formatDate(subscription.current_period_end)}`
-                            : `Renews ${formatDate(subscription.current_period_end)}`}
+                            ? `Cancels ${formatDate(subscription.current_period_end) ?? ""}`
+                            : `Renews ${formatDate(subscription.current_period_end) ?? ""}`}
                         </>
                       )}
                     </p>
@@ -661,10 +661,10 @@ export default function BillingSettings() {
                             <td className="py-3">
                               <span
                                 className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${invoice.status === "paid"
-                                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                    : invoice.status === "open"
-                                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                                      : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
+                                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                                  : invoice.status === "open"
+                                    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                                    : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
                                   }`}
                               >
                                 {invoice.status.charAt(0).toUpperCase() +

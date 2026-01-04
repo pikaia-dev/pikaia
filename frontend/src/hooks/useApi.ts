@@ -96,12 +96,12 @@ export function useApi() {
 
       updateMemberRole: (memberId: number, data: UpdateMemberRoleRequest) =>
         api.patch<MessageResponse>(
-          `/auth/organization/members/${memberId}`,
+          `/auth/organization/members/${String(memberId)}`,
           data
         ),
 
       deleteMember: (memberId: number) =>
-        api.delete<MessageResponse>(`/auth/organization/members/${memberId}`),
+        api.delete<MessageResponse>(`/auth/organization/members/${String(memberId)}`),
 
       // Billing
       getSubscription: () => api.get<SubscriptionInfo>("/billing/subscription"),
