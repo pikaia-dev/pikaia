@@ -1,5 +1,5 @@
-import { Building2,Upload, User, X } from "lucide-react"
-import { useCallback,useState } from "react"
+import { Building2, Upload, User, X } from "lucide-react"
+import { useCallback, useState } from "react"
 import { useDropzone } from "react-dropzone"
 import { toast } from "sonner"
 
@@ -64,14 +64,14 @@ export function ImageUploader({
       // Validate file size
       if (file.size > MEDIA_UPLOAD.MAX_SIZE_BYTES) {
         toast.error(
-          `File too large. Maximum size is ${MEDIA_UPLOAD.MAX_SIZE_MB}MB`
+          `File too large. Maximum size is ${String(MEDIA_UPLOAD.MAX_SIZE_MB)}MB`
         )
         return
       }
 
       // SVG files can't be cropped - upload directly
       if (file.type === "image/svg+xml") {
-        const filename = `${type}-${Date.now()}.svg`
+        const filename = `${type}-${String(Date.now())}.svg`
         await upload(file, filename)
         return
       }
@@ -103,7 +103,7 @@ export function ImageUploader({
 
     // Upload cropped image
     const ext = originalFilename.split(".").pop() || "png"
-    const filename = `${type}-${Date.now()}.${ext}`
+    const filename = `${type}-${String(Date.now())}.${ext}`
     await upload(croppedBlob, filename)
   }
 
