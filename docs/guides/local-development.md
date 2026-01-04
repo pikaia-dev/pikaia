@@ -125,6 +125,13 @@ uv run python manage.py setup_stripe
 # Development server
 pnpm dev
 
+# Run tests
+pnpm test         # Watch mode
+pnpm test run     # Single run
+
+# Regenerate API types from OpenAPI
+pnpm generate-types  # Requires backend running
+
 # Type check
 pnpm typecheck
 
