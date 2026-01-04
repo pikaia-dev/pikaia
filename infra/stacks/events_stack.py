@@ -29,6 +29,9 @@ from constructs import Construct
 # Path to Lambda functions directory
 FUNCTIONS_DIR = Path(__file__).parent.parent / "functions"
 
+# Lambda runtime versions (centralized for easier upgrades)
+PYTHON_RUNTIME = lambda_.Runtime.PYTHON_3_14
+
 
 class EventsStack(Stack):
     """
@@ -100,13 +103,13 @@ class EventsStack(Stack):
             self,
             "EventPublisher",
             function_name="tango-event-publisher",
-            runtime=lambda_.Runtime.PYTHON_3_12,
+            runtime=PYTHON_RUNTIME,
             handler="handler.handler",
             code=lambda_.Code.from_asset(
                 str(FUNCTIONS_DIR / "event-publisher"),
                 exclude=["tests", "__pycache__", "*.pyc"],
                 bundling={
-                    "image": lambda_.Runtime.PYTHON_3_12.bundling_image,
+                    "image": PYTHON_RUNTIME.bundling_image,
                     "command": [
                         "bash",
                         "-c",
