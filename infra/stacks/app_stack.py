@@ -238,6 +238,8 @@ class AppStack(Stack):
             protocol=listener_protocol,
             redirect_http=certificate is not None,
             health_check_grace_period=Duration.seconds(120),
+            min_healthy_percent=100,  # Keep all tasks running during deployment
+            max_healthy_percent=200,  # Allow 2x tasks during rolling update
         )
 
         # Auto-scaling

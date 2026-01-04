@@ -127,7 +127,11 @@ class EventsStack(Stack):
                 "MAX_ATTEMPTS": "10",
                 # DATABASE_URL injected from secret below
             },
-            log_retention=logs.RetentionDays.ONE_MONTH,
+            log_group=logs.LogGroup(
+                self,
+                "EventPublisherLogs",
+                retention=logs.RetentionDays.ONE_MONTH,
+            ),
             description="Publishes events from outbox table to EventBridge",
         )
 

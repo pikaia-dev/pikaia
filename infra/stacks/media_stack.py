@@ -94,7 +94,7 @@ class MediaStack(Stack):
 
             # Default behavior with both Lambda@Edge handlers
             default_behavior_config = cloudfront.BehaviorOptions(
-                origin=origins.S3Origin(
+                origin=origins.S3BucketOrigin.with_origin_access_identity(
                     self.bucket,
                     origin_access_identity=origin_access_identity,
                 ),
@@ -114,7 +114,7 @@ class MediaStack(Stack):
             )
         else:
             default_behavior_config = cloudfront.BehaviorOptions(
-                origin=origins.S3Origin(
+                origin=origins.S3BucketOrigin.with_origin_access_identity(
                     self.bucket,
                     origin_access_identity=origin_access_identity,
                 ),
