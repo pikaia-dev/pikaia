@@ -1,4 +1,4 @@
-import { useCallback,useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { PaymentForm } from "../../components/PaymentForm"
@@ -15,7 +15,7 @@ import { Checkbox } from "../../components/ui/checkbox"
 import { CountryCombobox } from "../../components/ui/country-combobox"
 import { LoadingSpinner } from "../../components/ui/loading-spinner"
 import { useApi } from "../../hooks/useApi"
-import type { BillingAddress, Invoice,SubscriptionInfo } from "../../lib/api"
+import type { BillingAddress, Invoice, SubscriptionInfo } from "../../lib/api"
 import {
   DEFAULT_COUNTRY,
   getPostalCodeLabel,
@@ -72,7 +72,7 @@ export default function BillingSettings() {
   }, [useBillingEmail])
 
   useEffect(() => {
-    Promise.all([getOrganization(), getSubscription()])
+    void Promise.all([getOrganization(), getSubscription()])
       .then(([orgData, subData]) => {
         setUseBillingEmail(orgData.billing.use_billing_email)
         setBillingEmail(orgData.billing.billing_email)
@@ -95,7 +95,7 @@ export default function BillingSettings() {
           setInvoices(data.invoices)
           setInvoicesHasMore(data.has_more)
         })
-        .catch((err) => {
+        .catch((err: unknown) => {
           console.error("Failed to load invoices:", err)
         })
         .finally(() => { setInvoicesLoading(false); })
@@ -284,13 +284,12 @@ export default function BillingSettings() {
                     <div className="flex items-center gap-2">
                       <span className="font-medium">Pro Plan</span>
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                          subscription.status === "active"
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${subscription.status === "active"
                             ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
                             : subscription.status === "past_due"
                               ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
                               : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
-                        }`}
+                          }`}
                       >
                         {subscription.status === "active"
                           ? "Active"
@@ -535,8 +534,7 @@ export default function BillingSettings() {
                     id="postalCode"
                     type="text"
                     value={address.postal_code}
-                    onChange={(e) =>
-                      { updateAddress("postal_code", e.target.value); }
+                    onChange={(e) => { updateAddress("postal_code", e.target.value); }
                     }
                     className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
@@ -579,8 +577,7 @@ export default function BillingSettings() {
                               ? vatId.slice(currentVatPrefix.length)
                               : vatId
                           }
-                          onChange={(e) =>
-                            { setVatId(currentVatPrefix + e.target.value); }
+                          onChange={(e) => { setVatId(currentVatPrefix + e.target.value); }
                           }
                           className="flex-1 px-3 py-2 border border-border rounded-r-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                           placeholder="123456789"
@@ -663,13 +660,12 @@ export default function BillingSettings() {
                             </td>
                             <td className="py-3">
                               <span
-                                className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                  invoice.status === "paid"
+                                className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${invoice.status === "paid"
                                     ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
                                     : invoice.status === "open"
                                       ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
                                       : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
-                                }`}
+                                  }`}
                               >
                                 {invoice.status.charAt(0).toUpperCase() +
                                   invoice.status.slice(1)}

@@ -122,8 +122,8 @@ export async function loadGooglePlacesScript(apiKey: string): Promise<void> {
 
   // Create a promise for the callback
   const callbackPromise = new Promise<void>((resolve) => {
-    ;(window as unknown as Record<string, unknown>)[CALLBACK_NAME] = () => {
-      delete (window as unknown as Record<string, unknown>)[CALLBACK_NAME]
+    ; (window as unknown as Record<string, unknown>)[CALLBACK_NAME] = () => {
+      Reflect.deleteProperty(window as unknown as Record<string, unknown>, CALLBACK_NAME)
       resolve()
     }
   })
@@ -137,7 +137,7 @@ export async function loadGooglePlacesScript(apiKey: string): Promise<void> {
 
   const errorPromise = new Promise<never>((_, reject) => {
     script.onerror = () => {
-      delete (window as unknown as Record<string, unknown>)[CALLBACK_NAME]
+      Reflect.deleteProperty(window as unknown as Record<string, unknown>, CALLBACK_NAME)
       reject(new Error("Failed to load Google Maps script"))
     }
   })

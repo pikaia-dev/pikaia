@@ -31,7 +31,7 @@ export default function Dashboard() {
     }
 
     if (session) {
-      fetchUser()
+      void fetchUser()
     }
   }, [session, getCurrentUser])
 
