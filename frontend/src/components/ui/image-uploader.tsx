@@ -157,7 +157,7 @@ export function ImageUploader({
           {value && !disabled && !isUploading && (
             <button
               type="button"
-              onClick={() => setDeleteDialogOpen(true)}
+              onClick={() => { setDeleteDialogOpen(true); }}
               className="absolute -top-1 -right-1 z-10 p-1 bg-muted-foreground/80 text-background rounded-full hover:bg-muted-foreground transition-colors shadow-sm cursor-pointer"
             >
               <X className="w-3 h-3" />

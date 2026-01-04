@@ -187,7 +187,7 @@ export default function MembersSettings() {
                 id="name"
                 type="text"
                 value={inviteName}
-                onChange={(e) => setInviteName(e.target.value)}
+                onChange={(e) => { setInviteName(e.target.value); }}
                 placeholder="Jane Doe"
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
@@ -199,7 +199,7 @@ export default function MembersSettings() {
               <Select
                 value={inviteRole}
                 onValueChange={(value) =>
-                  setInviteRole(value as "admin" | "member")
+                  { setInviteRole(value as "admin" | "member"); }
                 }
               >
                 <SelectTrigger className="w-full">
@@ -283,7 +283,7 @@ export default function MembersSettings() {
                         variant="ghost"
                         size="sm"
                         onClick={() =>
-                          openDeleteDialog(member.id, member.email)
+                          { openDeleteDialog(member.id, member.email); }
                         }
                         className="text-destructive hover:text-destructive"
                       >

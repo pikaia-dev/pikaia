@@ -231,7 +231,7 @@ export function PhoneNumberInput({
                   <CommandItem
                     key={c.code}
                     value={`${c.name} ${c.dialCode}`}
-                    onSelect={() => handleCountryChange(c.code)}
+                    onSelect={() => { handleCountryChange(c.code); }}
                   >
                     <span className="flex items-center gap-2 flex-1">
                       <span className="text-base">{c.flag}</span>

@@ -44,7 +44,7 @@ export default function OrganizationSettings() {
         setSlug(data.slug)
         setLogoUrl(data.logo_url || "")
       })
-      .finally(() => setLoading(false))
+      .finally(() => { setLoading(false); })
   }, [getOrganization])
 
   const handleNameChange = (newName: string) => {
@@ -130,7 +130,7 @@ export default function OrganizationSettings() {
                   id="name"
                   type="text"
                   value={name}
-                  onChange={(e) => handleNameChange(e.target.value)}
+                  onChange={(e) => { handleNameChange(e.target.value); }}
                   className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   placeholder="Your organization name"
                 />
@@ -147,7 +147,7 @@ export default function OrganizationSettings() {
                   id="slug"
                   type="text"
                   value={slug}
-                  onChange={(e) => handleSlugChange(e.target.value)}
+                  onChange={(e) => { handleSlugChange(e.target.value); }}
                   className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   placeholder="your-organization"
                 />
