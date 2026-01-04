@@ -8,7 +8,9 @@ https://aws.amazon.com/solutions/implementations/dynamic-image-transformation-fo
 from pathlib import Path
 
 from aws_cdk import (
+    BundlingOptions,
     CfnOutput,
+    DockerImage,
     Duration,
     RemovalPolicy,
     Stack,
@@ -31,7 +33,7 @@ class MediaStack(Stack):
     Features:
     - Private S3 bucket for image storage
     - CloudFront distribution for global CDN
-    - Lambda@Edge for on-the-fly image resizing (Thumbor-compatible URLs)
+    - Lambda@Edge for on-the-fly image resizing using Sharp (Thumbor-compatible URLs)
     - CORS configuration for frontend uploads
     """
 
@@ -84,12 +86,13 @@ class MediaStack(Stack):
         )
         self.bucket.grant_read(origin_access_identity)
 
-        # Configure default CloudFront behavior
+        # Configure CloudFront behavior based on image transformation setting
         if enable_image_transformation:
-            # Lambda@Edge for image transformation
-            transform_lambda = self._create_transform_lambda()
+            # Create both Lambda@Edge functions
+            origin_request_lambda = self._create_origin_request_lambda()
+            origin_response_lambda = self._create_origin_response_lambda()
 
-            # Add Lambda@Edge to default behavior for image paths
+            # Default behavior with both Lambda@Edge handlers
             default_behavior_config = cloudfront.BehaviorOptions(
                 origin=origins.S3Origin(
                     self.bucket,
@@ -97,11 +100,16 @@ class MediaStack(Stack):
                 ),
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                 cache_policy=cloudfront.CachePolicy.CACHING_OPTIMIZED,
+                origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
                 edge_lambdas=[
                     cloudfront.EdgeLambda(
-                        function_version=transform_lambda.current_version,
+                        function_version=origin_request_lambda.current_version,
                         event_type=cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
-                    )
+                    ),
+                    cloudfront.EdgeLambda(
+                        function_version=origin_response_lambda.current_version,
+                        event_type=cloudfront.LambdaEdgeEventType.ORIGIN_RESPONSE,
+                    ),
                 ],
             )
         else:
@@ -148,27 +156,68 @@ class MediaStack(Stack):
             export_name="TangoImageTransformUrl",
         )
 
-    def _create_transform_lambda(self) -> lambda_.Function:
+    def _create_origin_request_lambda(self) -> lambda_.Function:
         """
-        Create Lambda@Edge function for image transformation.
+        Create Lambda@Edge function for Origin Request (URL rewriting).
 
-        Uses Sharp library for image processing with Thumbor-compatible URL format:
-        - /{width}x{height}/{key} - Resize to exact dimensions
-        - /fit-in/{width}x{height}/{key} - Fit within dimensions (maintain aspect)
+        This is a lightweight function that only parses URLs and sets headers.
+        No external dependencies needed.
         """
-        # Lambda@Edge must be in us-east-1
         fn = lambda_.Function(
             self,
-            "ImageTransformLambda",
+            "OriginRequestLambda",
             runtime=lambda_.Runtime.NODEJS_20_X,
-            handler="index.handler",
-            code=lambda_.Code.from_asset(str(FUNCTIONS_DIR / "image-transform")),
-            timeout=Duration.seconds(30),
-            memory_size=512,  # Sufficient for URL parsing; increase when adding Sharp
-            description="Image transformation Lambda@Edge for CloudFront",
+            handler="index.originRequestHandler",
+            code=lambda_.Code.from_asset(
+                str(FUNCTIONS_DIR / "image-transform"),
+                exclude=["node_modules", "__tests__", "*.test.js"],
+            ),
+            timeout=Duration.seconds(5),
+            memory_size=128,
+            description="URL rewriting for image transformation (Origin Request)",
         )
 
-        # Grant S3 read access
+        return fn
+
+    def _create_origin_response_lambda(self) -> lambda_.Function:
+        """
+        Create Lambda@Edge function for Origin Response (image transformation).
+
+        Uses Sharp library for image processing. Requires Docker bundling
+        to compile native binaries for Amazon Linux.
+        """
+        fn = lambda_.Function(
+            self,
+            "OriginResponseLambda",
+            runtime=lambda_.Runtime.NODEJS_20_X,
+            handler="index.handler",
+            code=lambda_.Code.from_asset(
+                str(FUNCTIONS_DIR / "image-transform"),
+                bundling=BundlingOptions(
+                    image=DockerImage.from_registry(
+                        "public.ecr.aws/sam/build-nodejs20.x:latest"
+                    ),
+                    command=[
+                        "bash",
+                        "-c",
+                        " && ".join(
+                            [
+                                "npm ci --omit=dev",
+                                "cp -r . /asset-output/",
+                                "rm -rf /asset-output/node_modules/.cache",
+                                "rm -rf /asset-output/__tests__",
+                            ]
+                        ),
+                    ],
+                    user="root",
+                ),
+            ),
+            timeout=Duration.seconds(30),
+            memory_size=1024,  # Sharp needs more memory for image processing
+            description="Image transformation using Sharp (Origin Response)",
+        )
+
+        # Grant S3 read access for fetching original images
         self.bucket.grant_read(fn)
 
         return fn
