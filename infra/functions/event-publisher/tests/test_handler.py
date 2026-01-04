@@ -3,11 +3,16 @@ Tests for standalone Lambda event publisher.
 """
 
 import importlib
-import pytest
+import sys
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-import apps.events.lambda_handler as lh
+import pytest
+
+# Add the parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+import handler as lh
 
 
 @pytest.fixture
@@ -52,8 +57,8 @@ class TestLambdaPublishPendingEvents:
     def test_publish_pending_events_success(self, mock_env, sample_events):
         """Test successful event publishing."""
         with (
-            patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2,
-            patch("apps.events.lambda_handler.boto3") as mock_boto3,
+            patch("handler.psycopg2") as mock_psycopg2,
+            patch("handler.boto3") as mock_boto3,
         ):
             # Mock database connection context manager
             mock_conn = MagicMock()
@@ -79,8 +84,8 @@ class TestLambdaPublishPendingEvents:
     def test_no_pending_events(self, mock_env):
         """Test with no pending events."""
         with (
-            patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2,
-            patch("apps.events.lambda_handler.boto3"),
+            patch("handler.psycopg2") as mock_psycopg2,
+            patch("handler.boto3"),
         ):
             mock_conn = MagicMock()
             mock_cursor = MagicMock()
@@ -95,8 +100,8 @@ class TestLambdaPublishPendingEvents:
     def test_eventbridge_per_entry_errors(self, mock_env, sample_events):
         """Test handling of per-entry EventBridge errors."""
         with (
-            patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2,
-            patch("apps.events.lambda_handler.boto3") as mock_boto3,
+            patch("handler.psycopg2") as mock_psycopg2,
+            patch("handler.boto3") as mock_boto3,
         ):
             mock_conn = MagicMock()
             mock_cursor = MagicMock()
@@ -126,8 +131,8 @@ class TestLambdaHandler:
     def test_handler_returns_success(self, mock_env, sample_events):
         """Test handler returns 200 on success."""
         with (
-            patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2,
-            patch("apps.events.lambda_handler.boto3") as mock_boto3,
+            patch("handler.psycopg2") as mock_psycopg2,
+            patch("handler.boto3") as mock_boto3,
         ):
             mock_conn = MagicMock()
             mock_cursor = MagicMock()
@@ -149,8 +154,8 @@ class TestLambdaHandler:
     def test_handler_no_events(self, mock_env):
         """Test handler with no pending events."""
         with (
-            patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2,
-            patch("apps.events.lambda_handler.boto3"),
+            patch("handler.psycopg2") as mock_psycopg2,
+            patch("handler.boto3"),
         ):
             mock_conn = MagicMock()
             mock_cursor = MagicMock()
@@ -181,7 +186,7 @@ class TestLambdaHandler:
 
     def test_handler_database_error(self, mock_env):
         """Test handler handles database connection errors."""
-        with patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2:
+        with patch("handler.psycopg2") as mock_psycopg2:
             mock_psycopg2.connect.side_effect = Exception("Connection refused")
 
             result = lh.handler({}, None)

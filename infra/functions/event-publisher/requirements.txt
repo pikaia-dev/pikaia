@@ -1,0 +1,10 @@
+# Event Publisher Lambda Dependencies
+#
+# This Lambda runs outside Django, directly connecting to PostgreSQL
+# and publishing to EventBridge.
+#
+# For deployment, use a Lambda layer or bundle with:
+#   pip install -r requirements.txt -t .
+
+boto3>=1.35.0
+psycopg2-binary>=2.9.9

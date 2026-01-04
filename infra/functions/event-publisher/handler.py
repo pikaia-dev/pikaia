@@ -4,7 +4,9 @@ Standalone Lambda handler for the event publisher.
 This is a lightweight publisher that doesn't require Django.
 It queries the outbox table directly and publishes to EventBridge.
 
-Triggered by Aurora PostgreSQL trigger on INSERT to outbox table.
+Triggered by:
+- Aurora PostgreSQL trigger on INSERT to outbox table (production)
+- CloudWatch scheduled event (fallback polling)
 """
 
 import json
@@ -30,7 +32,8 @@ def handler(event: dict, context) -> dict:
     """
     Lambda entry point for event publishing.
 
-    Triggered by Aurora PostgreSQL trigger when events are inserted.
+    Triggered by Aurora PostgreSQL trigger when events are inserted,
+    or by CloudWatch Events as a fallback polling mechanism.
     """
     if not DATABASE_URL:
         logger.error("DATABASE_URL not configured")
