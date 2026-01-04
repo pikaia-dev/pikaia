@@ -11,7 +11,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "preview": "vite preview",
-    "test": "vitest"
+    "test": "vitest",
+    "generate-types": "curl -s http://localhost:8000/api/v1/openapi.json > src/lib/api-schema.json && openapi-typescript src/lib/api-schema.json -o src/lib/api-types.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -64,6 +65,7 @@
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "globals": "^16.5.0",
     "jsdom": "^27.4.0",
+    "openapi-typescript": "^7.10.1",
     "postcss": "^8.5.6",
     "prettier": "^3.7.4",
     "tailwindcss": "^4.1.18",
