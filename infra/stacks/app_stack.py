@@ -125,18 +125,12 @@ class AppStack(Stack):
             container_insights_v2=ecs.ContainerInsights.ENABLED,
         )
 
-        # ECR repository for Django app
-        self.ecr_repository = ecr.Repository(
+        # ECR repository for Django app (import existing or create new)
+        # Using from_repository_name to handle retained repositories from previous deployments
+        self.ecr_repository = ecr.Repository.from_repository_name(
             self,
             "TangoBackendRepo",
             repository_name="tango-backend",
-            removal_policy=RemovalPolicy.RETAIN,
-            lifecycle_rules=[
-                ecr.LifecycleRule(
-                    max_image_count=10,
-                    description="Keep only 10 most recent images",
-                )
-            ],
         )
 
         # =================================================================
