@@ -28,6 +28,7 @@ from stacks.app_stack import AppStack
 from stacks.events_stack import EventsStack
 from stacks.media_stack import MediaStack
 from stacks.network_stack import NetworkStack
+from stacks.validation import add_validation_aspects
 
 app = cdk.App()
 
@@ -98,5 +99,13 @@ events_stack = EventsStack(
     env=env,
 )
 events_stack.add_dependency(app_stack)
+
+# =============================================================================
+# Validation: Pre-deployment checks
+# =============================================================================
+# These aspects run during `cdk synth` and add warnings/errors for:
+# - Production readiness (HA, deletion protection)
+# - Security (S3 public access, encryption)
+add_validation_aspects(app)
 
 app.synth()
