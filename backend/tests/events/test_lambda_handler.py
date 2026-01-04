@@ -3,9 +3,7 @@ Tests for standalone Lambda event publisher.
 """
 
 import importlib
-import json
 import pytest
-from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
@@ -53,9 +51,10 @@ class TestLambdaPublishPendingEvents:
 
     def test_publish_pending_events_success(self, mock_env, sample_events):
         """Test successful event publishing."""
-        with patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2, \
-             patch("apps.events.lambda_handler.boto3") as mock_boto3:
-
+        with (
+            patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2,
+            patch("apps.events.lambda_handler.boto3") as mock_boto3,
+        ):
             # Mock database connection context manager
             mock_conn = MagicMock()
             mock_cursor = MagicMock()
@@ -79,9 +78,10 @@ class TestLambdaPublishPendingEvents:
 
     def test_no_pending_events(self, mock_env):
         """Test with no pending events."""
-        with patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2, \
-             patch("apps.events.lambda_handler.boto3"):
-
+        with (
+            patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2,
+            patch("apps.events.lambda_handler.boto3"),
+        ):
             mock_conn = MagicMock()
             mock_cursor = MagicMock()
             mock_psycopg2.connect.return_value.__enter__.return_value = mock_conn
@@ -94,9 +94,10 @@ class TestLambdaPublishPendingEvents:
 
     def test_eventbridge_per_entry_errors(self, mock_env, sample_events):
         """Test handling of per-entry EventBridge errors."""
-        with patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2, \
-             patch("apps.events.lambda_handler.boto3") as mock_boto3:
-
+        with (
+            patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2,
+            patch("apps.events.lambda_handler.boto3") as mock_boto3,
+        ):
             mock_conn = MagicMock()
             mock_cursor = MagicMock()
             mock_psycopg2.connect.return_value.__enter__.return_value = mock_conn
@@ -124,9 +125,10 @@ class TestLambdaHandler:
 
     def test_handler_returns_success(self, mock_env, sample_events):
         """Test handler returns 200 on success."""
-        with patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2, \
-             patch("apps.events.lambda_handler.boto3") as mock_boto3:
-
+        with (
+            patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2,
+            patch("apps.events.lambda_handler.boto3") as mock_boto3,
+        ):
             mock_conn = MagicMock()
             mock_cursor = MagicMock()
             mock_psycopg2.connect.return_value.__enter__.return_value = mock_conn
@@ -146,9 +148,10 @@ class TestLambdaHandler:
 
     def test_handler_no_events(self, mock_env):
         """Test handler with no pending events."""
-        with patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2, \
-             patch("apps.events.lambda_handler.boto3"):
-
+        with (
+            patch("apps.events.lambda_handler.psycopg2") as mock_psycopg2,
+            patch("apps.events.lambda_handler.boto3"),
+        ):
             mock_conn = MagicMock()
             mock_cursor = MagicMock()
             mock_psycopg2.connect.return_value.__enter__.return_value = mock_conn

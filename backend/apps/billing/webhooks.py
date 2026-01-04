@@ -6,7 +6,6 @@ This is a separate view (not Django Ninja) for raw request handling
 needed to verify Stripe signatures.
 """
 
-import json
 import logging
 
 import stripe

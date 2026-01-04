@@ -111,7 +111,7 @@ def confirm_upload(request: HttpRequest, payload: ConfirmUploadSchema) -> ImageR
 
     # Sanitize SVG files to prevent XSS (for S3 presigned uploads)
     if metadata.content_type == "image/svg+xml":
-        from apps.media.svg_sanitizer import SVGSanitizationError, sanitize_svg
+        from apps.media.svg_sanitizer import SVGSanitizationError
 
         try:
             # Download, sanitize, and re-upload

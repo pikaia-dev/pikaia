@@ -65,4 +65,3 @@ api.add_router("/media", media_router)
 def health_check(request: HttpRequest) -> dict:
     """Health check endpoint for load balancer."""
     return {"status": "ok"}
-

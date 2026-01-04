@@ -2,8 +2,6 @@
 Tests for billing models.
 """
 
-from datetime import datetime, timedelta, timezone
-
 import pytest
 
 from apps.billing.models import Subscription
@@ -64,7 +62,7 @@ class TestSubscriptionConstraints:
     def test_stripe_subscription_id_is_unique(self) -> None:
         """Should enforce unique constraint on stripe_subscription_id."""
         sub1 = SubscriptionFactory(stripe_subscription_id="sub_same_id")
-        
+
         with pytest.raises(Exception):  # IntegrityError wrapped
             SubscriptionFactory(
                 stripe_subscription_id="sub_same_id",
@@ -73,7 +71,7 @@ class TestSubscriptionConstraints:
     def test_one_subscription_per_org(self) -> None:
         """Should enforce OneToOne relationship with organization."""
         sub = SubscriptionFactory()
-        
+
         with pytest.raises(Exception):  # IntegrityError wrapped
             SubscriptionFactory(
                 organization=sub.organization,
@@ -100,8 +98,8 @@ class TestSubscriptionTimestamps:
         """Should update updated_at on each save."""
         sub = SubscriptionFactory()
         original_updated = sub.updated_at
-        
+
         sub.status = Subscription.Status.PAST_DUE
         sub.save()
-        
+
         assert sub.updated_at > original_updated

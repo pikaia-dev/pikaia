@@ -4,7 +4,6 @@ Tests for billing services.
 All Stripe API calls are mocked to isolate tests from external dependencies.
 """
 
-from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -132,9 +131,7 @@ class TestCreateCheckoutSession:
 
     @patch("apps.billing.services.get_or_create_stripe_customer")
     @patch("apps.billing.services.get_stripe")
-    def test_creates_session_with_correct_params(
-        self, mock_get_stripe, mock_get_customer
-    ) -> None:
+    def test_creates_session_with_correct_params(self, mock_get_stripe, mock_get_customer) -> None:
         """Should create checkout session with correct parameters."""
         mock_stripe = MagicMock()
         mock_get_stripe.return_value = mock_stripe
@@ -169,7 +166,7 @@ class TestCreateSubscriptionIntent:
         mock_stripe = MagicMock()
         mock_get_stripe.return_value = mock_stripe
         mock_get_customer.return_value = "cus_test"
-        
+
         # Mock nested response structure for Stripe 2025 API
         mock_subscription = MagicMock()
         mock_subscription.id = "sub_test_123"
@@ -182,7 +179,7 @@ class TestCreateSubscriptionIntent:
 
         assert client_secret == "pi_secret_test"
         assert sub_id == "sub_test_123"
-        
+
         call_kwargs = mock_stripe.Subscription.create.call_args[1]
         assert call_kwargs["payment_behavior"] == "default_incomplete"
         assert call_kwargs["items"][0]["quantity"] == 3
@@ -194,9 +191,7 @@ class TestSyncSubscriptionFromStripe:
 
     @patch("apps.billing.services.handle_subscription_created")
     @patch("apps.billing.services.get_stripe")
-    def test_syncs_active_subscription(
-        self, mock_get_stripe, mock_handle_created
-    ) -> None:
+    def test_syncs_active_subscription(self, mock_get_stripe, mock_handle_created) -> None:
         """Should return True for active subscription."""
         mock_stripe = MagicMock()
         mock_get_stripe.return_value = mock_stripe
@@ -251,7 +246,6 @@ class TestSyncSubscriptionQuantity:
     @patch("apps.billing.services.get_stripe")
     def test_skips_when_quantity_matches(self, mock_get_stripe) -> None:
         """Should do nothing when member count matches subscription quantity."""
-        from apps.accounts.models import Member
         from tests.accounts.factories import MemberFactory
 
         sub = SubscriptionFactory(quantity=2)
@@ -278,9 +272,7 @@ class TestCreateCustomerPortalSession:
 
         org = OrganizationFactory(stripe_customer_id="cus_test")
 
-        url = create_customer_portal_session(
-            org=org, return_url="https://example.com/billing"
-        )
+        url = create_customer_portal_session(org=org, return_url="https://example.com/billing")
 
         assert url == "https://billing.stripe.com/portal"
 
@@ -299,7 +291,7 @@ class TestHandleSubscriptionCreated:
     def test_creates_subscription_from_stripe_data(self) -> None:
         """Should create local subscription from Stripe webhook data."""
         org = OrganizationFactory()
-        
+
         stripe_data = {
             "id": "sub_webhook_123",
             "status": "active",
@@ -307,11 +299,7 @@ class TestHandleSubscriptionCreated:
                 "start": 1704067200,  # 2024-01-01
                 "end": 1706745600,  # 2024-02-01
             },
-            "items": {
-                "data": [
-                    {"price": {"id": "price_test"}, "quantity": 5}
-                ]
-            },
+            "items": {"data": [{"price": {"id": "price_test"}, "quantity": 5}]},
             "cancel_at_period_end": False,
             "metadata": {"organization_id": str(org.id)},
         }
@@ -326,7 +314,7 @@ class TestHandleSubscriptionCreated:
     def test_handles_legacy_period_format(self) -> None:
         """Should handle old Stripe API format with flat period fields."""
         org = OrganizationFactory()
-        
+
         stripe_data = {
             "id": "sub_legacy_123",
             "status": "active",
@@ -364,7 +352,7 @@ class TestHandleSubscriptionCreated:
             status=Subscription.Status.INCOMPLETE,
             quantity=1,
         )
-        
+
         stripe_data = {
             "id": "sub_existing",
             "status": "active",
@@ -393,7 +381,7 @@ class TestHandleSubscriptionUpdated:
             status=Subscription.Status.ACTIVE,
             quantity=1,
         )
-        
+
         stripe_data = {
             "id": "sub_update_test",
             "status": "past_due",
@@ -412,7 +400,7 @@ class TestHandleSubscriptionUpdated:
     def test_creates_subscription_if_not_exists(self) -> None:
         """Should create subscription via handle_subscription_created if not found."""
         org = OrganizationFactory()
-        
+
         stripe_data = {
             "id": "sub_new_from_update",
             "status": "active",
@@ -437,7 +425,7 @@ class TestHandleSubscriptionDeleted:
             stripe_subscription_id="sub_delete_test",
             status=Subscription.Status.ACTIVE,
         )
-        
+
         stripe_data = {"id": "sub_delete_test"}
 
         handle_subscription_deleted(stripe_data)

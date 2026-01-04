@@ -100,9 +100,7 @@ class TestSearchDirectoryUsers:
         assert result == []
 
     @patch("apps.accounts.google_directory.get_google_access_token")
-    def test_returns_empty_list_when_no_oauth_token(
-        self, mock_get_token: MagicMock
-    ) -> None:
+    def test_returns_empty_list_when_no_oauth_token(self, mock_get_token: MagicMock) -> None:
         """Should return empty list when user has no Google OAuth token."""
         mock_get_token.return_value = None
 
@@ -180,9 +178,7 @@ class TestSearchDirectoryUsers:
         user_no_domain = UserFactory(email="invalid-email")
         MemberFactory(user=user_no_domain, organization=self.org, role="member")
 
-        with patch(
-            "apps.accounts.google_directory.get_google_access_token"
-        ) as mock_get_token:
+        with patch("apps.accounts.google_directory.get_google_access_token") as mock_get_token:
             mock_get_token.return_value = "google-access-token"
             result = search_directory_users(user_no_domain, "query")
 

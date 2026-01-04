@@ -26,4 +26,3 @@ def get_stripe() -> stripe:
     """
     configure_stripe()
     return stripe
-

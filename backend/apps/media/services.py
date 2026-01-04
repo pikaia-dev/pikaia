@@ -45,9 +45,7 @@ class StorageService:
     """
 
     # Upload limits from settings
-    MAX_IMAGE_SIZE_BYTES: int = getattr(
-        settings, "MEDIA_MAX_IMAGE_SIZE_BYTES", 10 * 1024 * 1024
-    )
+    MAX_IMAGE_SIZE_BYTES: int = getattr(settings, "MEDIA_MAX_IMAGE_SIZE_BYTES", 10 * 1024 * 1024)
     ALLOWED_CONTENT_TYPES: set[str] = set(
         getattr(
             settings,

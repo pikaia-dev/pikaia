@@ -3,7 +3,6 @@ Tests for event backends.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
 from uuid import uuid4
 from datetime import datetime, timezone
 
@@ -86,9 +85,7 @@ class TestEventBridgeBackend:
             mock_boto3 = sys.modules["boto3"]
             mock_client = MagicMock()
             mock_boto3.client.return_value = mock_client
-            mock_client.put_events.return_value = {
-                "Entries": [{"EventId": "eb-123"}]
-            }
+            mock_client.put_events.return_value = {"Entries": [{"EventId": "eb-123"}]}
 
             backend = EventBridgeBackend(event_bus_name="test-bus")
             backend._client = mock_client  # Inject mock directly

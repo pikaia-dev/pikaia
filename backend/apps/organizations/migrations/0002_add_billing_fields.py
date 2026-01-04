@@ -4,55 +4,60 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('organizations', '0001_initial'),
+        ("organizations", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='organization',
-            name='billing_address_line1',
+            model_name="organization",
+            name="billing_address_line1",
             field=models.CharField(blank=True, max_length=255),
         ),
         migrations.AddField(
-            model_name='organization',
-            name='billing_address_line2',
+            model_name="organization",
+            name="billing_address_line2",
             field=models.CharField(blank=True, max_length=255),
         ),
         migrations.AddField(
-            model_name='organization',
-            name='billing_city',
+            model_name="organization",
+            name="billing_city",
             field=models.CharField(blank=True, max_length=100),
         ),
         migrations.AddField(
-            model_name='organization',
-            name='billing_country',
-            field=models.CharField(blank=True, help_text='ISO 3166-1 alpha-2 country code', max_length=2),
+            model_name="organization",
+            name="billing_country",
+            field=models.CharField(
+                blank=True, help_text="ISO 3166-1 alpha-2 country code", max_length=2
+            ),
         ),
         migrations.AddField(
-            model_name='organization',
-            name='billing_email',
-            field=models.EmailField(blank=True, help_text='Email for invoices', max_length=254),
+            model_name="organization",
+            name="billing_email",
+            field=models.EmailField(blank=True, help_text="Email for invoices", max_length=254),
         ),
         migrations.AddField(
-            model_name='organization',
-            name='billing_name',
-            field=models.CharField(blank=True, help_text='Legal/company name for invoices', max_length=255),
+            model_name="organization",
+            name="billing_name",
+            field=models.CharField(
+                blank=True, help_text="Legal/company name for invoices", max_length=255
+            ),
         ),
         migrations.AddField(
-            model_name='organization',
-            name='billing_postal_code',
+            model_name="organization",
+            name="billing_postal_code",
             field=models.CharField(blank=True, max_length=20),
         ),
         migrations.AddField(
-            model_name='organization',
-            name='billing_state',
+            model_name="organization",
+            name="billing_state",
             field=models.CharField(blank=True, max_length=100),
         ),
         migrations.AddField(
-            model_name='organization',
-            name='vat_id',
-            field=models.CharField(blank=True, help_text="EU VAT number, e.g. 'DE123456789'", max_length=50),
+            model_name="organization",
+            name="vat_id",
+            field=models.CharField(
+                blank=True, help_text="EU VAT number, e.g. 'DE123456789'", max_length=50
+            ),
         ),
     ]

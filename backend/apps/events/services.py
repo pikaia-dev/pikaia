@@ -2,7 +2,6 @@
 Event services - publishing events via transactional outbox.
 """
 
-import json
 import logging
 from datetime import datetime, timezone
 from typing import Any

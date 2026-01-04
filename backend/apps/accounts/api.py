@@ -66,7 +66,6 @@ router = Router(tags=["auth"])
 bearer_auth = BearerAuth()
 
 
-
 @router.post(
     "/magic-link/send",
     response={200: MessageResponse, 400: ErrorResponse},
@@ -511,7 +510,9 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
     operation_id="startEmailUpdate",
     summary="Start email address update flow",
 )
-def start_email_update(request: HttpRequest, payload: StartEmailUpdateRequest) -> EmailUpdateResponse:
+def start_email_update(
+    request: HttpRequest, payload: StartEmailUpdateRequest
+) -> EmailUpdateResponse:
     """
     Initiate email address change.
 
@@ -746,7 +747,12 @@ def list_members(request: HttpRequest) -> MemberListResponse:
 
 @router.post(
     "/organization/members",
-    response={200: InviteMemberResponse, 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse},
+    response={
+        200: InviteMemberResponse,
+        400: ErrorResponse,
+        401: ErrorResponse,
+        403: ErrorResponse,
+    },
     auth=bearer_auth,
     operation_id="inviteMember",
     summary="Invite a new member",
@@ -807,7 +813,13 @@ def invite_member_endpoint(
 
 @router.patch(
     "/organization/members/{member_id}",
-    response={200: MessageResponse, 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse},
+    response={
+        200: MessageResponse,
+        400: ErrorResponse,
+        401: ErrorResponse,
+        403: ErrorResponse,
+        404: ErrorResponse,
+    },
     auth=bearer_auth,
     operation_id="updateMemberRole",
     summary="Update member role",
@@ -862,7 +874,13 @@ def update_member_role_endpoint(
 
 @router.delete(
     "/organization/members/{member_id}",
-    response={200: MessageResponse, 400: ErrorResponse, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse},
+    response={
+        200: MessageResponse,
+        400: ErrorResponse,
+        401: ErrorResponse,
+        403: ErrorResponse,
+        404: ErrorResponse,
+    },
     auth=bearer_auth,
     operation_id="deleteMember",
     summary="Remove member from organization",

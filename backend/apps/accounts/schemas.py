@@ -184,7 +184,9 @@ class MemberInfo(BaseModel):
 
     id: int = Field(..., description="Local database member ID")
     stytch_member_id: str = Field(..., description="Stytch member ID")
-    role: str = Field(..., description="Member's role within the organization (e.g., admin, member)")
+    role: str = Field(
+        ..., description="Member's role within the organization (e.g., admin, member)"
+    )
     is_admin: bool = Field(..., description="Whether the member has admin privileges")
 
 
@@ -241,7 +243,9 @@ class MessageResponse(BaseModel):
 
     message: str = Field(..., description="Human-readable status message")
 
-    model_config = {"json_schema_extra": {"example": {"message": "Operation completed successfully."}}}
+    model_config = {
+        "json_schema_extra": {"example": {"message": "Operation completed successfully."}}
+    }
 
 
 # --- Settings Schemas ---
@@ -476,9 +480,7 @@ class MemberListItem(BaseModel):
 class MemberListResponse(BaseModel):
     """Response containing list of organization members."""
 
-    members: list[MemberListItem] = Field(
-        ..., description="List of active organization members"
-    )
+    members: list[MemberListItem] = Field(..., description="List of active organization members")
 
 
 class InviteMemberResponse(BaseModel):

@@ -9,7 +9,6 @@ import logging
 import random
 import signal
 import time
-from datetime import timedelta
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -71,9 +70,7 @@ class Command(BaseCommand):
 
         while not self._shutdown_requested:
             try:
-                published_count = self._publish_batch(
-                    backend, batch_size, max_attempts
-                )
+                published_count = self._publish_batch(backend, batch_size, max_attempts)
 
                 if published_count > 0:
                     logger.info("Published %d events", published_count)
@@ -109,9 +106,7 @@ class Command(BaseCommand):
             events = list(
                 OutboxEvent.objects.select_for_update(skip_locked=True)
                 .filter(status=OutboxEvent.Status.PENDING)
-                .filter(
-                    Q(next_attempt_at__isnull=True) | Q(next_attempt_at__lte=now)
-                )
+                .filter(Q(next_attempt_at__isnull=True) | Q(next_attempt_at__lte=now))
                 .order_by("created_at")[:batch_size]
             )
 
@@ -125,9 +120,7 @@ class Command(BaseCommand):
                 envelope = EventEnvelope(**event.payload)
                 envelopes.append(envelope)
             except Exception as e:
-                logger.error(
-                    "Failed to parse event %s payload: %s", event.event_id, e
-                )
+                logger.error("Failed to parse event %s payload: %s", event.event_id, e)
                 event.mark_failed(f"Payload parse error: {e}", max_attempts)
                 continue
 
@@ -148,9 +141,7 @@ class Command(BaseCommand):
             else:
                 error = result.get("error", "Unknown error")
                 event.mark_failed(error, max_attempts)
-                logger.warning(
-                    "Failed to publish event %s: %s", event.event_id, error
-                )
+                logger.warning("Failed to publish event %s: %s", event.event_id, error)
 
         return published_count
 

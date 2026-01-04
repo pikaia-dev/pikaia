@@ -5,7 +5,6 @@ LocalBackend: Logs events to console (dev)
 EventBridgeBackend: Publishes to AWS EventBridge (production)
 """
 
-import json
 import logging
 from abc import ABC, abstractmethod
 from typing import Any

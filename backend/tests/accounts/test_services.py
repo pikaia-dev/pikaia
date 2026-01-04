@@ -374,9 +374,7 @@ class TestInviteMember:
 
     @patch("apps.accounts.stytch_client.get_stytch_client")
     @patch("apps.billing.services.sync_subscription_quantity")
-    def test_invites_new_member(
-        self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
-    ) -> None:
+    def test_invites_new_member(self, mock_sync_qty: MagicMock, mock_stytch: MagicMock) -> None:
         """Should create a new member via Stytch and sync locally."""
         org = OrganizationFactory()
 
@@ -410,9 +408,7 @@ class TestInviteMember:
 
     @patch("apps.accounts.stytch_client.get_stytch_client")
     @patch("apps.billing.services.sync_subscription_quantity")
-    def test_invites_admin_member(
-        self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
-    ) -> None:
+    def test_invites_admin_member(self, mock_sync_qty: MagicMock, mock_stytch: MagicMock) -> None:
         """Should create admin member and set role in Stytch."""
         org = OrganizationFactory()
 
@@ -526,9 +522,7 @@ class TestInviteMember:
         mock_client = MagicMock()
         mock_stytch.return_value = mock_client
         mock_client.organizations.members.search.return_value = MagicMock(members=[])
-        mock_client.magic_links.email.invite.return_value = MagicMock(
-            member_id="new-member-123"
-        )
+        mock_client.magic_links.email.invite.return_value = MagicMock(member_id="new-member-123")
 
         invite_member(organization=org, email="sync@example.com")
 
@@ -595,9 +589,7 @@ class TestSoftDeleteMember:
 
     @patch("apps.accounts.stytch_client.get_stytch_client")
     @patch("apps.billing.services.sync_subscription_quantity")
-    def test_soft_deletes_locally(
-        self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
-    ) -> None:
+    def test_soft_deletes_locally(self, mock_sync_qty: MagicMock, mock_stytch: MagicMock) -> None:
         """Should soft delete member locally (set deleted_at)."""
         member = MemberFactory()
         member_id = member.id
@@ -613,9 +605,7 @@ class TestSoftDeleteMember:
 
     @patch("apps.accounts.stytch_client.get_stytch_client")
     @patch("apps.billing.services.sync_subscription_quantity")
-    def test_deletes_from_stytch(
-        self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
-    ) -> None:
+    def test_deletes_from_stytch(self, mock_sync_qty: MagicMock, mock_stytch: MagicMock) -> None:
         """Should delete member from Stytch."""
         member = MemberFactory()
         org_stytch_id = member.organization.stytch_org_id
@@ -665,4 +655,3 @@ class TestSoftDeleteMember:
         assert Member.objects.filter(organization=org).count() == 0
         # But should exist in all_objects
         assert Member.all_objects.filter(organization=org).count() == 1
-

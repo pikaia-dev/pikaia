@@ -147,9 +147,7 @@ class TestCreateCheckout:
 
         assert exc_info.value.status_code == 403
 
-    def test_already_subscribed_returns_400(
-        self, request_factory: RequestFactory
-    ) -> None:
+    def test_already_subscribed_returns_400(self, request_factory: RequestFactory) -> None:
         """Should return 400 if org already has active subscription."""
         sub = SubscriptionFactory(status=Subscription.Status.ACTIVE)
         org = sub.organization
@@ -232,8 +230,7 @@ class TestCreateSubscriptionIntent:
         org = OrganizationFactory()
 
         request = _create_authenticated_request(
-            request_factory, "post", "/api/v1/billing/subscription-intent",
-            org=org, role="admin"
+            request_factory, "post", "/api/v1/billing/subscription-intent", org=org, role="admin"
         )
         payload = SubscriptionIntentRequest(quantity=5)
 
@@ -255,8 +252,7 @@ class TestCreateSubscriptionIntent:
         MemberFactory(organization=org)
 
         request = _create_authenticated_request(
-            request_factory, "post", "/api/v1/billing/subscription-intent",
-            org=org, role="admin"
+            request_factory, "post", "/api/v1/billing/subscription-intent", org=org, role="admin"
         )
         payload = SubscriptionIntentRequest(quantity=None)
 
@@ -271,8 +267,7 @@ class TestCreateSubscriptionIntent:
         org = OrganizationFactory()
 
         request = _create_authenticated_request(
-            request_factory, "post", "/api/v1/billing/subscription-intent",
-            org=org, role="member"
+            request_factory, "post", "/api/v1/billing/subscription-intent", org=org, role="member"
         )
         payload = SubscriptionIntentRequest()
 
@@ -281,16 +276,13 @@ class TestCreateSubscriptionIntent:
 
         assert exc_info.value.status_code == 403
 
-    def test_already_subscribed_returns_400(
-        self, request_factory: RequestFactory
-    ) -> None:
+    def test_already_subscribed_returns_400(self, request_factory: RequestFactory) -> None:
         """Should return 400 if org already has active subscription."""
         sub = SubscriptionFactory(status=Subscription.Status.ACTIVE)
         org = sub.organization
 
         request = _create_authenticated_request(
-            request_factory, "post", "/api/v1/billing/subscription-intent",
-            org=org, role="admin"
+            request_factory, "post", "/api/v1/billing/subscription-intent", org=org, role="admin"
         )
         payload = SubscriptionIntentRequest()
 
@@ -313,8 +305,7 @@ class TestConfirmSubscription:
         org = OrganizationFactory()
 
         request = _create_authenticated_request(
-            request_factory, "post", "/api/v1/billing/confirm-subscription",
-            org=org, role="admin"
+            request_factory, "post", "/api/v1/billing/confirm-subscription", org=org, role="admin"
         )
         payload = ConfirmSubscriptionRequest(subscription_id="sub_test_123")
 
@@ -332,8 +323,7 @@ class TestConfirmSubscription:
         org = OrganizationFactory()
 
         request = _create_authenticated_request(
-            request_factory, "post", "/api/v1/billing/confirm-subscription",
-            org=org, role="admin"
+            request_factory, "post", "/api/v1/billing/confirm-subscription", org=org, role="admin"
         )
         payload = ConfirmSubscriptionRequest(subscription_id="sub_incomplete")
 
@@ -346,8 +336,7 @@ class TestConfirmSubscription:
         org = OrganizationFactory()
 
         request = _create_authenticated_request(
-            request_factory, "post", "/api/v1/billing/confirm-subscription",
-            org=org, role="member"
+            request_factory, "post", "/api/v1/billing/confirm-subscription", org=org, role="member"
         )
         payload = ConfirmSubscriptionRequest(subscription_id="sub_test")
 
@@ -357,16 +346,13 @@ class TestConfirmSubscription:
         assert exc_info.value.status_code == 403
 
     @patch("apps.billing.api.sync_subscription_from_stripe")
-    def test_stripe_error_returns_500(
-        self, mock_sync, request_factory: RequestFactory
-    ) -> None:
+    def test_stripe_error_returns_500(self, mock_sync, request_factory: RequestFactory) -> None:
         """Should return 500 on Stripe errors."""
         mock_sync.side_effect = Exception("Stripe API error")
         org = OrganizationFactory()
 
         request = _create_authenticated_request(
-            request_factory, "post", "/api/v1/billing/confirm-subscription",
-            org=org, role="admin"
+            request_factory, "post", "/api/v1/billing/confirm-subscription", org=org, role="admin"
         )
         payload = ConfirmSubscriptionRequest(subscription_id="sub_test")
 
@@ -423,9 +409,7 @@ class TestListInvoices:
         assert result.invoices[0].amount_paid == 1000
         assert result.has_more is False
 
-    def test_returns_empty_when_no_customer(
-        self, request_factory: RequestFactory
-    ) -> None:
+    def test_returns_empty_when_no_customer(self, request_factory: RequestFactory) -> None:
         """Should return empty list when org has no Stripe customer."""
         from apps.billing.api import list_invoices
 
@@ -504,4 +488,3 @@ class TestListInvoices:
             list_invoices(request)
 
         assert exc_info.value.status_code == 500
-

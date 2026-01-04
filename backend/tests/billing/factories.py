@@ -10,7 +10,6 @@ import factory
 from factory.django import DjangoModelFactory
 
 from apps.billing.models import Subscription
-from apps.organizations.models import Organization
 from tests.accounts.factories import OrganizationFactory
 
 

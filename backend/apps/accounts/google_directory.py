@@ -111,9 +111,7 @@ def search_directory_users(
 
         if response.status_code == 403:
             # User doesn't have admin access to directory or scope not granted
-            logger.debug(
-                "User %s doesn't have Directory API access (403)", user.email
-            )
+            logger.debug("User %s doesn't have Directory API access (403)", user.email)
             return []
 
         response.raise_for_status()

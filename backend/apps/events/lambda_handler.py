@@ -160,4 +160,3 @@ def publish_pending_events() -> int:
                 len(failed_events),
             )
             return len(published_ids)
-
