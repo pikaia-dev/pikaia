@@ -1,4 +1,6 @@
-import { useState } from "react"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
 
 import { Button } from "../../components/ui/button"
 import {
@@ -11,70 +13,73 @@ import {
 import { ImageUploader } from "../../components/ui/image-uploader"
 import { LoadingSpinner } from "../../components/ui/loading-spinner"
 import {
+  normalizeSlug,
+  type OrganizationFormData,
+  organizationSchema,
+} from "../../features/organization/forms/schema"
+import {
   useOrganization,
   useUpdateOrganization,
 } from "../../features/organization/queries"
 
-/**
- * Normalize a slug to meet Stytch requirements.
- * Must match backend normalize_slug() in apps/accounts/schemas.py
- *
- * Allowed characters: a-z, 0-9, hyphen, period, underscore, tilde
- */
-function normalizeSlug(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9._~-]+/g, "-") // Replace non-allowed chars with hyphen
-    .replace(/^-+|-+$/g, "") // Remove leading/trailing hyphens
-    .slice(0, 128) // Truncate to max length
-}
-
 export default function OrganizationSettings() {
   const { data: organization, isLoading, error } = useOrganization()
   const updateMutation = useUpdateOrganization()
-
-  // Track user edits; null means no edits yet (use server value)
-  const [editedName, setEditedName] = useState<string | null>(null)
-  const [editedSlug, setEditedSlug] = useState<string | null>(null)
   const [editedLogoUrl, setEditedLogoUrl] = useState<string | null>(null)
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
 
-  // Derive current values: use edited value if present, otherwise server value
-  const name = editedName ?? organization?.name ?? ""
-  const slug = editedSlug ?? organization?.slug ?? ""
   const logoUrl = editedLogoUrl ?? organization?.logo_url ?? ""
 
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<OrganizationFormData>({
+    resolver: zodResolver(organizationSchema),
+    defaultValues: {
+      name: "",
+      slug: "",
+    },
+  })
+
+  const name = watch("name")
+
+  // Sync form with server data when it loads
+  useEffect(() => {
+    if (organization) {
+      reset({
+        name: organization.name,
+        slug: organization.slug,
+      })
+    }
+  }, [organization, reset])
+
   const handleNameChange = (newName: string) => {
-    setEditedName(newName)
+    setValue("name", newName, { shouldValidate: true })
     // Auto-update slug if user hasn't manually edited it
     if (!slugManuallyEdited) {
-      setEditedSlug(normalizeSlug(newName))
+      setValue("slug", normalizeSlug(newName), { shouldValidate: true })
     }
   }
 
   const handleSlugChange = (newSlug: string) => {
     const normalized = normalizeSlug(newSlug)
-    setEditedSlug(normalized)
+    setValue("slug", normalized, { shouldValidate: true })
     // Mark as manually edited if different from auto-derived
     if (normalized !== normalizeSlug(name)) {
       setSlugManuallyEdited(true)
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    updateMutation.mutate(
-      { name, slug },
-      {
-        onSuccess: () => {
-          // Reset edit state after successful save
-          setEditedName(null)
-          setEditedSlug(null)
-          setSlugManuallyEdited(false)
-        },
-      }
-    )
+  const onSubmit = (data: OrganizationFormData) => {
+    updateMutation.mutate(data, {
+      onSuccess: () => {
+        setSlugManuallyEdited(false)
+      },
+    })
   }
 
   if (isLoading) {
@@ -129,7 +134,7 @@ export default function OrganizationSettings() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
                 <label
                   htmlFor="name"
@@ -138,15 +143,20 @@ export default function OrganizationSettings() {
                   Organization name
                 </label>
                 <input
+                  {...register("name")}
                   id="name"
                   type="text"
-                  value={name}
                   onChange={(e) => {
                     handleNameChange(e.target.value)
                   }}
                   className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   placeholder="Your organization name"
                 />
+                {errors.name && (
+                  <p className="text-xs text-destructive mt-1">
+                    {errors.name.message}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -157,18 +167,24 @@ export default function OrganizationSettings() {
                   Slug
                 </label>
                 <input
+                  {...register("slug")}
                   id="slug"
                   type="text"
-                  value={slug}
                   onChange={(e) => {
                     handleSlugChange(e.target.value)
                   }}
                   className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   placeholder="your-organization"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  URL-friendly identifier (lowercase, hyphens, 2-128 chars)
-                </p>
+                {errors.slug ? (
+                  <p className="text-xs text-destructive mt-1">
+                    {errors.slug.message}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    URL-friendly identifier (lowercase, hyphens, 2-128 chars)
+                  </p>
+                )}
               </div>
 
               <Button type="submit" disabled={updateMutation.isPending}>
