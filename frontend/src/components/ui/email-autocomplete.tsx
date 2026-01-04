@@ -1,5 +1,5 @@
 import { Keyboard, Search, User } from "lucide-react"
-import { useCallback,useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import { useApi } from "@/hooks/useApi"
 import type { DirectoryUser } from "@/lib/api"
@@ -75,7 +75,7 @@ export function EmailAutocomplete({
     if (!isFocused) return
 
     const timer = setTimeout(() => {
-      fetchSuggestions(value)
+      void fetchSuggestions(value)
     }, DEBOUNCE_DELAY_MS)
 
     return () => { clearTimeout(timer); }
