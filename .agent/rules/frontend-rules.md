@@ -65,3 +65,12 @@ Coding standards for TypeScript/React frontend.
 - `components/` — reusable UI
 - `features/` — feature-scoped (components, hooks, queries)
 - `lib/` — API client, utilities
+### Feature Directory Convention
+
+Each feature in `features/` follows this structure:
+- `queries/` — TanStack Query hooks (useQuery wrappers)
+- `mutations/` — TanStack mutation hooks (useMutation wrappers)  
+- `components/` — Feature-specific UI components
+- `forms/` — React Hook Form components with Zod schemas
+- `types.ts` — Feature-specific TypeScript types
+- `api.ts` — API call functions (optional, can reuse lib/api)
