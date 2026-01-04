@@ -12,7 +12,7 @@ import {
   useStripe,
 } from "@stripe/react-stripe-js"
 import type { StripeElementsOptions } from "@stripe/stripe-js"
-import { useEffect,useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { useApi } from "../hooks/useApi"
@@ -145,9 +145,10 @@ export function PaymentForm({
           setLoading(false)
         }
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err.message || "Failed to initialize payment")
+          const message = err instanceof Error ? err.message : "Failed to initialize payment"
+          setError(message)
           setLoading(false)
         }
       })
