@@ -12,6 +12,13 @@ Coding standards for TypeScript/React frontend.
 - TypeScript strict mode; avoid `any`
 - Prettier + ESLint (enforced in CI: typecheck + lint + test + build)
 
+## Package Manager
+
+- Use `pnpm` for all Node.js dependency and script commands
+- Run scripts with `pnpm run <script>` or `pnpm <script>` (e.g., `pnpm dev`, `pnpm run lint`)
+- Never use `npm` or `yarn`
+- Add shadcn components with: `pnpm dlx shadcn@latest add <component>`
+
 ## API & Data
 
 - One API client module (generated from OpenAPI or typed wrapper); no scattered fetch calls

@@ -14,6 +14,13 @@ Coding standards for Python/Django backend. Scoped to `*.py` files.
 - Format with `ruff format`, lint with `ruff check`
 - Imports: stdlib → third-party → local (enforced by ruff/isort)
 
+## Package Manager
+
+- Use `uv` for all Python dependency and command management
+- Run commands with `uv run <command>` (e.g., `uv run pytest`, `uv run python manage.py migrate`)
+- Never use `pip`, `python`, or `pip install` directly
+- Virtual environment is managed by uv at `backend/.venv`
+
 ## Django
 
 - Apps live in `apps/` directory
