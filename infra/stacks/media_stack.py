@@ -25,6 +25,13 @@ from constructs import Construct
 # Path to Lambda functions directory
 FUNCTIONS_DIR = Path(__file__).parent.parent / "functions"
 
+# Lambda runtime versions (centralized for easier upgrades)
+NODEJS_RUNTIME = lambda_.Runtime.NODEJS_20_X
+
+# Origin Response Lambda configuration (tune based on expected image sizes)
+ORIGIN_RESPONSE_MEMORY_MB = 1024  # Sharp needs more memory for image processing
+ORIGIN_RESPONSE_TIMEOUT_SECONDS = 30
+
 
 class MediaStack(Stack):
     """
@@ -88,11 +95,12 @@ class MediaStack(Stack):
 
         # Configure CloudFront behavior based on image transformation setting
         if enable_image_transformation:
-            # Create both Lambda@Edge functions
+            # Lambda@Edge architecture for image transformation:
+            # - ORIGIN_REQUEST: Parses Thumbor-style URLs and rewrites request to S3 key
+            # - ORIGIN_RESPONSE: Fetches original from S3, transforms with Sharp, returns result
             origin_request_lambda = self._create_origin_request_lambda()
             origin_response_lambda = self._create_origin_response_lambda()
 
-            # Default behavior with both Lambda@Edge handlers
             default_behavior_config = cloudfront.BehaviorOptions(
                 origin=origins.S3BucketOrigin.with_origin_access_identity(
                     self.bucket,
@@ -113,6 +121,7 @@ class MediaStack(Stack):
                 ],
             )
         else:
+            # Simple passthrough without image transformation
             default_behavior_config = cloudfront.BehaviorOptions(
                 origin=origins.S3BucketOrigin.with_origin_access_identity(
                     self.bucket,
@@ -120,6 +129,7 @@ class MediaStack(Stack):
                 ),
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                 cache_policy=cloudfront.CachePolicy.CACHING_OPTIMIZED,
+                origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
             )
 
         # CloudFront distribution
@@ -166,7 +176,7 @@ class MediaStack(Stack):
         fn = lambda_.Function(
             self,
             "OriginRequestLambda",
-            runtime=lambda_.Runtime.NODEJS_20_X,
+            runtime=NODEJS_RUNTIME,
             handler="index.originRequestHandler",
             code=lambda_.Code.from_asset(
                 str(FUNCTIONS_DIR / "image-transform"),
@@ -189,7 +199,7 @@ class MediaStack(Stack):
         fn = lambda_.Function(
             self,
             "OriginResponseLambda",
-            runtime=lambda_.Runtime.NODEJS_20_X,
+            runtime=NODEJS_RUNTIME,
             handler="index.handler",
             code=lambda_.Code.from_asset(
                 str(FUNCTIONS_DIR / "image-transform"),
@@ -212,8 +222,8 @@ class MediaStack(Stack):
                     user="root",
                 ),
             ),
-            timeout=Duration.seconds(30),
-            memory_size=1024,  # Sharp needs more memory for image processing
+            timeout=Duration.seconds(ORIGIN_RESPONSE_TIMEOUT_SECONDS),
+            memory_size=ORIGIN_RESPONSE_MEMORY_MB,
             description="Image transformation using Sharp (Origin Response)",
         )
 
