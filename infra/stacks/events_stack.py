@@ -83,9 +83,15 @@ class EventsStack(Stack):
         )
 
         # Allow Lambda to connect to database
-        database_security_group.add_ingress_rule(
-            peer=self.lambda_security_group,
-            connection=ec2.Port.tcp(5432),
+        # Use CfnSecurityGroupIngress to avoid cross-stack cyclic dependencies
+        ec2.CfnSecurityGroupIngress(
+            self,
+            "LambdaToDbIngress",
+            ip_protocol="tcp",
+            from_port=5432,
+            to_port=5432,
+            group_id=database_security_group.security_group_id,
+            source_security_group_id=self.lambda_security_group.security_group_id,
             description="Allow event publisher Lambda to connect to RDS",
         )
 

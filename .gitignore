@@ -234,3 +234,4 @@ infra/cdk.out/
 Thumbs.db
 
 infra/functions/*/node_modules/
+infra/uv.lock

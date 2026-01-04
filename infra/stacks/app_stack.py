@@ -45,6 +45,7 @@ class AppStack(Stack):
         construct_id: str,
         *,
         vpc: ec2.IVpc,
+        database_security_group: ec2.ISecurityGroup,
         certificate_arn: str | None = None,
         domain_name: str | None = None,
         min_capacity: int = 2,
@@ -59,14 +60,8 @@ class AppStack(Stack):
         # Database
         # =================================================================
 
-        # Security group for Aurora
-        self.database_security_group = ec2.SecurityGroup(
-            self,
-            "DatabaseSG",
-            vpc=vpc,
-            description="Security group for Aurora PostgreSQL",
-            allow_all_outbound=False,
-        )
+        # Security group from NetworkStack (avoids cyclic dependencies)
+        self.database_security_group = database_security_group
 
         # Aurora Serverless v2 cluster
         self.database = rds.DatabaseCluster(
@@ -207,9 +202,15 @@ class AppStack(Stack):
         )
 
         # Allow ECS to connect to database
-        self.database_security_group.add_ingress_rule(
-            peer=ecs_security_group,
-            connection=ec2.Port.tcp(5432),
+        # Use CfnSecurityGroupIngress to avoid cross-stack cyclic dependencies
+        ec2.CfnSecurityGroupIngress(
+            self,
+            "EcsToDbIngress",
+            ip_protocol="tcp",
+            from_port=5432,
+            to_port=5432,
+            group_id=self.database_security_group.security_group_id,
+            source_security_group_id=ecs_security_group.security_group_id,
             description="Allow ECS to connect to Aurora",
         )
 
