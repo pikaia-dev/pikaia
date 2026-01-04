@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
-import { toast } from "sonner"
+import { useState } from "react"
 
 import {
   AlertDialog,
@@ -28,19 +27,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select"
-import { useApi } from "../../hooks/useApi"
-import type { DirectoryUser, MemberListItem } from "../../lib/api"
+import {
+  useDeleteMember,
+  useInviteMember,
+  useMembers,
+  useUpdateMemberRole,
+} from "../../features/members/queries"
+import type { DirectoryUser } from "../../lib/api"
 
 export default function MembersSettings() {
-  const { listMembers, inviteMember, updateMemberRole, deleteMember } = useApi()
-  const [members, setMembers] = useState<MemberListItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: membersData, isLoading, error } = useMembers()
+  const inviteMutation = useInviteMember()
+  const updateRoleMutation = useUpdateMemberRole()
+  const deleteMutation = useDeleteMember()
 
   // Invite form state
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteName, setInviteName] = useState("")
   const [inviteRole, setInviteRole] = useState<"admin" | "member">("member")
-  const [inviting, setInviting] = useState(false)
 
   // Delete confirmation dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -49,49 +53,22 @@ export default function MembersSettings() {
     email: string
   } | null>(null)
 
-  const loadMembers = useCallback(async () => {
-    try {
-      const data = await listMembers()
-      setMembers(data.members)
-    } catch (err) {
-      // Use toast ID to prevent duplicates from React StrictMode
-      toast.error(
-        err instanceof Error ? err.message : "Failed to load members",
-        {
-          id: "load-members-error",
-        }
-      )
-    } finally {
-      setLoading(false)
-    }
-  }, [listMembers])
+  const members = membersData?.members ?? []
 
-  useEffect(() => {
-    void loadMembers()
-  }, [loadMembers])
-
-  const handleInvite = async (e: React.FormEvent) => {
+  const handleInvite = (e: React.FormEvent) => {
     e.preventDefault()
     if (!inviteEmail) return
 
-    setInviting(true)
-
-    try {
-      const response = await inviteMember({
-        email: inviteEmail,
-        name: inviteName,
-        role: inviteRole,
-      })
-      toast.success(response.message)
-      setInviteEmail("")
-      setInviteName("")
-      setInviteRole("member")
-      void loadMembers()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to send invite")
-    } finally {
-      setInviting(false)
-    }
+    inviteMutation.mutate(
+      { email: inviteEmail, name: inviteName, role: inviteRole },
+      {
+        onSuccess: () => {
+          setInviteEmail("")
+          setInviteName("")
+          setInviteRole("member")
+        },
+      }
+    )
   }
 
   // Handle directory user selection
@@ -102,17 +79,8 @@ export default function MembersSettings() {
     }
   }
 
-  const handleRoleChange = async (
-    memberId: number,
-    newRole: "admin" | "member"
-  ) => {
-    try {
-      await updateMemberRole(memberId, { role: newRole })
-      toast.success("Role updated")
-      void loadMembers()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update role")
-    }
+  const handleRoleChange = (memberId: number, newRole: "admin" | "member") => {
+    updateRoleMutation.mutate({ memberId, role: newRole })
   }
 
   const openDeleteDialog = (memberId: number, email: string) => {
@@ -120,27 +88,29 @@ export default function MembersSettings() {
     setDeleteDialogOpen(true)
   }
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = () => {
     if (!memberToDelete) return
 
-    try {
-      await deleteMember(memberToDelete.id)
-      toast.success(`${memberToDelete.email} removed`)
-      void loadMembers()
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to remove member"
-      )
-    } finally {
-      setDeleteDialogOpen(false)
-      setMemberToDelete(null)
-    }
+    deleteMutation.mutate(memberToDelete.id, {
+      onSettled: () => {
+        setDeleteDialogOpen(false)
+        setMemberToDelete(null)
+      },
+    })
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <LoadingSpinner size="sm" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-destructive">Failed to load members</p>
       </div>
     )
   }
@@ -163,10 +133,7 @@ export default function MembersSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form
-            onSubmit={handleInvite}
-            className="flex flex-wrap gap-3 items-end"
-          >
+          <form onSubmit={handleInvite} className="flex flex-wrap gap-3 items-end">
             <div className="flex-1 min-w-[200px]">
               <label htmlFor="email" className="block text-sm font-medium mb-1">
                 Email
@@ -187,7 +154,9 @@ export default function MembersSettings() {
                 id="name"
                 type="text"
                 value={inviteName}
-                onChange={(e) => { setInviteName(e.target.value); }}
+                onChange={(e) => {
+                  setInviteName(e.target.value)
+                }}
                 placeholder="Jane Doe"
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
@@ -198,8 +167,9 @@ export default function MembersSettings() {
               </label>
               <Select
                 value={inviteRole}
-                onValueChange={(value) => { setInviteRole(value as "admin" | "member"); }
-                }
+                onValueChange={(value) => {
+                  setInviteRole(value as "admin" | "member")
+                }}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select role" />
@@ -210,8 +180,11 @@ export default function MembersSettings() {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" disabled={inviting || !inviteEmail}>
-              {inviting ? "Sending..." : "Send Invite"}
+            <Button
+              type="submit"
+              disabled={inviteMutation.isPending || !inviteEmail}
+            >
+              {inviteMutation.isPending ? "Sending..." : "Send Invite"}
             </Button>
           </form>
         </CardContent>
@@ -261,12 +234,9 @@ export default function MembersSettings() {
                     <td className="p-3">
                       <Select
                         value={member.role}
-                        onValueChange={(value) =>
-                          handleRoleChange(
-                            member.id,
-                            value as "admin" | "member"
-                          )
-                        }
+                        onValueChange={(value) => {
+                          handleRoleChange(member.id, value as "admin" | "member")
+                        }}
                       >
                         <SelectTrigger className="w-28 h-8">
                           <SelectValue />
@@ -281,8 +251,9 @@ export default function MembersSettings() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => { openDeleteDialog(member.id, member.email); }
-                        }
+                        onClick={() => {
+                          openDeleteDialog(member.id, member.email)
+                        }}
                         className="text-destructive hover:text-destructive"
                       >
                         Remove
