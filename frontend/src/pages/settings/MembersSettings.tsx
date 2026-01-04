@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select"
+import { MembersTable } from "../../features/members/components"
 import {
   useDeleteMember,
   useInviteMember,
@@ -190,82 +191,12 @@ export default function MembersSettings() {
         </CardContent>
       </Card>
 
-      {/* Members List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Organization Members</CardTitle>
-          <CardDescription>
-            {members.length} active member{members.length !== 1 ? "s" : ""}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="border rounded-md overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="text-left p-3 font-medium">Email</th>
-                  <th className="text-left p-3 font-medium">Name</th>
-                  <th className="text-left p-3 font-medium">Status</th>
-                  <th className="text-left p-3 font-medium">Role</th>
-                  <th className="text-right p-3 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((member) => (
-                  <tr
-                    key={member.id}
-                    className={`border-t ${member.status === "invited" ? "opacity-60" : ""}`}
-                  >
-                    <td className="p-3">{member.email}</td>
-                    <td className="p-3 text-muted-foreground">
-                      {member.name || "—"}
-                    </td>
-                    <td className="p-3">
-                      {member.status === "invited" ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                          Pending
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                          Active
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3">
-                      <Select
-                        value={member.role}
-                        onValueChange={(value) => {
-                          handleRoleChange(member.id, value as "admin" | "member")
-                        }}
-                      >
-                        <SelectTrigger className="w-28 h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="member">Member</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="p-3 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          openDeleteDialog(member.id, member.email)
-                        }}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        Remove
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Members Table */}
+      <MembersTable
+        members={members}
+        onRoleChange={handleRoleChange}
+        onRemove={openDeleteDialog}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
