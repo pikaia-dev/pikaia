@@ -235,3 +235,6 @@ Thumbs.db
 
 infra/functions/*/node_modules/
 infra/uv.lock
+
+# Production secrets
+.env.production
