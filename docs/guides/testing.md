@@ -2,15 +2,23 @@
 
 ## Overview
 
-The project uses **pytest** for backend testing with factory_boy for test data generation.
+The project uses **pytest** for backend testing and **Vitest** for frontend testing.
 
 ## Running Tests
 
-### All Tests
+### Backend
 
 ```bash
 cd backend
 uv run pytest
+```
+
+### Frontend
+
+```bash
+cd frontend
+pnpm test         # Watch mode
+pnpm test run     # Single run
 ```
 
 ### Specific App
