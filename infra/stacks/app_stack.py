@@ -26,6 +26,8 @@ from aws_cdk import (
 )
 from constructs import Construct
 
+import json
+
 
 class AppStack(Stack):
     """
@@ -92,13 +94,21 @@ class AppStack(Stack):
         # =================================================================
 
         # Application secrets (API keys, etc.)
+        # Template for app secrets (will be populated post-deployment)
+        app_secrets_template = {
+            "STYTCH_PROJECT_ID": "",
+            "STYTCH_SECRET": "",
+            "STRIPE_SECRET_KEY": "",
+            "STRIPE_PRICE_ID": "",
+        }
+
         self.app_secrets = secretsmanager.Secret(
             self,
             "AppSecrets",
             secret_name="tango/app-secrets",
             description="Application secrets (Stytch, Stripe, etc.)",
             generate_secret_string=secretsmanager.SecretStringGenerator(
-                secret_string_template='{"STYTCH_PROJECT_ID":"","STYTCH_SECRET":"","STRIPE_SECRET_KEY":"","STRIPE_PRICE_ID":""}',
+                secret_string_template=json.dumps(app_secrets_template),
                 generate_string_key="DJANGO_SECRET_KEY",
                 exclude_punctuation=True,
             ),
@@ -154,9 +164,27 @@ class AppStack(Stack):
                 "ALLOWED_HOSTS": domain_name or "*",
             },
             secrets={
-                "DATABASE_URL": ecs.Secret.from_secrets_manager(
+                # RDS secret contains individual fields, not DATABASE_URL.
+                # Django settings should construct the URL from these at runtime.
+                "DB_HOST": ecs.Secret.from_secrets_manager(
                     self.database_secret,
-                    field="DATABASE_URL",
+                    field="host",
+                ),
+                "DB_PORT": ecs.Secret.from_secrets_manager(
+                    self.database_secret,
+                    field="port",
+                ),
+                "DB_NAME": ecs.Secret.from_secrets_manager(
+                    self.database_secret,
+                    field="dbname",
+                ),
+                "DB_USER": ecs.Secret.from_secrets_manager(
+                    self.database_secret,
+                    field="username",
+                ),
+                "DB_PASSWORD": ecs.Secret.from_secrets_manager(
+                    self.database_secret,
+                    field="password",
                 ),
                 "SECRET_KEY": ecs.Secret.from_secrets_manager(
                     self.app_secrets,
