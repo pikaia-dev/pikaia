@@ -157,15 +157,60 @@ ModuleNotFoundError: No module named 'constructs._jsii'
 
 **Workaround:** Use Python 3.12 for CDK operations, or deploy via CI/CD with pinned Python version.
 
+## Pre-deployment Validation
+
+### 1. CDK Synth with Validation Aspects
+
+Built-in validation aspects run during `cdk synth` to check for:
+- **Production readiness**: HA configurations, deletion protection
+- **Security**: S3 public access, encryption settings
+
+```bash
+# Synth with validation (aspects emit warnings/errors)
+npx cdk synth --all
+```
+
+### 2. CloudFormation Linting
+
+[cfn-lint](https://github.com/aws-cloudformation/cfn-lint) validates synthesized templates:
+
+```bash
+# Install dev dependencies (includes cfn-lint)
+uv sync --extra dev
+
+# Synth and lint in one command (requires Python 3.12)
+npx cdk synth --all && uv run cfn-lint cdk.out/*.template.json
+```
+
+> **Note:** cfn-lint currently requires Python 3.12 due to Pydantic v1 compatibility issues with Python 3.13+. Run in CI/CD with pinned Python version.
+
+### 3. Change Set Validation (Native AWS)
+
+For the most thorough pre-deploy check, create change sets without executing:
+
+```bash
+# Create change set (runs AWS pre-deployment validation)
+npx cdk deploy --no-execute TangoApp
+
+# Review validation in AWS Console or via CLI
+aws cloudformation describe-events --change-set-name <ARN>
+
+# Execute if validation passes
+npx cdk deploy TangoApp
+```
+
 ## Testing
 
 ```bash
 # Validate CDK synth (requires Python 3.12)
 npx cdk synth --all
 
+# Run cfn-lint on synthesized templates
+uv run cfn-lint cdk.out/*.template.json
+
 # Test image transform Lambda
 cd functions/image-transform && npm test
 
-# Test event publisher Lambda (requires pytest in dev deps)
+# Test event publisher Lambda
 cd functions/event-publisher && uv run pytest tests/
 ```
