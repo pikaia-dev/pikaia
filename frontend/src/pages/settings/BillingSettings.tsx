@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 
-import { PaymentForm } from "../../components/PaymentForm"
 import { AddressAutocomplete } from "../../components/ui/address-autocomplete"
 import { Button } from "../../components/ui/button"
 import {
@@ -15,11 +14,10 @@ import { Checkbox } from "../../components/ui/checkbox"
 import { CountryCombobox } from "../../components/ui/country-combobox"
 import { LoadingSpinner } from "../../components/ui/loading-spinner"
 import {
-  useCreatePortalSession,
-  useInvoices,
-  useRefreshSubscription,
-  useSubscription,
-} from "../../features/billing/queries"
+  InvoiceHistoryCard,
+  SubscriptionCard,
+} from "../../features/billing/components"
+import { useInvoices, useSubscription } from "../../features/billing/queries"
 import {
   useOrganization,
   useUpdateBilling,
@@ -47,8 +45,6 @@ export default function BillingSettings() {
 
   // Mutations
   const updateBillingMutation = useUpdateBilling()
-  const createPortalMutation = useCreatePortalSession()
-  const refreshSubscription = useRefreshSubscription()
 
   // Form state (editable fields)
   const [useBillingEmail, setUseBillingEmail] = useState<boolean | null>(null)
@@ -58,9 +54,6 @@ export default function BillingSettings() {
   const [vatId, setVatId] = useState<string | null>(null)
   const [savingDelivery, setSavingDelivery] = useState(false)
   const [savingAddress, setSavingAddress] = useState(false)
-
-  // UI state
-  const [showUpgradeForm, setShowUpgradeForm] = useState(false)
 
   // Invoice pagination state (additional invoices beyond first page)
   const [additionalInvoices, setAdditionalInvoices] = useState<Invoice[]>([])
@@ -109,11 +102,12 @@ export default function BillingSettings() {
     setLoadingMoreInvoices(true)
     try {
       const lastInvoice = allInvoices[allInvoices.length - 1]
+      const session = localStorage.getItem("stytch_session_jwt") ?? ""
       const response = await fetch(
         `/api/v1/billing/invoices?limit=6&starting_after=${lastInvoice.id}`,
         {
           headers: {
-            Authorization: `Bearer ${getSessionToken()}`,
+            Authorization: `Bearer ${session}`,
           },
         }
       )
@@ -129,29 +123,6 @@ export default function BillingSettings() {
     } finally {
       setLoadingMoreInvoices(false)
     }
-  }
-
-  // Helper to get session token - we need this for additional invoice fetching
-  const getSessionToken = (): string => {
-    // Access the Stytch session from local storage or session storage
-    const session = localStorage.getItem("stytch_session_jwt")
-    return session ?? ""
-  }
-
-  const handleUpgradeSuccess = () => {
-    setShowUpgradeForm(false)
-    refreshSubscription()
-  }
-
-  const handleManageSubscription = () => {
-    createPortalMutation.mutate(
-      { return_url: `${window.location.origin}/settings/billing` },
-      {
-        onSuccess: (data) => {
-          window.location.href = data.portal_url
-        },
-      }
-    )
   }
 
   const handleDeliverySubmit = async (e: React.FormEvent) => {
@@ -248,16 +219,6 @@ export default function BillingSettings() {
   // Get current VAT prefix based on country
   const currentVatPrefix = getVatPrefix(currentAddress.country)
 
-  // Format date for display
-  const formatDate = (isoDate: string | null) => {
-    if (!isoDate) return null
-    return new Date(isoDate).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    })
-  }
-
   const isLoading = orgLoading || subLoading
 
   if (isLoading) {
@@ -282,99 +243,7 @@ export default function BillingSettings() {
 
       <div className="space-y-6 max-w-2xl">
         {/* Subscription Status Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Subscription</CardTitle>
-            <CardDescription>
-              {isSubscribed
-                ? "Manage your subscription and billing"
-                : "Upgrade to unlock all features"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {showUpgradeForm ? (
-              <div className="space-y-4">
-                <div className="border-b pb-4 mb-4">
-                  <h3 className="font-medium">Subscribe to Pro Plan</h3>
-                  <p className="text-sm text-muted-foreground">
-                    ${10 * memberCount}/month for {memberCount}{" "}
-                    {memberCount === 1 ? "seat" : "seats"}
-                  </p>
-                </div>
-                <PaymentForm
-                  quantity={memberCount}
-                  onSuccess={handleUpgradeSuccess}
-                  onCancel={() => {
-                    setShowUpgradeForm(false)
-                  }}
-                />
-              </div>
-            ) : isSubscribed ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">Pro Plan</span>
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${subscription.status === "active"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : subscription.status === "past_due"
-                            ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                            : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
-                          }`}
-                      >
-                        {subscription.status === "active"
-                          ? "Active"
-                          : subscription.status === "past_due"
-                            ? "Past Due"
-                            : subscription.status === "trialing"
-                              ? "Trial"
-                              : subscription.status}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {subscription.quantity}{" "}
-                      {subscription.quantity === 1 ? "seat" : "seats"}
-                      {subscription.current_period_end && (
-                        <>
-                          {" · "}
-                          {subscription.cancel_at_period_end
-                            ? `Cancels ${formatDate(subscription.current_period_end) ?? ""}`
-                            : `Renews ${formatDate(subscription.current_period_end) ?? ""}`}
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={handleManageSubscription}
-                    disabled={createPortalMutation.isPending}
-                  >
-                    {createPortalMutation.isPending
-                      ? "Loading..."
-                      : "Manage Subscription"}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Free Plan</p>
-                  <p className="text-sm text-muted-foreground">
-                    {memberCount} {memberCount === 1 ? "member" : "members"}
-                  </p>
-                </div>
-                <Button
-                  onClick={() => {
-                    setShowUpgradeForm(true)
-                  }}
-                >
-                  Upgrade to Pro
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <SubscriptionCard subscription={subscription ?? null} memberCount={memberCount} />
 
         {/* Invoice Delivery Card */}
         <Card>
@@ -664,120 +533,13 @@ export default function BillingSettings() {
 
         {/* Invoice History Card - show only when subscribed */}
         {isSubscribed && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Invoice History</CardTitle>
-              <CardDescription>
-                View and download your past invoices
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {invoicesLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <LoadingSpinner size="sm" />
-                </div>
-              ) : allInvoices.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">
-                  No invoices yet. Your first invoice will appear here after
-                  your subscription renews.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-2 font-medium">
-                            Invoice
-                          </th>
-                          <th className="text-left py-2 font-medium">Status</th>
-                          <th className="text-right py-2 font-medium">
-                            Amount
-                          </th>
-                          <th className="text-right py-2 font-medium">Date</th>
-                          <th className="text-right py-2 font-medium sr-only">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allInvoices.map((invoice) => (
-                          <tr
-                            key={invoice.id}
-                            className="border-b last:border-0"
-                          >
-                            <td className="py-3">
-                              <span className="font-mono text-xs">
-                                {invoice.number || invoice.id.slice(-8)}
-                              </span>
-                            </td>
-                            <td className="py-3">
-                              <span
-                                className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${invoice.status === "paid"
-                                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                  : invoice.status === "open"
-                                    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                                    : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
-                                  }`}
-                              >
-                                {invoice.status.charAt(0).toUpperCase() +
-                                  invoice.status.slice(1)}
-                              </span>
-                            </td>
-                            <td className="py-3 text-right">
-                              {new Intl.NumberFormat(undefined, {
-                                style: "currency",
-                                currency: invoice.currency.toUpperCase(),
-                              }).format(invoice.amount_paid / 100)}
-                            </td>
-                            <td className="py-3 text-right text-muted-foreground">
-                              {formatDate(invoice.created)}
-                            </td>
-                            <td className="py-3 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                {invoice.hosted_invoice_url && (
-                                  <a
-                                    href={invoice.hosted_invoice_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-xs text-primary hover:underline"
-                                  >
-                                    View
-                                  </a>
-                                )}
-                                {invoice.invoice_pdf && (
-                                  <a
-                                    href={invoice.invoice_pdf}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-xs text-primary hover:underline"
-                                  >
-                                    PDF
-                                  </a>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {invoicesHasMore && (
-                    <div className="flex justify-center pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={loadMoreInvoices}
-                        disabled={loadingMoreInvoices}
-                      >
-                        {loadingMoreInvoices ? "Loading..." : "Load more"}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <InvoiceHistoryCard
+            invoices={allInvoices}
+            isLoading={invoicesLoading}
+            hasMore={invoicesHasMore}
+            loadingMore={loadingMoreInvoices}
+            onLoadMore={loadMoreInvoices}
+          />
         )}
       </div>
     </div>
