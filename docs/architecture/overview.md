@@ -171,6 +171,32 @@ graph LR
 
 ---
 
+## Scaling Considerations
+
+The default configuration is optimized for cost and simplicity. For high-volume production workloads, consider these enhancements:
+
+### Database Connections
+
+| Approach | When to Use | Trade-offs |
+|----------|-------------|------------|
+| **Direct connections** (default) | Low-to-moderate Lambda concurrency (<50) | Simple, Aurora Serverless v2 handles well |
+| **RDS Proxy** | High Lambda concurrency (>50 concurrent) | Adds ~$0.015/vCPU-hour, prevents connection exhaustion |
+| **Aurora Data API** | Very high Lambda volume, no persistent connections needed | HTTP-based, slight latency overhead |
+
+### Event Publishing
+
+- **Publisher Lambda concurrency**: Limited to 5 by default to prevent DB overload
+- **Dead Letter Queue**: Failed events retained 14 days for investigation
+- **CloudWatch schedule**: 1-minute fallback polling if Aurora triggers fail
+
+### Image Transformation
+
+- **Lambda memory**: Set to 1024MB for Sharp processing; increase for large images
+- **CloudFront caching**: Transformed images cached at edge (1-year max-age)
+- **CDN price class**: Currently using PRICE_CLASS_100 (US/Canada/Europe); expand for global audience
+
+---
+
 ## Related Documents
 
 | Document | Description |
