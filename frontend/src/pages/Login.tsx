@@ -67,11 +67,14 @@ export default function Login() {
   const { session, isInitialized } = useStytchMemberSession()
 
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isInitialized can be false
     if (isInitialized && session) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- navigate returns void
       navigate("/dashboard", { replace: true })
     }
   }, [session, isInitialized, navigate])
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isInitialized and session can change
   if (!isInitialized || session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">

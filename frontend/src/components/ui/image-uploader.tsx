@@ -59,6 +59,7 @@ export function ImageUploader({
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
       const file = acceptedFiles[0]
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- file can be undefined
       if (!file) return
 
       // Validate file size
@@ -86,6 +87,7 @@ export function ImageUploader({
   )
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises -- dropzone accepts async callbacks
     onDrop,
     accept: MEDIA_UPLOAD.ACCEPTED_TYPES,
     maxFiles: 1,
