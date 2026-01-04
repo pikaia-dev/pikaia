@@ -72,7 +72,7 @@ class MediaStack(Stack):
                         s3.HttpMethods.POST,
                     ],
                     allowed_origins=cors_allowed_origins,
-                    expose_headers=["ETag"],
+                    exposed_headers=["ETag"],
                     max_age=3600,
                 )
             ],

@@ -3,7 +3,7 @@
 AWS CDK app entry point for Tango infrastructure.
 
 Stacks:
-- TangoNetwork: VPC, subnets, NAT gateway
+- TangoNetwork: VPC, subnets, NAT gateway, database security group
 - TangoApp: Aurora PostgreSQL, ECS Fargate, ALB, Secrets Manager
 - TangoMedia: S3 bucket, CloudFront CDN, image transformation Lambda
 - TangoEvents: EventBridge bus, publisher Lambda, DLQ
@@ -38,7 +38,7 @@ env = cdk.Environment(
 )
 
 # =============================================================================
-# Foundation: Network
+# Foundation: Network + Security Groups
 # =============================================================================
 
 network = NetworkStack(app, "TangoNetwork", env=env)
@@ -55,6 +55,7 @@ app_stack = AppStack(
     app,
     "TangoApp",
     vpc=network.vpc,
+    database_security_group=network.database_security_group,
     domain_name=domain_name,
     certificate_arn=certificate_arn,
     min_capacity=2,
@@ -92,7 +93,7 @@ events_stack = EventsStack(
     "TangoEvents",
     vpc=network.vpc,
     database_secret=app_stack.database_secret,
-    database_security_group=app_stack.database_security_group,
+    database_security_group=network.database_security_group,
     event_bus_name="tango-events",
     env=env,
 )
