@@ -69,7 +69,7 @@ export default function ProfileSettings() {
           err instanceof Error ? err.message : "Failed to load profile"
         )
       })
-      .finally(() => setLoading(false))
+      .finally(() => { setLoading(false); })
   }, [getCurrentUser])
 
   const handleSubmit = async () => {
@@ -224,7 +224,7 @@ export default function ProfileSettings() {
                 id="name"
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => { setName(e.target.value); }}
                 className="w-full h-10 px-3 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 placeholder="Your name"
               />
@@ -249,7 +249,7 @@ export default function ProfileSettings() {
                 id="email"
                 type="email"
                 value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
+                onChange={(e) => { setNewEmail(e.target.value); }}
                 className="w-full h-10 px-3 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 placeholder="your@email.com"
               />
@@ -376,7 +376,7 @@ export default function ProfileSettings() {
                 autoComplete="one-time-code"
                 maxLength={6}
                 value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                onChange={(e) => { setOtpCode(e.target.value.replace(/\D/g, "")); }}
                 placeholder="123456"
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm text-center text-2xl tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-ring"
               />

@@ -53,8 +53,8 @@ export function AppSidebar() {
   // Fetch avatar from backend
   useEffect(() => {
     getCurrentUser()
-      .then((data) => setAvatarUrl(data.user.avatar_url || null))
-      .catch(() => setAvatarUrl(null))
+      .then((data) => { setAvatarUrl(data.user.avatar_url || null); })
+      .catch(() => { setAvatarUrl(null); })
   }, [getCurrentUser])
 
   // Check admin from Stytch roles

@@ -78,7 +78,7 @@ export function EmailAutocomplete({
       fetchSuggestions(value)
     }, DEBOUNCE_DELAY_MS)
 
-    return () => clearTimeout(timer)
+    return () => { clearTimeout(timer); }
   }, [value, isFocused, fetchSuggestions])
 
   // Fetch avatars for suggestions (in background)
@@ -159,7 +159,7 @@ export function EmailAutocomplete({
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
+    return () => { document.removeEventListener("mousedown", handleClickOutside); }
   }, [])
 
   const inputClasses = cn(
@@ -178,7 +178,7 @@ export function EmailAutocomplete({
           id={id}
           type="email"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => { onChange(e.target.value); }}
           onKeyDown={handleKeyDown}
           onFocus={() => {
             setIsFocused(true)
@@ -186,7 +186,7 @@ export function EmailAutocomplete({
           }}
           onBlur={() => {
             setIsFocused(false)
-            setTimeout(() => setIsOpen(false), 150)
+            setTimeout(() => { setIsOpen(false); }, 150)
           }}
           placeholder={placeholder}
           disabled={disabled}

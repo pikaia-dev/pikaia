@@ -62,17 +62,15 @@ export function AddressAutocomplete({
   const [isFocused, setIsFocused] = useState(false)
 
   // Check for API key at render time (not in effect)
-  const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY as
-    | string
-    | undefined
+  const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY
 
   // Load Google Places script
   useEffect(() => {
     if (!apiKey) return // No API key - component will show fallback
 
     loadGooglePlacesScript(apiKey)
-      .then(() => setIsLoaded(true))
-      .catch(() => setLoadError(true))
+      .then(() => { setIsLoaded(true); })
+      .catch(() => { setLoadError(true); })
   }, [apiKey])
 
   // Initialize services when loaded
@@ -161,7 +159,7 @@ export function AddressAutocomplete({
       fetchSuggestions(value)
     }, DEBOUNCE_DELAY_MS)
 
-    return () => clearTimeout(timer)
+    return () => { clearTimeout(timer); }
   }, [value, isLoaded, loadError, isFocused, fetchSuggestions])
 
   // Handle suggestion selection
@@ -253,7 +251,7 @@ export function AddressAutocomplete({
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
+    return () => { document.removeEventListener("mousedown", handleClickOutside); }
   }, [])
 
   const inputClasses = cn(
@@ -272,13 +270,13 @@ export function AddressAutocomplete({
           id={id}
           type="text"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => { onChange(e.target.value); }}
           onKeyDown={handleKeyDown}
           onFocus={() => {
             setIsFocused(true)
             if (suggestions.length > 0) setIsOpen(true)
           }}
-          onBlur={() => setIsFocused(false)}
+          onBlur={() => { setIsFocused(false); }}
           placeholder={loadError || !apiKey ? "Enter address" : placeholder}
           disabled={disabled}
           autoComplete="off"

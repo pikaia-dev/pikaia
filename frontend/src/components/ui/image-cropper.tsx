@@ -136,7 +136,7 @@ export function ImageCropper({
               max={3}
               step={0.1}
               value={zoom}
-              onChange={(e) => setZoom(Number(e.target.value))}
+              onChange={(e) => { setZoom(Number(e.target.value)); }}
               className={cn(
                 "flex-1 h-2 rounded-full appearance-none cursor-pointer",
                 "bg-muted",

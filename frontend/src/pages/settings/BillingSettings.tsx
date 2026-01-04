@@ -83,7 +83,7 @@ export default function BillingSettings() {
         setVatId(orgData.billing.vat_id)
         setSubscription(subData)
       })
-      .finally(() => setLoading(false))
+      .finally(() => { setLoading(false); })
   }, [getOrganization, getSubscription])
 
   // Fetch invoices when subscription is active
@@ -98,7 +98,7 @@ export default function BillingSettings() {
         .catch((err) => {
           console.error("Failed to load invoices:", err)
         })
-        .finally(() => setInvoicesLoading(false))
+        .finally(() => { setInvoicesLoading(false); })
     }
   }, [subscription, listInvoices])
 
@@ -274,7 +274,7 @@ export default function BillingSettings() {
                 <PaymentForm
                   quantity={memberCount}
                   onSuccess={handleUpgradeSuccess}
-                  onCancel={() => setShowUpgradeForm(false)}
+                  onCancel={() => { setShowUpgradeForm(false); }}
                 />
               </div>
             ) : isSubscribed ? (
@@ -331,7 +331,7 @@ export default function BillingSettings() {
                     {memberCount} {memberCount === 1 ? "member" : "members"}
                   </p>
                 </div>
-                <Button onClick={() => setShowUpgradeForm(true)}>
+                <Button onClick={() => { setShowUpgradeForm(true); }}>
                   Upgrade to Pro
                 </Button>
               </div>
@@ -409,7 +409,7 @@ export default function BillingSettings() {
                       id="billingEmail"
                       type="email"
                       value={billingEmail}
-                      onChange={(e) => setBillingEmail(e.target.value)}
+                      onChange={(e) => { setBillingEmail(e.target.value); }}
                       className="w-full max-w-sm px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                       placeholder="billing@company.com"
                       required
@@ -447,7 +447,7 @@ export default function BillingSettings() {
                   id="billingName"
                   type="text"
                   value={billingName}
-                  onChange={(e) => setBillingName(e.target.value)}
+                  onChange={(e) => { setBillingName(e.target.value); }}
                   className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   placeholder="Acme Corporation Inc."
                 />
@@ -464,7 +464,7 @@ export default function BillingSettings() {
                 <AddressAutocomplete
                   id="line1"
                   value={address.line1}
-                  onChange={(value) => updateAddress("line1", value)}
+                  onChange={(value) => { updateAddress("line1", value); }}
                   onAddressSelect={handleAddressSelect}
                   placeholder="Start typing to search..."
                 />
@@ -485,7 +485,7 @@ export default function BillingSettings() {
                   id="line2"
                   type="text"
                   value={address.line2}
-                  onChange={(e) => updateAddress("line2", e.target.value)}
+                  onChange={(e) => { updateAddress("line2", e.target.value); }}
                   className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   placeholder="Apt, Suite, Floor (optional)"
                 />
@@ -503,7 +503,7 @@ export default function BillingSettings() {
                     id="city"
                     type="text"
                     value={address.city}
-                    onChange={(e) => updateAddress("city", e.target.value)}
+                    onChange={(e) => { updateAddress("city", e.target.value); }}
                     className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
@@ -519,7 +519,7 @@ export default function BillingSettings() {
                     id="state"
                     type="text"
                     value={address.state}
-                    onChange={(e) => updateAddress("state", e.target.value)}
+                    onChange={(e) => { updateAddress("state", e.target.value); }}
                     className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
@@ -536,7 +536,7 @@ export default function BillingSettings() {
                     type="text"
                     value={address.postal_code}
                     onChange={(e) =>
-                      updateAddress("postal_code", e.target.value)
+                      { updateAddress("postal_code", e.target.value); }
                     }
                     className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
@@ -553,7 +553,7 @@ export default function BillingSettings() {
                   </label>
                   <CountryCombobox
                     value={address.country}
-                    onValueChange={(value) => updateAddress("country", value)}
+                    onValueChange={(value) => { updateAddress("country", value); }}
                     placeholder="Select country..."
                   />
                 </div>
@@ -580,7 +580,7 @@ export default function BillingSettings() {
                               : vatId
                           }
                           onChange={(e) =>
-                            setVatId(currentVatPrefix + e.target.value)
+                            { setVatId(currentVatPrefix + e.target.value); }
                           }
                           className="flex-1 px-3 py-2 border border-border rounded-r-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                           placeholder="123456789"
@@ -591,7 +591,7 @@ export default function BillingSettings() {
                         id="vatId"
                         type="text"
                         value={vatId}
-                        onChange={(e) => setVatId(e.target.value)}
+                        onChange={(e) => { setVatId(e.target.value); }}
                         className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                         placeholder="Enter VAT ID"
                       />

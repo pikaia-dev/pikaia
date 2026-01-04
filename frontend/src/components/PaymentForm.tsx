@@ -84,7 +84,7 @@ function PaymentFormInner({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <PaymentElement
-        onReady={() => setReady(true)}
+        onReady={() => { setReady(true); }}
         options={{
           layout: "tabs",
           wallets: {
