@@ -1,10 +1,31 @@
 #!/usr/bin/env python3
 """
 AWS CDK app entry point for Tango infrastructure.
+
+Stacks:
+- TangoNetwork: VPC, subnets, NAT gateway
+- TangoApp: Aurora PostgreSQL, ECS Fargate, ALB, Secrets Manager
+- TangoMedia: S3 bucket, CloudFront CDN, image transformation Lambda
+- TangoEvents: EventBridge bus, publisher Lambda, DLQ
+
+Usage:
+    # Synth (validate)
+    cdk synth --all
+
+    # Deploy foundation
+    cdk deploy TangoNetwork TangoApp
+
+    # Deploy with custom domain
+    cdk deploy TangoApp --context domain_name=api.example.com --context certificate_arn=arn:aws:acm:...
+
+    # Deploy all
+    cdk deploy --all
 """
 
 import aws_cdk as cdk
 
+from stacks.app_stack import AppStack
+from stacks.events_stack import EventsStack
 from stacks.media_stack import MediaStack
 from stacks.network_stack import NetworkStack
 
@@ -16,16 +37,43 @@ env = cdk.Environment(
     region=app.node.try_get_context("region") or "us-east-1",
 )
 
-# Foundation stacks
+# =============================================================================
+# Foundation: Network
+# =============================================================================
+
 network = NetworkStack(app, "TangoNetwork", env=env)
 
-# Media stack (S3 + CloudFront + image transformation)
+# =============================================================================
+# Application: Database + ECS + ALB
+# =============================================================================
+
+# Context parameters for production deployment
+domain_name = app.node.try_get_context("domain_name")
+certificate_arn = app.node.try_get_context("certificate_arn")
+
+app_stack = AppStack(
+    app,
+    "TangoApp",
+    vpc=network.vpc,
+    domain_name=domain_name,
+    certificate_arn=certificate_arn,
+    min_capacity=2,
+    max_capacity=10,
+    env=env,
+)
+app_stack.add_dependency(network)
+
+# =============================================================================
+# Media: S3 + CloudFront + Image Transformation
+# =============================================================================
+
 # Configuration via cdk.json or --context flag:
 #   cors_origins: CORS allowed origins (default: ["*"])
 #   enable_versioning: Enable S3 versioning for data recovery (default: false)
-# Example: cdk deploy --context cors_origins='["https://app.yourdomain.com"]' --context enable_versioning=true
+# Example: cdk deploy TangoMedia --context cors_origins='["https://app.example.com"]'
 cors_origins = app.node.try_get_context("cors_origins") or ["*"]
 enable_versioning = app.node.try_get_context("enable_versioning") or False
+
 media = MediaStack(
     app,
     "TangoMedia",
@@ -35,9 +83,19 @@ media = MediaStack(
     env=env,
 )
 
-# TODO: Add more stacks as needed
-# database = DatabaseStack(app, "TangoDatabase", vpc=network.vpc, env=env)
-# backend = BackendStack(app, "TangoBackend", vpc=network.vpc, env=env)
-# frontend = FrontendStack(app, "TangoFrontend", env=env)
+# =============================================================================
+# Events: EventBridge + Publisher Lambda + DLQ
+# =============================================================================
+
+events_stack = EventsStack(
+    app,
+    "TangoEvents",
+    vpc=network.vpc,
+    database_secret=app_stack.database_secret,
+    database_security_group=app_stack.database_security_group,
+    event_bus_name="tango-events",
+    env=env,
+)
+events_stack.add_dependency(app_stack)
 
 app.synth()
