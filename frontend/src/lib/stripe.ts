@@ -4,6 +4,7 @@
  */
 
 import { loadStripe, type Stripe } from "@stripe/stripe-js"
+
 import { config } from "./env"
 
 let stripePromise: Promise<Stripe | null> | null = null

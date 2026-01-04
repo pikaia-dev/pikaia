@@ -9,17 +9,18 @@
  * - Dynamic placeholder based on selected country
  */
 
-import { useState, useEffect, useMemo, useCallback } from "react"
 import {
-  parsePhoneNumber,
-  getExampleNumber,
   AsYouType,
   type CountryCode,
+  getExampleNumber,
+  parsePhoneNumber,
 } from "libphonenumber-js"
 import examples from "libphonenumber-js/mobile/examples"
+import { Check,ChevronDown } from "lucide-react"
+import { useCallback,useEffect, useMemo, useState } from "react"
+
 import { COUNTRIES, getCountryByCode } from "../../lib/countries"
 import { cn } from "../../lib/utils"
-import { Popover, PopoverContent, PopoverTrigger } from "./popover"
 import {
   Command,
   CommandEmpty,
@@ -28,7 +29,7 @@ import {
   CommandItem,
   CommandList,
 } from "./command"
-import { ChevronDown, Check } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "./popover"
 
 interface PhoneNumberInputProps {
   /** Phone number in E.164 format (e.g., "+14155551234") */

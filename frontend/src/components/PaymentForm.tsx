@@ -5,19 +5,20 @@
  * Used for in-app subscription checkout without redirect.
  */
 
-import { useState, useEffect } from "react"
 import {
   Elements,
   PaymentElement,
-  useStripe,
   useElements,
+  useStripe,
 } from "@stripe/react-stripe-js"
 import type { StripeElementsOptions } from "@stripe/stripe-js"
+import { useEffect,useState } from "react"
+import { toast } from "sonner"
+
+import { useApi } from "../hooks/useApi"
+import { getStripe } from "../lib/stripe"
 import { Button } from "./ui/button"
 import { LoadingSpinner } from "./ui/loading-spinner"
-import { getStripe } from "../lib/stripe"
-import { useApi } from "../hooks/useApi"
-import { toast } from "sonner"
 
 interface PaymentFormProps {
   quantity: number

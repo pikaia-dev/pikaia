@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react"
+import { useEffect, useRef,useState } from "react"
 import { toast } from "sonner"
-import { useApi } from "../../hooks/useApi"
+
 import { Button } from "../../components/ui/button"
 import {
   Card,
@@ -9,9 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "../../components/ui/card"
-import { LoadingSpinner } from "../../components/ui/loading-spinner"
-import { ImageUploader } from "../../components/ui/image-uploader"
-import { PhoneNumberInput } from "../../components/ui/phone-number-input"
 import {
   Dialog,
   DialogContent,
@@ -19,6 +16,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../components/ui/dialog"
+import { ImageUploader } from "../../components/ui/image-uploader"
+import { LoadingSpinner } from "../../components/ui/loading-spinner"
+import { PhoneNumberInput } from "../../components/ui/phone-number-input"
+import { useApi } from "../../hooks/useApi"
 
 // Delay before updating state after dialog close animation
 const DIALOG_CLOSE_DELAY_MS = 150

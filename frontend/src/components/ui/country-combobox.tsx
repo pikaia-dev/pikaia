@@ -1,6 +1,6 @@
-import * as React from "react"
 import { Check, ChevronsUpDown } from "lucide-react"
-import { cn } from "@/lib/utils"
+import * as React from "react"
+
 import { Button } from "@/components/ui/button"
 import {
   Command,
@@ -16,7 +16,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { COUNTRIES, getCountryByCode, type Country } from "@/lib/countries"
+import { COUNTRIES, type Country,getCountryByCode } from "@/lib/countries"
+import { cn } from "@/lib/utils"
 
 // Popular countries shown at top
 const POPULAR_CODES = ["US", "GB", "CA", "DE"]
