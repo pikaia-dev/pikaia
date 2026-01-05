@@ -135,22 +135,4 @@ class StytchAuthMiddleware:
         except Exception as e:
             # Catch any other exception (network errors, timeouts, etc.)
             logger.exception("Unexpected error during JWT authentication: %s", e)
-
-
-class TenantContextMiddleware:
-    """
-    Legacy middleware - kept for compatibility.
-
-    Auth context is now set by StytchAuthMiddleware.
-    This middleware can be used for additional tenant-scoping logic.
-    """
-
-    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
-        self.get_response = get_response
-
-    def __call__(self, request: HttpRequest) -> HttpResponse:
-        # Copy from auth middleware to legacy names for compatibility
-        request.organization = getattr(request, "auth_organization", None)  # type: ignore[attr-defined]
-        request.member = getattr(request, "auth_member", None)  # type: ignore[attr-defined]
-
-        return self.get_response(request)
+            logger.exception("Unexpected error during JWT authentication: %s", e)
