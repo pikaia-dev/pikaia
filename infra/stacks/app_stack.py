@@ -94,26 +94,13 @@ class AppStack(Stack):
         # =================================================================
 
         # Application secrets (API keys, etc.)
-        # Template for app secrets (will be populated post-deployment)
-        app_secrets_template = {
-            "STYTCH_PROJECT_ID": "",
-            "STYTCH_SECRET": "",
-            "STRIPE_SECRET_KEY": "",
-            "STRIPE_PRICE_ID": "",
-            "STRIPE_WEBHOOK_SECRET": "",
-            "RESEND_API_KEY": "",
-        }
-
-        self.app_secrets = secretsmanager.Secret(
+        # Import existing secret instead of creating - prevents CDK from
+        # overwriting manually-populated values. The secret must be created
+        # via scripts/bootstrap-secrets.sh BEFORE first deployment.
+        self.app_secrets = secretsmanager.Secret.from_secret_name_v2(
             self,
             "AppSecrets",
             secret_name="tango/app-secrets",
-            description="Application secrets (Stytch, Stripe, etc.)",
-            generate_secret_string=secretsmanager.SecretStringGenerator(
-                secret_string_template=json.dumps(app_secrets_template),
-                generate_string_key="DJANGO_SECRET_KEY",
-                exclude_punctuation=True,
-            ),
         )
 
         # =================================================================
