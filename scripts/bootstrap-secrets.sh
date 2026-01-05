@@ -63,6 +63,15 @@ REQUIRED_VARS=(
     "RESEND_API_KEY"
 )
 
+# Optional but recommended variables
+OPTIONAL_VARS=(
+    "STYTCH_TRUSTED_AUTH_PROFILE_ID"
+    "PASSKEY_JWT_PRIVATE_KEY"
+    "WEBAUTHN_RP_ID"
+    "WEBAUTHN_ORIGIN"
+    "CORS_ALLOWED_ORIGINS"
+)
+
 # Validate all required vars are set
 missing=()
 for var in "${REQUIRED_VARS[@]}"; do
@@ -92,18 +101,38 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
-# Build JSON from env vars
-SECRET_JSON=$(cat <<EOF
-{
-  "DJANGO_SECRET_KEY": "$DJANGO_SECRET_KEY",
-  "STYTCH_PROJECT_ID": "$STYTCH_PROJECT_ID",
-  "STYTCH_SECRET": "$STYTCH_SECRET",
-  "STRIPE_SECRET_KEY": "$STRIPE_SECRET_KEY",
-  "STRIPE_PRICE_ID": "$STRIPE_PRICE_ID",
-  "STRIPE_WEBHOOK_SECRET": "$STRIPE_WEBHOOK_SECRET",
-  "RESEND_API_KEY": "$RESEND_API_KEY"
-}
-EOF
+# Build JSON from env vars (using jq to properly escape values)
+SECRET_JSON=$(jq -n \
+    --arg django_secret "$DJANGO_SECRET_KEY" \
+    --arg stytch_project "$STYTCH_PROJECT_ID" \
+    --arg stytch_secret "$STYTCH_SECRET" \
+    --arg stripe_key "$STRIPE_SECRET_KEY" \
+    --arg stripe_price "$STRIPE_PRICE_ID" \
+    --arg stripe_webhook "$STRIPE_WEBHOOK_SECRET" \
+    --arg resend_key "$RESEND_API_KEY" \
+    --arg trusted_profile "${STYTCH_TRUSTED_AUTH_PROFILE_ID:-}" \
+    --arg trusted_audience "${STYTCH_TRUSTED_AUTH_AUDIENCE:-stytch}" \
+    --arg trusted_issuer "${STYTCH_TRUSTED_AUTH_ISSUER:-passkey-auth}" \
+    --arg passkey_key "${PASSKEY_JWT_PRIVATE_KEY:-}" \
+    --arg webauthn_rp "${WEBAUTHN_RP_ID:-}" \
+    --arg webauthn_origin "${WEBAUTHN_ORIGIN:-}" \
+    --arg cors_origins "${CORS_ALLOWED_ORIGINS:-}" \
+    '{
+        DJANGO_SECRET_KEY: $django_secret,
+        STYTCH_PROJECT_ID: $stytch_project,
+        STYTCH_SECRET: $stytch_secret,
+        STRIPE_SECRET_KEY: $stripe_key,
+        STRIPE_PRICE_ID: $stripe_price,
+        STRIPE_WEBHOOK_SECRET: $stripe_webhook,
+        RESEND_API_KEY: $resend_key,
+        STYTCH_TRUSTED_AUTH_PROFILE_ID: $trusted_profile,
+        STYTCH_TRUSTED_AUTH_AUDIENCE: $trusted_audience,
+        STYTCH_TRUSTED_AUTH_ISSUER: $trusted_issuer,
+        PASSKEY_JWT_PRIVATE_KEY: $passkey_key,
+        WEBAUTHN_RP_ID: $webauthn_rp,
+        WEBAUTHN_ORIGIN: $webauthn_origin,
+        CORS_ALLOWED_ORIGINS: $cors_origins
+    }'
 )
 
 # Update secrets
