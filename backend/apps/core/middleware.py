@@ -132,6 +132,9 @@ class StytchAuthMiddleware:
         except StytchError as e:
             # Invalid/expired JWT - request continues unauthenticated
             logger.debug("JWT authentication failed: %s", e.details.error_message)
+        except Exception as e:
+            # Catch any other exception (network errors, timeouts, etc.)
+            logger.exception("Unexpected error during JWT authentication: %s", e)
 
 
 class TenantContextMiddleware:
