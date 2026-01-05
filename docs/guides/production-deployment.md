@@ -200,6 +200,10 @@ The repository includes GitHub Actions workflows for automatic deployment:
 | Var | `FRONTEND_BUCKET` | S3 bucket for frontend |
 | Var | `CLOUDFRONT_DISTRIBUTION_ID` | Frontend CloudFront ID |
 | Var | `VITE_API_URL` | Backend API URL for frontend build |
+| Secret | `VITE_STYTCH_PUBLIC_TOKEN` | Stytch public token (required) |
+| Var | `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (optional) |
+| Var | `VITE_GOOGLE_PLACES_API_KEY` | Google Places API key (optional) |
+
 
 ## Next Steps
 
