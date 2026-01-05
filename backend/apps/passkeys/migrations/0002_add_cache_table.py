@@ -3,6 +3,26 @@
 from django.db import migrations
 
 
+def create_cache_table(apps, schema_editor):
+    """
+    Intentionally left as a no-op.
+    Django's cache framework should manage any database-backed cache tables
+    (via the `createcachetable` management command) rather than
+    having them created in application migrations.
+    """
+    # No action taken; cache table creation should be handled outside migrations.
+    pass
+
+
+def drop_cache_table(apps, schema_editor):
+    """
+    Intentionally left as a no-op.
+    The cache table, if used, is managed externally to the app's migrations.
+    """
+    # No action taken; cache table deletion should be handled outside migrations.
+    pass
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,15 +30,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunSQL(
-            """
-            CREATE TABLE IF NOT EXISTS django_cache (
-                cache_key VARCHAR(255) NOT NULL PRIMARY KEY,
-                value TEXT NOT NULL,
-                expires TIMESTAMPTZ NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS django_cache_expires_idx ON django_cache (expires);
-            """,
-            reverse_sql="DROP TABLE IF EXISTS django_cache;",
+        migrations.RunPython(
+            code=create_cache_table,
+            reverse_code=drop_cache_table,
         ),
     ]
