@@ -76,7 +76,7 @@ function PasskeyFirstLogin({
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="space-y-2">
             <GoogleOAuthButton
               onClick={startGoogleOAuth}
               isLoading={isLoading}
@@ -84,9 +84,9 @@ function PasskeyFirstLogin({
             <button
               type="button"
               onClick={() => setShowAlternatives(true)}
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
             >
-              Email
+              Send Magic Link
             </button>
           </div>
         </div>
@@ -178,13 +178,19 @@ export default function Login() {
           <PasskeyFirstLogin
             onPasskeySuccess={(result) => {
               // Passkey auth returns real Stytch session tokens via sessions.attest()
+              console.log("Passkey auth result:", result)
               if (result.session_token && result.session_token !== "passkey_authenticated") {
                 // Store session token for Stytch SDK to read on init
                 localStorage.setItem("stytch_session_token", result.session_token)
+                localStorage.setItem("stytch_session_jwt", result.session_jwt)
+                console.log("Tokens stored, redirecting to dashboard")
                 toast.success("Authenticated! Redirecting...")
                 // Use full page redirect so Stytch SDK reinitializes with new token
-                window.location.href = "/dashboard"
+                setTimeout(() => {
+                  window.location.href = "/dashboard"
+                }, 100)
               } else {
+                console.error("Invalid session result:", result)
                 toast.error("Authentication failed - no session received")
               }
             }}
