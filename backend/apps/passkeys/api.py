@@ -4,6 +4,7 @@ Passkey (WebAuthn) API endpoints.
 Provides endpoints for passkey registration, authentication, and management.
 """
 
+import json
 import logging
 
 from django.http import HttpRequest
@@ -53,7 +54,7 @@ def get_registration_options(request: HttpRequest) -> PasskeyRegistrationOptions
 
     return PasskeyRegistrationOptionsResponse(
         challenge_id=result.challenge_id,
-        options=result.options_json,
+        options=json.loads(result.options_json),
     )
 
 
@@ -109,7 +110,7 @@ def get_authentication_options(
 
     return PasskeyAuthenticationOptionsResponse(
         challenge_id=result.challenge_id,
-        options=result.options_json,
+        options=json.loads(result.options_json),
     )
 
 
