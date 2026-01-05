@@ -28,7 +28,26 @@ env:
   ECS_SECURITY_GROUPS: ${{ vars.ECS_SECURITY_GROUPS }}
 
 jobs:
+  # Check which paths changed to determine if CDK deploy is needed
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      infra: ${{ steps.filter.outputs.infra }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            infra:
+              - 'infra/**'
+            backend:
+              - 'backend/**'
+              - 'emails/**'
+
   deploy:
+    needs: changes
     runs-on: ubuntu-latest
     environment: demo
 
@@ -46,6 +65,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push Docker image
+        if: needs.changes.outputs.backend == 'true'
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
@@ -53,7 +73,29 @@ jobs:
           docker push "${ECR_REPOSITORY}:${IMAGE_TAG}"
           docker push "${ECR_REPOSITORY}:latest"
 
+      # Run CDK deploy when infra changes to update task definition, IAM roles, etc.
+      - name: Setup Python for CDK
+        if: needs.changes.outputs.infra == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup Node.js for CDK
+        if: needs.changes.outputs.infra == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install CDK and deploy infrastructure
+        if: needs.changes.outputs.infra == 'true'
+        working-directory: infra
+        run: |
+          npm install -g aws-cdk
+          pip install -r requirements.txt
+          cdk deploy TangoMedia TangoApp --require-approval never
+
       - name: Prepare and register new task definition revision
+        if: needs.changes.outputs.backend == 'true' && needs.changes.outputs.infra != 'true'
         id: td
         env:
           NEW_IMAGE: ${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
@@ -80,7 +122,8 @@ jobs:
           MIGRATE_CONTAINER=$(jq -r '.containerDefinitions[0].name' td.json)
           echo "migrateContainer=${MIGRATE_CONTAINER}" >> "$GITHUB_OUTPUT"
 
-      - name: Update ECS service and wait for stability
+      - name: Update ECS service and wait for stability (backend-only changes)
+        if: needs.changes.outputs.backend == 'true' && needs.changes.outputs.infra != 'true'
         run: |
           aws ecs update-service \
             --cluster "${ECS_CLUSTER}" \
@@ -93,13 +136,42 @@ jobs:
             --cluster "${ECS_CLUSTER}" \
             --services "${ECS_SERVICE}"
 
+      - name: Force new deployment after CDK (infra changes)
+        if: needs.changes.outputs.infra == 'true'
+        run: |
+          aws ecs update-service \
+            --cluster "${ECS_CLUSTER}" \
+            --service "${ECS_SERVICE}" \
+            --force-new-deployment \
+            --output json > service-update.json
+
+          aws ecs wait services-stable \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_SERVICE}"
+
+      - name: Get task definition for migrations
+        id: get-td
+        run: |
+          TD_ARN=$(aws ecs describe-services \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_SERVICE}" \
+            --query 'services[0].taskDefinition' \
+            --output text)
+          echo "taskDefinitionArn=${TD_ARN}" >> "$GITHUB_OUTPUT"
+          
+          MIGRATE_CONTAINER=$(aws ecs describe-task-definition \
+            --task-definition "${TD_ARN}" \
+            --query 'taskDefinition.containerDefinitions[0].name' \
+            --output text)
+          echo "migrateContainer=${MIGRATE_CONTAINER}" >> "$GITHUB_OUTPUT"
+
       - name: Run Django migrations
         run: |
           aws ecs run-task \
             --cluster "${ECS_CLUSTER}" \
             --launch-type FARGATE \
-            --task-definition "${{ steps.td.outputs.taskDefinitionArn }}" \
+            --task-definition "${{ steps.get-td.outputs.taskDefinitionArn }}" \
             --network-configuration "awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUPS}],assignPublicIp=DISABLED}" \
             --count 1 \
-            --overrides "{\"containerOverrides\":[{\"name\":\"${{ steps.td.outputs.migrateContainer }}\",\"command\":[\"python\",\"manage.py\",\"migrate\"]}]}" \
+            --overrides "{\"containerOverrides\":[{\"name\":\"${{ steps.get-td.outputs.migrateContainer }}\",\"command\":[\"python\",\"manage.py\",\"migrate\"]}]}" \
             --output json > migrations-run.json
