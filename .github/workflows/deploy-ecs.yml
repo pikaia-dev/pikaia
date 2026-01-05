@@ -173,6 +173,17 @@ jobs:
             --output text)
           echo "migrateContainer=${MIGRATE_CONTAINER}" >> "$GITHUB_OUTPUT"
 
+      - name: Create cache table
+        run: |
+          aws ecs run-task \
+            --cluster "${ECS_CLUSTER}" \
+            --launch-type FARGATE \
+            --task-definition "${{ steps.get-td.outputs.taskDefinitionArn }}" \
+            --network-configuration "awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUPS}],assignPublicIp=DISABLED}" \
+            --count 1 \
+            --overrides "{\"containerOverrides\":[{\"name\":\"${{ steps.get-td.outputs.migrateContainer }}\",\"command\":[\"python\",\"manage.py\",\"createcachetable\"]}]}" \
+            --output json > cache-table-run.json
+
       - name: Run Django migrations
         run: |
           aws ecs run-task \
