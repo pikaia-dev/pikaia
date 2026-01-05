@@ -11,6 +11,9 @@ from typing import Any
 import jwt
 from django.conf import settings
 
+# Token expiration: 5 minutes (short-lived for security)
+TRUSTED_AUTH_TOKEN_EXPIRY_SECONDS = 300
+
 
 def create_trusted_auth_token(
     email: str,
@@ -42,7 +45,7 @@ def create_trusted_auth_token(
         "iss": settings.STYTCH_TRUSTED_AUTH_ISSUER,  # Standard JWT issuer
         "aud": settings.STYTCH_TRUSTED_AUTH_AUDIENCE,  # Standard JWT audience
         "iat": now,
-        "exp": now + 300,  # 5 minute expiry (short-lived)
+        "exp": now + TRUSTED_AUTH_TOKEN_EXPIRY_SECONDS,
         # Optional claims that map to Stytch fields (per attribute mapping)
         "org_id": organization_id,  # Maps to organization_id
         "member_id": member_id,  # Maps to external_member_id
