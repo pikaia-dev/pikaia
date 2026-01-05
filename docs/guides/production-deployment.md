@@ -58,6 +58,9 @@ Edit `.env.production` with real values:
 | `STRIPE_PRICE_ID` | [Stripe Dashboard](https://dashboard.stripe.com/products) → Your product → Price ID |
 | `STRIPE_WEBHOOK_SECRET` | See Step 5 below |
 | `RESEND_API_KEY` | [Resend Dashboard](https://resend.com/api-keys) |
+| `WEBAUTHN_RP_ID` | Your domain (e.g., `app.example.com`) |
+| `WEBAUTHN_RP_NAME` | Display name for passkey prompts |
+| `WEBAUTHN_ORIGIN` | Full HTTPS URL (e.g., `https://app.example.com`) |
 
 ### 3.3 Push secrets to AWS
 
