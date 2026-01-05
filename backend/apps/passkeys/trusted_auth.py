@@ -36,16 +36,16 @@ def create_trusted_auth_token(
     now = int(time.time())
 
     payload: dict[str, Any] = {
-        # Required claims for Stytch
-        "sub": str(user_id),  # Maps to token_id
-        "email": email,  # Maps to email
-        "iss": settings.STYTCH_TRUSTED_AUTH_ISSUER,
-        "aud": settings.STYTCH_TRUSTED_AUTH_AUDIENCE,
+        # Required claims for Stytch Trusted Auth
+        "token_id": str(user_id),  # Required: unique identifier for the token
+        "email": email,  # Required: user's email address
+        "iss": settings.STYTCH_TRUSTED_AUTH_ISSUER,  # Standard JWT issuer
+        "aud": settings.STYTCH_TRUSTED_AUTH_AUDIENCE,  # Standard JWT audience
         "iat": now,
         "exp": now + 300,  # 5 minute expiry (short-lived)
-        # Custom claims for context
-        "stytch_member_id": member_id,
-        "stytch_org_id": organization_id,
+        # Optional claims that map to Stytch fields (per attribute mapping)
+        "org_id": organization_id,  # Maps to organization_id
+        "member_id": member_id,  # Maps to external_member_id
     }
 
     # Sign with RS256 using our private key
