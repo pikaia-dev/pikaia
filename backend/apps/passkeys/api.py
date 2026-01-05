@@ -124,6 +124,10 @@ def verify_authentication(
     payload: PasskeyAuthenticationVerifyRequest,
 ) -> PasskeyAuthenticationVerifyResponse:
     """Verify authentication response and create Stytch session."""
+    from django.conf import settings as django_settings
+
+    from apps.passkeys.trusted_auth import create_trusted_auth_token
+
     service = get_passkey_service()
 
     try:
@@ -135,39 +139,40 @@ def verify_authentication(
     except ValueError as e:
         raise HttpError(401, str(e))
 
-    # Create Stytch session for the authenticated user
+    # Create a trusted auth token for Stytch session attestation
+    try:
+        trusted_token = create_trusted_auth_token(
+            email=result.user.email,
+            member_id=result.member.stytch_member_id,
+            organization_id=result.member.organization.stytch_org_id,
+            user_id=result.user.id,
+        )
+    except ValueError as e:
+        logger.error("Failed to create trusted auth token: %s", e)
+        raise HttpError(500, "Passkey authentication not configured")
+
+    # Exchange trusted token for real Stytch session
     stytch = get_stytch_client()
 
     try:
-        # Use Stytch's session creation for the member
-        # Note: Call kept for potential side effects, result not used
-        _ = stytch.sessions.authenticate_jwt(
+        attest_response = stytch.sessions.attest(
+            profile_id=django_settings.STYTCH_TRUSTED_AUTH_PROFILE_ID,
+            token=trusted_token,
+            organization_id=result.member.organization.stytch_org_id,
             session_duration_minutes=43200,  # 30 days
         )
-        # Note: This approach may not work directly - Stytch B2B might not allow
-        # programmatic session creation without their auth flow.
-        # Fallback: Return member/org info and let frontend handle session
-        # via a discovery exchange or similar flow.
 
-        # For now, we'll create a placeholder response
-        # The frontend will need to call discovery.exchange() with the returned info
         return PasskeyAuthenticationVerifyResponse(
-            session_token="passkey_authenticated",  # Placeholder
-            session_jwt="passkey_authenticated",  # Placeholder
+            session_token=attest_response.session_token,
+            session_jwt=attest_response.session_jwt,
             member_id=result.member.stytch_member_id,
             organization_id=result.member.organization.stytch_org_id,
             user_id=result.user.id,
         )
     except Exception as e:
-        logger.warning("Failed to create Stytch session after passkey auth: %s", e)
-        # Return member info anyway - frontend can handle session creation
-        return PasskeyAuthenticationVerifyResponse(
-            session_token="passkey_authenticated",
-            session_jwt="passkey_authenticated",
-            member_id=result.member.stytch_member_id,
-            organization_id=result.member.organization.stytch_org_id,
-            user_id=result.user.id,
-        )
+        logger.error("Stytch session attestation failed: %s", e)
+        raise HttpError(500, f"Failed to create session: {e}")
+
 
 
 # --- Management (requires authentication) ---

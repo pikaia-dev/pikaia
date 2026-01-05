@@ -61,6 +61,10 @@ Edit `.env.production` with real values:
 | `WEBAUTHN_RP_ID` | Your domain (e.g., `app.example.com`) |
 | `WEBAUTHN_RP_NAME` | Display name for passkey prompts |
 | `WEBAUTHN_ORIGIN` | Full HTTPS URL (e.g., `https://app.example.com`) |
+| `STYTCH_TRUSTED_AUTH_PROFILE_ID` | [Stytch Dashboard](https://stytch.com/dashboard/trusted-auth-tokens) → Create profile |
+| `STYTCH_TRUSTED_AUTH_AUDIENCE` | Must match Stytch profile (default: `stytch`) |
+| `STYTCH_TRUSTED_AUTH_ISSUER` | Must match Stytch profile (default: `passkey-auth`) |
+| `PASSKEY_JWT_PRIVATE_KEY` | RSA private key PEM (newlines escaped as `\n`) |
 | `CORS_ALLOWED_ORIGINS` | Frontend URL(s), comma-separated (e.g., `https://app.example.com`) |
 
 ### 3.3 Push secrets to AWS

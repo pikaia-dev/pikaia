@@ -12,6 +12,8 @@ import {
 
 interface PasskeyLoginButtonProps {
     onSuccess: (result: {
+        session_token: string
+        session_jwt: string
         member_id: string
         organization_id: string
         user_id: number
@@ -38,11 +40,8 @@ export function PasskeyLoginButton({
             const result = await authenticateMutation.mutateAsync({})
             // Remember that this user has a passkey
             setPasskeyHint()
-            onSuccess({
-                member_id: result.member_id,
-                organization_id: result.organization_id,
-                user_id: result.user_id,
-            })
+            // Pass full result including session tokens
+            onSuccess(result)
         } catch (error) {
             toast.error(
                 error instanceof Error ? error.message : "Passkey authentication failed"

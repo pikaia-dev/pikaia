@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     WEBAUTHN_RP_ID: str = "localhost"
     WEBAUTHN_ORIGIN: str = "http://localhost:5173"
 
+    # Stytch Trusted Auth Token (for passkey -> Stytch session)
+    STYTCH_TRUSTED_AUTH_PROFILE_ID: str = ""  # From Stytch dashboard
+    STYTCH_TRUSTED_AUTH_AUDIENCE: str = "stytch"  # Must match dashboard config
+    STYTCH_TRUSTED_AUTH_ISSUER: str = "passkey-auth"  # Must match dashboard config
+    PASSKEY_JWT_PRIVATE_KEY: str = ""  # RSA private key (PEM format)
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
@@ -237,3 +243,9 @@ EVENT_BUS_NAME = settings.EVENT_BUS_NAME
 WEBAUTHN_RP_ID = settings.WEBAUTHN_RP_ID if hasattr(settings, "WEBAUTHN_RP_ID") else "localhost"
 WEBAUTHN_RP_NAME = "Tango B2B"
 WEBAUTHN_ORIGIN = settings.WEBAUTHN_ORIGIN if hasattr(settings, "WEBAUTHN_ORIGIN") else "http://localhost:5173"
+
+# Stytch Trusted Auth Token (for passkey -> Stytch session)
+STYTCH_TRUSTED_AUTH_PROFILE_ID = settings.STYTCH_TRUSTED_AUTH_PROFILE_ID
+STYTCH_TRUSTED_AUTH_AUDIENCE = settings.STYTCH_TRUSTED_AUTH_AUDIENCE
+STYTCH_TRUSTED_AUTH_ISSUER = settings.STYTCH_TRUSTED_AUTH_ISSUER
+PASSKEY_JWT_PRIVATE_KEY = settings.PASSKEY_JWT_PRIVATE_KEY

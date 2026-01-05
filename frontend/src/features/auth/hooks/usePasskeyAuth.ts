@@ -370,11 +370,7 @@ export function useAuthenticateWithPasskey() {
                     }
                 )
 
-            // Note: The backend currently returns placeholder tokens.
-            // In a full implementation, we would need to exchange these for a real
-            // Stytch session. For now, we'll use discovery exchange if available.
-            // This is a limitation to be addressed in a future iteration.
-
+            // Backend returns real Stytch session tokens via sessions.attest()
             return verifyResponse
         },
     })

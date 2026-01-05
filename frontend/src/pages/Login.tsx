@@ -20,6 +20,8 @@ import {
 // Props for the passkey-first login UI
 interface PasskeyFirstLoginProps {
   onPasskeySuccess: (result: {
+    session_token: string
+    session_jwt: string
     member_id: string
     organization_id: string
     user_id: number
@@ -175,12 +177,15 @@ export default function Login() {
         {state.step === "email" && (
           <PasskeyFirstLogin
             onPasskeySuccess={(result) => {
-              // Passkey auth succeeded - show success message
-              // TODO: Integrate with Stytch session creation for full flow
-              toast.success(`Authenticated! Redirecting...`)
-              // For now, we can't create a real session without Stytch integration
-              // The user would need to complete OAuth or magic link for full session
-              console.log("Passkey auth result:", result)
+              // Passkey auth returns real Stytch session tokens via sessions.attest()
+              // Store the session token in localStorage for the Stytch SDK to pick up
+              if (result.session_token && result.session_token !== "passkey_authenticated") {
+                // Store session for Stytch SDK - it will be picked up on next page load
+                localStorage.setItem("stytch_session_token", result.session_token)
+              }
+              toast.success("Authenticated! Redirecting...")
+              // Navigate to dashboard - the session will be validated by middleware
+              void navigate("/dashboard", { replace: true })
             }}
             startGoogleOAuth={startGoogleOAuth}
             sendMagicLink={sendMagicLink}
