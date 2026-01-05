@@ -79,7 +79,7 @@ jobs:
         if: needs.changes.outputs.infra == 'true'
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.14'
 
       - name: Setup Node.js for CDK
         if: needs.changes.outputs.infra == 'true'
