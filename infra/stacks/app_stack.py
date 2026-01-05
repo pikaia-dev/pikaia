@@ -220,6 +220,36 @@ class AppStack(Stack):
                     self.app_secrets,
                     field="CORS_ALLOWED_ORIGINS",
                 ),
+                # WebAuthn / Passkeys configuration
+                "WEBAUTHN_RP_ID": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="WEBAUTHN_RP_ID",
+                ),
+                "WEBAUTHN_RP_NAME": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="WEBAUTHN_RP_NAME",
+                ),
+                "WEBAUTHN_ORIGIN": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="WEBAUTHN_ORIGIN",
+                ),
+                # Stytch Trusted Auth Token (for passkey -> Stytch session)
+                "STYTCH_TRUSTED_AUTH_PROFILE_ID": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="STYTCH_TRUSTED_AUTH_PROFILE_ID",
+                ),
+                "STYTCH_TRUSTED_AUTH_AUDIENCE": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="STYTCH_TRUSTED_AUTH_AUDIENCE",
+                ),
+                "STYTCH_TRUSTED_AUTH_ISSUER": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="STYTCH_TRUSTED_AUTH_ISSUER",
+                ),
+                "PASSKEY_JWT_PRIVATE_KEY": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="PASSKEY_JWT_PRIVATE_KEY",
+                ),
             },
             health_check=ecs.HealthCheck(
                 command=["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"],
