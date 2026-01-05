@@ -50,6 +50,9 @@ jobs:
         working-directory: frontend
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_STYTCH_PUBLIC_TOKEN: ${{ secrets.VITE_STYTCH_PUBLIC_TOKEN }}
+          VITE_STRIPE_PUBLISHABLE_KEY: ${{ vars.VITE_STRIPE_PUBLISHABLE_KEY }}
+          VITE_GOOGLE_PLACES_API_KEY: ${{ vars.VITE_GOOGLE_PLACES_API_KEY }}
         run: pnpm build
 
       - name: Configure AWS credentials (OIDC)
