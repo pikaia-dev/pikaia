@@ -2,7 +2,8 @@
 
 ## Overview
 
-Authentication is handled by [Stytch B2B](https://stytch.com/b2b):
+Authentication is handled by [Stytch B2B](https://stytch.com/b2b) with native WebAuthn passkey support:
+- **Passkeys (WebAuthn)** — Passwordless biometric authentication
 - Magic link email authentication
 - Google OAuth sign-in
 - Organization discovery (multi-org access)
@@ -113,6 +114,60 @@ Stytch webhooks provide real-time synchronization when changes occur outside aut
 3. Enable events: `member.update`, `member.delete`, `organization.update`
 
 > **Note:** Webhooks use Svix for delivery with automatic retries and signature verification.
+
+## Passkeys (WebAuthn)
+
+Native WebAuthn passkey support for passwordless biometric authentication (Face ID, Touch ID, Windows Hello).
+
+### Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Backend
+    participant Authenticator
+
+    User->>Frontend: Click "Sign in with Passkey"
+    Frontend->>Backend: POST /auth/passkeys/authenticate/options
+    Backend-->>Frontend: challenge + options
+    Frontend->>Authenticator: navigator.credentials.get()
+    Authenticator-->>Frontend: Signed credential
+    Frontend->>Backend: POST /auth/passkeys/authenticate/verify
+    Backend-->>Frontend: Session tokens
+```
+
+### API Endpoints
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `POST /auth/passkeys/register/options` | Required | Get registration options |
+| `POST /auth/passkeys/register/verify` | Required | Complete registration |
+| `POST /auth/passkeys/authenticate/options` | Public | Get authentication options |
+| `POST /auth/passkeys/authenticate/verify` | Public | Verify and create session |
+| `GET /auth/passkeys` | Required | List user's passkeys |
+| `DELETE /auth/passkeys/{id}` | Required | Delete a passkey |
+
+### Configuration
+
+Backend environment variables:
+
+```env
+WEBAUTHN_RP_ID=localhost          # Your domain (no protocol/port)
+WEBAUTHN_RP_NAME=Your App         # Display name in browser prompts
+WEBAUTHN_ORIGIN=http://localhost:5173  # Full origin URL
+```
+
+> **Production:** Set `WEBAUTHN_RP_ID` to your domain (e.g., `app.example.com`) and `WEBAUTHN_ORIGIN` to your full HTTPS URL.
+
+### Browser Support
+
+Passkeys work in modern browsers with biometric hardware:
+- ✅ Chrome/Edge 108+ (Windows Hello, Android)
+- ✅ Safari 16+ (Touch ID, Face ID)
+- ✅ Firefox 122+ (experimental)
+
+The frontend gracefully degrades when passkeys aren't supported.
 
 ## Google OAuth
 

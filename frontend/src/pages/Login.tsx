@@ -1,6 +1,7 @@
 import { useStytchMemberSession } from "@stytch/react/b2b"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 
 import { LoadingSpinner } from "../components/ui/loading-spinner"
 import {
@@ -8,8 +9,139 @@ import {
   EmailLoginForm,
   GoogleOAuthButton,
   OrganizationSelector,
+  PasskeyLoginButton,
 } from "../features/auth/components"
 import { useDiscoveryAuth } from "../features/auth/hooks"
+import {
+  hasPasskeyHint,
+  isWebAuthnSupported,
+} from "../features/auth/hooks/usePasskeyAuth"
+
+// Props for the passkey-first login UI
+interface PasskeyFirstLoginProps {
+  onPasskeySuccess: (result: {
+    session_token: string
+    session_jwt: string
+    member_id: string
+    organization_id: string
+    user_id: number
+  }) => void
+  startGoogleOAuth: () => void
+  sendMagicLink: (email: string) => void
+  isLoading: boolean
+  error: string | null
+}
+
+/**
+ * Component that shows passkey-first login for returning users,
+ * or standard login for new users / users without passkeys.
+ */
+function PasskeyFirstLogin({
+  onPasskeySuccess,
+  startGoogleOAuth,
+  sendMagicLink,
+  isLoading,
+  error,
+}: PasskeyFirstLoginProps) {
+  const [showAlternatives, setShowAlternatives] = useState(false)
+  const showPasskeyFirst = isWebAuthnSupported() && hasPasskeyHint()
+
+  // Passkey-first UI for returning users
+  if (showPasskeyFirst && !showAlternatives) {
+    return (
+      <>
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Welcome back
+          </h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            Sign in with your passkey
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <PasskeyLoginButton
+            onSuccess={onPasskeySuccess}
+            variant="primary"
+          />
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-background px-2 text-muted-foreground">
+                Other sign in options
+              </span>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <GoogleOAuthButton
+              onClick={startGoogleOAuth}
+              isLoading={isLoading}
+            />
+            <button
+              type="button"
+              onClick={() => { setShowAlternatives(true); }}
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+            >
+              Email
+            </button>
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  // Standard login UI (no passkey hint or user clicked alternatives)
+  return (
+    <>
+      <div className="text-center mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Welcome back
+        </h1>
+        <p className="text-sm text-muted-foreground mt-2">
+          Sign in with Google or enter your email
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <GoogleOAuthButton
+          onClick={startGoogleOAuth}
+          isLoading={isLoading}
+        />
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">
+              Or continue with
+            </span>
+          </div>
+        </div>
+
+        <EmailLoginForm
+          onSubmit={sendMagicLink}
+          isLoading={isLoading}
+          error={error}
+        />
+
+        {/* Show passkey link for users who might have one */}
+        {isWebAuthnSupported() && (
+          <div className="text-center">
+            <PasskeyLoginButton
+              onSuccess={onPasskeySuccess}
+              variant="link"
+            />
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
 
 export default function Login() {
   const navigate = useNavigate()
@@ -43,40 +175,24 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-sm p-8">
         {state.step === "email" && (
-          <>
-            <div className="text-center mb-6">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                Welcome back
-              </h1>
-              <p className="text-sm text-muted-foreground mt-2">
-                Sign in with Google or enter your email
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <GoogleOAuthButton
-                onClick={startGoogleOAuth}
-                isLoading={state.isLoading}
-              />
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    Or continue with
-                  </span>
-                </div>
-              </div>
-
-              <EmailLoginForm
-                onSubmit={sendMagicLink}
-                isLoading={state.isLoading}
-                error={state.error}
-              />
-            </div>
-          </>
+          <PasskeyFirstLogin
+            onPasskeySuccess={(result) => {
+              // Passkey auth returns real Stytch session tokens via sessions.attest()
+              if (result.session_token && result.session_token !== "passkey_authenticated") {
+                // Store session token for Stytch SDK to read on init
+                localStorage.setItem("stytch_session_token", result.session_token)
+                toast.success("Authenticated! Redirecting...")
+                // Use full page redirect so Stytch SDK reinitializes with new token
+                window.location.href = "/dashboard"
+              } else {
+                toast.error("Authentication failed - no session received")
+              }
+            }}
+            startGoogleOAuth={startGoogleOAuth}
+            sendMagicLink={sendMagicLink}
+            isLoading={state.isLoading}
+            error={state.error}
+          />
         )}
 
         {state.step === "check-email" && (
