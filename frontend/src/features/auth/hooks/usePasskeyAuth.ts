@@ -13,7 +13,7 @@ import { useApi } from "@/hooks/useApi"
 
 interface PasskeyRegistrationOptionsResponse {
     challenge_id: string
-    options: string // JSON string of PublicKeyCredentialCreationOptions
+    options: JsonRegistrationOptions // PublicKeyCredentialCreationOptions (already parsed)
 }
 
 interface PasskeyRegistrationVerifyResponse {
@@ -24,7 +24,7 @@ interface PasskeyRegistrationVerifyResponse {
 
 interface PasskeyAuthenticationOptionsResponse {
     challenge_id: string
-    options: string // JSON string of PublicKeyCredentialRequestOptions
+    options: JsonAuthenticationOptions // PublicKeyCredentialRequestOptions (already parsed)
 }
 
 interface PasskeyAuthenticationVerifyResponse {
@@ -170,12 +170,11 @@ interface JsonAuthenticationOptions {
 }
 
 /**
- * Parse WebAuthn options from JSON string and convert base64url fields to ArrayBuffer.
+ * Parse WebAuthn options and convert base64url fields to ArrayBuffer.
  */
 function parseRegistrationOptions(
-    optionsJson: string
+    options: JsonRegistrationOptions
 ): PublicKeyCredentialCreationOptions {
-    const options = JSON.parse(optionsJson) as JsonRegistrationOptions
 
     const result: PublicKeyCredentialCreationOptions = {
         challenge: base64urlToBuffer(options.challenge),
@@ -207,12 +206,11 @@ function parseRegistrationOptions(
 }
 
 /**
- * Parse authentication options from JSON string.
+ * Parse authentication options and convert base64url fields to ArrayBuffer.
  */
 function parseAuthenticationOptions(
-    optionsJson: string
+    options: JsonAuthenticationOptions
 ): PublicKeyCredentialRequestOptions {
-    const options = JSON.parse(optionsJson) as JsonAuthenticationOptions
 
     const result: PublicKeyCredentialRequestOptions = {
         challenge: base64urlToBuffer(options.challenge),
