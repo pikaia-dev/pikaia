@@ -48,6 +48,35 @@ interface PasskeyListResponse {
     passkeys: PasskeyListItem[]
 }
 
+// --- LocalStorage Passkey Hint ---
+// Used to remember if the user has logged in with a passkey before
+
+const PASSKEY_HINT_KEY = "passkey_hint"
+
+/**
+ * Check if the user has previously logged in with a passkey.
+ */
+export function hasPasskeyHint(): boolean {
+    if (typeof window === "undefined") return false
+    return localStorage.getItem(PASSKEY_HINT_KEY) === "true"
+}
+
+/**
+ * Set the passkey hint after successful passkey login.
+ */
+export function setPasskeyHint(): void {
+    if (typeof window === "undefined") return
+    localStorage.setItem(PASSKEY_HINT_KEY, "true")
+}
+
+/**
+ * Clear the passkey hint (e.g., on logout or passkey deletion).
+ */
+export function clearPasskeyHint(): void {
+    if (typeof window === "undefined") return
+    localStorage.removeItem(PASSKEY_HINT_KEY)
+}
+
 // --- Helper Functions ---
 
 /**
