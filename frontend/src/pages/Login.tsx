@@ -189,7 +189,6 @@ export default function Login() {
                 document.cookie = `stytch_session_jwt=${result.session_jwt}; ${cookieOptions}`
 
                 console.log("Session cookies set, redirecting to dashboard")
-                toast.success("Authenticated! Redirecting...")
 
                 // Use full page redirect so Stytch SDK reinitializes with new session
                 setTimeout(() => {
