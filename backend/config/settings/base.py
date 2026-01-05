@@ -49,7 +49,10 @@ class Settings(BaseSettings):
         """Get database URL, preferring individual vars if DB_HOST is set."""
         if self.DB_HOST:
             # Construct from individual environment variables (ECS)
-            url = f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+            # URL-encode password to handle special characters
+            from urllib.parse import quote_plus
+            encoded_password = quote_plus(self.DB_PASSWORD)
+            url = f"postgresql://{self.DB_USER}:{encoded_password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
             return PostgresDsn(url)
         elif self.DATABASE_URL:
             # Use full DATABASE_URL (local development)
