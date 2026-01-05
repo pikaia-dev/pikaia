@@ -61,7 +61,7 @@ class TestSubscriptionConstraints:
 
     def test_stripe_subscription_id_is_unique(self) -> None:
         """Should enforce unique constraint on stripe_subscription_id."""
-        sub1 = SubscriptionFactory(stripe_subscription_id="sub_same_id")
+        _sub1 = SubscriptionFactory(stripe_subscription_id="sub_same_id")
 
         with pytest.raises(Exception):  # IntegrityError wrapped
             SubscriptionFactory(
