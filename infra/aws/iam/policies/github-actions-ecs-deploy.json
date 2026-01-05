@@ -57,6 +57,30 @@
         "logs:DescribeLogStreams"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "S3FrontendDeploy",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::tango-frontend-603628786616-us-east-1",
+        "arn:aws:s3:::tango-frontend-603628786616-us-east-1/*"
+      ]
+    },
+    {
+      "Sid": "CloudFrontInvalidation",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateInvalidation",
+        "cloudfront:GetInvalidation",
+        "cloudfront:ListInvalidations"
+      ],
+      "Resource": "*"
     }
   ]
 }

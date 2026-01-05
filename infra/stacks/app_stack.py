@@ -294,9 +294,12 @@ class AppStack(Stack):
             scale_out_cooldown=Duration.seconds(60),
         )
 
+        # Expose ALB for frontend stack
+        self.alb = self.fargate_service.load_balancer
+
         # Health check configuration
         self.fargate_service.target_group.configure_health_check(
-            path="/api/v1/health/",
+            path="/api/v1/health",
             healthy_http_codes="200",
             interval=Duration.seconds(30),
             timeout=Duration.seconds(5),

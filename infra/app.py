@@ -5,6 +5,7 @@ AWS CDK app entry point for Tango infrastructure.
 Stacks:
 - TangoNetwork: VPC, subnets, NAT gateway, database security group
 - TangoApp: Aurora PostgreSQL, ECS Fargate, ALB, Secrets Manager
+- TangoFrontend: S3 + CloudFront for React SPA with API routing
 - TangoMedia: S3 bucket, CloudFront CDN, image transformation Lambda
 - TangoEvents: EventBridge bus, publisher Lambda, DLQ
 
@@ -13,7 +14,7 @@ Usage:
     cdk synth --all
 
     # Deploy foundation
-    cdk deploy TangoNetwork TangoApp
+    cdk deploy TangoNetwork TangoApp TangoFrontend
 
     # Deploy with custom domain
     cdk deploy TangoApp --context domain_name=api.example.com --context certificate_arn=arn:aws:acm:...
@@ -26,6 +27,7 @@ import aws_cdk as cdk
 
 from stacks.app_stack import AppStack
 from stacks.events_stack import EventsStack
+from stacks.frontend_stack import FrontendStack
 from stacks.media_stack import MediaStack
 from stacks.network_stack import NetworkStack
 from stacks.validation import add_validation_aspects
@@ -64,6 +66,18 @@ app_stack = AppStack(
     env=env,
 )
 app_stack.add_dependency(network)
+
+# =============================================================================
+# Frontend: S3 + CloudFront for React SPA
+# =============================================================================
+
+frontend = FrontendStack(
+    app,
+    "TangoFrontend",
+    alb=app_stack.alb,
+    env=env,
+)
+frontend.add_dependency(app_stack)
 
 # =============================================================================
 # Media: S3 + CloudFront + Image Transformation

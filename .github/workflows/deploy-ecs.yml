@@ -1,12 +1,17 @@
-name: Deploy to AWS ECS (Fargate)
+name: Deploy Backend to AWS ECS
 
 on:
   push:
     branches: ["main"]
+    paths:
+      - 'backend/**'
+      - 'emails/**'
+      - 'infra/**'
+      - '.github/workflows/deploy-ecs.yml'
   workflow_dispatch:
 
 concurrency:
-  group: deploy-main
+  group: deploy-backend
   cancel-in-progress: true
 
 permissions:
@@ -44,7 +49,6 @@ jobs:
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          # Build using backend/Dockerfile, push to the full ECR repo URI you provided
           docker build -f backend/Dockerfile -t "${ECR_REPOSITORY}:${IMAGE_TAG}" -t "${ECR_REPOSITORY}:latest" backend/
           docker push "${ECR_REPOSITORY}:${IMAGE_TAG}"
           docker push "${ECR_REPOSITORY}:latest"
@@ -56,20 +60,16 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Fetch the current task definition so we keep roles, logs, resources, etc.
           aws ecs describe-task-definition \
             --task-definition "${ECS_TASK_DEFINITION}" \
             --query 'taskDefinition' \
             --output json > td.json
 
-          # Update image for ALL containers in the task definition
           jq --arg IMAGE "${NEW_IMAGE}" '
             .containerDefinitions |= map(.image=$IMAGE)
-            # Remove read-only/derivative fields before register
             | del(.revision, .status, .taskDefinitionArn, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)
           ' td.json > td-updated.json
 
-          # Register the new revision
           aws ecs register-task-definition \
             --cli-input-json file://td-updated.json \
             --output json > td-registered.json
@@ -77,7 +77,6 @@ jobs:
           NEW_TD_ARN=$(jq -r '.taskDefinition.taskDefinitionArn' td-registered.json)
           echo "taskDefinitionArn=${NEW_TD_ARN}" >> "$GITHUB_OUTPUT"
 
-          # Grab the first container name for migrations override
           MIGRATE_CONTAINER=$(jq -r '.containerDefinitions[0].name' td.json)
           echo "migrateContainer=${MIGRATE_CONTAINER}" >> "$GITHUB_OUTPUT"
 
@@ -94,7 +93,7 @@ jobs:
             --cluster "${ECS_CLUSTER}" \
             --services "${ECS_SERVICE}"
 
-      - name: Run Django migrations with one-off Fargate task
+      - name: Run Django migrations
         run: |
           aws ecs run-task \
             --cluster "${ECS_CLUSTER}" \
