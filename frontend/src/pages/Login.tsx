@@ -1,9 +1,13 @@
-import { useStytchMemberSession } from "@stytch/react/b2b"
+import { useStytchMemberSession, useStytchB2BClient } from "@stytch/react/b2b"
 import { Mail } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { LoadingSpinner } from "../components/ui/loading-spinner"
 import {
   CheckEmailScreen,
@@ -12,11 +16,15 @@ import {
   OrganizationSelector,
   PasskeyLoginButton,
 } from "../features/auth/components"
+import { PasskeyFirstLogin } from "@/features/auth/components/PasskeyFirstLogin"
 import { useDiscoveryAuth } from "../features/auth/hooks"
 import {
   hasPasskeyHint,
   isWebAuthnSupported,
 } from "../features/auth/hooks/usePasskeyAuth"
+
+// Passkey placeholder token before Stytch session attestation
+const PASSKEY_PLACEHOLDER_TOKEN = "passkey_authenticated"
 
 // Props for the passkey-first login UI
 interface PasskeyFirstLoginProps {

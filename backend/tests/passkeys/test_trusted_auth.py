@@ -9,7 +9,7 @@ import time
 import jwt
 import pytest
 
-from apps.passkeys.trusted_auth import create_trusted_auth_token
+from apps.passkeys.trusted_auth import create_trusted_auth_token, TRUSTED_AUTH_TOKEN_EXPIRY_SECONDS
 
 
 # Test RSA private key (generated for testing only)
@@ -91,8 +91,8 @@ class TestTrustedAuthToken:
         # Should be issued now-ish (within 2 seconds)
         assert abs(decoded["iat"] - now) <= 2
         
-        # Should expire in ~5 minutes
-        assert decoded["exp"] - decoded["iat"] == 300
+        # Should expire in exactly TRUSTED_AUTH_TOKEN_EXPIRY_SECONDS
+        assert decoded["exp"] - decoded["iat"] == TRUSTED_AUTH_TOKEN_EXPIRY_SECONDS
 
     def test_handles_escaped_newlines_in_private_key(self, settings):
         """Should convert escaped newlines to actual newlines."""
