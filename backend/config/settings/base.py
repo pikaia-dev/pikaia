@@ -6,7 +6,6 @@ Shared configuration for all environments.
 
 from pathlib import Path
 
-from django.core.management.utils import get_random_secret_key
 from pydantic import PostgresDsn
 from pydantic_settings import BaseSettings
 
@@ -14,7 +13,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Environment-based configuration using pydantic-settings."""
 
-    SECRET_KEY: str = get_random_secret_key()
+    SECRET_KEY: str = "django-insecure-change-me-in-production"
     DEBUG: bool = False
     ALLOWED_HOSTS: str = ""  # Comma-separated list, e.g. "localhost,127.0.0.1"
 
