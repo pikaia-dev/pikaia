@@ -45,6 +45,13 @@ class Settings(BaseSettings):
     EVENT_BACKEND: str = "local"  # "local" or "eventbridge"
     EVENT_BUS_NAME: str = ""  # AWS EventBridge bus name (required for eventbridge backend)
 
+    # S3 Media Storage (production)
+    USE_S3_STORAGE: bool = False
+    AWS_STORAGE_BUCKET_NAME: str = ""
+    AWS_S3_REGION_NAME: str = "us-east-1"
+    AWS_S3_CUSTOM_DOMAIN: str = ""  # CloudFront domain for media CDN
+    IMAGE_TRANSFORM_URL: str = ""  # URL for dynamic image transformation
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
@@ -187,8 +194,14 @@ STATIC_URL = "static/"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Storage backend - defaults to local filesystem
-USE_S3_STORAGE = False
+# Storage backend - from environment variable
+USE_S3_STORAGE = settings.USE_S3_STORAGE
+
+# S3 storage settings (used when USE_S3_STORAGE=True)
+AWS_STORAGE_BUCKET_NAME = settings.AWS_STORAGE_BUCKET_NAME
+AWS_S3_REGION_NAME = settings.AWS_S3_REGION_NAME
+AWS_S3_CUSTOM_DOMAIN = settings.AWS_S3_CUSTOM_DOMAIN or None
+IMAGE_TRANSFORM_URL = settings.IMAGE_TRANSFORM_URL or None
 
 # Media upload limits
 MEDIA_MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB

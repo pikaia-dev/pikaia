@@ -60,10 +60,9 @@ class StorageService:
         if self.use_s3:
             import boto3
 
+            # Use default credentials chain (works with Fargate task role, local credentials, etc.)
             self.s3_client = boto3.client(
                 "s3",
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
                 region_name=getattr(settings, "AWS_S3_REGION_NAME", "us-east-1"),
             )
             self.bucket_name = settings.AWS_STORAGE_BUCKET_NAME

@@ -47,6 +47,27 @@ env = cdk.Environment(
 network = NetworkStack(app, "TangoNetwork", env=env)
 
 # =============================================================================
+# Media: S3 + CloudFront + Image Transformation
+# Must be created before AppStack so we can pass the bucket
+# =============================================================================
+
+# Configuration via cdk.json or --context flag:
+#   cors_origins: CORS allowed origins (default: ["*"])
+#   enable_versioning: Enable S3 versioning for data recovery (default: false)
+# Example: cdk deploy TangoMedia --context cors_origins='["https://app.example.com"]'
+cors_origins = app.node.try_get_context("cors_origins") or ["*"]
+enable_versioning = app.node.try_get_context("enable_versioning") or False
+
+media = MediaStack(
+    app,
+    "TangoMedia",
+    cors_allowed_origins=cors_origins,
+    enable_versioning=enable_versioning,
+    enable_image_transformation=True,
+    env=env,
+)
+
+# =============================================================================
 # Application: Database + ECS + ALB
 # =============================================================================
 
@@ -59,6 +80,8 @@ app_stack = AppStack(
     "TangoApp",
     vpc=network.vpc,
     database_security_group=network.database_security_group,
+    media_bucket=media.bucket,
+    media_cdn_domain=media.distribution.distribution_domain_name,
     domain_name=domain_name,
     certificate_arn=certificate_arn,
     min_capacity=2,
@@ -66,6 +89,7 @@ app_stack = AppStack(
     env=env,
 )
 app_stack.add_dependency(network)
+app_stack.add_dependency(media)
 
 # =============================================================================
 # Frontend: S3 + CloudFront for React SPA
@@ -84,26 +108,6 @@ frontend = FrontendStack(
     env=env,
 )
 frontend.add_dependency(app_stack)
-
-# =============================================================================
-# Media: S3 + CloudFront + Image Transformation
-# =============================================================================
-
-# Configuration via cdk.json or --context flag:
-#   cors_origins: CORS allowed origins (default: ["*"])
-#   enable_versioning: Enable S3 versioning for data recovery (default: false)
-# Example: cdk deploy TangoMedia --context cors_origins='["https://app.example.com"]'
-cors_origins = app.node.try_get_context("cors_origins") or ["*"]
-enable_versioning = app.node.try_get_context("enable_versioning") or False
-
-media = MediaStack(
-    app,
-    "TangoMedia",
-    cors_allowed_origins=cors_origins,
-    enable_versioning=enable_versioning,
-    enable_image_transformation=True,
-    env=env,
-)
 
 # =============================================================================
 # Events: EventBridge + Publisher Lambda + DLQ
