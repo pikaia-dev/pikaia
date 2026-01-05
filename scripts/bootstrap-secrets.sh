@@ -115,6 +115,7 @@ SECRET_JSON=$(jq -n \
     --arg trusted_issuer "${STYTCH_TRUSTED_AUTH_ISSUER:-passkey-auth}" \
     --arg passkey_key "${PASSKEY_JWT_PRIVATE_KEY:-}" \
     --arg webauthn_rp "${WEBAUTHN_RP_ID:-}" \
+    --arg webauthn_name "${WEBAUTHN_RP_NAME:-Tango B2B}" \
     --arg webauthn_origin "${WEBAUTHN_ORIGIN:-}" \
     --arg cors_origins "${CORS_ALLOWED_ORIGINS:-}" \
     '{
@@ -130,6 +131,7 @@ SECRET_JSON=$(jq -n \
         STYTCH_TRUSTED_AUTH_ISSUER: $trusted_issuer,
         PASSKEY_JWT_PRIVATE_KEY: $passkey_key,
         WEBAUTHN_RP_ID: $webauthn_rp,
+        WEBAUTHN_RP_NAME: $webauthn_name,
         WEBAUTHN_ORIGIN: $webauthn_origin,
         CORS_ALLOWED_ORIGINS: $cors_origins
     }'
