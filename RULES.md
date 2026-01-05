@@ -17,6 +17,12 @@ Coding standards for Tango teams and AI agents.
 | Functions | snake_case | `get_user_by_id` |
 | Constants | SCREAMING_SNAKE | `MAX_RETRY_COUNT` |
 | URLs | kebab-case | `/api/v1/user-profiles` |
+| Unused vars | _prefix | `_unused_fixture` |
+
+## Testing
+
+- Prefix variables that exist only to create DB state with `_` (e.g., `_existing_member = MemberFactory(...)`)
+- This silences linter warnings and signals intentional non-use
 
 ## Environment
 
