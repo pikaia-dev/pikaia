@@ -15,6 +15,37 @@ from .base import *  # noqa: F403
 from .base import parse_comma_list, settings
 
 # =============================================================================
+# Logging Configuration - Output errors to stdout for CloudWatch
+# =============================================================================
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "WARNING",
+    },
+    "loggers": {
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
+
+# =============================================================================
 # Required Secrets Validation
 # =============================================================================
 # These secrets MUST be set in production. The app will refuse to start without them.
