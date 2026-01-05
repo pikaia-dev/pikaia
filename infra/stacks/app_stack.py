@@ -27,7 +27,6 @@ from aws_cdk import (
 )
 from constructs import Construct
 
-import json
 
 
 class AppStack(Stack):

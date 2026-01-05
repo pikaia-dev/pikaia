@@ -5,7 +5,7 @@ Handles passkey registration and authentication using the webauthn library.
 Integrates with Stytch for session management after successful authentication.
 """
 
-import base64
+
 import logging
 import secrets
 from dataclasses import dataclass
