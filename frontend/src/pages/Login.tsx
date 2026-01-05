@@ -180,22 +180,22 @@ export default function Login() {
           <PasskeyFirstLogin
             onPasskeySuccess={(result) => {
               // Passkey auth returns real Stytch session tokens via sessions.attest()
-              console.log("Passkey auth result:", result)
               if (result.session_token && result.session_token !== "passkey_authenticated") {
                 // Set cookies that Stytch SDK will recognize
-                // domain=b2b.demo.tango.agency; path=/; secure; max-age=2592000 (30 days)
+                // Example cookie attributes: domain=your-domain.com; path=/; secure; max-age=2592000 (30 days)
                 const cookieOptions = "path=/; secure; max-age=2592000; SameSite=Lax"
                 document.cookie = `stytch_session=${result.session_token}; ${cookieOptions}`
                 document.cookie = `stytch_session_jwt=${result.session_jwt}; ${cookieOptions}`
 
-                console.log("Session cookies set, redirecting to dashboard")
-
                 // Use full page redirect so Stytch SDK reinitializes with new session
-                setTimeout(() => {
-                  window.location.href = "/dashboard"
-                }, 100)
+                window.location.href = "/dashboard"
               } else {
-                console.error("Invalid session result:", result)
+                // Log error details without exposing sensitive data
+                console.error("Passkey authentication failed", {
+                  hasSessionToken: Boolean(result.session_token),
+                  hasSessionJwt: Boolean(result.session_jwt),
+                  hasValidToken: result.session_token && result.session_token !== "passkey_authenticated",
+                })
                 toast.error("Authentication failed - no session received")
               }
             }}
