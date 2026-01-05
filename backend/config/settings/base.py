@@ -45,22 +45,6 @@ class Settings(BaseSettings):
     EVENT_BACKEND: str = "local"  # "local" or "eventbridge"
     EVENT_BUS_NAME: str = ""  # AWS EventBridge bus name (required for eventbridge backend)
 
-    def get_database_url(self) -> PostgresDsn:
-        """Get database URL, preferring individual vars if DB_HOST is set."""
-        if self.DB_HOST:
-            # Construct from individual environment variables (ECS)
-            # URL-encode password to handle special characters
-            from urllib.parse import quote_plus
-            encoded_password = quote_plus(self.DB_PASSWORD)
-            url = f"postgresql://{self.DB_USER}:{encoded_password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-            return PostgresDsn(url)
-        elif self.DATABASE_URL:
-            # Use full DATABASE_URL (local development)
-            return self.DATABASE_URL
-        else:
-            # Default for local dev
-            return PostgresDsn("postgresql://postgres:postgres@localhost:5432/tango")
-
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
@@ -138,22 +122,49 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 
-# Database - parsed from DATABASE_URL
-def _parse_postgres_dsn(dsn: PostgresDsn) -> dict:
-    """Convert pydantic PostgresDsn to Django DATABASES format."""
-    # pydantic v2: hosts() returns list of dicts with username, password, host, port
-    host_info = dsn.hosts()[0] if dsn.hosts() else {}
-    return {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": dsn.path.lstrip("/") if dsn.path else "",
-        "USER": host_info.get("username") or "",
-        "PASSWORD": host_info.get("password") or "",
-        "HOST": host_info.get("host") or "localhost",
-        "PORT": str(host_info.get("port") or 5432),
-    }
+# Database configuration
+def _get_database_config() -> dict:
+    """Build Django DATABASES config.
+    
+    For ECS: Uses individual DB_* environment variables directly (no URL encoding needed).
+    For local: Uses DATABASE_URL or default localhost.
+    """
+    if settings.DB_HOST:
+        # ECS: Use individual env vars directly - no URL parsing needed
+        return {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": settings.DB_NAME,
+            "USER": settings.DB_USER,
+            "PASSWORD": settings.DB_PASSWORD,
+            "HOST": settings.DB_HOST,
+            "PORT": settings.DB_PORT,
+        }
+    elif settings.DATABASE_URL:
+        # Local dev: Parse DATABASE_URL via pydantic
+        from pydantic import PostgresDsn
+        dsn = settings.DATABASE_URL
+        host_info = dsn.hosts()[0] if dsn.hosts() else {}
+        return {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": dsn.path.lstrip("/") if dsn.path else "",
+            "USER": host_info.get("username") or "",
+            "PASSWORD": host_info.get("password") or "",
+            "HOST": host_info.get("host") or "localhost",
+            "PORT": str(host_info.get("port") or 5432),
+        }
+    else:
+        # Default for local dev without DATABASE_URL
+        return {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": "tango",
+            "USER": "postgres",
+            "PASSWORD": "postgres",
+            "HOST": "localhost",
+            "PORT": "5432",
+        }
 
 
-DATABASES = {"default": _parse_postgres_dsn(settings.get_database_url())}
+DATABASES = {"default": _get_database_config()}
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
