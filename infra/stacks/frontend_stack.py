@@ -7,6 +7,7 @@ This stack deploys the frontend with:
   - S3 origin for frontend assets
   - ALB origin for /api/* routes
   - SPA routing (404 → index.html)
+  - Optional custom domain with ACM certificate
 """
 
 from aws_cdk import (
@@ -14,6 +15,7 @@ from aws_cdk import (
     Duration,
     RemovalPolicy,
     Stack,
+    aws_certificatemanager as acm,
     aws_cloudfront as cloudfront,
     aws_cloudfront_origins as origins,
     aws_elasticloadbalancingv2 as elbv2,
@@ -31,6 +33,7 @@ class FrontendStack(Stack):
     - CloudFront distribution with Origin Access Control
     - API routing to ALB for /api/* paths
     - SPA routing (all 404s redirect to index.html)
+    - Optional custom domain with SSL certificate
     """
 
     def __init__(
@@ -39,6 +42,8 @@ class FrontendStack(Stack):
         construct_id: str,
         *,
         alb: elbv2.IApplicationLoadBalancer,
+        domain_name: str | None = None,
+        certificate_arn: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -74,11 +79,22 @@ class FrontendStack(Stack):
             http_port=80,
         )
 
+        # Certificate for custom domain
+        certificate = None
+        domain_names = None
+        if certificate_arn and domain_name:
+            certificate = acm.Certificate.from_certificate_arn(
+                self, "Certificate", certificate_arn
+            )
+            domain_names = [domain_name]
+
         # CloudFront distribution
         self.distribution = cloudfront.Distribution(
             self,
             "FrontendDistribution",
             comment="Tango SaaS Frontend",
+            domain_names=domain_names,
+            certificate=certificate,
             default_behavior=cloudfront.BehaviorOptions(
                 origin=s3_origin,
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -132,12 +148,20 @@ class FrontendStack(Stack):
             self,
             "CloudFrontDomainName",
             value=self.distribution.distribution_domain_name,
-            description="CloudFront domain name (your app URL)",
+            description="CloudFront domain name",
         )
 
-        CfnOutput(
-            self,
-            "FrontendURL",
-            value=f"https://{self.distribution.distribution_domain_name}",
-            description="Frontend URL",
-        )
+        if domain_name:
+            CfnOutput(
+                self,
+                "FrontendURL",
+                value=f"https://{domain_name}",
+                description="Frontend URL (custom domain)",
+            )
+        else:
+            CfnOutput(
+                self,
+                "FrontendURL",
+                value=f"https://{self.distribution.distribution_domain_name}",
+                description="Frontend URL",
+            )
