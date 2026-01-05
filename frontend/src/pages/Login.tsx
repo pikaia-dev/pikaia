@@ -180,12 +180,16 @@ export default function Login() {
               // Passkey auth returns real Stytch session tokens via sessions.attest()
               console.log("Passkey auth result:", result)
               if (result.session_token && result.session_token !== "passkey_authenticated") {
-                // Store session token for Stytch SDK to read on init
-                localStorage.setItem("stytch_session_token", result.session_token)
-                localStorage.setItem("stytch_session_jwt", result.session_jwt)
-                console.log("Tokens stored, redirecting to dashboard")
+                // Set cookies that Stytch SDK will recognize
+                // domain=b2b.demo.tango.agency; path=/; secure; max-age=2592000 (30 days)
+                const cookieOptions = "path=/; secure; max-age=2592000; SameSite=Lax"
+                document.cookie = `stytch_session=${result.session_token}; ${cookieOptions}`
+                document.cookie = `stytch_session_jwt=${result.session_jwt}; ${cookieOptions}`
+
+                console.log("Session cookies set, redirecting to dashboard")
                 toast.success("Authenticated! Redirecting...")
-                // Use full page redirect so Stytch SDK reinitializes with new token
+
+                // Use full page redirect so Stytch SDK reinitializes with new session
                 setTimeout(() => {
                   window.location.href = "/dashboard"
                 }, 100)
