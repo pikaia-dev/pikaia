@@ -6,7 +6,6 @@
 
 import { formatDistanceToNow } from "date-fns"
 import { AlertCircle, Key, Plus, Shield, Smartphone, Trash2 } from "lucide-react"
-import { useState } from "react"
 import { toast } from "sonner"
 
 import {
@@ -29,27 +28,14 @@ import {
     CardTitle,
 } from "@/components/ui/card"
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
     isWebAuthnSupported,
     useDeletePasskey,
     usePasskeys,
     useRegisterPasskey,
 } from "@/features/auth/hooks/usePasskeyAuth"
+import { generatePasskeyName } from "@/features/auth/utils"
 
 export function PasskeySettings() {
-    const [isDialogOpen, setIsDialogOpen] = useState(false)
-    const [passkeyName, setPasskeyName] = useState("")
-
     const { data: passkeysData, isLoading: isLoadingPasskeys } = usePasskeys()
     const registerMutation = useRegisterPasskey()
     const deleteMutation = useDeletePasskey()
@@ -58,16 +44,11 @@ export function PasskeySettings() {
     const isSupported = isWebAuthnSupported()
 
     const handleRegister = async () => {
-        if (!passkeyName.trim()) {
-            toast.error("Please enter a name for your passkey.")
-            return
-        }
+        const name = generatePasskeyName()
 
         try {
-            await registerMutation.mutateAsync(passkeyName.trim())
+            await registerMutation.mutateAsync(name)
             toast.success("Passkey registered successfully.")
-            setIsDialogOpen(false)
-            setPasskeyName("")
         } catch (error) {
             toast.error(
                 error instanceof Error ? error.message : "Failed to register passkey."
@@ -126,58 +107,17 @@ export function PasskeySettings() {
                             PIN.
                         </CardDescription>
                     </div>
-                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        {passkeys.length > 0 && (
-                            <DialogTrigger asChild>
-                                <Button size="sm" className="gap-1.5">
-                                    <Plus className="h-4 w-4" />
-                                    Add Passkey
-                                </Button>
-                            </DialogTrigger>
-                        )}
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Register a new passkey</DialogTitle>
-                                <DialogDescription>
-                                    Give your passkey a name to help you identify it later, like
-                                    "MacBook Pro" or "iPhone 15".
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="passkey-name">Passkey name</Label>
-                                    <Input
-                                        id="passkey-name"
-                                        placeholder="e.g., MacBook Pro"
-                                        value={passkeyName}
-                                        onChange={(e) => { setPasskeyName(e.target.value); }}
-                                        onKeyDown={(e) => {
-                                            if (e.key === "Enter") {
-                                                void handleRegister()
-                                            }
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                        setIsDialogOpen(false)
-                                        setPasskeyName("")
-                                    }}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    onClick={() => void handleRegister()}
-                                    disabled={registerMutation.isPending}
-                                >
-                                    {registerMutation.isPending ? "Registering..." : "Continue"}
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
+                    {passkeys.length > 0 && (
+                        <Button
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={() => void handleRegister()}
+                            disabled={registerMutation.isPending}
+                        >
+                            <Plus className="h-4 w-4" />
+                            {registerMutation.isPending ? "Adding..." : "Add Passkey"}
+                        </Button>
+                    )}
                 </div>
             </CardHeader>
             <CardContent>
@@ -194,9 +134,14 @@ export function PasskeySettings() {
                         <p className="mt-1 text-xs text-muted-foreground">
                             Add a passkey to sign in more securely without a password.
                         </p>
-                        <Button size="sm" className="mt-4 gap-1.5" onClick={() => setIsDialogOpen(true)}>
+                        <Button
+                            size="sm"
+                            className="mt-4 gap-1.5"
+                            onClick={() => void handleRegister()}
+                            disabled={registerMutation.isPending}
+                        >
                             <Plus className="h-4 w-4" />
-                            Add Passkey
+                            {registerMutation.isPending ? "Adding..." : "Add Passkey"}
                         </Button>
                     </div>
                 ) : (

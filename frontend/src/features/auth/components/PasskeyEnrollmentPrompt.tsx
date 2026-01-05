@@ -24,6 +24,7 @@ import {
     useRegisterPasskey,
     isWebAuthnSupported,
 } from "../hooks/usePasskeyAuth"
+import { generatePasskeyName } from "../utils"
 
 // LocalStorage key for tracking prompt dismissal
 const PROMPT_DISMISSED_KEY = "passkey_prompt_dismissed"
@@ -49,30 +50,6 @@ function setNeverAskAgain(): void {
     localStorage.setItem(PROMPT_NEVER_ASK_KEY, "true")
 }
 
-/**
- * Generate a passkey name based on the user's browser and device.
- */
-function generatePasskeyName(): string {
-    const ua = navigator.userAgent
-
-    // Detect browser
-    let browser = "Browser"
-    if (ua.includes("Chrome") && !ua.includes("Edg")) browser = "Chrome"
-    else if (ua.includes("Safari") && !ua.includes("Chrome")) browser = "Safari"
-    else if (ua.includes("Firefox")) browser = "Firefox"
-    else if (ua.includes("Edg")) browser = "Edge"
-
-    // Detect device type
-    let device = ""
-    if (ua.includes("iPhone")) device = "iPhone"
-    else if (ua.includes("iPad")) device = "iPad"
-    else if (ua.includes("Mac")) device = "Mac"
-    else if (ua.includes("Windows")) device = "Windows"
-    else if (ua.includes("Android")) device = "Android"
-    else if (ua.includes("Linux")) device = "Linux"
-
-    return device ? `${device} ${browser}` : browser
-}
 
 export function PasskeyEnrollmentPrompt() {
     const [isOpen, setIsOpen] = useState(false)
