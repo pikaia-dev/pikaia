@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     AWS_S3_CUSTOM_DOMAIN: str = ""  # CloudFront domain for media CDN
     IMAGE_TRANSFORM_URL: str = ""  # URL for dynamic image transformation
 
+    # WebAuthn / Passkeys
+    WEBAUTHN_RP_ID: str = "localhost"
+    WEBAUTHN_ORIGIN: str = "http://localhost:5173"
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
@@ -92,6 +96,7 @@ INSTALLED_APPS = [
     "apps.organizations",
     "apps.billing",
     "apps.media",
+    "apps.passkeys",
 ]
 
 MIDDLEWARE = [
@@ -227,3 +232,8 @@ STYTCH_WEBHOOK_SECRET = settings.STYTCH_WEBHOOK_SECRET
 # Event-driven architecture
 EVENT_BACKEND = settings.EVENT_BACKEND
 EVENT_BUS_NAME = settings.EVENT_BUS_NAME
+
+# WebAuthn / Passkeys
+WEBAUTHN_RP_ID = settings.WEBAUTHN_RP_ID if hasattr(settings, "WEBAUTHN_RP_ID") else "localhost"
+WEBAUTHN_RP_NAME = "Tango B2B"
+WEBAUTHN_ORIGIN = settings.WEBAUTHN_ORIGIN if hasattr(settings, "WEBAUTHN_ORIGIN") else "http://localhost:5173"
