@@ -100,6 +100,8 @@ class AppStack(Stack):
             "STYTCH_SECRET": "",
             "STRIPE_SECRET_KEY": "",
             "STRIPE_PRICE_ID": "",
+            "STRIPE_WEBHOOK_SECRET": "",
+            "RESEND_API_KEY": "",
         }
 
         self.app_secrets = secretsmanager.Secret(
@@ -199,6 +201,14 @@ class AppStack(Stack):
                 "STRIPE_PRICE_ID": ecs.Secret.from_secrets_manager(
                     self.app_secrets,
                     field="STRIPE_PRICE_ID",
+                ),
+                "STRIPE_WEBHOOK_SECRET": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="STRIPE_WEBHOOK_SECRET",
+                ),
+                "RESEND_API_KEY": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="RESEND_API_KEY",
                 ),
             },
             health_check=ecs.HealthCheck(
