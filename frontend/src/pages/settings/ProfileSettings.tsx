@@ -26,6 +26,7 @@ import {
   useUpdateProfile,
   useVerifyPhoneOtp,
 } from "../../features/profile/queries"
+import { PasskeySettings } from "../../features/settings/components/PasskeySettings"
 
 // Delay before updating state after dialog close animation
 const DIALOG_CLOSE_DELAY_MS = 150
@@ -327,6 +328,9 @@ export default function ProfileSettings() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Passkey Settings */}
+        <PasskeySettings />
       </div>
 
       {/* OTP Verification Dialog */}

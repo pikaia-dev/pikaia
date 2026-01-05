@@ -78,6 +78,18 @@ STRIPE_SECRET_KEY=sk_test_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx  # Optional for local dev
 STRIPE_PRICE_ID=price_xxx  # Created by setup_stripe
 
+# WebAuthn (Passkeys)
+WEBAUTHN_RP_ID=localhost
+WEBAUTHN_RP_NAME=Tango B2B
+WEBAUTHN_ORIGIN=http://localhost:5173
+
+# Stytch Trusted Auth Token (for passkey -> Stytch session)
+# Create profile at https://stytch.com/dashboard/trusted-auth-tokens
+STYTCH_TRUSTED_AUTH_PROFILE_ID=trusted-auth-profile-xxx
+STYTCH_TRUSTED_AUTH_AUDIENCE=stytch
+STYTCH_TRUSTED_AUTH_ISSUER=passkey-auth
+PASSKEY_JWT_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----
+
 # Django
 SECRET_KEY=your-secret-key
 DEBUG=True
