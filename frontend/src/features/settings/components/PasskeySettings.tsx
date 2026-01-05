@@ -149,74 +149,78 @@ export function PasskeySettings() {
                         {passkeys.map((passkey) => (
                             <div
                                 key={passkey.id}
-                                className="flex items-center justify-between rounded-lg border p-4"
+                                className="group relative overflow-hidden rounded-xl border bg-card transition-all hover:shadow-md hover:border-primary/20"
                             >
-                                <div className="flex items-center gap-3">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                                        <Smartphone className="h-5 w-5 text-primary" />
-                                    </div>
-                                    <div>
-                                        <p className="font-medium">{passkey.name}</p>
-                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                            <span>
-                                                Added{" "}
-                                                {formatDistanceToNow(new Date(passkey.created_at), {
-                                                    addSuffix: true,
-                                                })}
-                                            </span>
-                                            {passkey.last_used_at && (
-                                                <>
-                                                    <span>•</span>
-                                                    <span>
-                                                        Last used{" "}
-                                                        {formatDistanceToNow(
-                                                            new Date(passkey.last_used_at),
-                                                            { addSuffix: true }
-                                                        )}
+                                {/* Subtle gradient background */}
+                                <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                                <div className="relative flex items-center justify-between p-5">
+                                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                                        {/* Icon with gradient background */}
+                                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 ring-1 ring-primary/10 transition-all group-hover:scale-105 group-hover:ring-primary/20 flex-shrink-0">
+                                            <Smartphone className="h-6 w-6 text-primary" />
+                                        </div>
+
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-semibold text-base truncate">{passkey.name}</p>
+                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-sm text-muted-foreground">
+                                                <span className="flex items-center gap-1.5">
+                                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    Added {formatDistanceToNow(new Date(passkey.created_at), { addSuffix: true })}
+                                                </span>
+                                                {passkey.last_used_at && (
+                                                    <span className="flex items-center gap-1.5">
+                                                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        Last used {formatDistanceToNow(new Date(passkey.last_used_at), { addSuffix: true })}
                                                     </span>
-                                                </>
-                                            )}
-                                            {passkey.backup_state && (
-                                                <>
-                                                    <span>•</span>
-                                                    <span className="text-green-600 dark:text-green-400">
+                                                )}
+                                                {passkey.backup_state && (
+                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 text-xs font-medium ring-1 ring-emerald-600/20">
+                                                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                        </svg>
                                                         Synced
                                                     </span>
-                                                </>
-                                            )}
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                            <span className="sr-only">Delete passkey</span>
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Delete passkey?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                This will remove "{passkey.name}" from your account. You
-                                                won't be able to sign in with this passkey anymore.
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction
-                                                onClick={() => void handleDelete(passkey.id, passkey.name)}
-                                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all flex-shrink-0"
                                             >
-                                                {deleteMutation.isPending ? "Deleting..." : "Delete"}
-                                            </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
+                                                <Trash2 className="h-4 w-4" />
+                                                <span className="sr-only">Delete passkey</span>
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Delete passkey?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    This will remove "{passkey.name}" from your account. You
+                                                    won't be able to sign in with this passkey anymore.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction
+                                                    onClick={() => void handleDelete(passkey.id, passkey.name)}
+                                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                >
+                                                    {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </div>
                             </div>
                         ))}
                     </div>
