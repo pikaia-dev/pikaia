@@ -140,7 +140,8 @@ def verify_authentication(
 
     try:
         # Use Stytch's session creation for the member
-        session_response = stytch.sessions.authenticate_jwt(
+        # Note: Call kept for potential side effects, result not used
+        _ = stytch.sessions.authenticate_jwt(
             session_duration_minutes=43200,  # 30 days
         )
         # Note: This approach may not work directly - Stytch B2B might not allow

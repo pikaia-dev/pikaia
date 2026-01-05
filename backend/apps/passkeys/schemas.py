@@ -52,10 +52,6 @@ class PasskeyAuthenticationOptionsRequest(BaseModel):
         default=None,
         description="Optional email to filter allowed credentials",
     )
-    organization_id: str | None = Field(
-        default=None,
-        description="Optional organization ID for context",
-    )
 
 
 class PasskeyAuthenticationOptionsResponse(BaseModel):

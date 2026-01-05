@@ -201,7 +201,7 @@ class PasskeyService:
             name=passkey_name,
             aaguid=str(verification.aaguid) if verification.aaguid else "",
             is_discoverable=True,  # We require resident keys
-            backup_eligible=verification.credential_backed_up is not None,
+            backup_eligible=verification.credential_backed_up is not None and verification.credential_backed_up,
             backup_state=verification.credential_backed_up or False,
             transports=transports,
         )
