@@ -6,6 +6,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "../components/ui/sidebar"
+import { PasskeyEnrollmentPrompt } from "../features/auth/components"
 
 export default function AppLayout() {
   return (
@@ -19,6 +20,8 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </SidebarInset>
+      {/* Prompt user to add passkey if they don't have one */}
+      <PasskeyEnrollmentPrompt />
     </SidebarProvider>
   )
 }
