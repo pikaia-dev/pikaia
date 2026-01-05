@@ -5,7 +5,7 @@
  */
 
 import { formatDistanceToNow } from "date-fns"
-import { AlertCircle, Key, Plus, Shield, Smartphone, Trash2 } from "lucide-react"
+import { AlertCircle, Check, CheckCircle2, Clock, Key, Plus, Shield, Smartphone, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -111,7 +111,11 @@ export function PasskeySettings() {
                         <Button
                             size="sm"
                             className="gap-1.5"
-                            onClick={() => void handleRegister()}
+                            onClick={() => {
+                                handleRegister().catch(() => {
+                                    // Error already handled in handleRegister
+                                })
+                            }}
                             disabled={registerMutation.isPending}
                         >
                             <Plus className="h-4 w-4" />
@@ -137,7 +141,11 @@ export function PasskeySettings() {
                         <Button
                             size="sm"
                             className="mt-4 gap-1.5"
-                            onClick={() => void handleRegister()}
+                            onClick={() => {
+                                handleRegister().catch(() => {
+                                    // Error already handled in handleRegister
+                                })
+                            }}
                             disabled={registerMutation.isPending}
                         >
                             <Plus className="h-4 w-4" />
@@ -165,24 +173,18 @@ export function PasskeySettings() {
                                             <p className="font-semibold text-base truncate">{passkey.name}</p>
                                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-sm text-muted-foreground">
                                                 <span className="flex items-center gap-1.5">
-                                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                    </svg>
+                                                    <Clock className="h-3.5 w-3.5" />
                                                     Added {formatDistanceToNow(new Date(passkey.created_at), { addSuffix: true })}
                                                 </span>
                                                 {passkey.last_used_at && (
                                                     <span className="flex items-center gap-1.5">
-                                                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                        </svg>
+                                                        <CheckCircle2 className="h-3.5 w-3.5" />
                                                         Last used {formatDistanceToNow(new Date(passkey.last_used_at), { addSuffix: true })}
                                                     </span>
                                                 )}
                                                 {passkey.backup_state && (
                                                     <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 text-xs font-medium ring-1 ring-emerald-600/20">
-                                                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                        </svg>
+                                                        <Check className="h-3 w-3" />
                                                         Synced
                                                     </span>
                                                 )}
@@ -212,7 +214,11 @@ export function PasskeySettings() {
                                             <AlertDialogFooter>
                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                 <AlertDialogAction
-                                                    onClick={() => void handleDelete(passkey.id, passkey.name)}
+                                                    onClick={() => {
+                                                        handleDelete(passkey.id, passkey.name).catch((error) => {
+                                                            console.error("Failed to delete passkey", error)
+                                                        })
+                                                    }}
                                                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                                 >
                                                     {deleteMutation.isPending ? "Deleting..." : "Delete"}
