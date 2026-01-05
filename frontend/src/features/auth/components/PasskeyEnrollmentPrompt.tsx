@@ -18,8 +18,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 
 import {
     usePasskeys,
@@ -51,10 +49,33 @@ function setNeverAskAgain(): void {
     localStorage.setItem(PROMPT_NEVER_ASK_KEY, "true")
 }
 
+/**
+ * Generate a passkey name based on the user's browser and device.
+ */
+function generatePasskeyName(): string {
+    const ua = navigator.userAgent
+
+    // Detect browser
+    let browser = "Browser"
+    if (ua.includes("Chrome") && !ua.includes("Edg")) browser = "Chrome"
+    else if (ua.includes("Safari") && !ua.includes("Chrome")) browser = "Safari"
+    else if (ua.includes("Firefox")) browser = "Firefox"
+    else if (ua.includes("Edg")) browser = "Edge"
+
+    // Detect device type
+    let device = ""
+    if (ua.includes("iPhone")) device = "iPhone"
+    else if (ua.includes("iPad")) device = "iPad"
+    else if (ua.includes("Mac")) device = "Mac"
+    else if (ua.includes("Windows")) device = "Windows"
+    else if (ua.includes("Android")) device = "Android"
+    else if (ua.includes("Linux")) device = "Linux"
+
+    return device ? `${device} ${browser}` : browser
+}
+
 export function PasskeyEnrollmentPrompt() {
     const [isOpen, setIsOpen] = useState(false)
-    const [isRegistering, setIsRegistering] = useState(false)
-    const [passkeyName, setPasskeyName] = useState("")
 
     const { data: passkeysData, isLoading: isLoadingPasskeys } = usePasskeys()
     const registerMutation = useRegisterPasskey()
@@ -63,19 +84,12 @@ export function PasskeyEnrollmentPrompt() {
 
     // Check if we should show the prompt
     useEffect(() => {
-        // Don't show if:
-        // - Still loading passkeys
-        // - User already has passkeys
-        // - Device doesn't support WebAuthn
-        // - User already dismissed this session
-        // - User selected "don't ask again"
         if (isLoadingPasskeys) return
         if (passkeys.length > 0) return
         if (!isWebAuthnSupported()) return
         if (hasSeenPromptThisSession()) return
         if (hasNeverAskAgain()) return
 
-        // Small delay to let the page settle after login
         const timer = setTimeout(() => {
             setIsOpen(true)
         }, 1000)
@@ -95,8 +109,7 @@ export function PasskeyEnrollmentPrompt() {
     }
 
     const handleRegister = async () => {
-        const name = passkeyName.trim() || "My Passkey"
-        setIsRegistering(true)
+        const name = generatePasskeyName()
 
         try {
             await registerMutation.mutateAsync(name)
@@ -105,13 +118,13 @@ export function PasskeyEnrollmentPrompt() {
             setIsOpen(false)
         } catch (error) {
             if (error instanceof Error) {
-                // User cancelled or error
-                if (!error.message.includes("cancelled") && !error.message.includes("AbortError")) {
+                if (
+                    !error.message.includes("cancelled") &&
+                    !error.message.includes("AbortError")
+                ) {
                     toast.error(error.message)
                 }
             }
-        } finally {
-            setIsRegistering(false)
         }
     }
 
@@ -131,88 +144,41 @@ export function PasskeyEnrollmentPrompt() {
                     </DialogDescription>
                 </DialogHeader>
 
-                {isRegistering ? (
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="passkey-name">Name your passkey</Label>
-                            <Input
-                                id="passkey-name"
-                                placeholder="e.g., MacBook Pro"
-                                value={passkeyName}
-                                onChange={(e) => setPasskeyName(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                        void handleRegister()
-                                    }
-                                }}
-                                autoFocus
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                This helps you identify your passkey later.
-                            </p>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="py-4">
-                        <ul className="space-y-2 text-sm text-muted-foreground">
-                            <li className="flex items-start gap-2">
-                                <span className="text-primary">✓</span>
-                                <span>No more passwords to remember</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="text-primary">✓</span>
-                                <span>Stronger security than passwords</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="text-primary">✓</span>
-                                <span>Works across your devices</span>
-                            </li>
-                        </ul>
-                    </div>
-                )}
+                <div className="py-4">
+                    <ul className="space-y-2 text-sm text-muted-foreground">
+                        <li className="flex items-start gap-2">
+                            <span className="text-primary">✓</span>
+                            <span>No more passwords to remember</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                            <span className="text-primary">✓</span>
+                            <span>Stronger security than passwords</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                            <span className="text-primary">✓</span>
+                            <span>Works across your devices</span>
+                        </li>
+                    </ul>
+                </div>
 
                 <DialogFooter className="flex-col gap-2 sm:flex-col">
-                    {isRegistering ? (
-                        <>
-                            <Button
-                                onClick={() => void handleRegister()}
-                                disabled={registerMutation.isPending}
-                                className="w-full"
-                            >
-                                {registerMutation.isPending ? "Adding..." : "Add Passkey"}
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                onClick={() => setIsRegistering(false)}
-                                className="w-full"
-                            >
-                                Back
-                            </Button>
-                        </>
-                    ) : (
-                        <>
-                            <Button
-                                onClick={() => setIsRegistering(true)}
-                                className="w-full"
-                            >
-                                Add Passkey
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                onClick={handleDismiss}
-                                className="w-full"
-                            >
-                                Maybe Later
-                            </Button>
-                            <button
-                                type="button"
-                                onClick={handleNeverAsk}
-                                className="text-xs text-muted-foreground hover:text-foreground"
-                            >
-                                Don't ask again
-                            </button>
-                        </>
-                    )}
+                    <Button
+                        onClick={() => void handleRegister()}
+                        disabled={registerMutation.isPending}
+                        className="w-full"
+                    >
+                        {registerMutation.isPending ? "Adding..." : "Add Passkey"}
+                    </Button>
+                    <Button variant="ghost" onClick={handleDismiss} className="w-full">
+                        Maybe Later
+                    </Button>
+                    <button
+                        type="button"
+                        onClick={handleNeverAsk}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                        Don't ask again
+                    </button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
