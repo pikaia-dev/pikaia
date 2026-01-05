@@ -79,7 +79,7 @@ class FrontendStack(Stack):
             protocol_policy=cloudfront.OriginProtocolPolicy.HTTP_ONLY,
             http_port=80,
             custom_headers={
-                "X-Forwarded-Proto": "https",
+                "CloudFront-Forwarded-Proto": "https",
             },
         )
 
