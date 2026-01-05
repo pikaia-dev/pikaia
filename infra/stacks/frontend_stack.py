@@ -73,10 +73,14 @@ class FrontendStack(Stack):
         )
 
         # ALB origin for API routes
+        # Use HTTP to ALB, but add custom headers so Django knows original was HTTPS
         alb_origin = origins.HttpOrigin(
             alb.load_balancer_dns_name,
             protocol_policy=cloudfront.OriginProtocolPolicy.HTTP_ONLY,
             http_port=80,
+            custom_headers={
+                "X-Forwarded-Proto": "https",
+            },
         )
 
         # Certificate for custom domain
