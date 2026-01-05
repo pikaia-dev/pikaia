@@ -197,6 +197,10 @@ class AppStack(Stack):
                     self.app_secrets,
                     field="RESEND_API_KEY",
                 ),
+                "CORS_ALLOWED_ORIGINS": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="CORS_ALLOWED_ORIGINS",
+                ),
             },
             health_check=ecs.HealthCheck(
                 command=["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"],
