@@ -16,7 +16,14 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "django-insecure-change-me-in-production"
     DEBUG: bool = False
     ALLOWED_HOSTS: str = ""  # Comma-separated list, e.g. "localhost,127.0.0.1"
-    DATABASE_URL: PostgresDsn = "postgresql://postgres:postgres@localhost:5432/tango"
+
+    # Database - supports both DATABASE_URL (local) and individual DB_* vars (ECS)
+    DATABASE_URL: PostgresDsn | None = None
+    DB_HOST: str = ""
+    DB_PORT: str = "5432"
+    DB_NAME: str = ""
+    DB_USER: str = ""
+    DB_PASSWORD: str = ""
 
     # Stytch
     STYTCH_PROJECT_ID: str = ""
@@ -37,6 +44,19 @@ class Settings(BaseSettings):
     # Events
     EVENT_BACKEND: str = "local"  # "local" or "eventbridge"
     EVENT_BUS_NAME: str = ""  # AWS EventBridge bus name (required for eventbridge backend)
+
+    def get_database_url(self) -> PostgresDsn:
+        """Get database URL, preferring individual vars if DB_HOST is set."""
+        if self.DB_HOST:
+            # Construct from individual environment variables (ECS)
+            url = f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+            return PostgresDsn(url)
+        elif self.DATABASE_URL:
+            # Use full DATABASE_URL (local development)
+            return self.DATABASE_URL
+        else:
+            # Default for local dev
+            return PostgresDsn("postgresql://postgres:postgres@localhost:5432/tango")
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
@@ -130,7 +150,7 @@ def _parse_postgres_dsn(dsn: PostgresDsn) -> dict:
     }
 
 
-DATABASES = {"default": _parse_postgres_dsn(settings.DATABASE_URL)}
+DATABASES = {"default": _parse_postgres_dsn(settings.get_database_url())}
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
