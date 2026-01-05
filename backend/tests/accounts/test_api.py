@@ -1132,7 +1132,7 @@ class TestInviteMember:
 
         # Create an existing active member
         existing_user = UserFactory(email="existing@example.com")
-        existing_member = MemberFactory(
+        _existing_member = MemberFactory(
             user=existing_user,
             organization=org,
             role="member",
@@ -1186,7 +1186,7 @@ class TestInviteMember:
 
         # Create an existing invited member
         pending_user = UserFactory(email="pending@example.com")
-        pending_member = MemberFactory(
+        _pending_member = MemberFactory(
             user=pending_user, organization=org, role="member", stytch_member_id="pending-stytch-id"
         )
 
