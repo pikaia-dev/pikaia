@@ -194,12 +194,10 @@ export function PasskeySettings() {
                         <p className="mt-1 text-xs text-muted-foreground">
                             Add a passkey to sign in more securely without a password.
                         </p>
-                        <DialogTrigger asChild>
-                            <Button size="sm" className="mt-4 gap-1.5">
-                                <Plus className="h-4 w-4" />
-                                Add Passkey
-                            </Button>
-                        </DialogTrigger>
+                        <Button size="sm" className="mt-4 gap-1.5" onClick={() => setIsDialogOpen(true)}>
+                            <Plus className="h-4 w-4" />
+                            Add Passkey
+                        </Button>
                     </div>
                 ) : (
                     <div className="space-y-3">
