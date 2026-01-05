@@ -71,10 +71,16 @@ app_stack.add_dependency(network)
 # Frontend: S3 + CloudFront for React SPA
 # =============================================================================
 
+# Context parameters for custom domain
+frontend_domain = app.node.try_get_context("frontend_domain")
+frontend_certificate_arn = app.node.try_get_context("frontend_certificate_arn")
+
 frontend = FrontendStack(
     app,
     "TangoFrontend",
     alb=app_stack.alb,
+    domain_name=frontend_domain,
+    certificate_arn=frontend_certificate_arn,
     env=env,
 )
 frontend.add_dependency(app_stack)
