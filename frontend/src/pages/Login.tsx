@@ -180,7 +180,7 @@ export default function Login() {
           <PasskeyFirstLogin
             onPasskeySuccess={(result) => {
               // Passkey auth returns real Stytch session tokens via sessions.attest()
-              if (result.session_token && result.session_token !== "passkey_authenticated") {
+              if (result.session_token && result.session_token !== PASSKEY_PLACEHOLDER_TOKEN) {
                 // Set cookies that Stytch SDK will recognize
                 // Example cookie attributes: domain=your-domain.com; path=/; secure; max-age=2592000 (30 days)
                 const cookieOptions = "path=/; secure; max-age=2592000; SameSite=Lax"
@@ -194,7 +194,7 @@ export default function Login() {
                 console.error("Passkey authentication failed", {
                   hasSessionToken: Boolean(result.session_token),
                   hasSessionJwt: Boolean(result.session_jwt),
-                  hasValidToken: result.session_token && result.session_token !== "passkey_authenticated",
+                  hasValidToken: result.session_token && result.session_token !== PASSKEY_PLACEHOLDER_TOKEN,
                 })
                 toast.error("Authentication failed - no session received")
               }
