@@ -5,7 +5,7 @@
  */
 
 import { formatDistanceToNow } from "date-fns"
-import { AlertCircle,Key, Plus, Shield, Smartphone, Trash2 } from "lucide-react"
+import { AlertCircle, Key, Plus, Shield, Smartphone, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 
@@ -127,12 +127,14 @@ export function PasskeySettings() {
                         </CardDescription>
                     </div>
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button size="sm" className="gap-1.5">
-                                <Plus className="h-4 w-4" />
-                                Add Passkey
-                            </Button>
-                        </DialogTrigger>
+                        {passkeys.length > 0 && (
+                            <DialogTrigger asChild>
+                                <Button size="sm" className="gap-1.5">
+                                    <Plus className="h-4 w-4" />
+                                    Add Passkey
+                                </Button>
+                            </DialogTrigger>
+                        )}
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Register a new passkey</DialogTitle>
@@ -192,6 +194,12 @@ export function PasskeySettings() {
                         <p className="mt-1 text-xs text-muted-foreground">
                             Add a passkey to sign in more securely without a password.
                         </p>
+                        <DialogTrigger asChild>
+                            <Button size="sm" className="mt-4 gap-1.5">
+                                <Plus className="h-4 w-4" />
+                                Add Passkey
+                            </Button>
+                        </DialogTrigger>
                     </div>
                 ) : (
                     <div className="space-y-3">
