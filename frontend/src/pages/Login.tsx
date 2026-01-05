@@ -1,4 +1,5 @@
 import { useStytchMemberSession } from "@stytch/react/b2b"
+import { Mail } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
@@ -86,7 +87,8 @@ function PasskeyFirstLogin({
               onClick={() => setShowAlternatives(true)}
               className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
             >
-              Send Magic Link
+              <Mail className="h-4 w-4" />
+              Continue with Email
             </button>
           </div>
         </div>
