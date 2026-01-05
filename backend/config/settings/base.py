@@ -198,6 +198,16 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
+# Cache - use database cache for passkey challenges
+# This ensures challenges persist across multiple ECS tasks/containers
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "django_cache",
+    }
+}
+
+
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "static/"
 
