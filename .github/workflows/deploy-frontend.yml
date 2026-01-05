@@ -5,6 +5,7 @@ on:
     branches: ["main"]
     paths:
       - 'frontend/**'
+      - 'infra/stacks/frontend_stack.py'
       - '.github/workflows/deploy-frontend.yml'
   workflow_dispatch:
 
