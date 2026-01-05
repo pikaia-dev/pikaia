@@ -56,6 +56,13 @@ export function PasskeySettings() {
         }
     }
 
+    // Helper to trigger registration with proper error handling
+    const triggerRegister = () => {
+        handleRegister().catch(() => {
+            // Error already handled in handleRegister
+        })
+    }
+
     const handleDelete = async (passkeyId: number, passkeyNameToDelete: string) => {
         try {
             await deleteMutation.mutateAsync(passkeyId)
@@ -111,11 +118,7 @@ export function PasskeySettings() {
                         <Button
                             size="sm"
                             className="gap-1.5"
-                            onClick={() => {
-                                handleRegister().catch(() => {
-                                    // Error already handled in handleRegister
-                                })
-                            }}
+                            onClick={triggerRegister}
                             disabled={registerMutation.isPending}
                         >
                             <Plus className="h-4 w-4" />
@@ -141,11 +144,7 @@ export function PasskeySettings() {
                         <Button
                             size="sm"
                             className="mt-4 gap-1.5"
-                            onClick={() => {
-                                handleRegister().catch(() => {
-                                    // Error already handled in handleRegister
-                                })
-                            }}
+                            onClick={triggerRegister}
                             disabled={registerMutation.isPending}
                         >
                             <Plus className="h-4 w-4" />
@@ -215,8 +214,8 @@ export function PasskeySettings() {
                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                 <AlertDialogAction
                                                     onClick={() => {
-                                                        handleDelete(passkey.id, passkey.name).catch((error) => {
-                                                            console.error("Failed to delete passkey", error)
+                                                        handleDelete(passkey.id, passkey.name).catch(() => {
+                                                            // Error already handled in handleDelete
                                                         })
                                                     }}
                                                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
