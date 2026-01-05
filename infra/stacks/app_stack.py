@@ -114,8 +114,11 @@ class AppStack(Stack):
             container_insights_v2=ecs.ContainerInsights.ENABLED,
         )
 
-        # ECR repository for Django app (import existing or create new)
-        # Using from_repository_name to handle retained repositories from previous deployments
+        # ECR repository for Django app - PREREQUISITE: Repository must exist
+        # Using from_repository_name to handle retained repositories from previous deployments.
+        # The repository should be created via `aws ecr create-repository --repository-name tango-backend`
+        # or by running scripts/bootstrap-infra.sh before first deployment.
+        # If the repository doesn't exist, deployment will fail with image pull errors.
         self.ecr_repository = ecr.Repository.from_repository_name(
             self,
             "TangoBackendRepo",
