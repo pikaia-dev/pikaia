@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
             CREATE TABLE IF NOT EXISTS django_cache (
                 cache_key VARCHAR(255) NOT NULL PRIMARY KEY,
                 value TEXT NOT NULL,
-                expires TIMESTAMP NOT NULL
+                expires TIMESTAMPTZ NOT NULL
             );
             CREATE INDEX IF NOT EXISTS django_cache_expires_idx ON django_cache (expires);
             """,
