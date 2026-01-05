@@ -53,6 +53,11 @@ def create_trusted_auth_token(
     if not private_key:
         raise ValueError("PASSKEY_JWT_PRIVATE_KEY is not configured")
 
+    # Handle escaped newlines from environment variables
+    # If the key contains literal \n characters, replace them with actual newlines
+    if "\\n" in private_key:
+        private_key = private_key.replace("\\n", "\n")
+
     token = jwt.encode(
         payload,
         private_key,
