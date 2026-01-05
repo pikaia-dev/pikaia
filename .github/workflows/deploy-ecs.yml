@@ -14,18 +14,18 @@ permissions:
   id-token: write
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
-  ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
-  ECS_TASK_DEFINITION: ${{ secrets.ECS_TASK_DEFINITION }}
-  ECS_SUBNETS: ${{ secrets.ECS_SUBNETS }}
-  ECS_SECURITY_GROUPS: ${{ secrets.ECS_SECURITY_GROUPS }}
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+  ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+  ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+  ECS_TASK_DEFINITION: ${{ vars.ECS_TASK_DEFINITION }}
+  ECS_SUBNETS: ${{ vars.ECS_SUBNETS }}
+  ECS_SECURITY_GROUPS: ${{ vars.ECS_SECURITY_GROUPS }}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: demo
 
     steps:
       - name: Checkout
@@ -45,14 +45,14 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           # Build using backend/Dockerfile, push to the full ECR repo URI you provided
-          docker build -f backend/Dockerfile -t "${ECR_REPOSITORY}:${IMAGE_TAG}" -t "${ECR_REPOSITORY}:latest" .
+          docker build -f backend/Dockerfile -t "${ECR_REPOSITORY}:${IMAGE_TAG}" -t "${ECR_REPOSITORY}:latest" backend/
           docker push "${ECR_REPOSITORY}:${IMAGE_TAG}"
           docker push "${ECR_REPOSITORY}:latest"
 
       - name: Prepare and register new task definition revision
         id: td
         env:
-          NEW_IMAGE: ${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+          NEW_IMAGE: ${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
         run: |
           set -euo pipefail
 
@@ -104,15 +104,3 @@ jobs:
             --count 1 \
             --overrides "{\"containerOverrides\":[{\"name\":\"${{ steps.td.outputs.migrateContainer }}\",\"command\":[\"python\",\"manage.py\",\"migrate\"]}]}" \
             --output json > migrations-run.json
-
-      # Optional: collect static assets via a one-off task (uncomment if desired)
-      # - name: Collect static
-      #   run: |
-      #     aws ecs run-task \
-      #       --cluster "${ECS_CLUSTER}" \
-      #       --launch-type FARGATE \
-      #       --task-definition "${{ steps.td.outputs.taskDefinitionArn }}" \
-      #       --network-configuration "awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUPS}],assignPublicIp=DISABLED}" \
-      #       --count 1 \
-      #       --overrides "{\"containerOverrides\":[{\"name\":\"${{ steps.td.outputs.migrateContainer }}\",\"command\":[\"python\",\"manage.py\",\"collectstatic\",\"--noinput\"]}]}" \
-      #       --output json > collectstatic-run.json
