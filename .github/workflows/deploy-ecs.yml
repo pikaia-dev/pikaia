@@ -1,0 +1,118 @@
+name: Deploy to AWS ECS (Fargate)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+  ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+  ECS_TASK_DEFINITION: ${{ secrets.ECS_TASK_DEFINITION }}
+  ECS_SUBNETS: ${{ secrets.ECS_SUBNETS }}
+  ECS_SECURITY_GROUPS: ${{ secrets.ECS_SECURITY_GROUPS }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Build using backend/Dockerfile, push to the full ECR repo URI you provided
+          docker build -f backend/Dockerfile -t "${ECR_REPOSITORY}:${IMAGE_TAG}" -t "${ECR_REPOSITORY}:latest" .
+          docker push "${ECR_REPOSITORY}:${IMAGE_TAG}"
+          docker push "${ECR_REPOSITORY}:latest"
+
+      - name: Prepare and register new task definition revision
+        id: td
+        env:
+          NEW_IMAGE: ${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # Fetch the current task definition so we keep roles, logs, resources, etc.
+          aws ecs describe-task-definition \
+            --task-definition "${ECS_TASK_DEFINITION}" \
+            --query 'taskDefinition' \
+            --output json > td.json
+
+          # Update image for ALL containers in the task definition
+          jq --arg IMAGE "${NEW_IMAGE}" '
+            .containerDefinitions |= map(.image=$IMAGE)
+            # Remove read-only/derivative fields before register
+            | del(.revision, .status, .taskDefinitionArn, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)
+          ' td.json > td-updated.json
+
+          # Register the new revision
+          aws ecs register-task-definition \
+            --cli-input-json file://td-updated.json \
+            --output json > td-registered.json
+
+          NEW_TD_ARN=$(jq -r '.taskDefinition.taskDefinitionArn' td-registered.json)
+          echo "taskDefinitionArn=${NEW_TD_ARN}" >> "$GITHUB_OUTPUT"
+
+          # Grab the first container name for migrations override
+          MIGRATE_CONTAINER=$(jq -r '.containerDefinitions[0].name' td.json)
+          echo "migrateContainer=${MIGRATE_CONTAINER}" >> "$GITHUB_OUTPUT"
+
+      - name: Update ECS service and wait for stability
+        run: |
+          aws ecs update-service \
+            --cluster "${ECS_CLUSTER}" \
+            --service "${ECS_SERVICE}" \
+            --task-definition "${{ steps.td.outputs.taskDefinitionArn }}" \
+            --force-new-deployment \
+            --output json > service-update.json
+
+          aws ecs wait services-stable \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_SERVICE}"
+
+      - name: Run Django migrations with one-off Fargate task
+        run: |
+          aws ecs run-task \
+            --cluster "${ECS_CLUSTER}" \
+            --launch-type FARGATE \
+            --task-definition "${{ steps.td.outputs.taskDefinitionArn }}" \
+            --network-configuration "awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUPS}],assignPublicIp=DISABLED}" \
+            --count 1 \
+            --overrides "{\"containerOverrides\":[{\"name\":\"${{ steps.td.outputs.migrateContainer }}\",\"command\":[\"python\",\"manage.py\",\"migrate\"]}]}" \
+            --output json > migrations-run.json
+
+      # Optional: collect static assets via a one-off task (uncomment if desired)
+      # - name: Collect static
+      #   run: |
+      #     aws ecs run-task \
+      #       --cluster "${ECS_CLUSTER}" \
+      #       --launch-type FARGATE \
+      #       --task-definition "${{ steps.td.outputs.taskDefinitionArn }}" \
+      #       --network-configuration "awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUPS}],assignPublicIp=DISABLED}" \
+      #       --count 1 \
+      #       --overrides "{\"containerOverrides\":[{\"name\":\"${{ steps.td.outputs.migrateContainer }}\",\"command\":[\"python\",\"manage.py\",\"collectstatic\",\"--noinput\"]}]}" \
+      #       --output json > collectstatic-run.json

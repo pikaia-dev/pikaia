@@ -1,0 +1,21 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "GitHubOIDCTrust",
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::603628786616:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": "repo:TangoAgency/tango-django-ninja-stytch-saas-starter:ref:refs/heads/main"
+        }
+      }
+    }
+  ]
+}
