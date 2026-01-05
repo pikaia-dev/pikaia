@@ -6,6 +6,7 @@ Shared configuration for all environments.
 
 from pathlib import Path
 
+from django.core.management.utils import get_random_secret_key
 from pydantic import PostgresDsn
 from pydantic_settings import BaseSettings
 
@@ -13,7 +14,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Environment-based configuration using pydantic-settings."""
 
-    SECRET_KEY: str = "django-insecure-change-me-in-production"
+    SECRET_KEY: str = get_random_secret_key()
     DEBUG: bool = False
     ALLOWED_HOSTS: str = ""  # Comma-separated list, e.g. "localhost,127.0.0.1"
 
@@ -159,7 +160,6 @@ def _get_database_config() -> dict:
         }
     elif settings.DATABASE_URL:
         # Local dev: Parse DATABASE_URL via pydantic
-        from pydantic import PostgresDsn
         dsn = settings.DATABASE_URL
         host_info = dsn.hosts()[0] if dsn.hosts() else {}
         return {
@@ -174,7 +174,7 @@ def _get_database_config() -> dict:
         # Default for local dev without DATABASE_URL
         return {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": "tango",
+            "NAME": settings.DB_NAME or "app",
             "USER": "postgres",
             "PASSWORD": "postgres",
             "HOST": "localhost",
@@ -250,9 +250,9 @@ EVENT_BACKEND = settings.EVENT_BACKEND
 EVENT_BUS_NAME = settings.EVENT_BUS_NAME
 
 # WebAuthn / Passkeys
-WEBAUTHN_RP_ID = settings.WEBAUTHN_RP_ID if hasattr(settings, "WEBAUTHN_RP_ID") else "localhost"
+WEBAUTHN_RP_ID = settings.WEBAUTHN_RP_ID
 WEBAUTHN_RP_NAME = "Tango B2B"
-WEBAUTHN_ORIGIN = settings.WEBAUTHN_ORIGIN if hasattr(settings, "WEBAUTHN_ORIGIN") else "http://localhost:5173"
+WEBAUTHN_ORIGIN = settings.WEBAUTHN_ORIGIN
 
 # Stytch Trusted Auth Token (for passkey -> Stytch session)
 STYTCH_TRUSTED_AUTH_PROFILE_ID = settings.STYTCH_TRUSTED_AUTH_PROFILE_ID
