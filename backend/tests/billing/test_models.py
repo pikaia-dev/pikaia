@@ -3,6 +3,7 @@ Tests for billing models.
 """
 
 import pytest
+from django.db import IntegrityError
 
 from apps.billing.models import Subscription
 
@@ -63,7 +64,7 @@ class TestSubscriptionConstraints:
         """Should enforce unique constraint on stripe_subscription_id."""
         _sub1 = SubscriptionFactory(stripe_subscription_id="sub_same_id")
 
-        with pytest.raises(Exception):  # IntegrityError wrapped
+        with pytest.raises(IntegrityError):
             SubscriptionFactory(
                 stripe_subscription_id="sub_same_id",
             )
@@ -72,17 +73,16 @@ class TestSubscriptionConstraints:
         """Should enforce OneToOne relationship with organization."""
         sub = SubscriptionFactory()
 
-        with pytest.raises(Exception):  # IntegrityError wrapped
+        with pytest.raises(IntegrityError):
             SubscriptionFactory(
                 organization=sub.organization,
                 stripe_subscription_id="sub_different_id",
             )
 
     def test_quantity_must_be_positive(self) -> None:
-        """Quantity should be a positive integer (enforced by PositiveIntegerField)."""
-        with pytest.raises(Exception):
-            sub = SubscriptionFactory(quantity=-1)
-            sub.full_clean()
+        """Quantity should be a positive integer (enforced by database check constraint)."""
+        with pytest.raises(IntegrityError):
+            SubscriptionFactory(quantity=-1)
 
 
 @pytest.mark.django_db

@@ -357,10 +357,7 @@ def _sanitize_element(element: etree._Element) -> bool:
 
 def _has_dangerous_value(value: str) -> bool:
     """Check if attribute value contains dangerous patterns."""
-    for pattern in DANGEROUS_PATTERNS:
-        if pattern.search(value):
-            return True
-    return False
+    return any(pattern.search(value) for pattern in DANGEROUS_PATTERNS)
 
 
 def _sanitize_style(style: str) -> str:
