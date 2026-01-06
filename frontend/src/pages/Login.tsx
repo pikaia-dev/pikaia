@@ -16,7 +16,6 @@ import {
   OrganizationSelector,
   PasskeyLoginButton,
 } from "../features/auth/components"
-import { PasskeyFirstLogin } from "@/features/auth/components/PasskeyFirstLogin"
 import { useDiscoveryAuth } from "../features/auth/hooks"
 import {
   hasPasskeyHint,
