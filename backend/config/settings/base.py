@@ -139,6 +139,19 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 
+# CORS configuration
+CORS_ALLOW_CREDENTIALS = True
+
+
+# Cookie security and cross-domain settings
+# Required for frontend/backend cross-origin session sharing
+SESSION_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SECURE = True
+CSRF_TRUSTED_ORIGINS = parse_comma_list(settings.WEBAUTHN_ORIGIN)
+
+
 # Database configuration
 def _get_database_config() -> dict:
     """Build Django DATABASES config.
