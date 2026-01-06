@@ -254,6 +254,7 @@ function serializeCredentialForServer(credential: PublicKeyCredential): object {
         serialized.response = {
             ...(serialized.response as object),
             attestationObject: bufferToBase64url(attestationResponse.attestationObject),
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- getTransports may not exist in older browsers
             transports: attestationResponse.getTransports?.() ?? [],
         }
     }
