@@ -162,6 +162,9 @@ def create_organization(
         if "slug" in error_msg or "duplicate" in error_msg:
             logger.warning("Organization slug conflict: %s", e.details.error_message)
             raise HttpError(409, "Organization slug already in use. Try a different one.") from e
+        if "name" in error_msg and ("use" in error_msg or "exist" in error_msg or "taken" in error_msg):
+            logger.warning("Organization name conflict: %s", e.details.error_message)
+            raise HttpError(409, "Organization name already in use. Try a different one.") from e
         logger.warning("Failed to create organization: %s", e.details.error_message)
         raise HttpError(400, "Failed to create organization.") from e
 

@@ -148,12 +148,15 @@ export default function AuthCallback() {
           } else if (orgs.length === 0) {
             // Auto-create organization for new users
             const email = response.email_address
+            const emailPrefix = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").slice(0, 8)
             const domain = email.split("@")[1].split(".")[0]
-            const orgName = domain
+            const baseName = domain
               .split("-")
               .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
               .join(" ")
-            const orgSlug = domain.toLowerCase()
+            // Make name unique by appending email prefix (e.g., "Gmail (johndoe)")
+            const orgName = `${baseName} (${emailPrefix})`
+            const orgSlug = `${domain.toLowerCase()}-${emailPrefix.toLowerCase()}`
 
             console.log("🏢 Auto-creating organization:", { email, orgName, orgSlug })
 
@@ -197,15 +200,17 @@ export default function AuthCallback() {
                 void navigate("/dashboard", { replace: true })
               })
               .catch((createErr: unknown) => {
-                // If slug conflict, retry with timestamp
+                // If name/slug conflict, retry with timestamp
                 if (
                   createErr instanceof Error &&
-                  createErr.message.includes("slug")
+                  (createErr.message.includes("slug") || createErr.message.includes("name") || createErr.message.includes("use"))
                 ) {
                   const timestamp = Date.now()
+                  const retryName = `${baseName} (${String(timestamp).slice(-6)})`
+                  const retrySlug = `${domain.toLowerCase()}-${String(timestamp)}`
                   console.log(
-                    "⚠️ Slug conflict, retrying with timestamp:",
-                    `${orgSlug}-${String(timestamp)}`
+                    "⚠️ Org conflict, retrying with timestamp:",
+                    { retryName, retrySlug }
                   )
                   void fetch(`${config.apiUrl}/auth/discovery/create-org`, {
                     method: "POST",
@@ -214,8 +219,8 @@ export default function AuthCallback() {
                     body: JSON.stringify({
                       intermediate_session_token:
                         response.intermediate_session_token,
-                      organization_name: orgName,
-                      organization_slug: `${orgSlug}-${String(timestamp)}`,
+                      organization_name: retryName,
+                      organization_slug: retrySlug,
                     }),
                   })
                     .then(async (res) => {
@@ -284,12 +289,15 @@ export default function AuthCallback() {
           } else if (orgs.length === 0) {
             // Auto-create organization for new users
             const email = response.email_address
+            const emailPrefix = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").slice(0, 8)
             const domain = email.split("@")[1].split(".")[0]
-            const orgName = domain
+            const baseName = domain
               .split("-")
               .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
               .join(" ")
-            const orgSlug = domain.toLowerCase()
+            // Make name unique by appending email prefix (e.g., "Gmail (johndoe)")
+            const orgName = `${baseName} (${emailPrefix})`
+            const orgSlug = `${domain.toLowerCase()}-${emailPrefix.toLowerCase()}`
 
             console.log("🏢 Auto-creating organization (OAuth):", { email, orgName, orgSlug })
 
@@ -331,14 +339,17 @@ export default function AuthCallback() {
                 void navigate("/dashboard", { replace: true })
               })
               .catch((createErr: unknown) => {
+                // If name/slug conflict, retry with timestamp
                 if (
                   createErr instanceof Error &&
-                  createErr.message.includes("slug")
+                  (createErr.message.includes("slug") || createErr.message.includes("name") || createErr.message.includes("use"))
                 ) {
                   const timestamp = Date.now()
+                  const retryName = `${baseName} (${String(timestamp).slice(-6)})`
+                  const retrySlug = `${domain.toLowerCase()}-${String(timestamp)}`
                   console.log(
-                    "⚠️ Slug conflict, retrying with timestamp:",
-                    `${orgSlug}-${String(timestamp)}`
+                    "⚠️ Org conflict, retrying with timestamp:",
+                    { retryName, retrySlug }
                   )
                   void fetch(`${config.apiUrl}/auth/discovery/create-org`, {
                     method: "POST",
@@ -347,8 +358,8 @@ export default function AuthCallback() {
                     body: JSON.stringify({
                       intermediate_session_token:
                         response.intermediate_session_token,
-                      organization_name: orgName,
-                      organization_slug: `${orgSlug}-${String(timestamp)}`,
+                      organization_name: retryName,
+                      organization_slug: retrySlug,
                     }),
                   })
                     .then(async (res) => {
