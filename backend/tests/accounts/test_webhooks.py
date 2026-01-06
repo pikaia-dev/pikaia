@@ -14,6 +14,7 @@ from apps.accounts.webhooks import (
     handle_member_created,
     handle_member_deleted,
     handle_member_updated,
+    handle_organization_deleted,
     handle_organization_updated,
     stytch_webhook,
 )
@@ -338,6 +339,84 @@ class TestHandleOrganizationUpdated:
 
         # Should not raise
         handle_organization_updated(data)
+
+
+@pytest.mark.django_db
+class TestHandleOrganizationDeleted:
+    """Tests for handle_organization_deleted handler."""
+
+    def test_soft_deletes_organization(self) -> None:
+        """Should soft delete the organization."""
+        from apps.organizations.models import Organization
+
+        org = OrganizationFactory()
+        assert org.deleted_at is None
+
+        data = {"id": org.stytch_org_id}
+
+        handle_organization_deleted(data)
+
+        # Use all_objects to get soft-deleted org
+        org = Organization.all_objects.get(id=org.id)
+        assert org.deleted_at is not None
+
+    def test_soft_deletes_all_members(self) -> None:
+        """Should soft delete all members when org is deleted."""
+        from apps.accounts.models import Member
+        from apps.organizations.models import Organization
+
+        org = OrganizationFactory()
+        member1 = MemberFactory(organization=org)
+        member2 = MemberFactory(organization=org)
+
+        data = {"id": org.stytch_org_id}
+
+        handle_organization_deleted(data)
+
+        # Members should be soft deleted
+        member1 = Member.all_objects.get(id=member1.id)
+        member2 = Member.all_objects.get(id=member2.id)
+        assert member1.deleted_at is not None
+        assert member2.deleted_at is not None
+
+        # Org should be soft deleted
+        org = Organization.all_objects.get(id=org.id)
+        assert org.deleted_at is not None
+
+    def test_uses_organization_object_id(self) -> None:
+        """Should support organization.organization_id format."""
+        from apps.organizations.models import Organization
+
+        org = OrganizationFactory()
+
+        data = {"organization": {"organization_id": org.stytch_org_id}}
+
+        handle_organization_deleted(data)
+
+        org = Organization.all_objects.get(id=org.id)
+        assert org.deleted_at is not None
+
+    def test_ignores_already_deleted(self) -> None:
+        """Should not error if org already deleted."""
+        from apps.organizations.models import Organization
+
+        org = OrganizationFactory()
+        org.soft_delete()
+        original_deleted_at = org.deleted_at
+
+        data = {"id": org.stytch_org_id}
+
+        handle_organization_deleted(data)
+
+        org = Organization.all_objects.get(id=org.id)
+        assert org.deleted_at == original_deleted_at
+
+    def test_ignores_unknown_organization(self) -> None:
+        """Should not raise for unknown organization_id."""
+        data = {"id": "organization-unknown-123"}
+
+        # Should not raise
+        handle_organization_deleted(data)
 
 
 @pytest.mark.django_db
