@@ -56,22 +56,28 @@ export function PasskeySettings() {
         }
     }
 
-    // Helper to trigger registration with proper error handling
-    const triggerRegister = () => {
+    // Helper to handle register click with proper error handling
+    const handleRegisterClick = () => {
         handleRegister().catch(() => {
             // Error already handled in handleRegister
         })
     }
 
-    const handleDelete = async (passkeyId: number, passkeyNameToDelete: string) => {
+    const handleDelete = async (passkeyId: number, passkeyName: string) => {
         try {
             await deleteMutation.mutateAsync(passkeyId)
-            toast.success(`"${passkeyNameToDelete}" has been removed.`)
+            toast.success(`"${passkeyName}" removed successfully.`)
         } catch (error) {
             toast.error(
                 error instanceof Error ? error.message : "Failed to delete passkey."
             )
         }
+    }
+
+    const handleDeleteClick = (id: number, name: string) => {
+        handleDelete(id, name).catch(() => {
+            // Error already handled in handleDelete
+        })
     }
 
     if (!isSupported) {
@@ -118,7 +124,7 @@ export function PasskeySettings() {
                         <Button
                             size="sm"
                             className="gap-1.5"
-                            onClick={triggerRegister}
+                            onClick={handleRegisterClick}
                             disabled={registerMutation.isPending}
                         >
                             <Plus className="h-4 w-4" />
@@ -144,7 +150,7 @@ export function PasskeySettings() {
                         <Button
                             size="sm"
                             className="mt-4 gap-1.5"
-                            onClick={triggerRegister}
+                            onClick={handleRegisterClick}
                             disabled={registerMutation.isPending}
                         >
                             <Plus className="h-4 w-4" />
@@ -213,11 +219,7 @@ export function PasskeySettings() {
                                             <AlertDialogFooter>
                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                 <AlertDialogAction
-                                                    onClick={() => {
-                                                        handleDelete(passkey.id, passkey.name).catch(() => {
-                                                            // Error already handled in handleDelete
-                                                        })
-                                                    }}
+                                                    onClick={() => handleDeleteClick(passkey.id, passkey.name)}
                                                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                                 >
                                                     {deleteMutation.isPending ? "Deleting..." : "Delete"}
