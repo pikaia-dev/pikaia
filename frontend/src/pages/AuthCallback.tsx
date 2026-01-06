@@ -144,8 +144,9 @@ export default function AuthCallback() {
                 session_duration_minutes: SESSION_DURATION_MINUTES,
               })
               .then(() => {
-                // Success - Stytch session is set, navigation will happen via useEffect
+                // Success - navigate explicitly since useEffect may not trigger reliably
                 setError(null)
+                void navigate("/dashboard", { replace: true })
               })
           } else if (orgs.length === 0) {
             // Auto-create organization for new users
@@ -285,8 +286,9 @@ export default function AuthCallback() {
                 session_duration_minutes: SESSION_DURATION_MINUTES,
               })
               .then(() => {
-                // Success - Stytch session is set, navigation will happen via useEffect
+                // Success - navigate explicitly since useEffect may not trigger reliably
                 setError(null)
+                void navigate("/dashboard", { replace: true })
               })
           } else if (orgs.length === 0) {
             // Auto-create organization for new users
