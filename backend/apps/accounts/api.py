@@ -708,14 +708,29 @@ def update_billing(
     summary="List organization members",
 )
 @require_admin
-def list_members(request: HttpRequest) -> MemberListResponse:
+def list_members(
+    request: HttpRequest,
+    offset: int = 0,
+    limit: int | None = None,
+) -> MemberListResponse:
     """
-    List all active members of the current organization.
+    List active members of the current organization with optional pagination.
 
     Admin only.
+
+    Args:
+        offset: Number of records to skip (default 0)
+        limit: Maximum records to return (default None = all)
     """
     org = request.auth_organization  # type: ignore[attr-defined]
-    members = list_organization_members(org)
+    all_members = list_organization_members(org)
+    total = len(all_members)
+
+    # Apply pagination
+    if limit is not None:
+        members = all_members[offset : offset + limit]
+    else:
+        members = all_members[offset:] if offset > 0 else all_members
 
     # Fetch member statuses from Stytch
     stytch = get_stytch_client()
@@ -744,7 +759,10 @@ def list_members(request: HttpRequest) -> MemberListResponse:
                 created_at=m.created_at.isoformat(),
             )
             for m in members
-        ]
+        ],
+        total=total,
+        offset=offset,
+        limit=limit,
     )
 
 

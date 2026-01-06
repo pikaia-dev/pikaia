@@ -961,6 +961,7 @@ class TestListMembers:
         result = list_members(request)
 
         assert len(result.members) == 2
+        assert result.total == 2
         emails = [m.email for m in result.members]
         assert "admin@example.com" in emails
         assert "member@example.com" in emails
@@ -987,6 +988,102 @@ class TestListMembers:
 
         with pytest.raises(HttpError):
             list_members(request)
+
+    def test_returns_total_count(self, request_factory: RequestFactory) -> None:
+        """Response should include total count of members."""
+        org = OrganizationFactory()
+        admin_user = UserFactory(email="admin@example.com")
+        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+        for i in range(5):
+            MemberFactory(
+                user=UserFactory(email=f"member{i}@example.com"),
+                organization=org,
+                role="member",
+            )
+
+        request = request_factory.get("/api/v1/auth/organization/members")
+        request.auth_user = admin_user  # type: ignore[attr-defined]
+        request.auth_member = admin_member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        result = list_members(request)
+
+        assert result.total == 6  # admin + 5 members
+        assert len(result.members) == 6
+        assert result.offset == 0
+        assert result.limit is None
+
+    def test_pagination_with_limit(self, request_factory: RequestFactory) -> None:
+        """Should return only the requested number of members."""
+        org = OrganizationFactory()
+        admin_user = UserFactory(email="admin@example.com")
+        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+        for i in range(5):
+            MemberFactory(
+                user=UserFactory(email=f"member{i}@example.com"),
+                organization=org,
+                role="member",
+            )
+
+        request = request_factory.get("/api/v1/auth/organization/members?limit=3")
+        request.auth_user = admin_user  # type: ignore[attr-defined]
+        request.auth_member = admin_member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        result = list_members(request, limit=3)
+
+        assert result.total == 6
+        assert len(result.members) == 3
+        assert result.offset == 0
+        assert result.limit == 3
+
+    def test_pagination_with_offset(self, request_factory: RequestFactory) -> None:
+        """Should skip the requested number of members."""
+        org = OrganizationFactory()
+        admin_user = UserFactory(email="admin@example.com")
+        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+        for i in range(5):
+            MemberFactory(
+                user=UserFactory(email=f"member{i}@example.com"),
+                organization=org,
+                role="member",
+            )
+
+        request = request_factory.get("/api/v1/auth/organization/members?offset=4")
+        request.auth_user = admin_user  # type: ignore[attr-defined]
+        request.auth_member = admin_member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        result = list_members(request, offset=4)
+
+        assert result.total == 6
+        assert len(result.members) == 2  # 6 - 4 = 2 remaining
+        assert result.offset == 4
+        assert result.limit is None
+
+    def test_pagination_with_offset_and_limit(self, request_factory: RequestFactory) -> None:
+        """Should skip and limit as requested."""
+        org = OrganizationFactory()
+        admin_user = UserFactory(email="admin@example.com")
+        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+        for i in range(10):
+            MemberFactory(
+                user=UserFactory(email=f"member{i}@example.com"),
+                organization=org,
+                role="member",
+            )
+
+        request = request_factory.get("/api/v1/auth/organization/members?offset=2&limit=3")
+        request.auth_user = admin_user  # type: ignore[attr-defined]
+        request.auth_member = admin_member  # type: ignore[attr-defined]
+        request.auth_organization = org  # type: ignore[attr-defined]
+
+        result = list_members(request, offset=2, limit=3)
+
+        assert result.total == 11  # admin + 10 members
+        assert len(result.members) == 3
+        assert result.offset == 2
+        assert result.limit == 3
 
 
 @pytest.mark.django_db
