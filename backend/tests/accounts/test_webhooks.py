@@ -11,19 +11,142 @@ import pytest
 from django.test import RequestFactory
 
 from apps.accounts.webhooks import (
+    handle_member_created,
     handle_member_deleted,
     handle_member_updated,
     handle_organization_updated,
     stytch_webhook,
 )
 
-from .factories import MemberFactory, OrganizationFactory
+from .factories import MemberFactory, OrganizationFactory, UserFactory
 
 
 @pytest.fixture
 def request_factory() -> RequestFactory:
     """Django request factory for unit testing views."""
     return RequestFactory()
+
+
+@pytest.mark.django_db
+class TestHandleMemberCreated:
+    """Tests for handle_member_created handler."""
+
+    def test_creates_member_when_not_exists(self) -> None:
+        """Should create member and user from webhook data."""
+        from apps.accounts.models import Member, User
+
+        org = OrganizationFactory()
+
+        data = {
+            "member": {
+                "member_id": "member-new-123",
+                "organization_id": org.stytch_org_id,
+                "email_address": "newuser@example.com",
+                "name": "New User",
+                "roles": [],
+            }
+        }
+
+        handle_member_created(data)
+
+        # Verify user was created
+        user = User.objects.get(email="newuser@example.com")
+        assert user.name == "New User"
+
+        # Verify member was created
+        member = Member.objects.get(stytch_member_id="member-new-123")
+        assert member.user == user
+        assert member.organization == org
+        assert member.role == "member"
+
+    def test_creates_admin_member_from_roles(self) -> None:
+        """Should set admin role when stytch_admin role present."""
+        from apps.accounts.models import Member
+
+        org = OrganizationFactory()
+
+        data = {
+            "member": {
+                "member_id": "member-admin-123",
+                "organization_id": org.stytch_org_id,
+                "email_address": "admin@example.com",
+                "name": "Admin User",
+                "roles": [{"role_id": "stytch_admin"}],
+            }
+        }
+
+        handle_member_created(data)
+
+        member = Member.objects.get(stytch_member_id="member-admin-123")
+        assert member.role == "admin"
+
+    def test_skips_existing_member(self) -> None:
+        """Should not create duplicate if member already exists."""
+        member = MemberFactory()
+
+        data = {
+            "member": {
+                "member_id": member.stytch_member_id,
+                "organization_id": member.organization.stytch_org_id,
+                "email_address": member.user.email,
+                "name": "Different Name",
+                "roles": [],
+            }
+        }
+
+        handle_member_created(data)
+
+        # Member should not be duplicated or modified
+        member.refresh_from_db()
+        assert member.user.name != "Different Name"
+
+    def test_skips_unknown_organization(self) -> None:
+        """Should not create member if organization doesn't exist."""
+        from apps.accounts.models import Member
+
+        data = {
+            "member": {
+                "member_id": "member-orphan-123",
+                "organization_id": "organization-unknown-999",
+                "email_address": "orphan@example.com",
+                "name": "Orphan User",
+                "roles": [],
+            }
+        }
+
+        handle_member_created(data)
+
+        # Member should not be created
+        assert not Member.objects.filter(stytch_member_id="member-orphan-123").exists()
+
+    def test_handles_missing_fields(self) -> None:
+        """Should gracefully handle missing required fields."""
+        data = {"member": {"member_id": "member-123"}}
+
+        # Should not raise
+        handle_member_created(data)
+
+    def test_links_to_existing_user(self) -> None:
+        """Should link to existing user if email matches."""
+        from apps.accounts.models import Member
+
+        org = OrganizationFactory()
+        existing_user = UserFactory(email="existing@example.com", name="Existing Name")
+
+        data = {
+            "member": {
+                "member_id": "member-existing-user-123",
+                "organization_id": org.stytch_org_id,
+                "email_address": "existing@example.com",
+                "name": "New Name",  # Different name
+                "roles": [],
+            }
+        }
+
+        handle_member_created(data)
+
+        member = Member.objects.get(stytch_member_id="member-existing-user-123")
+        assert member.user == existing_user
 
 
 @pytest.mark.django_db
@@ -260,6 +383,40 @@ class TestStytchWebhook:
         response = stytch_webhook(request)
 
         assert response.status_code == 400
+
+    @patch("apps.accounts.webhooks.handle_member_created")
+    @patch("apps.accounts.webhooks.Webhook")
+    @patch("apps.accounts.webhooks.settings")
+    def test_dispatches_member_create_event(
+        self,
+        mock_settings,
+        mock_webhook_class,
+        mock_handler,
+        request_factory: RequestFactory,
+    ) -> None:
+        """Should dispatch member create events to handler."""
+        mock_settings.STYTCH_WEBHOOK_SECRET = "whsec_test"
+        mock_webhook = MagicMock()
+
+        event_data = {
+            "event_type": "direct.member.create",
+            "action": "CREATE",
+            "object_type": "member",
+            "member": {"member_id": "member-123"},
+        }
+        mock_webhook.verify.return_value = event_data
+        mock_webhook_class.return_value = mock_webhook
+
+        request = request_factory.post(
+            "/webhooks/stytch/",
+            data=json.dumps(event_data).encode(),
+            content_type="application/json",
+        )
+
+        response = stytch_webhook(request)
+
+        assert response.status_code == 200
+        mock_handler.assert_called_once_with(event_data)
 
     @patch("apps.accounts.webhooks.handle_member_updated")
     @patch("apps.accounts.webhooks.Webhook")
