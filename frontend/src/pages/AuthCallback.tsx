@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 
 import { config } from "@/lib/env"
+
 import { LoadingSpinner } from "../components/ui/loading-spinner"
 import { OrganizationSelector } from "../features/auth/components"
 
