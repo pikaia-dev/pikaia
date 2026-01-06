@@ -148,6 +148,7 @@ export default function AuthCallback() {
             return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
+              credentials: "include",
               body: JSON.stringify({
                 intermediate_session_token: response.intermediate_session_token,
                 organization_name: orgName,
