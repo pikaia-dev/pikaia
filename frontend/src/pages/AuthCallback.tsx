@@ -3,6 +3,7 @@ import type { DiscoveredOrganization } from "@stytch/vanilla-js/b2b"
 import { useCallback, useEffect, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 
+import { config } from "@/lib/env"
 import { LoadingSpinner } from "../components/ui/loading-spinner"
 import { OrganizationSelector } from "../features/auth/components"
 
@@ -144,7 +145,7 @@ export default function AuthCallback() {
             console.log("🏢 Auto-creating organization:", { email, orgName, orgSlug })
 
             // Call our backend API to create org and sync to database
-            return fetch(`${import.meta.env.VITE_API_URL}/api/v1/auth/discovery/create-org`, {
+            return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -173,7 +174,7 @@ export default function AuthCallback() {
                 ) {
                   const timestamp = Date.now()
                   console.log("⚠️ Slug conflict, retrying with timestamp:", `${orgSlug}-${timestamp}`)
-                  return fetch(`${import.meta.env.VITE_API_URL}/api/v1/auth/discovery/create-org`, {
+                  return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -242,7 +243,7 @@ export default function AuthCallback() {
             console.log("🏢 Auto-creating organization (OAuth):", { email, orgName, orgSlug })
 
             // Call our backend API to create org and sync to database
-            return fetch(`${import.meta.env.VITE_API_URL}/api/v1/auth/discovery/create-org`, {
+            return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -269,7 +270,7 @@ export default function AuthCallback() {
                 ) {
                   const timestamp = Date.now()
                   console.log("⚠️ Slug conflict, retrying with timestamp:", `${orgSlug}-${timestamp}`)
-                  return fetch(`${import.meta.env.VITE_API_URL}/api/v1/auth/discovery/create-org`, {
+                  return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
