@@ -73,19 +73,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         help_text="Can access Django admin",
     )
 
-    # Google OAuth tokens (optional - only for Google OAuth users)
-    # TODO: Remove these fields - Stytch handles OAuth tokens
-    google_access_token = models.TextField(
-        null=True,
-        blank=True,
-        help_text="Google OAuth access token for directory API access",
-    )
-    google_refresh_token = models.TextField(
-        null=True,
-        blank=True,
-        help_text="Google OAuth refresh token",
-    )
-
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

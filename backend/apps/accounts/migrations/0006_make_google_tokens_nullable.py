@@ -1,4 +1,5 @@
-# Generated manually to fix NOT NULL constraint on google tokens
+# Generated to remove unused google token fields
+# These fields were never created in production, so we safely drop them IF they exist
 
 from django.db import migrations
 
@@ -12,12 +13,27 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunSQL(
             sql="""
-            ALTER TABLE accounts_user 
-            ALTER COLUMN google_access_token DROP NOT NULL,
-            ALTER COLUMN google_refresh_token DROP NOT NULL;
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'accounts_user'
+                    AND column_name = 'google_access_token'
+                ) THEN
+                    ALTER TABLE accounts_user DROP COLUMN google_access_token;
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'accounts_user'
+                    AND column_name = 'google_refresh_token'
+                ) THEN
+                    ALTER TABLE accounts_user DROP COLUMN google_refresh_token;
+                END IF;
+            END $$;
             """,
             reverse_sql="""
-            -- Cannot reverse - would require values for all rows
+            -- Cannot reverse - these fields are no longer used
             """,
         ),
     ]
