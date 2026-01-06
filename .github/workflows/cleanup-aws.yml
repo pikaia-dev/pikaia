@@ -1,0 +1,44 @@
+name: AWS Cleanup
+
+on:
+  schedule:
+    # Run weekly on Sunday at 3:00 AM UTC
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run mode (no changes)'
+        required: false
+        default: 'false'
+        type: boolean
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  cleanup:
+    name: Clean up orphaned AWS resources
+    runs-on: ubuntu-latest
+    environment: demo
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::603628786616:role/GitHubActionsEcsDeployRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run cleanup script
+        run: |
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            ./infra/scripts/cleanup-aws.sh --dry-run
+          else
+            ./infra/scripts/cleanup-aws.sh
+          fi
