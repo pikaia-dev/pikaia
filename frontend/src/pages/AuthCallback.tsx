@@ -426,11 +426,33 @@ export default function AuthCallback() {
         })
     }
 
-    if (
-      tokenType === "discovery" ||
-      tokenType === "multi_tenant_magic_links"
-    ) {
+    // Handle org-scoped magic links (invites)
+    // These create a session directly - no intermediate session or org selection needed
+    const handleInviteToken = () => {
+      stytch.magicLinks
+        .authenticate({
+          magic_links_token: token,
+          session_duration_minutes: SESSION_DURATION_MINUTES,
+        })
+        .then(() => {
+          // Session created directly - redirect to dashboard
+          sessionStorage.setItem("stytch_just_logged_in", "true")
+          setError(null)
+          window.location.href = "/dashboard"
+        })
+        .catch((err: unknown) => {
+          const message =
+            err instanceof Error ? err.message : "Failed to accept invitation"
+          setError(message)
+          setIsLoading(false)
+        })
+    }
+
+    if (tokenType === "discovery") {
       handleDiscoveryToken()
+    } else if (tokenType === "multi_tenant_magic_links") {
+      // Org-scoped magic links (invites) - authenticate directly
+      handleInviteToken()
     } else if (tokenType === "discovery_oauth") {
       handleOAuthToken()
     } else {

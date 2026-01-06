@@ -132,7 +132,7 @@ class Command(BaseCommand):
 
         # Process results
         published_count = 0
-        for event, result in zip(events, results):
+        for event, result in zip(events, results, strict=True):
             if result.get("status") == "success":
                 event.status = OutboxEvent.Status.PUBLISHED
                 event.published_at = timezone.now()

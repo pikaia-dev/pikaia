@@ -8,6 +8,7 @@ Handles Stytch B2B authentication flows:
 - User profile and organization settings
 """
 
+import contextlib
 import logging
 
 from django.http import HttpRequest
@@ -413,7 +414,7 @@ def send_phone_otp(request: HttpRequest, payload: SendPhoneOtpRequest) -> PhoneO
         )
     except StytchError as e:
         logger.warning("Failed to send phone OTP: %s", e.details.error_message)
-        raise HttpError(400, e.details.error_message or "Failed to send verification code")
+        raise HttpError(400, e.details.error_message or "Failed to send verification code") from None
 
 
 @router.post(
@@ -436,19 +437,15 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
     member = request.auth_member  # type: ignore[attr-defined]
     org = request.auth_organization  # type: ignore[attr-defined]
 
-    # Extract session JWT from auth header
-    auth_header = request.headers.get("Authorization", "")
-    session_jwt = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
-
     try:
         client = get_stytch_client()
 
-        # Verify the OTP with Stytch
+        # Verify the OTP with Stytch (no session_jwt - just validate the code,
+        # don't try to add phone factor to session which fails for immutable sessions)
         client.otps.sms.authenticate(
             organization_id=org.stytch_org_id,
             member_id=member.stytch_member_id,
             code=payload.otp_code,
-            session_jwt=session_jwt,
         )
 
         # OTP verified - now update the phone number
@@ -456,13 +453,11 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
 
         # Handle Stytch phone update (delete-then-update pattern)
         if old_phone:
-            try:
+            with contextlib.suppress(StytchError):
                 client.organizations.members.delete_mfa_phone_number(
                     organization_id=org.stytch_org_id,
                     member_id=member.stytch_member_id,
                 )
-            except StytchError:
-                pass  # No phone to delete
 
         # Set new phone number in Stytch
         client.organizations.members.update(
@@ -498,9 +493,9 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
     except StytchError as e:
         error_msg = e.details.error_message or "Verification failed"
         if "invalid" in error_msg.lower() or "expired" in error_msg.lower():
-            raise HttpError(400, "Invalid or expired verification code")
+            raise HttpError(400, "Invalid or expired verification code") from None
         logger.warning("Phone OTP verification failed: %s", error_msg)
-        raise HttpError(400, error_msg)
+        raise HttpError(400, error_msg) from None
 
 
 # --- Email Update ---
@@ -548,7 +543,7 @@ def start_email_update(
     except StytchError as e:
         error_msg = e.details.error_message or "Failed to initiate email update"
         logger.warning("Failed to start email update: %s", error_msg)
-        raise HttpError(400, error_msg)
+        raise HttpError(400, error_msg) from None
 
 
 # --- Organization Settings (Admin Only) ---

@@ -82,7 +82,7 @@ def verify_registration(
             passkey_name=payload.name,
         )
     except ValueError as e:
-        raise HttpError(400, str(e))
+        raise HttpError(400, str(e)) from None
 
     return PasskeyRegistrationVerifyResponse(
         id=passkey.id,
@@ -138,7 +138,7 @@ def verify_authentication(
             organization_id=payload.organization_id,
         )
     except ValueError as e:
-        raise HttpError(401, str(e))
+        raise HttpError(401, str(e)) from None
 
     # Create a trusted auth token for Stytch session attestation
     try:
@@ -150,7 +150,7 @@ def verify_authentication(
         )
     except ValueError as e:
         logger.error("Failed to create trusted auth token: %s", e)
-        raise HttpError(500, "Passkey authentication not configured")
+        raise HttpError(500, "Passkey authentication not configured") from None
 
     # Exchange trusted token for real Stytch session
     stytch = get_stytch_client()
@@ -172,7 +172,7 @@ def verify_authentication(
         )
     except Exception as e:
         logger.error("Stytch session attestation failed: %s", e)
-        raise HttpError(500, f"Failed to create session: {e}")
+        raise HttpError(500, f"Failed to create session: {e}") from None
 
 
 
@@ -221,7 +221,7 @@ def delete_passkey(request: HttpRequest, passkey_id: int) -> PasskeyDeleteRespon
     try:
         passkey = Passkey.objects.get(id=passkey_id, user=user)
     except Passkey.DoesNotExist:
-        raise HttpError(404, "Passkey not found")
+        raise HttpError(404, "Passkey not found") from None
 
     passkey_name = passkey.name
     passkey.delete()
