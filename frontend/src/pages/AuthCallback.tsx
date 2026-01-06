@@ -136,6 +136,8 @@ export default function AuthCallback() {
 
           if (autoLoginOrg) {
             // Auto-login to single organization
+            // Set session flag BEFORE exchange to prevent login flash
+            sessionStorage.setItem("stytch_just_logged_in", "true")
             return stytch.discovery.intermediateSessions
               .exchange({
                 organization_id: autoLoginOrg.organization.organization_id,
@@ -275,6 +277,8 @@ export default function AuthCallback() {
 
           if (autoLoginOrg) {
             // Auto-login to single organization
+            // Set session flag BEFORE exchange to prevent login flash
+            sessionStorage.setItem("stytch_just_logged_in", "true")
             void stytch.discovery.intermediateSessions.exchange({
               organization_id: autoLoginOrg.organization.organization_id,
               session_duration_minutes: SESSION_DURATION_MINUTES,
