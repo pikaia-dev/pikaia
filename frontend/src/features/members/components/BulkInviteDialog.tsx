@@ -378,8 +378,8 @@ export function BulkInviteDialog({
           </button>
         </div>
 
-        {/* Tab content */}
-        <div className="flex-1 overflow-auto py-2">
+        {/* Tab content - px-0.5 provides space for focus ring outside overflow boundary */}
+        <div className="flex-1 overflow-auto py-2 px-0.5">
           {/* Manual entry tab */}
           {activeTab === "manual" && (
             <div className="space-y-4">
