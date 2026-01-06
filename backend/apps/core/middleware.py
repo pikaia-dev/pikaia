@@ -114,27 +114,65 @@ class StytchAuthMiddleware:
         return any(path.startswith(public_path) for public_path in self.PUBLIC_PATHS)
 
     def _authenticate_jwt(self, request: HttpRequest, session_jwt: str) -> None:
-        """Validate JWT and populate request with user/member/org."""
+        """
+        Validate JWT and populate request with user/member/org.
+
+        Uses a two-tier strategy for performance:
+        1. Local JWT verification (fast, no API call)
+        2. Local DB lookup for member/user/org
+
+        Falls back to full Stytch API call only when:
+        - Member doesn't exist locally (first-time login)
+        - Local JWT verification fails (triggers fresh API check)
+
+        Role changes are synced via Stytch webhooks (handle_member_updated),
+        so we don't need to call Stytch API on every request.
+        """
         # Import here to avoid circular imports
+        from apps.accounts.models import Member
         from apps.accounts.services import sync_session_to_local
         from apps.accounts.stytch_client import get_stytch_client
 
         client = get_stytch_client()
 
         try:
-            # Always do full authenticate to get current roles from Stytch
-            # This ensures role changes (e.g., becoming admin) are reflected
-            response = client.sessions.authenticate(session_jwt=session_jwt)
-
-            # Sync to local database (creates or updates member/user/org)
-            user, member, org = sync_session_to_local(
-                stytch_member=response.member,
-                stytch_organization=response.organization,
+            # Step 1: Local JWT verification (no API call)
+            # max_token_age_seconds=None uses the session's expiration from JWT
+            local_response = client.sessions.authenticate_jwt(
+                session_jwt=session_jwt,
+                max_token_age_seconds=None,
             )
 
-            request.auth_user = user  # type: ignore[attr-defined]
-            request.auth_member = member  # type: ignore[attr-defined]
-            request.auth_organization = org  # type: ignore[attr-defined]
+            # Extract member_id from JWT claims
+            stytch_member_id = local_response.member.member_id
+
+            # Step 2: Look up member from local DB
+            member = (
+                Member.objects.select_related("user", "organization")
+                .filter(stytch_member_id=stytch_member_id)
+                .first()
+            )
+
+            if member:
+                # Fast path: member exists locally, use cached data
+                request.auth_user = member.user  # type: ignore[attr-defined]
+                request.auth_member = member  # type: ignore[attr-defined]
+                request.auth_organization = member.organization  # type: ignore[attr-defined]
+            else:
+                # Slow path: first-time login, sync from Stytch
+                # Call the full API to get current data
+                logger.info(
+                    "Member %s not found locally, syncing from Stytch",
+                    stytch_member_id,
+                )
+                full_response = client.sessions.authenticate(session_jwt=session_jwt)
+                user, member, org = sync_session_to_local(
+                    stytch_member=full_response.member,
+                    stytch_organization=full_response.organization,
+                )
+                request.auth_user = user  # type: ignore[attr-defined]
+                request.auth_member = member  # type: ignore[attr-defined]
+                request.auth_organization = org  # type: ignore[attr-defined]
 
         except StytchError as e:
             # Invalid/expired JWT - request continues unauthenticated
