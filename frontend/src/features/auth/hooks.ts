@@ -125,7 +125,7 @@ export function useDiscoveryAuth(): UseDiscoveryAuthReturn {
      * Start Google OAuth Discovery flow.
      */
     const startGoogleOAuth = useCallback(() => {
-        stytch.oauth.google.discovery.start({
+        void stytch.oauth.google.discovery.start({
             discovery_redirect_url: `${window.location.origin}/auth/callback`,
             custom_scopes: [
                 "https://www.googleapis.com/auth/admin.directory.user.readonly",
