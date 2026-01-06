@@ -1,6 +1,8 @@
+import { useStytchMemberSession } from "@stytch/react/b2b"
 import { useRef, useState } from "react"
 import { toast } from "sonner"
 
+import { Alert, AlertDescription } from "../../components/ui/alert"
 import { Button } from "../../components/ui/button"
 import {
   Card,
@@ -32,11 +34,18 @@ import { PasskeySettings } from "../../features/settings/components/PasskeySetti
 const DIALOG_CLOSE_DELAY_MS = 150
 
 export default function ProfileSettings() {
+  const { session } = useStytchMemberSession()
   const { data: userData, isLoading, error } = useCurrentUser()
   const updateProfileMutation = useUpdateProfile()
   const sendPhoneOtpMutation = useSendPhoneOtp()
   const verifyPhoneOtpMutation = useVerifyPhoneOtp()
   const startEmailUpdateMutation = useStartEmailUpdate()
+
+  // Detect if user logged in with passkey (trusted_auth_token type)
+  // Passkey sessions are immutable and cannot have phone factors added
+  const isPasskeySession = session?.authentication_factors.some(
+    (factor) => factor.type === "trusted_auth_token"
+  )
 
   // Edited values (null = use server value)
   const [editedName, setEditedName] = useState<string | null>(null)
@@ -274,9 +283,20 @@ export default function ProfileSettings() {
               <PhoneNumberInput
                 value={phoneNumber}
                 onChange={setEditedPhoneNumber}
+                disabled={isPasskeySession}
               />
-              {/* Show status based on current state */}
-              {savedPhoneNumber && !isPhoneChanged && (
+              {/* Passkey session warning - phone verification not available */}
+              {isPasskeySession && (
+                <Alert className="mt-3 border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950">
+                  <AlertDescription className="text-amber-800 dark:text-amber-200 text-xs">
+                    Phone verification is not available when logged in with a
+                    passkey. To add or update your phone number, please log out
+                    and sign in with email instead.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {/* Show status based on current state (only if not passkey session) */}
+              {!isPasskeySession && savedPhoneNumber && !isPhoneChanged && (
                 <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1.5">
                   <svg
                     className="h-3.5 w-3.5"
@@ -292,7 +312,7 @@ export default function ProfileSettings() {
                   Verified
                 </p>
               )}
-              {isPhoneChanged && phoneNumber && (
+              {!isPasskeySession && isPhoneChanged && phoneNumber && (
                 <>
                   <p className="text-xs text-amber-600 mt-2 flex items-center gap-1.5">
                     <svg
@@ -320,7 +340,7 @@ export default function ProfileSettings() {
                   </Button>
                 </>
               )}
-              {!savedPhoneNumber && !phoneNumber && (
+              {!isPasskeySession && !savedPhoneNumber && !phoneNumber && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Add a phone number for account security
                 </p>
