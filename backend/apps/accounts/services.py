@@ -33,8 +33,12 @@ def get_or_create_user_from_stytch(
     """
     try:
         user = User.objects.select_for_update().get(email=email)
-        user.name = name
-        update_fields = ["name", "updated_at"]
+        update_fields = ["updated_at"]
+        # Only update name if provided and user doesn't have one
+        # This preserves existing names when user joins additional orgs
+        if name and not user.name:
+            user.name = name
+            update_fields.append("name")
         # Only update avatar if provided and user doesn't have one
         if avatar_url and not user.avatar_url:
             user.avatar_url = avatar_url

@@ -38,20 +38,36 @@ class TestGetOrCreateUserFromStytch:
         assert user.name == "New User"
         assert User.objects.count() == 1
 
-    def test_updates_existing_user(self) -> None:
-        """Should update an existing user when one exists."""
+    def test_preserves_existing_user_name(self) -> None:
+        """Should preserve existing user's name when they join another org."""
         existing = UserFactory(
             email="existing@example.com",
-            name="Old Name",
+            name="Original Name",
         )
 
         user = get_or_create_user_from_stytch(
             email="existing@example.com",
-            name="Updated Name",
+            name="New Name From Invite",
         )
 
         assert user.id == existing.id
-        assert user.name == "Updated Name"
+        assert user.name == "Original Name"  # Name preserved, not overwritten
+        assert User.objects.count() == 1
+
+    def test_sets_name_when_user_has_none(self) -> None:
+        """Should set name when existing user doesn't have one."""
+        existing = UserFactory(
+            email="existing@example.com",
+            name="",  # No name set
+        )
+
+        user = get_or_create_user_from_stytch(
+            email="existing@example.com",
+            name="New Name",
+        )
+
+        assert user.id == existing.id
+        assert user.name == "New Name"  # Name is set since user had none
         assert User.objects.count() == 1
 
 
@@ -280,15 +296,15 @@ class TestSyncSessionEdgeCases:
 class TestUpdateExistingRecords:
     """Tests for updating existing records via service functions."""
 
-    def test_update_user_name(self) -> None:
-        """Updating an existing user should change the name field when provided."""
-        existing = UserFactory(name="Old Name")
+    def test_preserve_user_name_on_sync(self) -> None:
+        """Syncing an existing user should preserve their name, not overwrite it."""
+        existing = UserFactory(name="Original Name")
         updated_user = get_or_create_user_from_stytch(
             email=existing.email,
-            name="New Name",
+            name="Name From New Org",
         )
         assert updated_user.id == existing.id
-        assert updated_user.name == "New Name"
+        assert updated_user.name == "Original Name"  # Preserved
 
     def test_update_member_role(self) -> None:
         """If a Member already exists, calling get_or_create_member_from_stytch with a new role updates it."""
