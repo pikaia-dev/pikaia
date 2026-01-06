@@ -448,6 +448,28 @@ export default function AuthCallback() {
         })
     }
 
+    // Handle impersonation tokens from Stytch dashboard
+    // Creates an impersonated session for admin support/debugging
+    const handleImpersonationToken = () => {
+      stytch.impersonation
+        .authenticate({
+          impersonation_token: token,
+          session_duration_minutes: SESSION_DURATION_MINUTES,
+        })
+        .then(() => {
+          // Impersonated session created - redirect to dashboard
+          sessionStorage.setItem("stytch_just_logged_in", "true")
+          setError(null)
+          window.location.href = "/dashboard"
+        })
+        .catch((err: unknown) => {
+          const message =
+            err instanceof Error ? err.message : "Failed to start impersonation"
+          setError(message)
+          setIsLoading(false)
+        })
+    }
+
     if (tokenType === "discovery") {
       handleDiscoveryToken()
     } else if (tokenType === "multi_tenant_magic_links") {
@@ -455,6 +477,9 @@ export default function AuthCallback() {
       handleInviteToken()
     } else if (tokenType === "discovery_oauth") {
       handleOAuthToken()
+    } else if (tokenType === "impersonation") {
+      // Impersonation from Stytch dashboard
+      handleImpersonationToken()
     } else {
       // Unknown token type, redirect to login
       // eslint-disable-next-line @typescript-eslint/no-floating-promises -- fire-and-forget navigation
