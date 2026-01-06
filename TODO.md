@@ -68,16 +68,15 @@ The billing is per-seat with automatic scaling, NOT capped seats:
 
 ## LOW Priority
 
-### 6. Stytch Auth on Every Request
+### ~~6. Stytch Auth on Every Request~~ ✅ FIXED
 
-**File:** `backend/apps/stytch_utils/middleware.py`
+**File:** `backend/apps/core/middleware.py`
 
-**Issue:** Every authenticated request calls Stytch's `sessions.authenticate()` API. This adds latency and increases Stytch API usage costs.
-
-**Fix options:**
-- Cache session validity locally (with short TTL, e.g., 60 seconds)
-- Trust JWT signature verification without round-trip (Stytch JWTs are signed)
-- Only re-authenticate on sensitive operations
+Fixed with commit `665c3e3`:
+- Uses `sessions.authenticate_jwt()` for local JWT verification (no API call)
+- Looks up member/user/org from local database
+- Only calls full Stytch API on first login when member doesn't exist locally
+- Role changes synced via Stytch webhooks (handle_member_updated)
 
 ---
 
