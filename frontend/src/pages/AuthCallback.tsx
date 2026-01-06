@@ -144,9 +144,9 @@ export default function AuthCallback() {
                 session_duration_minutes: SESSION_DURATION_MINUTES,
               })
               .then(() => {
-                // Success - navigate explicitly since useEffect may not trigger reliably
+                // Success - full page reload to let Stytch SDK reinitialize with session
                 setError(null)
-                void navigate("/dashboard", { replace: true })
+                window.location.href = "/dashboard"
               })
           } else if (orgs.length === 0) {
             // Auto-create organization for new users
@@ -198,7 +198,7 @@ export default function AuthCallback() {
                 setError(null)
                 // Set session flag to prevent login flash before redirect
                 sessionStorage.setItem("stytch_just_logged_in", "true")
-                void navigate("/dashboard", { replace: true })
+                window.location.href = "/dashboard"
               })
               .catch((createErr: unknown) => {
                 // If name/slug conflict, retry with timestamp
@@ -244,7 +244,7 @@ export default function AuthCallback() {
                       setError(null)
                       // Set session flag to prevent login flash before redirect
                       sessionStorage.setItem("stytch_just_logged_in", "true")
-                      void navigate("/dashboard", { replace: true })
+                      window.location.href = "/dashboard"
                     })
                 }
                 console.error("❌ Failed to create organization:", createErr)
@@ -286,9 +286,9 @@ export default function AuthCallback() {
                 session_duration_minutes: SESSION_DURATION_MINUTES,
               })
               .then(() => {
-                // Success - navigate explicitly since useEffect may not trigger reliably
+                // Success - full page reload to let Stytch SDK reinitialize with session
                 setError(null)
-                void navigate("/dashboard", { replace: true })
+                window.location.href = "/dashboard"
               })
           } else if (orgs.length === 0) {
             // Auto-create organization for new users
@@ -338,7 +338,7 @@ export default function AuthCallback() {
                 setError(null)
                 // Set session flag to prevent login flash before redirect
                 sessionStorage.setItem("stytch_just_logged_in", "true")
-                void navigate("/dashboard", { replace: true })
+                window.location.href = "/dashboard"
               })
               .catch((createErr: unknown) => {
                 // If name/slug conflict, retry with timestamp
@@ -384,7 +384,7 @@ export default function AuthCallback() {
                       setError(null)
                       // Set session flag to prevent login flash before redirect
                       sessionStorage.setItem("stytch_just_logged_in", "true")
-                      void navigate("/dashboard", { replace: true })
+                      window.location.href = "/dashboard"
                     })
                 }
                 console.error("❌ Failed to create organization:", createErr)
@@ -425,7 +425,7 @@ export default function AuthCallback() {
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isInitialized can be false during SDK init
     if (isInitialized && session) {
-      void navigate("/dashboard", { replace: true })
+      window.location.href = "/dashboard"
     }
   }, [session, isInitialized, navigate])
 
