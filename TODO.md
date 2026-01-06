@@ -6,19 +6,15 @@ Last reviewed: 2026-01-06
 
 ## HIGH Priority
 
-### 1. SSRF Vulnerability in Avatar Proxy
+### ~~1. SSRF Vulnerability in Avatar Proxy~~ ✅ FIXED
 
-**File:** `backend/apps/accounts/api.py` (around line 98)
+**File:** `backend/apps/core/url_validation.py`
 
-**Issue:** The avatar proxy endpoint fetches arbitrary URLs without validation. An attacker could use this to:
-- Probe internal network services (169.254.169.254 for AWS metadata, internal IPs)
-- Exfiltrate data via DNS/HTTP requests
-- Bypass firewalls by using the server as a proxy
-
-**Fix:** Add URL validation:
-- Allowlist of domains (e.g., only allow known avatar providers like Gravatar, Google, GitHub)
-- Block private IP ranges and localhost
-- Consider using a dedicated image proxy service
+Fixed with commit `ed11e06`:
+- Added `validate_avatar_url()` with domain allowlist (Google user content domains only)
+- Blocks private IP ranges, loopback, AWS metadata endpoint
+- DNS resolution check for defense-in-depth against DNS rebinding
+- 49 comprehensive tests in `tests/core/test_url_validation.py`
 
 ---
 
