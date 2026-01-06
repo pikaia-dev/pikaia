@@ -163,9 +163,9 @@ export default function AuthCallback() {
                 return res.json()
               })
               .then((_data: { session_token: string; session_jwt: string }) => {
-                // Backend has set session cookies - navigate to dashboard
+                // Backend has set session cookies - full page reload to let Stytch SDK initialize
                 setError(null)
-                navigate("/dashboard", { replace: true })
+                window.location.href = "/dashboard"
               })
               .catch((createErr: unknown) => {
                 // If slug conflict, retry with timestamp
@@ -192,9 +192,9 @@ export default function AuthCallback() {
                       return res.json()
                     })
                     .then(() => {
-                      // Backend has set session cookies - navigate to dashboard
+                      // Backend has set session cookies - full page reload to let Stytch SDK initialize
                       setError(null)
-                      navigate("/dashboard", { replace: true })
+                      window.location.href = "/dashboard"
                     })
                 }
                 console.error("❌ Failed to create organization:", createErr)
