@@ -106,7 +106,7 @@ export function PasskeyEnrollmentPrompt() {
     }
 
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && handleDismiss()}>
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleDismiss(); }}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
