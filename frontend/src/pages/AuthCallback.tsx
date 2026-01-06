@@ -454,7 +454,6 @@ export default function AuthCallback() {
       stytch.impersonation
         .authenticate({
           impersonation_token: token,
-          session_duration_minutes: SESSION_DURATION_MINUTES,
         })
         .then(() => {
           // Impersonated session created - redirect to dashboard
