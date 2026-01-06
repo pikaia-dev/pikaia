@@ -31,22 +31,17 @@ Already implemented at `/webhooks/stripe/` with:
 
 ## MEDIUM Priority
 
-### 3. Stytch-to-Local Sync Can Diverge
+### ~~3. Stytch-to-Local Sync Can Diverge~~ ✅ FIXED
 
 **Files:**
-- `backend/apps/stytch_utils/member_sync.py`
-- `backend/apps/organizations/api.py`
+- `backend/apps/accounts/webhooks.py`
 
-**Issue:** When creating/updating members, the code:
-1. Creates in Stytch
-2. Creates locally in Django
-
-If step 2 fails, Stytch has the member but Django doesn't. There's no reconciliation mechanism.
-
-**Fix options:**
-- Wrap in transaction and implement Stytch rollback on local failure
-- Add periodic sync job to reconcile Stytch ↔ Django state
-- Use Stytch webhooks as source of truth
+Fixed with commit `36f8535`:
+- Added `handle_member_created` webhook handler
+- Stytch webhooks now act as source of truth for sync recovery
+- If Django creation fails after Stytch succeeds, the webhook heals the divergence
+- Handler is idempotent (skips if member already exists)
+- 6 comprehensive tests in `tests/accounts/test_webhooks.py`
 
 ---
 
