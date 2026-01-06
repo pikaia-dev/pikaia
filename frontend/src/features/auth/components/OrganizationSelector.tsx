@@ -36,16 +36,15 @@ export function OrganizationSelector({
         return (
             <div className="text-center space-y-6">
                 <div className="space-y-2">
-                    <h2 className="text-xl font-semibold">No organizations found</h2>
+                    <h2 className="text-xl font-semibold">Unable to create organization</h2>
                     <p className="text-sm text-muted-foreground">
-                        <span className="font-medium text-foreground">{email}</span> is not
-                        a member of any organizations.
+                        <span className="font-medium text-foreground">{email}</span> encountered
+                        an issue during setup.
                     </p>
                 </div>
 
                 <p className="text-xs text-muted-foreground">
-                    Make sure your email address is correct, or ask your organization
-                    admin to invite you.
+                    Please try again or contact support if this issue persists.
                 </p>
 
                 <Button variant="ghost" onClick={onBack} className="text-sm">

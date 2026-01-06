@@ -121,11 +121,51 @@ export default function AuthCallback() {
           const autoLoginOrg = getSingleLoginOrg(orgs, directLoginOptions)
 
           if (autoLoginOrg) {
+            // Auto-login to single organization
             return stytch.discovery.intermediateSessions.exchange({
               organization_id: autoLoginOrg.organization.organization_id,
               session_duration_minutes: SESSION_DURATION_MINUTES,
             })
+          } else if (orgs.length === 0) {
+            // Auto-create organization for new users
+            const email = response.email_address
+            const domain = email.split("@")[1].split(".")[0]
+            const orgName = domain
+              .split("-")
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(" ")
+            const orgSlug = domain.toLowerCase()
+
+            console.log("🏢 Auto-creating organization:", { email, orgName, orgSlug })
+
+            return stytch.discovery.organizations
+              .create({
+                intermediate_session_token: response.intermediate_session_token,
+                organization_name: orgName,
+                organization_slug: orgSlug,
+                session_duration_minutes: SESSION_DURATION_MINUTES,
+              } as any) // Type assertion: SDK types are incomplete
+              .catch((createErr: unknown) => {
+                // If slug conflict, retry with timestamp
+                if (
+                  createErr instanceof Error &&
+                  createErr.message.includes("slug")
+                ) {
+                  const timestamp = Date.now()
+                  console.log("⚠️ Slug conflict, retrying with timestamp:", `${orgSlug}-${timestamp}`)
+                  return stytch.discovery.organizations.create({
+                    intermediate_session_token:
+                      response.intermediate_session_token,
+                    organization_name: orgName,
+                    organization_slug: `${orgSlug}-${timestamp}`,
+                    session_duration_minutes: SESSION_DURATION_MINUTES,
+                  } as any) // Type assertion: SDK types are incomplete
+                }
+                console.error("❌ Failed to create organization:", createErr)
+                throw createErr
+              })
           } else {
+            // Multiple organizations - show selector
             setEmail(response.email_address)
             setDiscoveredOrgs(orgs)
             setShowOrgSelector(true)
@@ -151,11 +191,47 @@ export default function AuthCallback() {
           const autoLoginOrg = getSingleLoginOrg(orgs, directLoginOptions)
 
           if (autoLoginOrg) {
+            // Auto-login to single organization
             return stytch.discovery.intermediateSessions.exchange({
               organization_id: autoLoginOrg.organization.organization_id,
               session_duration_minutes: SESSION_DURATION_MINUTES,
             })
+          } else if (orgs.length === 0) {
+            // Auto-create organization for new users
+            const email = response.email_address
+            const domain = email.split("@")[1].split(".")[0]
+            const orgName = domain
+              .split("-")
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(" ")
+            const orgSlug = domain.toLowerCase()
+
+            return stytch.discovery.organizations
+              .create({
+                intermediate_session_token: response.intermediate_session_token,
+                organization_name: orgName,
+                organization_slug: orgSlug,
+                session_duration_minutes: SESSION_DURATION_MINUTES,
+              } as any) // Type assertion: SDK types are incomplete
+              .catch((createErr: unknown) => {
+                // If slug conflict, retry with timestamp
+                if (
+                  createErr instanceof Error &&
+                  createErr.message.includes("slug")
+                ) {
+                  const timestamp = Date.now()
+                  return stytch.discovery.organizations.create({
+                    intermediate_session_token:
+                      response.intermediate_session_token,
+                    organization_name: orgName,
+                    organization_slug: `${orgSlug}-${timestamp}`,
+                    session_duration_minutes: SESSION_DURATION_MINUTES,
+                  } as any) // Type assertion: SDK types are incomplete
+                }
+                throw createErr
+              })
           } else {
+            // Multiple organizations - show selector
             setEmail(response.email_address)
             setDiscoveredOrgs(orgs)
             setShowOrgSelector(true)
