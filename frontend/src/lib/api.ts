@@ -44,6 +44,7 @@ export function createApiClient(getToken: TokenProvider) {
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...options,
       headers,
+      credentials: "include",
     })
 
     if (!response.ok) {
@@ -95,6 +96,7 @@ export function createApiClient(getToken: TokenProvider) {
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: "GET",
         headers,
+        credentials: "include",
       })
       if (!response.ok) {
         throw new Error("Failed to fetch blob")
