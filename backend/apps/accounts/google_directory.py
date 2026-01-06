@@ -42,10 +42,16 @@ def get_google_access_token(organization_id: str, member_id: str) -> str | None:
             member_id=member_id,
         )
         # access_token is directly on the response (Optional field)
+        if not response.access_token:
+            logger.warning(
+                "Stytch returned no access_token for member %s (org %s)",
+                member_id,
+                organization_id,
+            )
         return response.access_token
     except StytchError as e:
         # No Google OAuth tokens for this member
-        logger.debug(
+        logger.warning(
             "No Google OAuth tokens for member %s: %s",
             member_id,
             e.details.error_message if e.details else str(e),
@@ -80,6 +86,7 @@ def search_directory_users(
     )
 
     if not member:
+        logger.warning("Directory search: no member found for user %s", user.email)
         return []
 
     access_token = get_google_access_token(
@@ -88,6 +95,11 @@ def search_directory_users(
     )
 
     if not access_token:
+        logger.warning(
+            "Directory search: no access token for user %s (member %s)",
+            user.email,
+            member.stytch_member_id,
+        )
         return []
 
     try:
@@ -111,7 +123,10 @@ def search_directory_users(
 
         if response.status_code == 403:
             # User doesn't have admin access to directory or scope not granted
-            logger.debug("User %s doesn't have Directory API access (403)", user.email)
+            logger.warning(
+                "Directory API returned 403 for user %s - check scopes or Workspace settings",
+                user.email,
+            )
             return []
 
         response.raise_for_status()
