@@ -61,6 +61,7 @@ def get_google_access_token(organization_id: str, member_id: str) -> str | None:
 
 def search_directory_users(
     user: "User",  # noqa: F821 - forward reference
+    member: "Member",  # noqa: F821 - forward reference
     query: str,
     limit: int = 10,
 ) -> list[DirectoryUser]:
@@ -68,7 +69,8 @@ def search_directory_users(
     Search Google Workspace directory for users matching query.
 
     Args:
-        user: The authenticated user (must have Google OAuth)
+        user: The authenticated user
+        member: The current member (tried first for Google token)
         query: Search query (matches name or email)
         limit: Maximum results to return
 
@@ -78,27 +80,39 @@ def search_directory_users(
     # Import here to avoid circular imports
     from apps.accounts.models import Member
 
-    # Find the member for this user to get Stytch IDs
-    member = (
-        Member.objects.filter(user=user, deleted_at__isnull=True)
-        .select_related("organization")
-        .first()
-    )
-
-    if not member:
-        logger.warning("Directory search: no member found for user %s", user.email)
-        return []
-
+    # Try current member first, then fall back to any member with a Google token
+    # (user may have logged in via Google in a different org)
     access_token = get_google_access_token(
         organization_id=member.organization.stytch_org_id,
         member_id=member.stytch_member_id,
     )
 
     if not access_token:
+        # Try other memberships (ordered by oldest first - most likely to have token)
+        other_members = (
+            Member.objects.filter(user=user, deleted_at__isnull=True)
+            .exclude(id=member.id)
+            .select_related("organization")
+            .order_by("created_at")
+        )
+        for other_member in other_members:
+            access_token = get_google_access_token(
+                organization_id=other_member.organization.stytch_org_id,
+                member_id=other_member.stytch_member_id,
+            )
+            if access_token:
+                logger.info(
+                    "Directory search: using token from member %s (org %s) for user %s",
+                    other_member.stytch_member_id,
+                    other_member.organization.name,
+                    user.email,
+                )
+                break
+
+    if not access_token:
         logger.warning(
-            "Directory search: no access token for user %s (member %s)",
+            "Directory search: no Google OAuth token found for user %s in any org",
             user.email,
-            member.stytch_member_id,
         )
         return []
 

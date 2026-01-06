@@ -985,11 +985,12 @@ def search_directory(request: HttpRequest, q: str = "") -> list[DirectoryUserSch
         return []
 
     user = request.auth_user  # type: ignore[attr-defined]
+    member = request.auth_member  # type: ignore[attr-defined]
 
     # Import here to avoid circular imports
     from apps.accounts.google_directory import search_directory_users
 
-    directory_users = search_directory_users(user, q, limit=10)
+    directory_users = search_directory_users(user, member, q, limit=10)
 
     return [
         DirectoryUserSchema(
