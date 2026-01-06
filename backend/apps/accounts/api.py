@@ -872,24 +872,46 @@ def bulk_invite_members_endpoint(
     member = request.auth_member  # type: ignore[attr-defined]
     org = request.auth_organization  # type: ignore[attr-defined]
 
-    # Filter out self-invites
+    current_user_email = member.user.email.lower()
+
+    # Filter out self-invites, normalize emails
     members_data = []
+    skipped_results = []
     for item in payload.members:
-        if item.email.lower() == member.user.email.lower():
+        # Normalize email: strip whitespace and lowercase for comparison
+        normalized_email = item.email.strip().lower()
+
+        if normalized_email == current_user_email:
+            skipped_results.append({
+                "email": item.email.strip(),
+                "success": False,
+                "error": "Cannot invite yourself",
+                "stytch_member_id": None,
+            })
             continue
+
         members_data.append({
-            "email": item.email,
-            "name": item.name,
-            "phone": item.phone,
+            "email": item.email.strip(),  # Use stripped email
+            "name": item.name.strip() if item.name else "",
+            "phone": item.phone.strip() if item.phone else "",
             "role": item.role,
         })
 
     if not members_data:
+        # All members were skipped (self-invites or existing members)
         return BulkInviteResponse(
-            results=[],
-            total=0,
+            results=[
+                BulkInviteResultItem(
+                    email=r["email"],
+                    success=r["success"],
+                    error=r["error"],
+                    stytch_member_id=r["stytch_member_id"],
+                )
+                for r in skipped_results
+            ],
+            total=len(skipped_results),
             succeeded=0,
-            failed=0,
+            failed=len(skipped_results),
         )
 
     result = bulk_invite_members(organization=org, members_data=members_data)
@@ -908,6 +930,9 @@ def bulk_invite_members_endpoint(
             actor=member.user,
         )
 
+    # Combine skipped results with actual invite results
+    all_results = skipped_results + result["results"]
+
     return BulkInviteResponse(
         results=[
             BulkInviteResultItem(
@@ -916,11 +941,11 @@ def bulk_invite_members_endpoint(
                 error=r["error"],
                 stytch_member_id=r["stytch_member_id"],
             )
-            for r in result["results"]
+            for r in all_results
         ],
-        total=result["total"],
+        total=len(all_results),
         succeeded=result["succeeded"],
-        failed=result["failed"],
+        failed=result["failed"] + len(skipped_results),
     )
 
 
