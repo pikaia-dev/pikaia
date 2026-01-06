@@ -1,7 +1,7 @@
 import "./App.css"
 
 import { useStytchMemberSession } from "@stytch/react/b2b"
-import { lazy, Suspense } from "react"
+import { lazy, Suspense, useEffect, useState } from "react"
 import { Navigate, Route, Routes } from "react-router-dom"
 
 import { LoadingSpinner } from "./components/ui/loading-spinner"
@@ -19,18 +19,52 @@ const OrganizationSettings = lazy(
 const MembersSettings = lazy(() => import("./pages/settings/MembersSettings"))
 const BillingSettings = lazy(() => import("./pages/settings/BillingSettings"))
 
+// Basic ProtectedRoute component
+// Enhanced to prevent "flash of login" by handling undefined session state
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, isInitialized } = useStytchMemberSession()
+  const [isWaitingForSession, setIsWaitingForSession] = useState(() => {
+    // efficient lazy initialization
+    return sessionStorage.getItem("stytch_just_logged_in") === "true"
+  })
 
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isInitialized can be false
-  if (!isInitialized) {
+  useEffect(() => {
+    if (session) {
+      // Session found! Clear flag and stop waiting
+      sessionStorage.removeItem("stytch_just_logged_in")
+      setIsWaitingForSession(false)
+    }
+  }, [session])
+
+  useEffect(() => {
+    if (isWaitingForSession && isInitialized && !session) {
+      // If we are waiting for session but it hasn't appeared yet, set a timeout safety valve
+      const timer = setTimeout(() => {
+        sessionStorage.removeItem("stytch_just_logged_in")
+        setIsWaitingForSession(false)
+      }, 5000) // 5s max wait time
+      return () => clearTimeout(timer)
+    }
+  }, [isWaitingForSession, isInitialized, session])
+
+  // Wait for SDK initialization AND initial session check
+  // isInitialized only means the SDK is ready, not that we've checked for a session
+  if (!isInitialized || isWaitingForSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <LoadingSpinner />
+        <div className="text-center">
+          <LoadingSpinner className="mx-auto" />
+          {isWaitingForSession && (
+            <p className="mt-4 text-sm text-muted-foreground">
+              Signing you in...
+            </p>
+          )}
+        </div>
       </div>
     )
   }
 
+  // If initialized but no session, redirect to login
   if (!session) {
     return <Navigate to="/login" replace />
   }
