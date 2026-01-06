@@ -976,7 +976,7 @@ def search_directory(request: HttpRequest, q: str = "") -> list[DirectoryUserSch
 
 @router.get(
     "/directory/avatar",
-    response={200: bytes, 401: ErrorResponse, 404: ErrorResponse},
+    response={200: bytes, 400: ErrorResponse, 401: ErrorResponse, 404: ErrorResponse},
     auth=bearer_auth,
     operation_id="getDirectoryAvatar",
     summary="Proxy Google Workspace avatar image",
@@ -987,15 +987,23 @@ def get_directory_avatar(request: HttpRequest, url: str = ""):
 
     Google Directory API avatar URLs require OAuth authentication.
     This endpoint fetches the image server-side and returns it.
+
+    Only allows fetching from Google user content domains (SSRF protection).
     """
     import httpx
     from django.http import HttpResponse as DjangoHttpResponse
 
+    from apps.core.url_validation import SSRFError, validate_avatar_url
+
     if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
         raise HttpError(401, "Not authenticated")
 
-    if not url or not url.startswith("https://"):
-        raise HttpError(404, "Invalid avatar URL")
+    # Validate URL against SSRF attacks
+    try:
+        validate_avatar_url(url)
+    except SSRFError as e:
+        logger.warning("Avatar URL validation failed: %s (url=%s)", e, url)
+        raise HttpError(400, "Invalid avatar URL") from None
 
     # Import here to avoid circular imports
     from apps.accounts.google_directory import get_google_access_token
