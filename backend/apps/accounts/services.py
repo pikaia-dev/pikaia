@@ -224,6 +224,9 @@ def invite_member(
 
     stytch = get_stytch_client()
 
+    # Normalize email to prevent search mismatches
+    email = email.strip().lower()
+
     # Map role to Stytch role IDs
     roles = [StytchRoles.ADMIN] if role == "admin" else []
 
@@ -488,15 +491,40 @@ def bulk_invite_members(
                     user.phone_verified_at = None  # Explicitly mark as unverified
                     user.save(update_fields=["phone_number", "phone_verified_at", "updated_at"])
 
-            results.append(
-                {
-                    "email": email,
-                    "success": True,
-                    "error": None,
-                    "stytch_member_id": member.stytch_member_id,
-                }
-            )
-            succeeded += 1
+            # Provide informative feedback based on invite status
+            if invite_status is False:
+                # Member already active - not an error, but no invite sent
+                results.append(
+                    {
+                        "email": email,
+                        "success": False,
+                        "error": "Member already active in this organization",
+                        "stytch_member_id": member.stytch_member_id,
+                    }
+                )
+                failed += 1
+            elif invite_status == "pending":
+                # Member already invited - not an error, but no new invite sent
+                results.append(
+                    {
+                        "email": email,
+                        "success": False,
+                        "error": "Member already has a pending invitation",
+                        "stytch_member_id": member.stytch_member_id,
+                    }
+                )
+                failed += 1
+            else:
+                # New invite sent successfully
+                results.append(
+                    {
+                        "email": email,
+                        "success": True,
+                        "error": None,
+                        "stytch_member_id": member.stytch_member_id,
+                    }
+                )
+                succeeded += 1
 
         except StytchError as e:
             error_msg = e.details.error_message if e.details else str(e)

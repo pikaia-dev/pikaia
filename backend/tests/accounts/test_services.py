@@ -838,3 +838,47 @@ class TestBulkInviteMembers:
         assert result["failed"] == 1
         assert result["results"][0]["success"] is False
         assert "Something went wrong" in result["results"][0]["error"]
+
+    @patch("apps.accounts.services.invite_member")
+    def test_already_active_member_returns_failed(self, mock_invite: MagicMock) -> None:
+        """Should report failure when member is already active."""
+        org = OrganizationFactory()
+        member = MemberFactory(organization=org, stytch_member_id="stytch-active")
+
+        # invite_member returns False for active members
+        mock_invite.return_value = (member, False)
+
+        members_data = [
+            {"email": "active@example.com", "name": "Active User", "phone": "", "role": "member"},
+        ]
+
+        result = bulk_invite_members(organization=org, members_data=members_data)
+
+        assert result["total"] == 1
+        assert result["succeeded"] == 0
+        assert result["failed"] == 1
+        assert result["results"][0]["success"] is False
+        assert "already active" in result["results"][0]["error"]
+        assert result["results"][0]["stytch_member_id"] == "stytch-active"
+
+    @patch("apps.accounts.services.invite_member")
+    def test_already_invited_member_returns_failed(self, mock_invite: MagicMock) -> None:
+        """Should report failure when member already has pending invitation."""
+        org = OrganizationFactory()
+        member = MemberFactory(organization=org, stytch_member_id="stytch-invited")
+
+        # invite_member returns "pending" for already invited members
+        mock_invite.return_value = (member, "pending")
+
+        members_data = [
+            {"email": "invited@example.com", "name": "Invited User", "phone": "", "role": "member"},
+        ]
+
+        result = bulk_invite_members(organization=org, members_data=members_data)
+
+        assert result["total"] == 1
+        assert result["succeeded"] == 0
+        assert result["failed"] == 1
+        assert result["results"][0]["success"] is False
+        assert "pending invitation" in result["results"][0]["error"]
+        assert result["results"][0]["stytch_member_id"] == "stytch-invited"

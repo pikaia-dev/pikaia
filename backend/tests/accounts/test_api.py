@@ -13,6 +13,7 @@ from ninja.errors import HttpError
 
 from apps.accounts.api import (
     authenticate_magic_link,
+    bulk_invite_members_endpoint,
     create_organization,
     delete_member_endpoint,
     exchange_session,
