@@ -190,6 +190,9 @@ export default function Login() {
                 document.cookie = `stytch_session=${result.session_token}; ${cookieOptions}`
                 document.cookie = `stytch_session_jwt=${result.session_jwt}; ${cookieOptions}`
 
+                // Set flag so ProtectedRoute shows loading instead of redirecting to login
+                sessionStorage.setItem("stytch_just_logged_in", "true")
+
                 // Use full page redirect so Stytch SDK reinitializes with new session
                 window.location.href = "/dashboard"
               } else {

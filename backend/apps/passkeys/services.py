@@ -181,9 +181,37 @@ class PasskeyService:
             logger.warning("Passkey registration verification failed: %s", e)
             raise ValueError(f"Registration verification failed: {e}") from e
 
-        # Check if credential already exists (shouldn't happen but be safe)
-        if Passkey.objects.filter(credential_id=verification.credential_id).exists():
-            raise ValueError("This passkey is already registered")
+        # Check if credential already exists
+        existing_passkey = Passkey.objects.filter(
+            credential_id=verification.credential_id
+        ).select_related("user").first()
+
+        if existing_passkey:
+            if existing_passkey.user_id == user.id:
+                # Same user, same credential - update name and return existing
+                logger.info(
+                    "Passkey already exists for user %s, updating name to '%s'",
+                    user.email,
+                    passkey_name,
+                )
+                existing_passkey.name = passkey_name
+                existing_passkey.save(update_fields=["name", "updated_at"])
+                return existing_passkey
+
+            # Check if the existing passkey's user has any active memberships
+            has_active_membership = existing_passkey.user.memberships.filter(
+                deleted_at__isnull=True
+            ).exists()
+
+            if not has_active_membership:
+                # User has no active memberships (orphaned) - delete old passkey
+                logger.info(
+                    "Deleting orphaned passkey for user %s (no active memberships)",
+                    existing_passkey.user.email,
+                )
+                existing_passkey.delete()
+            else:
+                raise ValueError("This passkey is already registered to another account")
 
         # Extract transports from the response if available
         transports = []
@@ -301,8 +329,8 @@ class PasskeyService:
 
         try:
             passkey = Passkey.objects.select_related("user").get(credential_id=credential_id)
-        except Passkey.DoesNotExist:
-            raise ValueError("Passkey not found")
+        except Passkey.DoesNotExist as e:
+            raise ValueError("Passkey not found") from e
 
         try:
             verification = verify_authentication_response(
