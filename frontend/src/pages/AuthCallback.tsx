@@ -122,10 +122,15 @@ export default function AuthCallback() {
 
           if (autoLoginOrg) {
             // Auto-login to single organization
-            return stytch.discovery.intermediateSessions.exchange({
-              organization_id: autoLoginOrg.organization.organization_id,
-              session_duration_minutes: SESSION_DURATION_MINUTES,
-            })
+            return stytch.discovery.intermediateSessions
+              .exchange({
+                organization_id: autoLoginOrg.organization.organization_id,
+                session_duration_minutes: SESSION_DURATION_MINUTES,
+              })
+              .then(() => {
+                // Success - Stytch session is set, navigation will happen via useEffect
+                setError(null)
+              })
           } else if (orgs.length === 0) {
             // Auto-create organization for new users
             const email = response.email_address
@@ -138,13 +143,28 @@ export default function AuthCallback() {
 
             console.log("🏢 Auto-creating organization:", { email, orgName, orgSlug })
 
-            return stytch.discovery.organizations
-              .create({
+            // Call our backend API to create org and sync to database
+            return fetch(`${import.meta.env.VITE_API_URL}/api/v1/auth/discovery/create-org`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
                 intermediate_session_token: response.intermediate_session_token,
                 organization_name: orgName,
                 organization_slug: orgSlug,
-                session_duration_minutes: SESSION_DURATION_MINUTES,
-              } as any) // Type assertion: SDK types are incomplete
+              }),
+            })
+              .then(async (res) => {
+                if (!res.ok) {
+                  const error = await res.json().catch(() => ({ detail: "Failed to create organization" }))
+                  throw new Error(error.detail || "Failed to create organization")
+                }
+                return res.json()
+              })
+              .then((data: { session_token: string; session_jwt: string }) => {
+                // Save session tokens - Stytch SDK will use them
+                stytch.session.updateSession({ session_token: data.session_token, session_jwt: data.session_jwt })
+                setError(null)
+              })
               .catch((createErr: unknown) => {
                 // If slug conflict, retry with timestamp
                 if (
@@ -153,13 +173,26 @@ export default function AuthCallback() {
                 ) {
                   const timestamp = Date.now()
                   console.log("⚠️ Slug conflict, retrying with timestamp:", `${orgSlug}-${timestamp}`)
-                  return stytch.discovery.organizations.create({
-                    intermediate_session_token:
-                      response.intermediate_session_token,
-                    organization_name: orgName,
-                    organization_slug: `${orgSlug}-${timestamp}`,
-                    session_duration_minutes: SESSION_DURATION_MINUTES,
-                  } as any) // Type assertion: SDK types are incomplete
+                  return fetch(`${import.meta.env.VITE_API_URL}/api/v1/auth/discovery/create-org`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      intermediate_session_token: response.intermediate_session_token,
+                      organization_name: orgName,
+                      organization_slug: `${orgSlug}-${timestamp}`,
+                    }),
+                  })
+                    .then(async (res) => {
+                      if (!res.ok) {
+                        const error = await res.json().catch(() => ({ detail: "Failed to create organization" }))
+                        throw new Error(error.detail || "Failed to create organization")
+                      }
+                      return res.json()
+                    })
+                    .then((data: { session_token: string; session_jwt: string }) => {
+                      stytch.session.updateSession({ session_token: data.session_token, session_jwt: data.session_jwt })
+                      setError(null)
+                    })
                 }
                 console.error("❌ Failed to create organization:", createErr)
                 throw createErr
@@ -206,28 +239,58 @@ export default function AuthCallback() {
               .join(" ")
             const orgSlug = domain.toLowerCase()
 
-            return stytch.discovery.organizations
-              .create({
+            console.log("🏢 Auto-creating organization (OAuth):", { email, orgName, orgSlug })
+
+            // Call our backend API to create org and sync to database
+            return fetch(`${import.meta.env.VITE_API_URL}/api/v1/auth/discovery/create-org`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
                 intermediate_session_token: response.intermediate_session_token,
                 organization_name: orgName,
                 organization_slug: orgSlug,
-                session_duration_minutes: SESSION_DURATION_MINUTES,
-              } as any) // Type assertion: SDK types are incomplete
+              }),
+            })
+              .then(async (res) => {
+                if (!res.ok) {
+                  const error = await res.json().catch(() => ({ detail: "Failed to create organization" }))
+                  throw new Error(error.detail || "Failed to create organization")
+                }
+                return res.json()
+              })
+              .then((data: { session_token: string; session_jwt: string }) => {
+                stytch.session.updateSession({ session_token: data.session_token, session_jwt: data.session_jwt })
+                setError(null)
+              })
               .catch((createErr: unknown) => {
-                // If slug conflict, retry with timestamp
                 if (
                   createErr instanceof Error &&
                   createErr.message.includes("slug")
                 ) {
                   const timestamp = Date.now()
-                  return stytch.discovery.organizations.create({
-                    intermediate_session_token:
-                      response.intermediate_session_token,
-                    organization_name: orgName,
-                    organization_slug: `${orgSlug}-${timestamp}`,
-                    session_duration_minutes: SESSION_DURATION_MINUTES,
-                  } as any) // Type assertion: SDK types are incomplete
+                  console.log("⚠️ Slug conflict, retrying with timestamp:", `${orgSlug}-${timestamp}`)
+                  return fetch(`${import.meta.env.VITE_API_URL}/api/v1/auth/discovery/create-org`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      intermediate_session_token: response.intermediate_session_token,
+                      organization_name: orgName,
+                      organization_slug: `${orgSlug}-${timestamp}`,
+                    }),
+                  })
+                    .then(async (res) => {
+                      if (!res.ok) {
+                        const error = await res.json().catch(() => ({ detail: "Failed to create organization" }))
+                        throw new Error(error.detail || "Failed to create organization")
+                      }
+                      return res.json()
+                    })
+                    .then((data: { session_token: string; session_jwt: string }) => {
+                      stytch.session.updateSession({ session_token: data.session_token, session_jwt: data.session_jwt })
+                      setError(null)
+                    })
                 }
+                console.error("❌ Failed to create organization:", createErr)
                 throw createErr
               })
           } else {
