@@ -279,11 +279,15 @@ export default function AuthCallback() {
             // Auto-login to single organization
             // Set session flag BEFORE exchange to prevent login flash
             sessionStorage.setItem("stytch_just_logged_in", "true")
-            void stytch.discovery.intermediateSessions.exchange({
-              organization_id: autoLoginOrg.organization.organization_id,
-              session_duration_minutes: SESSION_DURATION_MINUTES,
-            })
-            return
+            return stytch.discovery.intermediateSessions
+              .exchange({
+                organization_id: autoLoginOrg.organization.organization_id,
+                session_duration_minutes: SESSION_DURATION_MINUTES,
+              })
+              .then(() => {
+                // Success - Stytch session is set, navigation will happen via useEffect
+                setError(null)
+              })
           } else if (orgs.length === 0) {
             // Auto-create organization for new users
             const email = response.email_address
