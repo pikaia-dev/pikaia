@@ -313,3 +313,29 @@ export interface DirectoryUser {
   name: string
   avatar_url: string
 }
+
+// Bulk invite types
+export interface BulkInviteMemberItem {
+  email: string
+  name?: string
+  phone?: string
+  role?: "admin" | "member"
+}
+
+export interface BulkInviteRequest {
+  members: BulkInviteMemberItem[]
+}
+
+export interface BulkInviteResultItem {
+  email: string
+  success: boolean
+  error: string | null
+  stytch_member_id: string | null
+}
+
+export interface BulkInviteResponse {
+  results: BulkInviteResultItem[]
+  total: number
+  succeeded: number
+  failed: number
+}

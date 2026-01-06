@@ -3,6 +3,8 @@ import { useMemo } from "react"
 
 import {
   type BillingAddress,
+  type BulkInviteRequest,
+  type BulkInviteResponse,
   type CheckoutSessionRequest,
   type CheckoutSessionResponse,
   type ConfirmSubscriptionRequest,
@@ -93,6 +95,9 @@ export function useApi() {
 
       inviteMember: (data: InviteMemberRequest) =>
         api.post<InviteMemberResponse>("/auth/organization/members", data),
+
+      bulkInviteMembers: (data: BulkInviteRequest) =>
+        api.post<BulkInviteResponse>("/auth/organization/members/bulk", data),
 
       updateMemberRole: (memberId: number, data: UpdateMemberRoleRequest) =>
         api.patch<MessageResponse>(

@@ -65,6 +65,11 @@ class User(AbstractBaseUser, PermissionsMixin):
         default="",
         help_text="Phone number in E.164 format (e.g., +14155551234)",
     )
+    phone_verified_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when phone was verified via OTP. NULL = unverified.",
+    )
 
     # Django auth compatibility
     is_active = models.BooleanField(default=True)

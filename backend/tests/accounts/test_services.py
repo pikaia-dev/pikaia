@@ -9,6 +9,7 @@ import pytest
 
 from apps.accounts.models import Member, User
 from apps.accounts.services import (
+    bulk_invite_members,
     get_or_create_member_from_stytch,
     get_or_create_organization_from_stytch,
     get_or_create_user_from_stytch,
@@ -671,3 +672,169 @@ class TestSoftDeleteMember:
         assert Member.objects.filter(organization=org).count() == 0
         # But should exist in all_objects
         assert Member.all_objects.filter(organization=org).count() == 1
+
+
+@pytest.mark.django_db
+class TestBulkInviteMembers:
+    """Tests for bulk_invite_members service."""
+
+    @patch("apps.accounts.services.invite_member")
+    def test_invites_multiple_members(self, mock_invite: MagicMock) -> None:
+        """Should invite multiple members and return results."""
+        org = OrganizationFactory()
+
+        # Mock successful invites
+        mock_invite.side_effect = [
+            (MemberFactory(stytch_member_id="stytch-1"), True),
+            (MemberFactory(stytch_member_id="stytch-2"), True),
+        ]
+
+        members_data = [
+            {"email": "user1@example.com", "name": "User One", "phone": "", "role": "member"},
+            {"email": "user2@example.com", "name": "User Two", "phone": "", "role": "admin"},
+        ]
+
+        result = bulk_invite_members(organization=org, members_data=members_data)
+
+        assert result["total"] == 2
+        assert result["succeeded"] == 2
+        assert result["failed"] == 0
+        assert len(result["results"]) == 2
+        assert all(r["success"] for r in result["results"])
+
+    @patch("apps.accounts.services.invite_member")
+    def test_handles_partial_failure(self, mock_invite: MagicMock) -> None:
+        """Should handle mix of successful and failed invites."""
+        from stytch.core.response_base import StytchError, StytchErrorDetails
+
+        org = OrganizationFactory()
+
+        # First succeeds, second fails
+        mock_invite.side_effect = [
+            (MemberFactory(stytch_member_id="stytch-1"), True),
+            StytchError(
+                StytchErrorDetails(
+                    status_code=400,
+                    request_id="req-123",
+                    error_type="invalid_email",
+                    error_message="Invalid email format",
+                )
+            ),
+        ]
+
+        members_data = [
+            {"email": "valid@example.com", "name": "Valid", "phone": "", "role": "member"},
+            {"email": "invalid-email", "name": "Invalid", "phone": "", "role": "member"},
+        ]
+
+        result = bulk_invite_members(organization=org, members_data=members_data)
+
+        assert result["total"] == 2
+        assert result["succeeded"] == 1
+        assert result["failed"] == 1
+        assert result["results"][0]["success"] is True
+        assert result["results"][1]["success"] is False
+        assert result["results"][1]["error"] == "Invalid email format"
+
+    @patch("apps.accounts.services.invite_member")
+    def test_stores_phone_number_unverified(self, mock_invite: MagicMock) -> None:
+        """Should store phone number on user as unverified."""
+        org = OrganizationFactory()
+        user = UserFactory(phone_number="", phone_verified_at=None)
+        member = MemberFactory(user=user, organization=org, stytch_member_id="stytch-1")
+
+        mock_invite.return_value = (member, True)
+
+        members_data = [
+            {"email": user.email, "name": "User", "phone": "+14155551234", "role": "member"},
+        ]
+
+        result = bulk_invite_members(organization=org, members_data=members_data)
+
+        assert result["succeeded"] == 1
+
+        # Reload user from DB
+        user.refresh_from_db()
+        assert user.phone_number == "+14155551234"
+        assert user.phone_verified_at is None  # Explicitly unverified
+
+    @patch("apps.accounts.services.invite_member")
+    def test_does_not_overwrite_existing_verified_phone(self, mock_invite: MagicMock) -> None:
+        """Should not overwrite existing phone if same number."""
+        from django.utils import timezone
+
+        org = OrganizationFactory()
+        verified_time = timezone.now()
+        user = UserFactory(phone_number="+14155551234", phone_verified_at=verified_time)
+        member = MemberFactory(user=user, organization=org, stytch_member_id="stytch-1")
+
+        mock_invite.return_value = (member, True)
+
+        members_data = [
+            {"email": user.email, "name": "User", "phone": "+14155551234", "role": "member"},
+        ]
+
+        result = bulk_invite_members(organization=org, members_data=members_data)
+
+        assert result["succeeded"] == 1
+
+        # Phone should remain unchanged since same number
+        user.refresh_from_db()
+        assert user.phone_number == "+14155551234"
+        assert user.phone_verified_at == verified_time  # Still verified
+
+    @patch("apps.accounts.services.invite_member")
+    def test_updates_phone_if_different(self, mock_invite: MagicMock) -> None:
+        """Should update phone and clear verification if different number."""
+        from django.utils import timezone
+
+        org = OrganizationFactory()
+        user = UserFactory(phone_number="+14155551111", phone_verified_at=timezone.now())
+        member = MemberFactory(user=user, organization=org, stytch_member_id="stytch-1")
+
+        mock_invite.return_value = (member, True)
+
+        members_data = [
+            {"email": user.email, "name": "User", "phone": "+14155552222", "role": "member"},
+        ]
+
+        result = bulk_invite_members(organization=org, members_data=members_data)
+
+        assert result["succeeded"] == 1
+
+        # Phone should be updated and verification cleared
+        user.refresh_from_db()
+        assert user.phone_number == "+14155552222"
+        assert user.phone_verified_at is None  # Verification cleared
+
+    @patch("apps.accounts.services.invite_member")
+    def test_empty_members_list(self, mock_invite: MagicMock) -> None:
+        """Should handle empty members list."""
+        org = OrganizationFactory()
+
+        result = bulk_invite_members(organization=org, members_data=[])
+
+        assert result["total"] == 0
+        assert result["succeeded"] == 0
+        assert result["failed"] == 0
+        assert result["results"] == []
+        mock_invite.assert_not_called()
+
+    @patch("apps.accounts.services.invite_member")
+    def test_handles_generic_exception(self, mock_invite: MagicMock) -> None:
+        """Should catch and report generic exceptions."""
+        org = OrganizationFactory()
+
+        mock_invite.side_effect = ValueError("Something went wrong")
+
+        members_data = [
+            {"email": "user@example.com", "name": "User", "phone": "", "role": "member"},
+        ]
+
+        result = bulk_invite_members(organization=org, members_data=members_data)
+
+        assert result["total"] == 1
+        assert result["succeeded"] == 0
+        assert result["failed"] == 1
+        assert result["results"][0]["success"] is False
+        assert "Something went wrong" in result["results"][0]["error"]
