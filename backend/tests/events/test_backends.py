@@ -2,9 +2,10 @@
 Tests for event backends.
 """
 
-import pytest
+from datetime import UTC, datetime
 from uuid import uuid4
-from datetime import datetime, timezone
+
+import pytest
 
 from apps.events.backends import EventBridgeBackend, LocalBackend, get_backend
 from apps.events.schemas import ActorSchema, EventEnvelope
@@ -16,7 +17,7 @@ def create_test_envelope(**kwargs) -> EventEnvelope:
         "event_id": uuid4(),
         "event_type": "test.event",
         "schema_version": 1,
-        "occurred_at": datetime.now(timezone.utc),
+        "occurred_at": datetime.now(UTC),
         "aggregate_id": "test_123",
         "aggregate_type": "test",
         "organization_id": "org_456",

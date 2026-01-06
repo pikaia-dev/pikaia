@@ -19,13 +19,13 @@ from webauthn import (
     verify_authentication_response,
     verify_registration_response,
 )
-from webauthn.helpers import bytes_to_base64url, base64url_to_bytes, options_to_json
+from webauthn.helpers import base64url_to_bytes, bytes_to_base64url, options_to_json
 from webauthn.helpers.structs import (
     AuthenticatorSelectionCriteria,
+    AuthenticatorTransport,
     PublicKeyCredentialDescriptor,
     ResidentKeyRequirement,
     UserVerificationRequirement,
-    AuthenticatorTransport,
 )
 
 from apps.accounts.models import Member, User
@@ -187,9 +187,7 @@ class PasskeyService:
 
         # Extract transports from the response if available
         transports = []
-        if hasattr(credential_json, "response") and hasattr(credential_json["response"], "transports"):
-            transports = credential_json["response"].get("transports", [])
-        elif isinstance(credential_json, dict) and "response" in credential_json:
+        if hasattr(credential_json, "response") and hasattr(credential_json["response"], "transports") or isinstance(credential_json, dict) and "response" in credential_json:
             transports = credential_json["response"].get("transports", [])
 
         # Create passkey record

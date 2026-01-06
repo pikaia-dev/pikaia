@@ -4,13 +4,12 @@ Tests for PasskeyService.
 Tests passkey registration and authentication flows with mocked WebAuthn responses.
 """
 
-from unittest.mock import MagicMock, patch
 import json
+
 import pytest
 from django.core.cache import cache
 
 from apps.passkeys.services import PasskeyService, get_passkey_service
-from apps.passkeys.models import Passkey
 from tests.accounts.factories import MemberFactory, UserFactory
 from tests.passkeys.factories import PasskeyFactory
 

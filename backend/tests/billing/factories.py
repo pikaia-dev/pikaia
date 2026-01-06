@@ -4,7 +4,7 @@ Factories for billing app models.
 Used in tests to create test data.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import factory
 from factory.django import DjangoModelFactory
@@ -24,8 +24,8 @@ class SubscriptionFactory(DjangoModelFactory):
     stripe_price_id = factory.Sequence(lambda n: f"price_test_{n}")
     status = Subscription.Status.ACTIVE
     quantity = 1
-    current_period_start = factory.LazyFunction(lambda: datetime.now(tz=timezone.utc))
+    current_period_start = factory.LazyFunction(lambda: datetime.now(tz=UTC))
     current_period_end = factory.LazyFunction(
-        lambda: datetime.now(tz=timezone.utc) + timedelta(days=30)
+        lambda: datetime.now(tz=UTC) + timedelta(days=30)
     )
     cancel_at_period_end = False
