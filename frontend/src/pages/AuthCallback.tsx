@@ -23,6 +23,11 @@ const directLoginOptions: DirectLoginOptions = {
   ignoreJitProvisioning: true,
 }
 
+/** API error response shape */
+interface ApiErrorResponse {
+  detail?: string
+}
+
 /**
  * Determines if user should auto-login to a single organization.
  */
@@ -165,12 +170,21 @@ export default function AuthCallback() {
             })
               .then(async (res) => {
                 if (!res.ok) {
-                  const error = await res.json().catch(() => ({ detail: "Failed to create organization" }))
-                  throw new Error(error.detail || "Failed to create organization")
+                  const errorBody = (await res
+                    .json()
+                    .catch(() => ({
+                      detail: "Failed to create organization",
+                    }))) as ApiErrorResponse
+                  throw new Error(
+                    errorBody.detail ?? "Failed to create organization"
+                  )
                 }
-                return res.json()
+                return res.json() as Promise<{
+                  session_token: string
+                  session_jwt: string
+                }>
               })
-              .then((data: { session_token: string; session_jwt: string }) => {
+              .then((data) => {
                 // Update Stytch SDK with new session
                 stytch.session.updateSession({
                   session_token: data.session_token,
@@ -180,7 +194,7 @@ export default function AuthCallback() {
                 setError(null)
                 // Set session flag to prevent login flash before redirect
                 sessionStorage.setItem("stytch_just_logged_in", "true")
-                navigate("/dashboard", { replace: true })
+                void navigate("/dashboard", { replace: true })
               })
               .catch((createErr: unknown) => {
                 // If slug conflict, retry with timestamp
@@ -189,25 +203,38 @@ export default function AuthCallback() {
                   createErr.message.includes("slug")
                 ) {
                   const timestamp = Date.now()
-                  console.log("⚠️ Slug conflict, retrying with timestamp:", `${orgSlug}-${timestamp}`)
-                  return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
+                  console.log(
+                    "⚠️ Slug conflict, retrying with timestamp:",
+                    `${orgSlug}-${String(timestamp)}`
+                  )
+                  void fetch(`${config.apiUrl}/auth/discovery/create-org`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     credentials: "include",
                     body: JSON.stringify({
-                      intermediate_session_token: response.intermediate_session_token,
+                      intermediate_session_token:
+                        response.intermediate_session_token,
                       organization_name: orgName,
-                      organization_slug: `${orgSlug}-${timestamp}`,
+                      organization_slug: `${orgSlug}-${String(timestamp)}`,
                     }),
                   })
                     .then(async (res) => {
                       if (!res.ok) {
-                        const error = await res.json().catch(() => ({ detail: "Failed to create organization" }))
-                        throw new Error(error.detail || "Failed to create organization")
+                        const errorBody = (await res
+                          .json()
+                          .catch(() => ({
+                            detail: "Failed to create organization",
+                          }))) as ApiErrorResponse
+                        throw new Error(
+                          errorBody.detail ?? "Failed to create organization"
+                        )
                       }
-                      return res.json()
+                      return res.json() as Promise<{
+                        session_token: string
+                        session_jwt: string
+                      }>
                     })
-                    .then((data: { session_token: string; session_jwt: string }) => {
+                    .then((data) => {
                       stytch.session.updateSession({
                         session_token: data.session_token,
                         session_jwt: data.session_jwt,
@@ -215,7 +242,7 @@ export default function AuthCallback() {
                       setError(null)
                       // Set session flag to prevent login flash before redirect
                       sessionStorage.setItem("stytch_just_logged_in", "true")
-                      navigate("/dashboard", { replace: true })
+                      void navigate("/dashboard", { replace: true })
                     })
                 }
                 console.error("❌ Failed to create organization:", createErr)
@@ -279,12 +306,21 @@ export default function AuthCallback() {
             })
               .then(async (res) => {
                 if (!res.ok) {
-                  const error = await res.json().catch(() => ({ detail: "Failed to create organization" }))
-                  throw new Error(error.detail || "Failed to create organization")
+                  const errorBody = (await res
+                    .json()
+                    .catch(() => ({
+                      detail: "Failed to create organization",
+                    }))) as ApiErrorResponse
+                  throw new Error(
+                    errorBody.detail ?? "Failed to create organization"
+                  )
                 }
-                return res.json()
+                return res.json() as Promise<{
+                  session_token: string
+                  session_jwt: string
+                }>
               })
-              .then((data: { session_token: string; session_jwt: string }) => {
+              .then((data) => {
                 stytch.session.updateSession({
                   session_token: data.session_token,
                   session_jwt: data.session_jwt,
@@ -292,7 +328,7 @@ export default function AuthCallback() {
                 setError(null)
                 // Set session flag to prevent login flash before redirect
                 sessionStorage.setItem("stytch_just_logged_in", "true")
-                navigate("/dashboard", { replace: true })
+                void navigate("/dashboard", { replace: true })
               })
               .catch((createErr: unknown) => {
                 if (
@@ -300,25 +336,38 @@ export default function AuthCallback() {
                   createErr.message.includes("slug")
                 ) {
                   const timestamp = Date.now()
-                  console.log("⚠️ Slug conflict, retrying with timestamp:", `${orgSlug}-${timestamp}`)
-                  return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
+                  console.log(
+                    "⚠️ Slug conflict, retrying with timestamp:",
+                    `${orgSlug}-${String(timestamp)}`
+                  )
+                  void fetch(`${config.apiUrl}/auth/discovery/create-org`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     credentials: "include",
                     body: JSON.stringify({
-                      intermediate_session_token: response.intermediate_session_token,
+                      intermediate_session_token:
+                        response.intermediate_session_token,
                       organization_name: orgName,
-                      organization_slug: `${orgSlug}-${timestamp}`,
+                      organization_slug: `${orgSlug}-${String(timestamp)}`,
                     }),
                   })
                     .then(async (res) => {
                       if (!res.ok) {
-                        const error = await res.json().catch(() => ({ detail: "Failed to create organization" }))
-                        throw new Error(error.detail || "Failed to create organization")
+                        const errorBody = (await res
+                          .json()
+                          .catch(() => ({
+                            detail: "Failed to create organization",
+                          }))) as ApiErrorResponse
+                        throw new Error(
+                          errorBody.detail ?? "Failed to create organization"
+                        )
                       }
-                      return res.json()
+                      return res.json() as Promise<{
+                        session_token: string
+                        session_jwt: string
+                      }>
                     })
-                    .then((data: { session_token: string; session_jwt: string }) => {
+                    .then((data) => {
                       stytch.session.updateSession({
                         session_token: data.session_token,
                         session_jwt: data.session_jwt,
@@ -326,7 +375,7 @@ export default function AuthCallback() {
                       setError(null)
                       // Set session flag to prevent login flash before redirect
                       sessionStorage.setItem("stytch_just_logged_in", "true")
-                      navigate("/dashboard", { replace: true })
+                      void navigate("/dashboard", { replace: true })
                     })
                 }
                 console.error("❌ Failed to create organization:", createErr)
@@ -365,8 +414,9 @@ export default function AuthCallback() {
 
   // Redirect to dashboard when session is established
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isInitialized can be false during SDK init
     if (isInitialized && session) {
-      navigate("/dashboard", { replace: true })
+      void navigate("/dashboard", { replace: true })
     }
   }, [session, isInitialized, navigate])
 
