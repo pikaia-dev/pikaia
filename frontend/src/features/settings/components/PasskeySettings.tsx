@@ -219,7 +219,7 @@ export function PasskeySettings() {
                                             <AlertDialogFooter>
                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                 <AlertDialogAction
-                                                    onClick={() => handleDeleteClick(passkey.id, passkey.name)}
+                                                    onClick={() => { handleDeleteClick(passkey.id, passkey.name); }}
                                                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                                 >
                                                     {deleteMutation.isPending ? "Deleting..." : "Delete"}

@@ -43,7 +43,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
         sessionStorage.removeItem("stytch_just_logged_in")
         setIsWaitingForSession(false)
       }, 5000) // 5s max wait time
-      return () => clearTimeout(timer)
+      return () => { clearTimeout(timer); }
     }
   }, [isWaitingForSession, isInitialized, session])
 

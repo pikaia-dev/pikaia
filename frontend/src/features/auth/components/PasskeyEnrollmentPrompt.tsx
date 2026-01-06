@@ -5,8 +5,8 @@
  * if they don't have one and their device supports WebAuthn.
  */
 
-import { useEffect, useState } from "react"
 import { Fingerprint } from "lucide-react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -20,9 +20,9 @@ import {
 } from "@/components/ui/dialog"
 
 import {
+    isWebAuthnSupported,
     usePasskeys,
     useRegisterPasskey,
-    isWebAuthnSupported,
 } from "../hooks/usePasskeyAuth"
 import { generatePasskeyName } from "../utils"
 
@@ -71,7 +71,7 @@ export function PasskeyEnrollmentPrompt() {
             setIsOpen(true)
         }, 1000)
 
-        return () => clearTimeout(timer)
+        return () => { clearTimeout(timer); }
     }, [isLoadingPasskeys, passkeys.length])
 
     const handleDismiss = () => {
