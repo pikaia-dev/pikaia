@@ -23,32 +23,38 @@ const BillingSettings = lazy(() => import("./pages/settings/BillingSettings"))
 // Enhanced to prevent "flash of login" by handling undefined session state
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, isInitialized } = useStytchMemberSession()
-  const [isWaitingForSession, setIsWaitingForSession] = useState(() => {
-    // efficient lazy initialization
-    return sessionStorage.getItem("stytch_just_logged_in") === "true"
-  })
+  const [waitingTimedOut, setWaitingTimedOut] = useState(false)
 
+  // Check if we should wait for session (set during login flow)
+  // Read from sessionStorage on each render to get current value
+  const justLoggedIn =
+    sessionStorage.getItem("stytch_just_logged_in") === "true"
+
+  // Clear flag when session arrives
   useEffect(() => {
-    if (session) {
-      // Session found! Clear flag and stop waiting
+    if (session && justLoggedIn) {
       sessionStorage.removeItem("stytch_just_logged_in")
-      setIsWaitingForSession(false)
     }
-  }, [session])
+  }, [session, justLoggedIn])
 
+  // Timeout safety valve - only runs when waiting for session
   useEffect(() => {
-    if (isWaitingForSession && isInitialized && !session) {
-      // If we are waiting for session but it hasn't appeared yet, set a timeout safety valve
-      const timer = setTimeout(() => {
-        sessionStorage.removeItem("stytch_just_logged_in")
-        setIsWaitingForSession(false)
-      }, 5000) // 5s max wait time
-      return () => { clearTimeout(timer); }
+    if (!justLoggedIn || session || waitingTimedOut) return
+
+    const timer = setTimeout(() => {
+      sessionStorage.removeItem("stytch_just_logged_in")
+      setWaitingTimedOut(true)
+    }, 5000) // 5s max wait time
+    return () => {
+      clearTimeout(timer)
     }
-  }, [isWaitingForSession, isInitialized, session])
+  }, [justLoggedIn, session, waitingTimedOut])
+
+  // Derive waiting state from other values instead of syncing via setState
+  const isWaitingForSession = justLoggedIn && !session && !waitingTimedOut
 
   // Wait for SDK initialization AND initial session check
-  // isInitialized only means the SDK is ready, not that we've checked for a session
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isInitialized can be false during SDK init
   if (!isInitialized || isWaitingForSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
