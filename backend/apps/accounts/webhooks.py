@@ -234,6 +234,71 @@ def handle_organization_updated(data: dict) -> None:
         org.save()
 
 
+def handle_organization_deleted(data: dict) -> None:
+    """
+    Handle organization.delete event from Stytch.
+
+    Soft deletes the organization and all its members in local database.
+    This handles deletion via Stytch dashboard or SCIM.
+    """
+    # Try both possible locations for org_id in the event payload
+    stytch_org_id = data.get("id") or data.get("organization", {}).get("organization_id")
+
+    if not stytch_org_id:
+        logger.warning("organization.delete event missing organization id")
+        return
+
+    # Use all_objects to find even if already soft-deleted
+    try:
+        org = Organization.all_objects.get(stytch_org_id=stytch_org_id)
+    except Organization.DoesNotExist:
+        logger.debug(
+            "Organization %s not found, already deleted or never synced",
+            stytch_org_id,
+        )
+        return
+
+    if org.deleted_at is not None:
+        logger.debug("Organization %s already soft-deleted", stytch_org_id)
+        return
+
+    logger.info(
+        "Soft deleting organization %s (%s) from Stytch webhook",
+        stytch_org_id,
+        org.name,
+    )
+
+    # Soft delete all members in the organization first
+    members = Member.objects.filter(organization=org)
+    member_count = members.count()
+    for member in members:
+        if member.deleted_at is None:
+            member.soft_delete()
+
+    if member_count > 0:
+        logger.info(
+            "Soft deleted %d members from organization %s",
+            member_count,
+            org.name,
+        )
+
+    # Soft delete the organization
+    org.soft_delete()
+
+    # Emit organization.deleted event
+    publish_event(
+        event_type="organization.deleted",
+        aggregate=org,
+        data={
+            "name": org.name,
+            "slug": org.slug,
+            "member_count": member_count,
+            "deleted_via": "stytch_webhook",
+        },
+        actor=None,  # System/webhook event
+    )
+
+
 @csrf_exempt
 @require_POST
 def stytch_webhook(request: HttpRequest) -> HttpResponse:
@@ -288,6 +353,8 @@ def stytch_webhook(request: HttpRequest) -> HttpResponse:
         elif object_type == "organization":
             if action == "UPDATE":
                 handle_organization_updated(event)
+            elif action == "DELETE":
+                handle_organization_deleted(event)
             else:
                 logger.debug("Unhandled organization action: %s", action)
 
