@@ -20,6 +20,9 @@ from apps.accounts.models import Member
 from apps.accounts.schemas import (
     BillingAddressSchema,
     BillingInfoResponse,
+    BulkInviteRequest,
+    BulkInviteResponse,
+    BulkInviteResultItem,
     DirectoryUserSchema,
     DiscoveredOrganization,
     DiscoveryCreateOrgRequest,
@@ -49,6 +52,7 @@ from apps.accounts.schemas import (
     VerifyPhoneOtpRequest,
 )
 from apps.accounts.services import (
+    bulk_invite_members,
     invite_member,
     list_organization_members,
     soft_delete_member,
@@ -838,6 +842,85 @@ def invite_member_endpoint(
     return InviteMemberResponse(
         message=message,
         stytch_member_id=new_member.stytch_member_id,
+    )
+
+
+@router.post(
+    "/organization/members/bulk",
+    response={
+        200: BulkInviteResponse,
+        400: ErrorResponse,
+        401: ErrorResponse,
+        403: ErrorResponse,
+    },
+    auth=bearer_auth,
+    operation_id="bulkInviteMembers",
+    summary="Bulk invite multiple members",
+)
+@require_admin
+def bulk_invite_members_endpoint(
+    request: HttpRequest, payload: BulkInviteRequest
+) -> BulkInviteResponse:
+    """
+    Invite multiple members to the organization at once.
+
+    Admin only. Processes each invite individually, allowing partial success.
+    Phone numbers are stored unverified (will require OTP verification later).
+
+    Returns detailed results for each member attempted.
+    """
+    member = request.auth_member  # type: ignore[attr-defined]
+    org = request.auth_organization  # type: ignore[attr-defined]
+
+    # Filter out self-invites
+    members_data = []
+    for item in payload.members:
+        if item.email.lower() == member.user.email.lower():
+            continue
+        members_data.append({
+            "email": item.email,
+            "name": item.name,
+            "phone": item.phone,
+            "role": item.role,
+        })
+
+    if not members_data:
+        return BulkInviteResponse(
+            results=[],
+            total=0,
+            succeeded=0,
+            failed=0,
+        )
+
+    result = bulk_invite_members(organization=org, members_data=members_data)
+
+    # Emit member.bulk_invited event for successful invites
+    successful_emails = [r["email"] for r in result["results"] if r["success"]]
+    if successful_emails:
+        publish_event(
+            event_type="member.bulk_invited",
+            aggregate=org,
+            data={
+                "emails": successful_emails,
+                "count": len(successful_emails),
+                "invited_by_member_id": str(member.id),
+            },
+            actor=member.user,
+        )
+
+    return BulkInviteResponse(
+        results=[
+            BulkInviteResultItem(
+                email=r["email"],
+                success=r["success"],
+                error=r["error"],
+                stytch_member_id=r["stytch_member_id"],
+            )
+            for r in result["results"]
+        ],
+        total=result["total"],
+        succeeded=result["succeeded"],
+        failed=result["failed"],
     )
 
 
