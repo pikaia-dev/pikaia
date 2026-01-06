@@ -502,3 +502,78 @@ class DirectoryUserSchema(BaseModel):
     email: str = Field(..., description="User's email address")
     name: str = Field(..., description="User's display name")
     avatar_url: str = Field("", description="URL to user's avatar image")
+
+
+# --- Bulk Invite Schemas ---
+
+
+class BulkInviteMemberItem(BaseModel):
+    """Single member to invite in bulk operation."""
+
+    email: EmailStr = Field(
+        ...,
+        description="Email address of the member to invite",
+        examples=["user@example.com"],
+    )
+    name: str = Field(
+        "",
+        max_length=255,
+        description="Optional display name",
+        examples=["Jane Doe"],
+    )
+    phone: str = Field(
+        "",
+        max_length=20,
+        description="Optional phone number in E.164 format (stored unverified)",
+        examples=["+14155551234"],
+    )
+    role: str = Field(
+        "member",
+        pattern="^(admin|member)$",
+        description="Role to assign: 'admin' or 'member'",
+        examples=["member"],
+    )
+
+    @field_validator("phone", mode="before")
+    @classmethod
+    def validate_phone_if_provided(cls, v: str) -> str:
+        """Validate phone number format if provided."""
+        if not v:
+            return ""
+        v = v.strip()
+        # Basic E.164 format validation
+        if not v.startswith("+"):
+            raise ValueError("Phone number must start with +")
+        if not v[1:].replace(" ", "").replace("-", "").isdigit():
+            raise ValueError("Phone number must contain only digits after +")
+        # Strip spaces/dashes for storage
+        return "+" + "".join(c for c in v[1:] if c.isdigit())
+
+
+class BulkInviteRequest(BaseModel):
+    """Request to invite multiple members at once."""
+
+    members: list[BulkInviteMemberItem] = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="List of members to invite (max 100)",
+    )
+
+
+class BulkInviteResultItem(BaseModel):
+    """Result of a single member invite in bulk operation."""
+
+    email: str = Field(..., description="Email address attempted")
+    success: bool = Field(..., description="Whether the invite succeeded")
+    error: str | None = Field(None, description="Error message if failed")
+    stytch_member_id: str | None = Field(None, description="Stytch member ID if succeeded")
+
+
+class BulkInviteResponse(BaseModel):
+    """Response for bulk invite operation."""
+
+    results: list[BulkInviteResultItem] = Field(..., description="Results for each member")
+    total: int = Field(..., description="Total members processed")
+    succeeded: int = Field(..., description="Number of successful invites")
+    failed: int = Field(..., description="Number of failed invites")

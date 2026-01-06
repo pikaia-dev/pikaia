@@ -433,3 +433,103 @@ def sync_logo_to_stytch(organization: Organization) -> None:
             organization.stytch_org_id,
             e.details.error_message,
         )
+
+
+# --- Bulk Invite Services ---
+
+
+def bulk_invite_members(
+    organization: Organization,
+    members_data: list[dict[str, str]],
+) -> dict[str, Any]:
+    """
+    Invite multiple members to the organization at once.
+
+    Processes each member individually, catching errors per-row to allow
+    partial success. Phone numbers are stored unverified on the User model
+    (will require OTP verification later).
+
+    Args:
+        organization: The organization to invite to
+        members_data: List of dicts with keys: email, name, phone, role
+
+    Returns:
+        Dict with results, total, succeeded, failed counts
+    """
+    import logging
+
+    from stytch.core.response_base import StytchError
+
+    logger = logging.getLogger(__name__)
+    results = []
+    succeeded = 0
+    failed = 0
+
+    for member_item in members_data:
+        email = member_item.get("email", "")
+        name = member_item.get("name", "")
+        phone = member_item.get("phone", "")
+        role = member_item.get("role", "member")
+
+        try:
+            member, invite_status = invite_member(
+                organization=organization,
+                email=email,
+                name=name,
+                role=role,
+            )
+
+            # Store phone number (unverified) on the User if provided
+            if phone:
+                user = member.user
+                # Only update phone if user doesn't have one or it's different
+                if not user.phone_number or user.phone_number != phone:
+                    user.phone_number = phone
+                    user.phone_verified_at = None  # Explicitly mark as unverified
+                    user.save(update_fields=["phone_number", "phone_verified_at", "updated_at"])
+
+            results.append(
+                {
+                    "email": email,
+                    "success": True,
+                    "error": None,
+                    "stytch_member_id": member.stytch_member_id,
+                }
+            )
+            succeeded += 1
+
+        except StytchError as e:
+            error_msg = e.details.error_message if e.details else str(e)
+            logger.warning(
+                "Bulk invite failed for %s: %s",
+                email,
+                error_msg,
+            )
+            results.append(
+                {
+                    "email": email,
+                    "success": False,
+                    "error": error_msg,
+                    "stytch_member_id": None,
+                }
+            )
+            failed += 1
+
+        except Exception as e:
+            logger.exception("Unexpected error inviting %s", email)
+            results.append(
+                {
+                    "email": email,
+                    "success": False,
+                    "error": str(e),
+                    "stytch_member_id": None,
+                }
+            )
+            failed += 1
+
+    return {
+        "results": results,
+        "total": len(members_data),
+        "succeeded": succeeded,
+        "failed": failed,
+    }
