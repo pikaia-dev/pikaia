@@ -9,8 +9,7 @@ import time
 import jwt
 import pytest
 
-from apps.passkeys.trusted_auth import create_trusted_auth_token, TRUSTED_AUTH_TOKEN_EXPIRY_SECONDS
-
+from apps.passkeys.trusted_auth import TRUSTED_AUTH_TOKEN_EXPIRY_SECONDS, create_trusted_auth_token
 
 # Test RSA private key (generated for testing only)
 TEST_PRIVATE_KEY = """-----BEGIN PRIVATE KEY-----

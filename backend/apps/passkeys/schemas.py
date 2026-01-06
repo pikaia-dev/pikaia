@@ -4,7 +4,6 @@ Pydantic schemas for passkey API endpoints.
 
 from pydantic import BaseModel, Field
 
-
 # --- Registration ---
 
 

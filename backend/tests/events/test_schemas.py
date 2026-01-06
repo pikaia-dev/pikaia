@@ -2,13 +2,13 @@
 Tests for EventEnvelope schema.
 """
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
+import pytest
 from pydantic import ValidationError
 
-from apps.events.schemas import ActorSchema, EventEnvelope, MAX_PAYLOAD_SIZE_BYTES
+from apps.events.schemas import MAX_PAYLOAD_SIZE_BYTES, ActorSchema, EventEnvelope
 
 
 class TestActorSchema:
@@ -41,7 +41,7 @@ class TestEventEnvelope:
         envelope = EventEnvelope(
             event_id=uuid4(),
             event_type="member.invited",
-            occurred_at=datetime.now(timezone.utc),
+            occurred_at=datetime.now(UTC),
             aggregate_id="mbr_123",
             aggregate_type="member",
             organization_id="org_456",
@@ -65,7 +65,7 @@ class TestEventEnvelope:
         """Test envelope serializes correctly to JSON."""
         event_id = uuid4()
         correlation_id = uuid4()
-        occurred_at = datetime.now(timezone.utc)
+        occurred_at = datetime.now(UTC)
 
         envelope = EventEnvelope(
             event_id=event_id,
@@ -97,7 +97,7 @@ class TestEventEnvelope:
         envelope = EventEnvelope(
             event_id=uuid4(),
             event_type="test.event",
-            occurred_at=datetime.now(timezone.utc),
+            occurred_at=datetime.now(UTC),
             aggregate_id="test_123",
             aggregate_type="test",
             organization_id="org_456",
@@ -113,7 +113,7 @@ class TestEventEnvelope:
         envelope = EventEnvelope(
             event_id=uuid4(),
             event_type="test.event",
-            occurred_at=datetime.now(timezone.utc),
+            occurred_at=datetime.now(UTC),
             aggregate_id="test_123",
             aggregate_type="test",
             organization_id="org_456",
@@ -148,7 +148,7 @@ class TestPayloadSizeLimit:
         envelope = EventEnvelope(
             event_id=uuid4(),
             event_type="test.event",
-            occurred_at=datetime.now(timezone.utc),
+            occurred_at=datetime.now(UTC),
             aggregate_id="test_123",
             aggregate_type="test",
             organization_id="org_456",
