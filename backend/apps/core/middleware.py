@@ -94,10 +94,17 @@ class StytchAuthMiddleware:
         if self._is_public_path(request.path):
             return self.get_response(request)
 
-        # Extract JWT from Authorization header
+        # Extract JWT from Authorization header or Cookies
         auth_header = request.headers.get("Authorization", "")
+        session_jwt = None
+
         if auth_header.startswith("Bearer "):
             session_jwt = auth_header.replace("Bearer ", "")
+        else:
+            # Fallback to cookies (used after discovery/create-org)
+            session_jwt = request.COOKIES.get("stytch_session_jwt")
+
+        if session_jwt:
             self._authenticate_jwt(request, session_jwt)
 
         return self.get_response(request)
