@@ -22,19 +22,14 @@ Last reviewed: 2026-01-06
 
 ---
 
-### 2. Missing Stripe Webhook Handler
+### ~~2. Missing Stripe Webhook Handler~~ ✅ ALREADY IMPLEMENTED
 
-**File:** `backend/apps/billing/` - no webhook endpoint found
+**File:** `backend/apps/billing/webhooks.py`
 
-**Issue:** No Stripe webhook handler exists. This means:
-- Subscription status changes (cancellations, payment failures) won't be reflected
-- Seat count changes from Stripe dashboard won't sync
-- Invoice events, disputes, and refunds won't be handled
-
-**Fix:** Implement webhook endpoint at `/api/v1/billing/webhook`:
-- Verify webhook signature using `stripe.Webhook.construct_event()`
-- Handle key events: `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
-- Update local Organization billing state accordingly
+Already implemented at `/webhooks/stripe/` with:
+- Signature verification via `stripe.Webhook.construct_event()`
+- Handlers for: `checkout.session.completed`, `customer.subscription.created/updated/deleted`, `invoice.paid/payment_failed`
+- Comprehensive test coverage in `tests/billing/test_webhooks.py`
 
 ---
 
@@ -59,35 +54,24 @@ If step 2 fails, Stytch has the member but Django doesn't. There's no reconcilia
 
 ---
 
-### 4. Billing Info Visible to All Members
+### ~~4. Billing Info Visible to All Members~~ ✅ ALREADY IMPLEMENTED
 
 **File:** `backend/apps/billing/api.py`
 
-**Issue:** The billing endpoints only check for authenticated member, not admin role. Any member can view:
-- Subscription status
-- Billing email
-- Payment method details
-
-**Fix:** Add admin role check to sensitive billing endpoints:
-```python
-if not request.member.is_admin:
-    return 403, {"detail": "Admin access required"}
-```
+Already properly secured:
+- All sensitive endpoints (`create_checkout`, `create_portal`, `list_invoices`, etc.) have `@require_admin`
+- Only `get_subscription` is available to all members (intentional - needed for feature gating)
 
 ---
 
-### 5. No Seat Limit Check Before Invite
+### ~~5. No Seat Limit Check Before Invite~~ ❌ NOT AN ISSUE
 
-**File:** `backend/apps/organizations/api.py` - invite endpoint
+**File:** `backend/apps/billing/services.py`
 
-**Issue:** When inviting new members, there's no check against the subscription seat limit. This allows:
-- Inviting more members than paid for
-- Potential billing disputes
-
-**Fix:** Before sending invite:
-1. Get current member count
-2. Get subscription seat limit from Stripe
-3. Reject invite if at capacity with helpful error message
+The billing is per-seat with automatic scaling, NOT capped seats:
+- `sync_subscription_quantity()` automatically updates subscription when members are added/removed
+- Stripe charges based on actual member count via proration
+- No seat limit enforcement needed - billing just scales automatically
 
 ---
 
