@@ -1,9 +1,9 @@
 import { useStytchB2BClient } from "@stytch/react/b2b"
 import { useQueryClient } from "@tanstack/react-query"
-import { useCallback,useState } from "react"
+import { useCallback, useState } from "react"
 
 import { queryKeys } from "../features/shared/query-keys"
-import type { ImageResponse,UploadRequest } from "../lib/api"
+import type { ImageResponse, UploadRequest } from "../lib/api"
 import { useApi } from "./useApi"
 
 interface UseImageUploadOptions {
@@ -52,7 +52,7 @@ export function useImageUpload(
             },
           })
           if (!response.ok) {
-            throw new Error("Upload failed")
+            throw new Error(`Failed to upload ${imageType}: server returned ${String(response.status)}`)
           }
         } else {
           // Local direct upload (POST with multipart form)
@@ -101,7 +101,7 @@ export function useImageUpload(
         options.onSuccess?.(result)
         return result
       } catch (err) {
-        const error = err instanceof Error ? err : new Error("Upload failed")
+        const error = err instanceof Error ? err : new Error(`Failed to upload ${imageType}`)
         setError(error)
         options.onError?.(error)
         return null

@@ -66,6 +66,43 @@ function getSingleLoginOrg(
 }
 
 /**
+ * Derives organization name and slug from an email address.
+ * Handles edge cases where email format might be unexpected.
+ * Returns all components needed for org creation and retry logic.
+ */
+function deriveOrgFromEmail(email: string): {
+  orgName: string
+  orgSlug: string
+  baseName: string
+  domainLabel: string
+} {
+  // Safely split email, handling missing @ or domain
+  const atIndex = email.indexOf("@")
+  const localPart = atIndex > 0 ? email.slice(0, atIndex) : email
+  const domainPart = atIndex > 0 ? email.slice(atIndex + 1) : ""
+
+  // Extract prefix from local part (max 8 alphanumeric chars)
+  const emailPrefix = localPart.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8) || "user"
+
+  // Extract domain label (part before first dot)
+  const dotIndex = domainPart.indexOf(".")
+  const domainLabel = dotIndex > 0 ? domainPart.slice(0, dotIndex) : (domainPart || "org")
+
+  // Create readable name from domain (e.g., "my-company" -> "My Company")
+  const baseName = domainLabel
+    .split("-")
+    .filter((word) => word.length > 0)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ") || "Organization"
+
+  // Make name unique by appending email prefix (e.g., "Gmail (johndoe)")
+  const orgName = `${baseName} (${emailPrefix})`
+  const orgSlug = `${domainLabel.toLowerCase()}-${emailPrefix.toLowerCase()}`
+
+  return { orgName, orgSlug, baseName, domainLabel }
+}
+
+/**
  * Auth callback handles Stytch redirects after magic link clicks and OAuth.
  */
 export default function AuthCallback() {
@@ -150,16 +187,7 @@ export default function AuthCallback() {
               })
           } else if (orgs.length === 0) {
             // Auto-create organization for new users
-            const email = response.email_address
-            const emailPrefix = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").slice(0, 8)
-            const domain = email.split("@")[1].split(".")[0]
-            const baseName = domain
-              .split("-")
-              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(" ")
-            // Make name unique by appending email prefix (e.g., "Gmail (johndoe)")
-            const orgName = `${baseName} (${emailPrefix})`
-            const orgSlug = `${domain.toLowerCase()}-${emailPrefix.toLowerCase()}`
+            const { orgName, orgSlug, baseName, domainLabel } = deriveOrgFromEmail(response.email_address)
 
             // Call our backend API to create org and sync to database
             return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
@@ -208,7 +236,7 @@ export default function AuthCallback() {
                 ) {
                   const timestamp = Date.now()
                   const retryName = `${baseName} (${String(timestamp).slice(-6)})`
-                  const retrySlug = `${domain.toLowerCase()}-${String(timestamp)}`
+                  const retrySlug = `${domainLabel.toLowerCase()}-${String(timestamp)}`
                   return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -292,16 +320,7 @@ export default function AuthCallback() {
               })
           } else if (orgs.length === 0) {
             // Auto-create organization for new users
-            const email = response.email_address
-            const emailPrefix = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").slice(0, 8)
-            const domain = email.split("@")[1].split(".")[0]
-            const baseName = domain
-              .split("-")
-              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(" ")
-            // Make name unique by appending email prefix (e.g., "Gmail (johndoe)")
-            const orgName = `${baseName} (${emailPrefix})`
-            const orgSlug = `${domain.toLowerCase()}-${emailPrefix.toLowerCase()}`
+            const { orgName, orgSlug, baseName, domainLabel } = deriveOrgFromEmail(response.email_address)
 
             // Call our backend API to create org and sync to database
             return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
@@ -348,7 +367,7 @@ export default function AuthCallback() {
                 ) {
                   const timestamp = Date.now()
                   const retryName = `${baseName} (${String(timestamp).slice(-6)})`
-                  const retrySlug = `${domain.toLowerCase()}-${String(timestamp)}`
+                  const retrySlug = `${domainLabel.toLowerCase()}-${String(timestamp)}`
                   return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
