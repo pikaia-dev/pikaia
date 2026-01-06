@@ -248,10 +248,11 @@ export default function AuthCallback() {
 
           if (autoLoginOrg) {
             // Auto-login to single organization
-            return stytch.discovery.intermediateSessions.exchange({
+            void stytch.discovery.intermediateSessions.exchange({
               organization_id: autoLoginOrg.organization.organization_id,
               session_duration_minutes: SESSION_DURATION_MINUTES,
             })
+            return
           } else if (orgs.length === 0) {
             // Auto-create organization for new users
             const email = response.email_address
@@ -265,7 +266,7 @@ export default function AuthCallback() {
             console.log("🏢 Auto-creating organization (OAuth):", { email, orgName, orgSlug })
 
             // Call our backend API to create org and sync to database
-            return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
+            void fetch(`${config.apiUrl}/auth/discovery/create-org`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               credentials: "include",
