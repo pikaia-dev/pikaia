@@ -212,7 +212,7 @@ export default function AuthCallback() {
                     "⚠️ Org conflict, retrying with timestamp:",
                     { retryName, retrySlug }
                   )
-                  void fetch(`${config.apiUrl}/auth/discovery/create-org`, {
+                  return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     credentials: "include",
@@ -302,7 +302,7 @@ export default function AuthCallback() {
             console.log("🏢 Auto-creating organization (OAuth):", { email, orgName, orgSlug })
 
             // Call our backend API to create org and sync to database
-            void fetch(`${config.apiUrl}/auth/discovery/create-org`, {
+            return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               credentials: "include",
@@ -351,7 +351,7 @@ export default function AuthCallback() {
                     "⚠️ Org conflict, retrying with timestamp:",
                     { retryName, retrySlug }
                   )
-                  void fetch(`${config.apiUrl}/auth/discovery/create-org`, {
+                  return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     credentials: "include",
