@@ -158,8 +158,6 @@ export default function AuthCallback() {
             const orgName = `${baseName} (${emailPrefix})`
             const orgSlug = `${domain.toLowerCase()}-${emailPrefix.toLowerCase()}`
 
-            console.log("🏢 Auto-creating organization:", { email, orgName, orgSlug })
-
             // Call our backend API to create org and sync to database
             return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
               method: "POST",
@@ -208,10 +206,6 @@ export default function AuthCallback() {
                   const timestamp = Date.now()
                   const retryName = `${baseName} (${String(timestamp).slice(-6)})`
                   const retrySlug = `${domain.toLowerCase()}-${String(timestamp)}`
-                  console.log(
-                    "⚠️ Org conflict, retrying with timestamp:",
-                    { retryName, retrySlug }
-                  )
                   return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -299,8 +293,6 @@ export default function AuthCallback() {
             const orgName = `${baseName} (${emailPrefix})`
             const orgSlug = `${domain.toLowerCase()}-${emailPrefix.toLowerCase()}`
 
-            console.log("🏢 Auto-creating organization (OAuth):", { email, orgName, orgSlug })
-
             // Call our backend API to create org and sync to database
             return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
               method: "POST",
@@ -347,10 +339,6 @@ export default function AuthCallback() {
                   const timestamp = Date.now()
                   const retryName = `${baseName} (${String(timestamp).slice(-6)})`
                   const retrySlug = `${domain.toLowerCase()}-${String(timestamp)}`
-                  console.log(
-                    "⚠️ Org conflict, retrying with timestamp:",
-                    { retryName, retrySlug }
-                  )
                   return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
