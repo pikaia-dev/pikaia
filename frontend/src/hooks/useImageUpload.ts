@@ -1,6 +1,8 @@
 import { useStytchB2BClient } from "@stytch/react/b2b"
+import { useQueryClient } from "@tanstack/react-query"
 import { useCallback,useState } from "react"
 
+import { queryKeys } from "../features/shared/query-keys"
 import type { ImageResponse,UploadRequest } from "../lib/api"
 import { useApi } from "./useApi"
 
@@ -14,6 +16,7 @@ export function useImageUpload(
   options: UseImageUploadOptions = {}
 ) {
   const stytch = useStytchB2BClient()
+  const queryClient = useQueryClient()
   const { requestUpload, confirmUpload } = useApi()
   const [isUploading, setIsUploading] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -89,6 +92,12 @@ export function useImageUpload(
         })
 
         setProgress(100)
+
+        // Invalidate user cache when avatar is updated so sidebar refreshes
+        if (imageType === "avatar") {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.auth.me() })
+        }
+
         options.onSuccess?.(result)
         return result
       } catch (err) {
@@ -100,7 +109,7 @@ export function useImageUpload(
         setIsUploading(false)
       }
     },
-    [imageType, requestUpload, confirmUpload, options, stytch]
+    [imageType, requestUpload, confirmUpload, options, stytch, queryClient]
   )
 
   const reset = useCallback(() => {
