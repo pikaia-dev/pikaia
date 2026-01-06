@@ -1,6 +1,6 @@
 import { useStytchB2BClient, useStytchMemberSession } from "@stytch/react/b2b"
 import type { DiscoveredOrganization } from "@stytch/vanilla-js/b2b"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 
 import { config } from "@/lib/env"
@@ -101,7 +101,12 @@ export default function AuthCallback() {
     navigate("/login", { replace: true })
   }, [navigate])
 
+  // Prevent double-invocation in React Strict Mode
+  const processedTokenRef = useRef(false)
+
   useEffect(() => {
+    if (processedTokenRef.current) return
+
     const tokenType = searchParams.get("stytch_token_type")
     const token = searchParams.get("token")
 
@@ -111,6 +116,8 @@ export default function AuthCallback() {
       navigate("/login", { replace: true })
       return
     }
+
+    processedTokenRef.current = true
 
     const handleDiscoveryToken = () => {
       stytch.magicLinks.discovery
@@ -162,10 +169,17 @@ export default function AuthCallback() {
                 }
                 return res.json()
               })
-              .then((_data: { session_token: string; session_jwt: string }) => {
-                // Backend has set session cookies - full page reload to let Stytch SDK initialize
+              .then((data: { session_token: string; session_jwt: string }) => {
+                // Update Stytch SDK with new session
+                stytch.session.updateSession({
+                  session_token: data.session_token,
+                  session_jwt: data.session_jwt,
+                })
+                // Full page reload to let SDK initialize with new session
                 setError(null)
-                window.location.href = "/dashboard"
+                // Set session flag to prevent login flash before redirect
+                sessionStorage.setItem("stytch_just_logged_in", "true")
+                navigate("/dashboard", { replace: true })
               })
               .catch((createErr: unknown) => {
                 // If slug conflict, retry with timestamp
@@ -178,6 +192,7 @@ export default function AuthCallback() {
                   return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
+                    credentials: "include",
                     body: JSON.stringify({
                       intermediate_session_token: response.intermediate_session_token,
                       organization_name: orgName,
@@ -191,10 +206,15 @@ export default function AuthCallback() {
                       }
                       return res.json()
                     })
-                    .then(() => {
-                      // Backend has set session cookies - full page reload to let Stytch SDK initialize
+                    .then((data: { session_token: string; session_jwt: string }) => {
+                      stytch.session.updateSession({
+                        session_token: data.session_token,
+                        session_jwt: data.session_jwt,
+                      })
                       setError(null)
-                      window.location.href = "/dashboard"
+                      // Set session flag to prevent login flash before redirect
+                      sessionStorage.setItem("stytch_just_logged_in", "true")
+                      navigate("/dashboard", { replace: true })
                     })
                 }
                 console.error("❌ Failed to create organization:", createErr)
@@ -248,6 +268,7 @@ export default function AuthCallback() {
             return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
+              credentials: "include",
               body: JSON.stringify({
                 intermediate_session_token: response.intermediate_session_token,
                 organization_name: orgName,
@@ -262,8 +283,14 @@ export default function AuthCallback() {
                 return res.json()
               })
               .then((data: { session_token: string; session_jwt: string }) => {
-                stytch.session.updateSession({ session_token: data.session_token, session_jwt: data.session_jwt })
+                stytch.session.updateSession({
+                  session_token: data.session_token,
+                  session_jwt: data.session_jwt,
+                })
                 setError(null)
+                // Set session flag to prevent login flash before redirect
+                sessionStorage.setItem("stytch_just_logged_in", "true")
+                navigate("/dashboard", { replace: true })
               })
               .catch((createErr: unknown) => {
                 if (
@@ -275,6 +302,7 @@ export default function AuthCallback() {
                   return fetch(`${config.apiUrl}/auth/discovery/create-org`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
+                    credentials: "include",
                     body: JSON.stringify({
                       intermediate_session_token: response.intermediate_session_token,
                       organization_name: orgName,
@@ -289,8 +317,14 @@ export default function AuthCallback() {
                       return res.json()
                     })
                     .then((data: { session_token: string; session_jwt: string }) => {
-                      stytch.session.updateSession({ session_token: data.session_token, session_jwt: data.session_jwt })
+                      stytch.session.updateSession({
+                        session_token: data.session_token,
+                        session_jwt: data.session_jwt,
+                      })
                       setError(null)
+                      // Set session flag to prevent login flash before redirect
+                      sessionStorage.setItem("stytch_just_logged_in", "true")
+                      navigate("/dashboard", { replace: true })
                     })
                 }
                 console.error("❌ Failed to create organization:", createErr)
@@ -329,9 +363,7 @@ export default function AuthCallback() {
 
   // Redirect to dashboard when session is established
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isInitialized can be false
     if (isInitialized && session) {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- fire-and-forget navigation
       navigate("/dashboard", { replace: true })
     }
   }, [session, isInitialized, navigate])
