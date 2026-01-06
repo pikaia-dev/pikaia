@@ -142,4 +142,5 @@ class StytchAuthMiddleware:
         except Exception as e:
             # Catch any other exception (network errors, timeouts, etc.)
             logger.exception("Unexpected error during JWT authentication: %s", e)
-            logger.exception("Unexpected error during JWT authentication: %s", e)
+
+
