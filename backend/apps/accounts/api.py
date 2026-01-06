@@ -437,15 +437,21 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
     member = request.auth_member  # type: ignore[attr-defined]
     org = request.auth_organization  # type: ignore[attr-defined]
 
+    # Extract session JWT from auth header (required by Stytch B2B OTP)
+    auth_header = request.headers.get("Authorization", "")
+    session_jwt = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
+
     try:
         client = get_stytch_client()
 
-        # Verify the OTP with Stytch (no session_jwt - just validate the code,
-        # don't try to add phone factor to session which fails for immutable sessions)
+        # Verify the OTP with Stytch
+        # Note: Stytch B2B OTP requires a session field. For sessions created via
+        # trusted auth (passkeys), this will fail with "immutable session" error.
         client.otps.sms.authenticate(
             organization_id=org.stytch_org_id,
             member_id=member.stytch_member_id,
             code=payload.otp_code,
+            session_jwt=session_jwt,
         )
 
         # OTP verified - now update the phone number
@@ -494,6 +500,14 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
         error_msg = e.details.error_message or "Verification failed"
         if "invalid" in error_msg.lower() or "expired" in error_msg.lower():
             raise HttpError(400, "Invalid or expired verification code") from None
+        if "immutable" in error_msg.lower():
+            # Sessions created via passkey (trusted auth) are immutable and can't
+            # have MFA factors added. User needs to re-authenticate via magic link.
+            raise HttpError(
+                400,
+                "Phone verification is not available for passkey sessions. "
+                "Please log out and sign in with email to update your phone number.",
+            ) from None
         logger.warning("Phone OTP verification failed: %s", error_msg)
         raise HttpError(400, error_msg) from None
 
