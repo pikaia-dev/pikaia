@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-globs: *.py
+globs: "*.py"
 ---
 
 # Backend Rules
