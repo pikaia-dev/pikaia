@@ -144,7 +144,7 @@ class StytchAuthMiddleware:
             )
 
             # Extract member_id from JWT claims
-            stytch_member_id = local_response.member.member_id
+            stytch_member_id = local_response.member_session.member_id
 
             # Step 2: Look up member from local DB
             member = (
