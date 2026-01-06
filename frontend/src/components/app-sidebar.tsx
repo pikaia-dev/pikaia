@@ -9,10 +9,9 @@ import {
   User,
   Users,
 } from "lucide-react"
-import { useEffect, useState } from "react"
 import { NavLink, useNavigate } from "react-router-dom"
 
-import { useApi } from "../hooks/useApi"
+import { useCurrentUser } from "../features/auth/queries"
 import { STYTCH_ROLES } from "../lib/constants"
 import {
   DropdownMenu,
@@ -47,15 +46,10 @@ export function AppSidebar() {
   const stytch = useStytchB2BClient()
   const { member } = useStytchMember()
   const navigate = useNavigate()
-  const { getCurrentUser } = useApi()
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const { data: userData } = useCurrentUser()
 
-  // Fetch avatar from backend
-  useEffect(() => {
-    void getCurrentUser()
-      .then((data) => { setAvatarUrl(data.user.avatar_url || null); })
-      .catch(() => { setAvatarUrl(null); })
-  }, [getCurrentUser])
+  // Get avatar from React Query cache (auto-updates when cache changes)
+  const avatarUrl = userData?.user.avatar_url || null
 
   // Check admin from Stytch roles
   const roles = member?.roles || []
