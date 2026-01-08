@@ -65,20 +65,22 @@ function PaymentFormInner({
     if (error) {
       toast.error(error.message || "Payment failed")
       setProcessing(false)
-    } else {
-      // Payment succeeded - now sync subscription status from Stripe
-      // This is needed because webhooks may not reach localhost in dev
-      try {
-        await confirmSubscription({ subscription_id: subscriptionId })
-        toast.success("Subscription activated!")
-        onSuccess()
-      } catch (syncError) {
-        // Payment succeeded but sync failed - user should refresh
-        console.error("Failed to sync subscription:", syncError)
-        toast.success("Payment successful! Refreshing...")
-        onSuccess()
-      }
+      return
     }
+
+    // Payment succeeded - now sync subscription status from Stripe
+    // This is needed because webhooks may not reach localhost in dev
+    try {
+      await confirmSubscription({ subscription_id: subscriptionId })
+      toast.success("Subscription activated!")
+    } catch (syncError) {
+      // Sync failed but payment already went through - user should refresh
+      console.error("Failed to sync subscription:", syncError)
+      toast.success("Payment successful! Refreshing...")
+    }
+
+    // Always proceed - payment succeeded regardless of sync outcome
+    onSuccess()
   }
 
   return (
