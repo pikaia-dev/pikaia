@@ -24,6 +24,7 @@ Coding standards for TypeScript/React frontend.
 - One API client module (generated from OpenAPI or typed wrapper); no scattered fetch calls
 - Server state: TanStack Query
 - Local state: Zustand only if needed; prefer colocation
+- Always adhere to the single responsibility principle
 
 ## UI & Forms
 
@@ -65,6 +66,7 @@ Coding standards for TypeScript/React frontend.
 - `components/` — reusable UI
 - `features/` — feature-scoped (components, hooks, queries)
 - `lib/` — API client, utilities
+
 ### Feature Directory Convention
 
 Each feature in `features/` follows this structure:
