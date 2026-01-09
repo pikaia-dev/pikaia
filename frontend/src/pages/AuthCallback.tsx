@@ -1,456 +1,77 @@
-import { useStytchB2BClient, useStytchMemberSession } from "@stytch/react/b2b"
-import type { DiscoveredOrganization } from "@stytch/vanilla-js/b2b"
-import { useCallback, useEffect, useRef, useState } from "react"
-import { useNavigate, useSearchParams } from "react-router-dom"
-
-import { config } from "@/lib/env"
+import { useStytchMemberSession } from "@stytch/react/b2b"
+import { useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 
 import { LoadingSpinner } from "../components/ui/loading-spinner"
 import { OrganizationSelector } from "../features/auth/components"
-
-// Session duration: 30 days
-const SESSION_DURATION_MINUTES = 30 * 24 * 60
-
-interface DirectLoginOptions {
-  status: boolean
-  ignoreInvites?: boolean
-  ignoreJitProvisioning?: boolean
-}
-
-const directLoginOptions: DirectLoginOptions = {
-  status: true,
-  ignoreInvites: true,
-  ignoreJitProvisioning: true,
-}
-
-/** API error response shape */
-interface ApiErrorResponse {
-  detail?: string
-}
-
-/**
- * Determines if user should auto-login to a single organization.
- */
-function getSingleLoginOrg(
-  organizations: DiscoveredOrganization[],
-  options: DirectLoginOptions
-): DiscoveredOrganization | null {
-  if (!options.status) return null
-
-  const activeMembers = organizations.filter(
-    (org) => org.membership.type === "active_member"
-  )
-
-  const hasPendingOrInvited = organizations.some((org) => {
-    const type = org.membership.type
-    if (
-      (type === "pending_member" || type === "invited_member") &&
-      !options.ignoreInvites
-    ) {
-      return true
-    }
-    if (
-      type === "eligible_to_join_by_email_domain" &&
-      !options.ignoreJitProvisioning
-    ) {
-      return true
-    }
-    return false
-  })
-
-  if (activeMembers.length === 1 && !hasPendingOrInvited) {
-    return activeMembers[0]
-  }
-
-  return null
-}
-
-/** Response from create-org API */
-interface CreateOrgResponse {
-  session_token: string
-  session_jwt: string
-}
-
-/**
- * Creates an organization via the backend API and handles session setup.
- * Retries with a timestamped name/slug if the initial attempt fails due to conflict.
- */
-async function createOrganizationWithRetry(
-  stytch: ReturnType<typeof useStytchB2BClient>,
-  intermediateSessionToken: string,
-  orgName: string,
-  orgSlug: string,
-  baseName: string,
-  domainLabel: string
-): Promise<void> {
-  const makeRequest = async (name: string, slug: string): Promise<CreateOrgResponse> => {
-    const res = await fetch(`${config.apiUrl}/auth/discovery/create-org`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        intermediate_session_token: intermediateSessionToken,
-        organization_name: name,
-        organization_slug: slug,
-      }),
-    })
-
-    if (!res.ok) {
-      const errorBody = (await res.json().catch(() => ({
-        detail: "Failed to create organization",
-      }))) as ApiErrorResponse
-      throw new Error(errorBody.detail ?? "Failed to create organization")
-    }
-
-    return res.json() as Promise<CreateOrgResponse>
-  }
-
-  const handleSuccess = (data: CreateOrgResponse): void => {
-    stytch.session.updateSession({
-      session_token: data.session_token,
-      session_jwt: data.session_jwt,
-    })
-    sessionStorage.setItem("stytch_just_logged_in", "true")
-    window.location.href = "/dashboard"
-  }
-
-  try {
-    const data = await makeRequest(orgName, orgSlug)
-    handleSuccess(data)
-  } catch (createErr: unknown) {
-    // If name/slug conflict, retry with timestamp + random suffix for uniqueness
-    if (
-      createErr instanceof Error &&
-      (createErr.message.includes("slug") ||
-        createErr.message.includes("name") ||
-        createErr.message.includes("use"))
-    ) {
-      const timestamp = Date.now()
-      const timestampSuffix = String(timestamp).slice(-6)
-      const randomSuffix = Math.random().toString(36).slice(2, 8)
-      const retryName = `${baseName} (${timestampSuffix})`
-      const retrySlug = `${domainLabel.toLowerCase()}-${String(timestamp)}-${randomSuffix}`
-
-      const data = await makeRequest(retryName, retrySlug)
-      handleSuccess(data)
-    } else {
-      console.error("❌ Failed to create organization:", createErr)
-      throw createErr
-    }
-  }
-}
-
-/**
- * Derives organization name and slug from an email address.
- * Handles edge cases where email format might be unexpected.
- * Returns all components needed for org creation and retry logic.
- */
-function deriveOrgFromEmail(email: string): {
-  orgName: string
-  orgSlug: string
-  baseName: string
-  domainLabel: string
-} {
-  // Safely split email, handling missing @ or domain
-  const atIndex = email.indexOf("@")
-  const localPart = atIndex > 0 ? email.slice(0, atIndex) : email
-  const domainPart = atIndex > 0 ? email.slice(atIndex + 1) : ""
-
-  // Extract prefix from local part (max 8 alphanumeric chars)
-  const emailPrefix = localPart.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8) || "user"
-
-  // Extract domain label (part before first dot)
-  const dotIndex = domainPart.indexOf(".")
-  const domainLabel = dotIndex > 0 ? domainPart.slice(0, dotIndex) : (domainPart || "org")
-
-  // Create readable name from domain (e.g., "my-company" -> "My Company")
-  const baseName = domainLabel
-    .split("-")
-    .filter((word) => word.length > 0)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ") || "Organization"
-
-  // Make name unique by appending email prefix (e.g., "Gmail (johndoe)")
-  const orgName = `${baseName} (${emailPrefix})`
-  const orgSlug = `${domainLabel.toLowerCase()}-${emailPrefix.toLowerCase()}`
-
-  return { orgName, orgSlug, baseName, domainLabel }
-}
+import { useAuthCallback } from "../features/auth/hooks"
 
 /**
  * Auth callback handles Stytch redirects after magic link clicks and OAuth.
+ * Uses useAuthCallback hook for all auth flow logic.
  */
 export default function AuthCallback() {
-  const stytch = useStytchB2BClient()
-  const { session, isInitialized } = useStytchMemberSession()
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+    const { session, isInitialized } = useStytchMemberSession()
+    const navigate = useNavigate()
 
-  const [discoveredOrgs, setDiscoveredOrgs] = useState<
-    DiscoveredOrganization[]
-  >([])
-  const [email, setEmail] = useState("")
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [showOrgSelector, setShowOrgSelector] = useState(false)
+    const { state, exchangeSession, goToLogin } = useAuthCallback({
+        onRedirectToLogin: () => {
+            void navigate("/login", { replace: true })
+        },
+    })
 
-  const exchangeSession = useCallback(
-    (organizationId: string) => {
-      setIsLoading(true)
-      setError(null)
-      stytch.discovery.intermediateSessions
-        .exchange({
-          organization_id: organizationId,
-          session_duration_minutes: SESSION_DURATION_MINUTES,
-        })
-        .catch((err: unknown) => {
-          const message =
-            err instanceof Error ? err.message : "Failed to join organization"
-          setError(message)
-          setIsLoading(false)
-        })
-      // Session is set, navigation handled by session effect
-    },
-    [stytch]
-  )
+    // Redirect to dashboard when session is established
+    useEffect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isInitialized can be false during SDK init
+        if (isInitialized && session) {
+            window.location.href = "/dashboard"
+        }
+    }, [session, isInitialized])
 
-  const goToLogin = useCallback(() => {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises -- fire-and-forget navigation
-    navigate("/login", { replace: true })
-  }, [navigate])
-
-  // Prevent double-invocation in React Strict Mode
-  const processedTokenRef = useRef(false)
-
-  useEffect(() => {
-    if (processedTokenRef.current) return
-
-    const tokenType = searchParams.get("stytch_token_type")
-    const token = searchParams.get("token")
-
-    // If no token, redirect to login
-    if (!token) {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- fire-and-forget navigation
-      navigate("/login", { replace: true })
-      return
+    // Show org selector for multi-org users
+    if (state.showOrgSelector) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <div className="w-full max-w-sm p-8">
+                    <OrganizationSelector
+                        organizations={state.discoveredOrgs}
+                        onSelect={exchangeSession}
+                        onBack={goToLogin}
+                        isLoading={state.isLoading}
+                        error={state.error}
+                        email={state.email}
+                    />
+                </div>
+            </div>
+        )
     }
 
-    processedTokenRef.current = true
-
-    const handleDiscoveryToken = () => {
-      stytch.magicLinks.discovery
-        .authenticate({
-          discovery_magic_links_token: token,
-        })
-        .then((response) => {
-          const orgs = response.discovered_organizations
-          const autoLoginOrg = getSingleLoginOrg(orgs, directLoginOptions)
-
-          if (autoLoginOrg) {
-            // Auto-login to single organization
-            // Set session flag BEFORE exchange to prevent login flash
-            sessionStorage.setItem("stytch_just_logged_in", "true")
-            return stytch.discovery.intermediateSessions
-              .exchange({
-                organization_id: autoLoginOrg.organization.organization_id,
-                session_duration_minutes: SESSION_DURATION_MINUTES,
-              })
-              .then(() => {
-                // Success - full page reload to let Stytch SDK reinitialize with session
-                setError(null)
-                window.location.href = "/dashboard"
-              })
-          } else if (orgs.length === 0) {
-            // Auto-create organization for new users
-            const { orgName, orgSlug, baseName, domainLabel } = deriveOrgFromEmail(response.email_address)
-            setError(null)
-            return createOrganizationWithRetry(
-              stytch,
-              response.intermediate_session_token,
-              orgName,
-              orgSlug,
-              baseName,
-              domainLabel
-            )
-          } else {
-            // Multiple organizations - show selector
-            setEmail(response.email_address)
-            setDiscoveredOrgs(orgs)
-            setShowOrgSelector(true)
-            setIsLoading(false)
-            return undefined
-          }
-        })
-        .catch((err: unknown) => {
-          const message =
-            err instanceof Error ? err.message : "Authentication failed"
-          setError(message)
-          setIsLoading(false)
-        })
+    // Show error state
+    if (state.error) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <div className="text-center">
+                    <p className="text-destructive mb-4">{state.error}</p>
+                    <button
+                        onClick={goToLogin}
+                        className="text-sm text-muted-foreground hover:text-foreground"
+                    >
+                        Back to login
+                    </button>
+                </div>
+            </div>
+        )
     }
 
-    const handleOAuthToken = () => {
-      stytch.oauth.discovery
-        .authenticate({
-          discovery_oauth_token: token,
-        })
-        .then((response) => {
-          const orgs = response.discovered_organizations
-          const autoLoginOrg = getSingleLoginOrg(orgs, directLoginOptions)
-
-          if (autoLoginOrg) {
-            // Auto-login to single organization
-            // Set session flag BEFORE exchange to prevent login flash
-            sessionStorage.setItem("stytch_just_logged_in", "true")
-            return stytch.discovery.intermediateSessions
-              .exchange({
-                organization_id: autoLoginOrg.organization.organization_id,
-                session_duration_minutes: SESSION_DURATION_MINUTES,
-              })
-              .then(() => {
-                // Success - full page reload to let Stytch SDK reinitialize with session
-                setError(null)
-                window.location.href = "/dashboard"
-              })
-          } else if (orgs.length === 0) {
-            // Auto-create organization for new users
-            const { orgName, orgSlug, baseName, domainLabel } = deriveOrgFromEmail(response.email_address)
-            setError(null)
-            return createOrganizationWithRetry(
-              stytch,
-              response.intermediate_session_token,
-              orgName,
-              orgSlug,
-              baseName,
-              domainLabel
-            )
-          } else {
-            // Multiple organizations - show selector
-            setEmail(response.email_address)
-            setDiscoveredOrgs(orgs)
-            setShowOrgSelector(true)
-            setIsLoading(false)
-            return undefined
-          }
-        })
-        .catch((err: unknown) => {
-          const message =
-            err instanceof Error ? err.message : "Authentication failed"
-          setError(message)
-          setIsLoading(false)
-        })
-    }
-
-    // Handle org-scoped magic links (invites)
-    // These create a session directly - no intermediate session or org selection needed
-    const handleInviteToken = () => {
-      stytch.magicLinks
-        .authenticate({
-          magic_links_token: token,
-          session_duration_minutes: SESSION_DURATION_MINUTES,
-        })
-        .then(() => {
-          // Session created directly - redirect to dashboard
-          sessionStorage.setItem("stytch_just_logged_in", "true")
-          setError(null)
-          window.location.href = "/dashboard"
-        })
-        .catch((err: unknown) => {
-          const message =
-            err instanceof Error ? err.message : "Failed to accept invitation"
-          setError(message)
-          setIsLoading(false)
-        })
-    }
-
-    // Handle impersonation tokens from Stytch dashboard
-    // Creates an impersonated session for admin support/debugging
-    const handleImpersonationToken = () => {
-      stytch.impersonation
-        .authenticate({
-          impersonation_token: token,
-        })
-        .then(() => {
-          // Impersonated session created - redirect to dashboard
-          sessionStorage.setItem("stytch_just_logged_in", "true")
-          setError(null)
-          window.location.href = "/dashboard"
-        })
-        .catch((err: unknown) => {
-          const message =
-            err instanceof Error ? err.message : "Failed to start impersonation"
-          setError(message)
-          setIsLoading(false)
-        })
-    }
-
-    if (tokenType === "discovery") {
-      handleDiscoveryToken()
-    } else if (tokenType === "multi_tenant_magic_links") {
-      // Org-scoped magic links (invites) - authenticate directly
-      handleInviteToken()
-    } else if (tokenType === "discovery_oauth") {
-      handleOAuthToken()
-    } else if (tokenType === "impersonation") {
-      // Impersonation from Stytch dashboard
-      handleImpersonationToken()
-    } else {
-      // Unknown token type, redirect to login
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- fire-and-forget navigation
-      navigate("/login", { replace: true })
-    }
-  }, [searchParams, stytch, navigate])
-
-  // Redirect to dashboard when session is established
-  useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isInitialized can be false during SDK init
-    if (isInitialized && session) {
-      window.location.href = "/dashboard"
-    }
-  }, [session, isInitialized, navigate])
-
-  // Show org selector for multi-org users
-  if (showOrgSelector) {
+    // Loading state
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-full max-w-sm p-8">
-          <OrganizationSelector
-            organizations={discoveredOrgs}
-            onSelect={exchangeSession}
-            onBack={goToLogin}
-            isLoading={isLoading}
-            error={error}
-            email={email}
-          />
+        <div className="min-h-screen flex items-center justify-center bg-background">
+            <div className="text-center">
+                <LoadingSpinner className="mx-auto" />
+                <p className="mt-4 text-sm text-muted-foreground">
+                    Signing you in...
+                </p>
+            </div>
         </div>
-      </div>
     )
-  }
-
-  // Show error state
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-destructive mb-4">{error}</p>
-          <button
-            onClick={goToLogin}
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Back to login
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // Loading state
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <LoadingSpinner className="mx-auto" />
-        <p className="mt-4 text-sm text-muted-foreground">Signing you in...</p>
-      </div>
-    </div>
-  )
 }
