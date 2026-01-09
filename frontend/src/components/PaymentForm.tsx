@@ -15,6 +15,7 @@ import type { StripeElementsOptions } from "@stripe/stripe-js"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
+import { useApi } from "../hooks/useApi"
 import { getStripe } from "../lib/stripe"
 import { Button } from "./ui/button"
 import { LoadingSpinner } from "./ui/loading-spinner"
