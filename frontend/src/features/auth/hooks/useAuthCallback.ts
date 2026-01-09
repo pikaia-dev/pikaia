@@ -3,6 +3,8 @@ import type { DiscoveredOrganization } from "@stytch/vanilla-js/b2b"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 
+import { directLoginOptions, SESSION_DURATION_MINUTES } from "../constants"
+import { getErrorMessage } from "../utils"
 import {
     createOrganization,
     isConflictError,
@@ -13,15 +15,6 @@ import {
     generateRetryOrgInfo,
     getSingleLoginOrg,
 } from "../utils/org-derivation"
-
-// Session duration: 30 days
-const SESSION_DURATION_MINUTES = 30 * 24 * 60
-
-const directLoginOptions = {
-    status: true,
-    ignoreInvites: true,
-    ignoreJitProvisioning: true,
-} as const
 
 export type TokenType =
     | "discovery"
@@ -98,11 +91,7 @@ export function useAuthCallback(
                     session_duration_minutes: SESSION_DURATION_MINUTES,
                 })
                 .catch((err: unknown) => {
-                    const message =
-                        err instanceof Error
-                            ? err.message
-                            : "Failed to join organization"
-                    setError(message)
+                    setError(getErrorMessage(err, "Failed to join organization"))
                 })
         },
         [stytch, setError]
@@ -285,9 +274,7 @@ export function useAuthCallback(
         }
 
         processToken().catch((err: unknown) => {
-            const message =
-                err instanceof Error ? err.message : "Authentication failed"
-            setError(message)
+            setError(getErrorMessage(err, "Authentication failed"))
         })
     }, [
         searchParams,
