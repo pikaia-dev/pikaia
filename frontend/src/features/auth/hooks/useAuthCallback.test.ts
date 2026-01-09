@@ -58,17 +58,30 @@ vi.mock("@/lib/env", () => ({
 
 // Helper to create mock discovered organizations
 function createMockOrg(id: string, membershipType: string) {
+    const baseMember = {
+        member_id: `member-${id}`,
+        organization_id: id,
+        name: "Test User",
+        email_address: "user@example.com",
+        status: "active" as const,
+        trusted_metadata: {},
+        untrusted_metadata: {},
+    }
+
+    // For active/pending/invited members, provide a member object
+    // For eligible_to_join_by_email_domain, provide domain details
+    const membership =
+        membershipType === "eligible_to_join_by_email_domain"
+            ? { type: membershipType, details: { domain: "example.com" }, member: null }
+            : { type: membershipType, details: null, member: baseMember }
+
     return {
         organization: {
             organization_id: id,
             organization_name: `Org ${id}`,
             organization_slug: `org-${id}`,
         },
-        membership: {
-            type: membershipType,
-            details: null,
-            member: null,
-        },
+        membership,
         member_authenticated: false,
     }
 }
