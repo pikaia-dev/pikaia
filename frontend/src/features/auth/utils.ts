@@ -1,4 +1,12 @@
 /**
+ * Extracts error message from unknown error type.
+ * Useful for catch blocks where error type is unknown.
+ */
+export function getErrorMessage(err: unknown, fallback: string): string {
+    return err instanceof Error ? err.message : fallback
+}
+
+/**
  * Generate a passkey name based on the user's browser and device.
  */
 export function generatePasskeyName(): string {
