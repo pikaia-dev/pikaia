@@ -8,45 +8,22 @@ import {
 } from "./org-derivation"
 
 // Helper to create mock discovered organizations
+// Uses type assertion since Stytch types are complex with many required fields
 function createMockOrg(
     id: string,
-    membershipType:
-        | "active_member"
-        | "pending_member"
-        | "invited_member"
-        | "eligible_to_join_by_email_domain"
+    membershipType: string
 ): DiscoveredOrganization {
     return {
         organization: {
             organization_id: id,
             organization_name: `Org ${id}`,
             organization_slug: `org-${id}`,
-            organization_logo_url: null,
-            trusted_metadata: {},
-            sso_default_connection_id: null,
-            sso_jit_provisioning: "NOT_ALLOWED",
-            sso_jit_provisioning_allowed_connections: [],
-            sso_active_connections: [],
-            scim_active_connection: null,
-            email_allowed_domains: [],
-            email_jit_provisioning: "NOT_ALLOWED",
-            email_invites: "ALL_ALLOWED",
-            auth_methods: "ALL_ALLOWED",
-            allowed_auth_methods: [],
-            mfa_policy: "OPTIONAL",
-            rbac_email_implicit_role_assignments: [],
-            mfa_methods: "ALL_ALLOWED",
-            allowed_mfa_methods: [],
         },
         membership: {
             type: membershipType,
-            details: null,
-            member: null,
         },
         member_authenticated: false,
-        primary_required: null,
-        mfa_required: null,
-    }
+    } as DiscoveredOrganization
 }
 
 describe("getSingleLoginOrg", () => {

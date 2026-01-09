@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom"
 
 import { LoadingSpinner } from "../components/ui/loading-spinner"
 import { OrganizationSelector } from "../features/auth/components"
-import { useAuthCallback } from "../features/auth/hooks"
+import { useAuthCallback } from "../features/auth/hooks/useAuthCallback"
 
 /**
  * Auth callback handles Stytch redirects after magic link clicks and OAuth.
