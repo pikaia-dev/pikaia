@@ -15,14 +15,13 @@ import type { StripeElementsOptions } from "@stripe/stripe-js"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
-import { useApi } from "../hooks/useApi"
 import { getStripe } from "../lib/stripe"
 import { Button } from "./ui/button"
 import { LoadingSpinner } from "./ui/loading-spinner"
 
 interface PaymentFormProps {
   quantity: number
-  onSuccess: () => void
+  onSuccess: (subscriptionId: string) => void
   onCancel: () => void
 }
 
@@ -36,12 +35,11 @@ function PaymentFormInner({
   onCancel,
 }: {
   subscriptionId: string
-  onSuccess: () => void
+  onSuccess: (subscriptionId: string) => void
   onCancel: () => void
 }) {
   const stripe = useStripe()
   const elements = useElements()
-  const { confirmSubscription } = useApi()
   const [processing, setProcessing] = useState(false)
   const [ready, setReady] = useState(false)
 
@@ -68,19 +66,8 @@ function PaymentFormInner({
       return
     }
 
-    // Payment succeeded - now sync subscription status from Stripe
-    // This is needed because webhooks may not reach localhost in dev
-    try {
-      await confirmSubscription({ subscription_id: subscriptionId })
-      toast.success("Subscription activated!")
-    } catch (syncError) {
-      // Sync failed but payment already went through - user should refresh
-      console.error("Failed to sync subscription:", syncError)
-      toast.success("Payment successful! Refreshing...")
-    }
-
-    // Always proceed - payment succeeded regardless of sync outcome
-    onSuccess()
+    // Payment succeeded - let caller handle subscription sync
+    onSuccess(subscriptionId)
   }
 
   return (
