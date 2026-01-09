@@ -6,6 +6,7 @@ import {
   Home,
   LogOut,
   Settings,
+  Shield,
   User,
   Users,
 } from "lucide-react"
@@ -40,6 +41,7 @@ const organizationNavItems = [
   { to: "/settings/organization", label: "General", icon: Building2 },
   { to: "/settings/members", label: "Members", icon: Users },
   { to: "/settings/billing", label: "Billing", icon: CreditCard },
+  { to: "/settings/security", label: "Security", icon: Shield },
 ]
 
 export function AppSidebar() {

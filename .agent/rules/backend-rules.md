@@ -21,6 +21,11 @@ Coding standards for Python/Django backend. Scoped to `*.py` files.
 - Never use `pip`, `python`, or `pip install` directly
 - Virtual environment is managed by uv at `backend/.venv`
 
+## AWS / Infrastructure
+
+- Always use `--profile tango-b2b-demo` for AWS CLI commands
+- Examples: `aws --profile tango-b2b-demo ecs list-clusters`, `aws --profile tango-b2b-demo logs tail ...`
+
 ## Django
 
 - Apps live in `apps/` directory

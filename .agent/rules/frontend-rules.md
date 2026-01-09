@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-globs: "*.ts, *.tsx"
+globs: "*.ts,*.tsx"
 ---
 
 # Frontend Rules

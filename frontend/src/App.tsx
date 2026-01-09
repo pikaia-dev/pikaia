@@ -18,6 +18,7 @@ const OrganizationSettings = lazy(
 )
 const MembersSettings = lazy(() => import("./pages/settings/MembersSettings"))
 const BillingSettings = lazy(() => import("./pages/settings/BillingSettings"))
+const SecuritySettings = lazy(() => import("./pages/settings/SecuritySettings"))
 
 // Basic ProtectedRoute component
 // Enhanced to prevent "flash of login" by handling undefined session state
@@ -122,6 +123,14 @@ function App() {
           element={
             <Suspense fallback={<SettingsSkeleton />}>
               <BillingSettings />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/settings/security"
+          element={
+            <Suspense fallback={<SettingsSkeleton />}>
+              <SecuritySettings />
             </Suspense>
           }
         />
