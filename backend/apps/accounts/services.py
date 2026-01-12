@@ -561,3 +561,169 @@ def bulk_invite_members(
         "succeeded": succeeded,
         "failed": failed,
     }
+
+
+# --- Mobile Provisioning Services ---
+
+
+def provision_mobile_user(
+    email: str,
+    name: str = "",
+    phone_number: str = "",
+    organization_id: str | None = None,
+    organization_name: str | None = None,
+    organization_slug: str | None = None,
+) -> tuple[User, Member, Organization, str, str]:
+    """
+    Provision a mobile user and create a Stytch session via Trusted Auth.
+
+    Either joins an existing org (organization_id) or creates a new one
+    (organization_name + organization_slug).
+
+    Args:
+        email: User's email address
+        name: User's display name (optional)
+        phone_number: User's phone number in E.164 format (optional, stored unverified)
+        organization_id: Stytch org ID to join existing org
+        organization_name: Name for new organization (requires organization_slug)
+        organization_slug: Slug for new organization (requires organization_name)
+
+    Returns:
+        Tuple of (user, member, org, session_token, session_jwt)
+
+    Raises:
+        ValueError: If input validation fails
+        StytchError: If Stytch API call fails
+    """
+    from django.conf import settings as django_settings
+
+    from apps.accounts.stytch_client import get_stytch_client
+    from apps.passkeys.trusted_auth import create_trusted_auth_token
+
+    # Input validation
+    email = email.strip().lower()
+    creating_org = organization_name is not None or organization_slug is not None
+    joining_org = organization_id is not None
+
+    if creating_org and joining_org:
+        raise ValueError("Cannot specify both organization_id and organization_name/slug")
+
+    if not creating_org and not joining_org:
+        raise ValueError("Must specify either organization_id or organization_name and organization_slug")
+
+    if creating_org and (not organization_name or not organization_slug):
+        raise ValueError("Both organization_name and organization_slug are required to create an organization")
+
+    stytch = get_stytch_client()
+    stytch_org_id: str
+    stytch_member_id: str
+    stytch_member: Any  # Stytch Member object
+    stytch_organization: Any  # Stytch Organization object
+
+    if creating_org:
+        # Create new organization
+        org_response = stytch.organizations.create(
+            organization_name=organization_name,
+            organization_slug=organization_slug,
+        )
+        stytch_org_id = org_response.organization.organization_id
+        stytch_organization = org_response.organization
+
+        # Create member in the new org
+        member_response = stytch.organizations.members.create(
+            organization_id=stytch_org_id,
+            email_address=email,
+            name=name if name else None,
+        )
+        stytch_member_id = member_response.member.member_id
+        stytch_member = member_response.member
+
+        # Make the creator an admin
+        stytch.organizations.members.update(
+            organization_id=stytch_org_id,
+            member_id=stytch_member_id,
+            roles=[StytchRoles.ADMIN],
+        )
+    else:
+        # Join existing organization
+        stytch_org_id = organization_id  # type: ignore[assignment]
+
+        # Get org details
+        org_response = stytch.organizations.get(organization_id=stytch_org_id)
+        stytch_organization = org_response.organization
+
+        # Check if member already exists
+        search_result = stytch.organizations.members.search(
+            organization_ids=[stytch_org_id],
+            query={
+                "operator": "AND",
+                "operands": [{"filter_name": "member_emails", "filter_value": [email]}],
+            },
+        )
+
+        if search_result.members:
+            existing_member = search_result.members[0]
+            member_status = getattr(existing_member, "status", "active")
+
+            if member_status == "deleted":
+                # Reactivate deleted member
+                stytch.organizations.members.reactivate(
+                    organization_id=stytch_org_id,
+                    member_id=existing_member.member_id,
+                )
+
+            stytch_member_id = existing_member.member_id
+
+            # Update name if provided
+            if name:
+                stytch.organizations.members.update(
+                    organization_id=stytch_org_id,
+                    member_id=stytch_member_id,
+                    name=name,
+                )
+
+            # Fetch updated member
+            member_response = stytch.organizations.members.get(
+                organization_id=stytch_org_id,
+                member_id=stytch_member_id,
+            )
+            stytch_member = member_response.member
+        else:
+            # Create new member
+            member_response = stytch.organizations.members.create(
+                organization_id=stytch_org_id,
+                email_address=email,
+                name=name if name else None,
+            )
+            stytch_member_id = member_response.member.member_id
+            stytch_member = member_response.member
+
+    # Sync to local database
+    user, member, org = sync_session_to_local(
+        stytch_member=stytch_member,
+        stytch_organization=stytch_organization,
+    )
+
+    # Store phone number if provided (unverified)
+    if phone_number:
+        user.phone_number = phone_number
+        user.phone_verified_at = None
+        user.save(update_fields=["phone_number", "phone_verified_at", "updated_at"])
+
+    # Create trusted auth token for session attestation
+    trusted_token = create_trusted_auth_token(
+        email=user.email,
+        member_id=stytch_member_id,
+        organization_id=stytch_org_id,
+        user_id=user.id,
+    )
+
+    # Exchange for real Stytch session
+    attest_response = stytch.sessions.attest(
+        profile_id=django_settings.STYTCH_TRUSTED_AUTH_PROFILE_ID,
+        token=trusted_token,
+        organization_id=stytch_org_id,
+        session_duration_minutes=43200,  # 30 days
+    )
+
+    return user, member, org, attest_response.session_token, attest_response.session_jwt

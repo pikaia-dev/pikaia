@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     STYTCH_TRUSTED_AUTH_ISSUER: str = "passkey-auth"  # Must match dashboard config
     PASSKEY_JWT_PRIVATE_KEY: str = ""  # RSA private key (PEM format)
 
+    # Mobile provisioning
+    MOBILE_PROVISION_API_KEY: str = ""  # API key for mobile app user provisioning
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
@@ -92,6 +95,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",
     # Third-party
     "corsheaders",
     "storages",
@@ -103,6 +107,7 @@ INSTALLED_APPS = [
     "apps.billing",
     "apps.media",
     "apps.passkeys",
+    "apps.webhooks",
 ]
 
 MIDDLEWARE = [
@@ -270,3 +275,6 @@ STYTCH_TRUSTED_AUTH_PROFILE_ID = settings.STYTCH_TRUSTED_AUTH_PROFILE_ID
 STYTCH_TRUSTED_AUTH_AUDIENCE = settings.STYTCH_TRUSTED_AUTH_AUDIENCE
 STYTCH_TRUSTED_AUTH_ISSUER = settings.STYTCH_TRUSTED_AUTH_ISSUER
 PASSKEY_JWT_PRIVATE_KEY = settings.PASSKEY_JWT_PRIVATE_KEY
+
+# Mobile provisioning
+MOBILE_PROVISION_API_KEY = settings.MOBILE_PROVISION_API_KEY

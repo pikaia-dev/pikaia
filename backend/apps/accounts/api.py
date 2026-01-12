@@ -38,6 +38,7 @@ from apps.accounts.schemas import (
     MemberListResponse,
     MeResponse,
     MessageResponse,
+    MobileProvisionRequest,
     OrganizationDetailResponse,
     OrganizationInfo,
     PhoneOtpResponse,
@@ -55,6 +56,7 @@ from apps.accounts.services import (
     bulk_invite_members,
     invite_member,
     list_organization_members,
+    provision_mobile_user,
     soft_delete_member,
     sync_session_to_local,
     update_member_role,
@@ -246,6 +248,96 @@ def exchange_session(
         session_jwt=response.session_jwt,
         member_id=response.member.member_id,
         organization_id=response.organization.organization_id,
+    )
+
+
+# --- Mobile Provisioning ---
+
+
+@router.post(
+    "/mobile/provision",
+    response={200: SessionResponse, 400: ErrorResponse, 401: ErrorResponse, 409: ErrorResponse},
+    operation_id="provisionMobileUser",
+    summary="Provision mobile user (API key auth)",
+)
+def provision_mobile_user_endpoint(
+    request: HttpRequest,
+    payload: MobileProvisionRequest,
+) -> SessionResponse:
+    """
+    Provision a user for mobile app and return session tokens.
+
+    Requires X-Mobile-API-Key header with valid API key.
+    Creates user/member in Stytch and local DB, returns session credentials.
+
+    Either provide organization_id to join an existing org,
+    or organization_name + organization_slug to create a new one.
+    """
+    from django.conf import settings as django_settings
+
+    # Validate API key
+    api_key = request.headers.get("X-Mobile-API-Key")
+    expected_key = django_settings.MOBILE_PROVISION_API_KEY
+
+    if not expected_key:
+        logger.error("MOBILE_PROVISION_API_KEY not configured")
+        raise HttpError(401, "Mobile provisioning not configured")
+
+    if not api_key or api_key != expected_key:
+        raise HttpError(401, "Invalid or missing API key")
+
+    try:
+        user, member, org, session_token, session_jwt = provision_mobile_user(
+            email=payload.email,
+            name=payload.name,
+            phone_number=payload.phone_number,
+            organization_id=payload.organization_id,
+            organization_name=payload.organization_name,
+            organization_slug=payload.organization_slug,
+        )
+    except ValueError as e:
+        raise HttpError(400, str(e)) from None
+    except StytchError as e:
+        error_msg = e.details.error_message.lower() if e.details.error_message else ""
+        if "slug" in error_msg or "duplicate" in error_msg:
+            logger.warning("Organization slug conflict: %s", e.details.error_message)
+            raise HttpError(409, "Organization slug already in use. Try a different one.") from None
+        logger.warning("Mobile provisioning failed: %s", e.details.error_message)
+        raise HttpError(400, f"Provisioning failed: {e.details.error_message}") from None
+
+    # Emit appropriate event
+    if payload.organization_id:
+        # Joined existing org
+        publish_event(
+            event_type="member.joined",
+            aggregate=member,
+            data={
+                "email": user.email,
+                "organization_name": org.name,
+                "source": "mobile_provision",
+            },
+            actor=user,
+        )
+    else:
+        # Created new org
+        publish_event(
+            event_type="organization.created",
+            aggregate=org,
+            data={
+                "name": org.name,
+                "slug": org.slug,
+                "stytch_org_id": org.stytch_org_id,
+                "created_by_member_id": str(member.id),
+                "source": "mobile_provision",
+            },
+            actor=user,
+        )
+
+    return SessionResponse(
+        session_token=session_token,
+        session_jwt=session_jwt,
+        member_id=member.stytch_member_id,
+        organization_id=org.stytch_org_id,
     )
 
 
