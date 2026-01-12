@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     # Mobile provisioning
     MOBILE_PROVISION_API_KEY: str = ""  # API key for mobile app user provisioning
 
+    # AWS SMS (End User Messaging)
+    AWS_SMS_REGION: str = "us-east-1"  # AWS region for SMS service
+    AWS_SMS_ORIGINATION_IDENTITY: str = ""  # Phone number or sender ID
+    AWS_SMS_OTP_LENGTH: int = 4  # Length of OTP codes
+    AWS_SMS_OTP_EXPIRY_MINUTES: int = 30  # OTP expiration time
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
@@ -108,6 +114,7 @@ INSTALLED_APPS = [
     "apps.media",
     "apps.passkeys",
     "apps.webhooks",
+    "apps.sms",
 ]
 
 MIDDLEWARE = [
@@ -278,3 +285,9 @@ PASSKEY_JWT_PRIVATE_KEY = settings.PASSKEY_JWT_PRIVATE_KEY
 
 # Mobile provisioning
 MOBILE_PROVISION_API_KEY = settings.MOBILE_PROVISION_API_KEY
+
+# AWS SMS (End User Messaging)
+AWS_SMS_REGION = settings.AWS_SMS_REGION
+AWS_SMS_ORIGINATION_IDENTITY = settings.AWS_SMS_ORIGINATION_IDENTITY
+AWS_SMS_OTP_LENGTH = settings.AWS_SMS_OTP_LENGTH
+AWS_SMS_OTP_EXPIRY_MINUTES = settings.AWS_SMS_OTP_EXPIRY_MINUTES
