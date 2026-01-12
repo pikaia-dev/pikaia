@@ -10,6 +10,8 @@ Authentication is handled by [Stytch B2B](https://stytch.com/b2b) with native We
 - Role-based access control
 - SSO and SCIM ready
 
+> **Mobile Apps:** For mobile-specific auth (silent provisioning, phone OTP), see [Mobile Authentication](./mobile-authentication.md).
+
 ## Authentication Flow
 
 ```mermaid
