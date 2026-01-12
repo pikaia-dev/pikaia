@@ -78,6 +78,7 @@ class StytchAuthMiddleware:
         "/api/v1/auth/magic-link/authenticate",
         "/api/v1/auth/discovery/create-org",
         "/api/v1/auth/discovery/exchange",
+        "/api/v1/auth/mobile/provision",
         "/admin/",
     }
 

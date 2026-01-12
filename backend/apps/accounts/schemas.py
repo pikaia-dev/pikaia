@@ -115,6 +115,61 @@ class DiscoveryCreateOrgRequest(BaseModel):
         return validate_slug(slug)
 
 
+class MobileProvisionRequest(BaseModel):
+    """Request for mobile user provisioning (API key auth).
+
+    Either provide organization_id to join an existing org,
+    or organization_name + organization_slug to create a new one.
+    """
+
+    email: EmailStr = Field(
+        ...,
+        description="User's email address",
+        examples=["user@example.com"],
+    )
+    name: str = Field(
+        "",
+        max_length=255,
+        description="User's display name (optional)",
+        examples=["Jane Doe"],
+    )
+    phone_number: str = Field(
+        "",
+        max_length=20,
+        description="User's phone number in E.164 format (optional, stored unverified)",
+        examples=["+14155551234"],
+    )
+
+    # Either provide organization_id to join existing, or org name/slug to create new
+    organization_id: str | None = Field(
+        None,
+        description="Stytch org ID to join (mutually exclusive with org creation fields)",
+        examples=["organization-live-abc123"],
+    )
+    organization_name: str | None = Field(
+        None,
+        max_length=255,
+        description="Name for new organization (requires organization_slug)",
+        examples=["Acme Corp"],
+    )
+    organization_slug: str | None = Field(
+        None,
+        description="Slug for new organization (requires organization_name)",
+        examples=["acme-corp"],
+    )
+
+    @field_validator("organization_slug", mode="before")
+    @classmethod
+    def normalize_and_validate_slug_if_provided(cls, v: str | None) -> str | None:
+        """Normalize slug and validate against Stytch requirements if provided."""
+        if v is None:
+            return None
+        if not isinstance(v, str):
+            raise ValueError("Slug must be a string")
+        slug = normalize_slug(v)
+        return validate_slug(slug)
+
+
 # --- Response Schemas ---
 
 
