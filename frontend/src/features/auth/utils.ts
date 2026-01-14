@@ -10,23 +10,23 @@ export function getErrorMessage(err: unknown, fallback: string): string {
  * Generate a passkey name based on the user's browser and device.
  */
 export function generatePasskeyName(): string {
-    const ua = navigator.userAgent
+    const userAgent = navigator.userAgent
 
     // Detect browser
     let browser = "Browser"
-    if (ua.includes("Chrome") && !ua.includes("Edg")) browser = "Chrome"
-    else if (ua.includes("Safari") && !ua.includes("Chrome")) browser = "Safari"
-    else if (ua.includes("Firefox")) browser = "Firefox"
-    else if (ua.includes("Edg")) browser = "Edge"
+    if (userAgent.includes("Chrome") && !userAgent.includes("Edg")) browser = "Chrome"
+    else if (userAgent.includes("Safari") && !userAgent.includes("Chrome")) browser = "Safari"
+    else if (userAgent.includes("Firefox")) browser = "Firefox"
+    else if (userAgent.includes("Edg")) browser = "Edge"
 
     // Detect device type
-    let device = ""
-    if (ua.includes("iPhone")) device = "iPhone"
-    else if (ua.includes("iPad")) device = "iPad"
-    else if (ua.includes("Mac")) device = "Mac"
-    else if (ua.includes("Windows")) device = "Windows"
-    else if (ua.includes("Android")) device = "Android"
-    else if (ua.includes("Linux")) device = "Linux"
+    let deviceType = ""
+    if (userAgent.includes("iPhone")) deviceType = "iPhone"
+    else if (userAgent.includes("iPad")) deviceType = "iPad"
+    else if (userAgent.includes("Mac")) deviceType = "Mac"
+    else if (userAgent.includes("Windows")) deviceType = "Windows"
+    else if (userAgent.includes("Android")) deviceType = "Android"
+    else if (userAgent.includes("Linux")) deviceType = "Linux"
 
-    return device ? `${device} ${browser}` : browser
+    return deviceType ? `${deviceType} ${browser}` : browser
 }
