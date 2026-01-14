@@ -110,7 +110,7 @@ export function useDeleteWebhookEndpoint() {
     const { deleteWebhookEndpoint } = useApi()
     const queryClient = useQueryClient()
 
-    return useMutation<undefined, Error, string>({
+    return useMutation<void, Error, string>({
         mutationFn: deleteWebhookEndpoint,
         onSuccess: () => {
             void queryClient.invalidateQueries({
