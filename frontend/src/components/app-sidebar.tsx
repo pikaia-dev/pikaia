@@ -9,6 +9,7 @@ import {
   Shield,
   User,
   Users,
+  Webhook,
 } from "lucide-react"
 import { NavLink, useNavigate } from "react-router-dom"
 
@@ -42,6 +43,7 @@ const organizationNavItems = [
   { to: "/settings/members", label: "Members", icon: Users },
   { to: "/settings/billing", label: "Billing", icon: CreditCard },
   { to: "/settings/security", label: "Security", icon: Shield },
+  { to: "/settings/integrations", label: "Integrations", icon: Webhook },
 ]
 
 export function AppSidebar() {
