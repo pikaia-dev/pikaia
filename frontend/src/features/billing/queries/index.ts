@@ -84,11 +84,13 @@ export function useConfirmSubscription() {
             toast.success("Subscription activated!")
         },
         onError: () => {
-            // Sync failed but payment succeeded - still invalidate to let webhook catch up
+            // Sync failed but payment likely succeeded - still invalidate to let webhook catch up
             void queryClient.invalidateQueries({
                 queryKey: queryKeys.billing.subscription(),
             })
-            toast.success("Subscription activated!")
+            toast.error(
+                "Payment received, but we couldn't confirm your subscription yet. It should update shortly."
+            )
         },
     })
 }
