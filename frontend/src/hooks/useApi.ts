@@ -31,6 +31,14 @@ import {
   type UploadRequest,
   type UploadResponse,
   type UserInfo,
+  type WebhookDeliveryListResponse,
+  type WebhookEndpointCreateRequest,
+  type WebhookEndpointListResponse,
+  type WebhookEndpointUpdateRequest,
+  type WebhookEndpointWithSecret,
+  type WebhookEventListResponse,
+  type WebhookTestRequest,
+  type WebhookTestResponse,
 } from "../lib/api"
 
 /**
@@ -167,6 +175,41 @@ export function useApi() {
           return null
         }
       },
+
+      // Webhooks
+      listWebhookEvents: () =>
+        api.get<WebhookEventListResponse>("/webhooks/events"),
+
+      listWebhookEndpoints: () =>
+        api.get<WebhookEndpointListResponse>("/webhooks/endpoints"),
+
+      createWebhookEndpoint: (data: WebhookEndpointCreateRequest) =>
+        api.post<WebhookEndpointWithSecret>("/webhooks/endpoints", data),
+
+      updateWebhookEndpoint: (
+        endpointId: string,
+        data: WebhookEndpointUpdateRequest
+      ) =>
+        api.patch<WebhookEndpointListResponse["endpoints"][0]>(
+          `/webhooks/endpoints/${endpointId}`,
+          data
+        ),
+
+      deleteWebhookEndpoint: (endpointId: string) =>
+        api.delete<void>(`/webhooks/endpoints/${endpointId}`),
+
+      listWebhookDeliveries: (endpointId: string, limit?: number) => {
+        const query = limit ? `?limit=${String(limit)}` : ""
+        return api.get<WebhookDeliveryListResponse>(
+          `/webhooks/endpoints/${endpointId}/deliveries${query}`
+        )
+      },
+
+      testWebhookEndpoint: (endpointId: string, data: WebhookTestRequest) =>
+        api.post<WebhookTestResponse>(
+          `/webhooks/endpoints/${endpointId}/test`,
+          data
+        ),
     }),
     [api]
   )
