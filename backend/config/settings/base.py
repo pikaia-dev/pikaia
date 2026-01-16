@@ -44,13 +44,17 @@ class Settings(BaseSettings):
     # Events
     EVENT_BACKEND: str = "local"  # "local" or "eventbridge"
     EVENT_BUS_NAME: str = ""  # AWS EventBridge bus name (required for eventbridge backend)
+    AWS_EVENTS_ENDPOINT_URL: str = ""  # Custom endpoint for LocalStack
 
-    # S3 Media Storage (production)
+    # S3 Media Storage (production or LocalStack for local dev)
     USE_S3_STORAGE: bool = False
     AWS_STORAGE_BUCKET_NAME: str = ""
     AWS_S3_REGION_NAME: str = "us-east-1"
     AWS_S3_CUSTOM_DOMAIN: str = ""  # CloudFront domain for media CDN
     IMAGE_TRANSFORM_URL: str = ""  # URL for dynamic image transformation
+    AWS_S3_ENDPOINT_URL: str = ""  # Custom endpoint for LocalStack
+    AWS_ACCESS_KEY_ID: str = ""  # Explicit credentials (for LocalStack)
+    AWS_SECRET_ACCESS_KEY: str = ""  # Explicit credentials (for LocalStack)
 
     # WebAuthn / Passkeys
     WEBAUTHN_RP_ID: str = "localhost"
@@ -246,6 +250,9 @@ AWS_STORAGE_BUCKET_NAME = settings.AWS_STORAGE_BUCKET_NAME
 AWS_S3_REGION_NAME = settings.AWS_S3_REGION_NAME
 AWS_S3_CUSTOM_DOMAIN = settings.AWS_S3_CUSTOM_DOMAIN or None
 IMAGE_TRANSFORM_URL = settings.IMAGE_TRANSFORM_URL or None
+AWS_S3_ENDPOINT_URL = settings.AWS_S3_ENDPOINT_URL or None  # For LocalStack
+AWS_ACCESS_KEY_ID = settings.AWS_ACCESS_KEY_ID or None  # Explicit credentials
+AWS_SECRET_ACCESS_KEY = settings.AWS_SECRET_ACCESS_KEY or None  # Explicit credentials
 
 # Media upload limits
 MEDIA_MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
@@ -271,6 +278,7 @@ STYTCH_WEBHOOK_SECRET = settings.STYTCH_WEBHOOK_SECRET
 # Event-driven architecture
 EVENT_BACKEND = settings.EVENT_BACKEND
 EVENT_BUS_NAME = settings.EVENT_BUS_NAME
+AWS_EVENTS_ENDPOINT_URL = settings.AWS_EVENTS_ENDPOINT_URL or None  # For LocalStack
 
 # WebAuthn / Passkeys
 WEBAUTHN_RP_ID = settings.WEBAUTHN_RP_ID
