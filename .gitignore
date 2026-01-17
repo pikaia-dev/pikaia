@@ -238,3 +238,8 @@ infra/uv.lock
 
 # Production secrets
 .env.production
+
+# AI Agent Local Config
+*.local.md
+.agent/settings.local.json
+.claude/settings.local.json

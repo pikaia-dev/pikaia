@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-globs: "*.ts,*.tsx"
+globs: "frontend/**/*"
 ---
 
 # Frontend Rules
 
-Coding standards for TypeScript/React frontend. 
+Coding standards for TypeScript/React frontend.
 
 ## Typing & Linting
 
@@ -42,19 +42,19 @@ Coding standards for TypeScript/React frontend.
 ## Performance
 
 - **Algorithm Complexity**:
-    - Consider O() complexity when implementing algorithms
-    - Prefer optimal solutions where possible, but don't sacrifice readability for minor gains
+  - Consider O() complexity when implementing algorithms
+  - Prefer optimal solutions where possible, but don't sacrifice readability for minor gains
 - **Rendering**:
-    - Minimize unnecessary re-renders; use `useMemo`/`useCallback` judiciously (not everywhere)
-    - Lazy load routes and heavy components (`React.lazy`, `Suspense`)
-    - Virtualize long lists (if >100 items)
+  - Minimize unnecessary re-renders; use `useMemo`/`useCallback` judiciously (not everywhere)
+  - Lazy load routes and heavy components (`React.lazy`, `Suspense`)
+  - Virtualize long lists (if >100 items)
 - **Loading & Refresh**:
-    - Use optimistic updates for snappy UX where appropriate
-    - Prefetch data on hover/focus for anticipated navigation
-    - Skeleton loaders instead of spinners for content areas
+  - Use optimistic updates for snappy UX where appropriate
+  - Prefetch data on hover/focus for anticipated navigation
+  - Skeleton loaders instead of spinners for content areas
 - **Bundle Size**:
-    - Tree-shake; avoid importing entire libraries
-    - Monitor bundle size in CI (alert on significant increases)
+  - Tree-shake; avoid importing entire libraries
+  - Monitor bundle size in CI (alert on significant increases)
 
 ## Testing
 
@@ -70,8 +70,9 @@ Coding standards for TypeScript/React frontend.
 ### Feature Directory Convention
 
 Each feature in `features/` follows this structure:
+
 - `queries/` — TanStack Query hooks (useQuery wrappers)
-- `mutations/` — TanStack mutation hooks (useMutation wrappers)  
+- `mutations/` — TanStack mutation hooks (useMutation wrappers)
 - `components/` — Feature-specific UI components
 - `forms/` — React Hook Form components with Zod schemas
 - `types.ts` — Feature-specific TypeScript types
