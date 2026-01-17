@@ -212,9 +212,9 @@ class StytchAuthMiddleware:
             # Bind user/org context to structured logging (Datadog-compatible field names)
             bind_contextvars(
                 **{
-                    "usr.id": str(user.id),
-                    "usr.email": user.email,
-                    "organization.id": org.stytch_id if org else None,
+                    "usr.id": str(member.user.id),
+                    "usr.email": member.user.email,
+                    "organization.id": member.organization.stytch_org_id if member.organization else None,
                 }
             )
 
