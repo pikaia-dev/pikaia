@@ -2,12 +2,12 @@
 title: Deduplicate Global Event Listeners
 impact: LOW
 impactDescription: single listener for N components
-tags: client, swr, event-listeners, subscription
+tags: client, event-listeners, singleton
 ---
 
 ## Deduplicate Global Event Listeners
 
-Use `useSWRSubscription()` to share global event listeners across component instances.
+Use a module-level singleton to share global event listeners across component instances.
 
 **Incorrect (N instances = N listeners):**
 
@@ -30,14 +30,25 @@ When using the `useKeyboardShortcut` hook multiple times, each instance will reg
 **Correct (N instances = 1 listener):**
 
 ```tsx
-import useSWRSubscription from 'swr/subscription'
-
-// Module-level Map to track callbacks per key
+// Module-level singleton for the global listener
 const keyCallbacks = new Map<string, Set<() => void>>()
+let listenerAttached = false
+
+function attachGlobalListener() {
+  if (listenerAttached) return
+  listenerAttached = true
+
+  window.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.metaKey && keyCallbacks.has(e.key)) {
+      keyCallbacks.get(e.key)!.forEach(cb => cb())
+    }
+  })
+}
 
 function useKeyboardShortcut(key: string, callback: () => void) {
-  // Register this callback in the Map
   useEffect(() => {
+    attachGlobalListener()
+
     if (!keyCallbacks.has(key)) {
       keyCallbacks.set(key, new Set())
     }
@@ -53,22 +64,14 @@ function useKeyboardShortcut(key: string, callback: () => void) {
       }
     }
   }, [key, callback])
-
-  useSWRSubscription('global-keydown', () => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.metaKey && keyCallbacks.has(e.key)) {
-        keyCallbacks.get(e.key)!.forEach(cb => cb())
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  })
 }
 
 function Profile() {
-  // Multiple shortcuts will share the same listener
-  useKeyboardShortcut('p', () => { /* ... */ }) 
+  // Multiple shortcuts share the same global listener
+  useKeyboardShortcut('p', () => { /* ... */ })
   useKeyboardShortcut('k', () => { /* ... */ })
   // ...
 }
 ```
+
+The singleton pattern ensures only one event listener is attached regardless of how many hook instances exist.

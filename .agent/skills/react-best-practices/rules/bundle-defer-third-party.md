@@ -1,49 +1,54 @@
 ---
 title: Defer Non-Critical Third-Party Libraries
 impact: MEDIUM
-impactDescription: loads after hydration
+impactDescription: loads after initial render
 tags: bundle, third-party, analytics, defer
 ---
 
 ## Defer Non-Critical Third-Party Libraries
 
-Analytics, logging, and error tracking don't block user interaction. Load them after hydration.
+Analytics, logging, and error tracking don't block user interaction. Load them after initial render.
 
 **Incorrect (blocks initial bundle):**
 
 ```tsx
-import { Analytics } from '@vercel/analytics/react'
+import { PostHogProvider } from 'posthog-js/react'
 
-export default function RootLayout({ children }) {
+export default function App() {
   return (
-    <html>
-      <body>
-        {children}
-        <Analytics />
-      </body>
-    </html>
+    <PostHogProvider>
+      <MainContent />
+    </PostHogProvider>
   )
 }
 ```
 
-**Correct (loads after hydration):**
+**Correct (loads after initial render):**
 
 ```tsx
-import dynamic from 'next/dynamic'
+import { lazy, Suspense, useEffect, useState } from 'react'
 
-const Analytics = dynamic(
-  () => import('@vercel/analytics/react').then(m => m.Analytics),
-  { ssr: false }
+const PostHogProvider = lazy(() =>
+  import('posthog-js/react').then(m => ({ default: m.PostHogProvider }))
 )
 
-export default function RootLayout({ children }) {
+export default function App() {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   return (
-    <html>
-      <body>
-        {children}
-        <Analytics />
-      </body>
-    </html>
+    <Suspense fallback={null}>
+      {mounted ? (
+        <PostHogProvider>
+          <MainContent />
+        </PostHogProvider>
+      ) : (
+        <MainContent />
+      )}
+    </Suspense>
   )
 }
 ```
