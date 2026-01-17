@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "deny": [
+      "Read:.env",
+      "Read:.env.*",
+      "Read:secrets/**",
+      "Read:**/*.pem",
+      "Read:**/*.key",
+      "Run:git push*",
+      "Run:git remote*"
+    ],
+    "allow": [
+      "Read:.env.example",
+      "Read:.env.*.example",
+      "Run:uv run pytest*",
+      "Run:pnpm test*",
+      "Run:pnpm lint*",
+      "Run:uv run ruff*",
+      "Run:git status*",
+      "Run:git diff*",
+      "Run:git log*",
+      "Run:git show*",
+      "Run:git branch*",
+      "Run:git checkout*",
+      "Run:git add*",
+      "Run:git commit*",
+      "Run:git stash*"
+    ]
+  }
+}

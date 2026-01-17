@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-globs: "*.py"
+globs: "backend/**/*.py"
 ---
 
 # Backend Rules
@@ -40,9 +40,9 @@ Coding standards for Python/Django backend. Scoped to `*.py` files.
 - Use Pydantic schemas for request/response
 - Consistent error format across all endpoints
 - Paginate all potentially unbounded lists
-    - Default: Cursor pagination (infinite scroll ready)
-    - Admin tables: Limit/Offset
-    - Small static enumerations: Explicit opt-out allowed
+  - Default: Cursor pagination (infinite scroll ready)
+  - Admin tables: Limit/Offset
+  - Small static enumerations: Explicit opt-out allowed
 
 ## Testing
 
@@ -65,19 +65,19 @@ Coding standards for Python/Django backend. Scoped to `*.py` files.
 ## Performance
 
 - **Algorithm Complexity**:
-    - Consider O() complexity when implementing algorithms
-    - Prefer optimal solutions where possible, but don't sacrifice readability for minor gains
-    - Document non-obvious performance trade-offs in comments
+  - Consider O() complexity when implementing algorithms
+  - Prefer optimal solutions where possible, but don't sacrifice readability for minor gains
+  - Document non-obvious performance trade-offs in comments
 - **Database**:
-    - **Avoid N+1**: Use `select_related` (FKs) and `prefetch_related` (M2M/Reverse FKs) by default in services
-    - **Indexing**: Add indexes for any field frequently used in `filter()`, `ordering`, or `distinct()`
+  - **Avoid N+1**: Use `select_related` (FKs) and `prefetch_related` (M2M/Reverse FKs) by default in services
+  - **Indexing**: Add indexes for any field frequently used in `filter()`, `ordering`, or `distinct()`
 
 ## Data Consistency & Transactions
 
 - **Transactions**: Use `transaction.atomic()` for multi-write invariants and webhook-driven mutations (not every single `.save()`)
 - **External Calls**: Never call external APIs (Stripe, Stytch, Resend) inside a DB transaction
 - **Webhooks**: Handlers must be idempotent:
-    - Dedupe by event ID (store processed IDs)
-    - Side effects must be safe on replay (e.g., don't create duplicate rows/emails)
+  - Dedupe by event ID (store processed IDs)
+  - Side effects must be safe on replay (e.g., don't create duplicate rows/emails)
 - **Delivery**: Assume "at-least-once" from EventBridge/SQS
 - **Event Publishing**: Use `transaction.on_commit()` to publish events after successful commit
