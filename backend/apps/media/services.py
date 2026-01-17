@@ -2,7 +2,6 @@
 Storage service abstraction for local and S3 backends.
 """
 
-import logging
 import mimetypes
 import uuid
 from dataclasses import dataclass
@@ -13,7 +12,9 @@ from django.conf import settings
 from django.core.files.storage import default_storage
 from PIL import Image
 
-logger = logging.getLogger(__name__)
+from apps.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass

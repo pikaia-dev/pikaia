@@ -4,7 +4,6 @@ Billing API endpoints.
 Handles Stripe checkout, subscription management, and customer portal.
 """
 
-import logging
 from datetime import UTC, datetime
 
 from django.http import HttpRequest
@@ -32,10 +31,11 @@ from apps.billing.services import (
     sync_subscription_from_stripe,
 )
 from apps.billing.stripe_client import get_stripe
+from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth, require_admin
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = Router(tags=["billing"])
 bearer_auth = BearerAuth()
@@ -85,9 +85,9 @@ def create_checkout(
             success_url=payload.success_url,
             cancel_url=payload.cancel_url,
         )
-    except Exception as e:
-        logger.error("Failed to create checkout session: %s", e)
-        raise HttpError(500, "Failed to create checkout session") from e
+    except Exception:
+        logger.exception("checkout_session_creation_failed")
+        raise HttpError(500, "Failed to create checkout session")
 
     return CheckoutSessionResponse(checkout_url=checkout_url)
 
@@ -116,9 +116,9 @@ def create_portal(request: HttpRequest, payload: PortalSessionRequest) -> Portal
             org=org,
             return_url=payload.return_url,
         )
-    except Exception as e:
-        logger.error("Failed to create portal session: %s", e)
-        raise HttpError(500, "Failed to create portal session") from e
+    except Exception:
+        logger.exception("portal_session_creation_failed")
+        raise HttpError(500, "Failed to create portal session")
 
     return PortalSessionResponse(portal_url=portal_url)
 
@@ -211,9 +211,9 @@ def create_subscription_intent_endpoint(
             org=org,
             quantity=quantity,
         )
-    except Exception as e:
-        logger.error("Failed to create subscription intent: %s", e)
-        raise HttpError(500, "Failed to create subscription intent") from e
+    except Exception:
+        logger.exception("subscription_intent_creation_failed")
+        raise HttpError(500, "Failed to create subscription intent")
 
     return SubscriptionIntentResponse(
         client_secret=client_secret,
@@ -246,9 +246,9 @@ def confirm_subscription_endpoint(
 
     try:
         is_active = sync_subscription_from_stripe(payload.subscription_id)
-    except Exception as e:
-        logger.error("Failed to confirm subscription: %s", e)
-        raise HttpError(500, "Failed to confirm subscription") from e
+    except Exception:
+        logger.exception("subscription_confirmation_failed")
+        raise HttpError(500, "Failed to confirm subscription")
 
     return ConfirmSubscriptionResponse(is_active=is_active)
 
@@ -330,6 +330,6 @@ def list_invoices(
             has_more=invoice_list.has_more,
         )
 
-    except Exception as e:
-        logger.error("Failed to list invoices: %s", e)
-        raise HttpError(500, "Failed to retrieve invoices") from e
+    except Exception:
+        logger.exception("invoice_list_failed")
+        raise HttpError(500, "Failed to retrieve invoices")

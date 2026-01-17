@@ -161,6 +161,53 @@ class TestJWTAuthentication:
         assert request.auth_member.stytch_member_id == "member-123"
         assert request.auth_organization.stytch_org_id == "org-123"
 
+    @patch("apps.core.middleware.bind_contextvars")
+    @patch("apps.accounts.stytch_client.get_stytch_client")
+    def test_valid_jwt_binds_user_context_for_logging(
+        self,
+        mock_get_client: MagicMock,
+        mock_bind_contextvars: MagicMock,
+        middleware: StytchAuthMiddleware,
+    ) -> None:
+        """Valid JWT should bind user/org context for structured logging."""
+        # Create local records
+        user = User.objects.create(email="context@example.com", name="Context User")
+        org = Organization.objects.create(
+            stytch_org_id="org-context-123",
+            name="Context Org",
+            slug="context-org",
+        )
+        Member.objects.create(
+            stytch_member_id="member-context-123",
+            user=user,
+            organization=org,
+            role="member",
+        )
+
+        # Mock local JWT verification
+        mock_client = MagicMock()
+        mock_client.sessions.authenticate_jwt.return_value = MockJWTAuthResponse(
+            member=MockStytchMember(
+                member_id="member-context-123",
+                email_address="context@example.com",
+                name="Context User",
+                roles=[],
+            ),
+            member_session=MockMemberSession(member_id="member-context-123"),
+        )
+        mock_get_client.return_value = mock_client
+
+        # Make request
+        request = make_request("/api/v1/test", "Bearer valid-jwt")
+        middleware(request)
+
+        # Verify bind_contextvars was called with user/org context
+        mock_bind_contextvars.assert_called()
+        call_kwargs = mock_bind_contextvars.call_args[1]
+        assert call_kwargs.get("usr.id") == str(user.id)
+        assert call_kwargs.get("usr.email") == "context@example.com"
+        assert call_kwargs.get("organization.id") == "org-context-123"
+
     @patch("apps.accounts.stytch_client.get_stytch_client")
     def test_invalid_jwt_sets_none(
         self,
