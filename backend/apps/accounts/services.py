@@ -10,7 +10,10 @@ from django.db import IntegrityError, transaction
 
 from apps.accounts.constants import StytchRoles
 from apps.accounts.models import Member, User
+from apps.core.logging import get_logger
 from apps.organizations.models import Organization
+
+logger = get_logger(__name__)
 
 
 def get_or_create_user_from_stytch(
@@ -321,17 +324,7 @@ def invite_member(
             )
 
     # Sync subscription quantity to Stripe (outside transaction - external call)
-    try:
-        from apps.billing.services import sync_subscription_quantity
-
-        sync_subscription_quantity(organization)
-    except Exception:
-        # Don't fail the invite if billing sync fails
-        import logging
-
-        logging.getLogger(__name__).warning(
-            "Failed to sync subscription quantity for org %s", organization.id
-        )
+    _sync_subscription_quantity_safe(organization)
 
     return member, invite_sent
 
@@ -396,17 +389,23 @@ def soft_delete_member(member: Member) -> None:
     member.soft_delete()
 
     # Sync subscription quantity to Stripe (outside transaction - external call)
+    _sync_subscription_quantity_safe(organization)
+
+
+def _sync_subscription_quantity_safe(organization: Organization) -> None:
+    """
+    Sync subscription quantity to Stripe, logging failures without raising.
+
+    This is called after member changes (invite/delete) to update the
+    per-seat subscription quantity. Failures are logged but don't fail
+    the parent operation.
+    """
     try:
         from apps.billing.services import sync_subscription_quantity
 
         sync_subscription_quantity(organization)
     except Exception:
-        # Don't fail the delete if billing sync fails
-        import logging
-
-        logging.getLogger(__name__).warning(
-            "Failed to sync subscription quantity for org %s", organization.id
-        )
+        logger.warning("billing_subscription_quantity_sync_failed", org_id=str(organization.id))
 
 
 def sync_logo_to_stytch(organization: Organization) -> None:
@@ -416,13 +415,9 @@ def sync_logo_to_stytch(organization: Organization) -> None:
     Called after logo upload/delete in media API.
     Fails silently with a warning log on error to not break the upload flow.
     """
-    import logging
-
     from stytch.core.response_base import StytchError
 
     from apps.accounts.stytch_client import get_stytch_client
-
-    logger = logging.getLogger(__name__)
 
     try:
         client = get_stytch_client()
@@ -432,9 +427,9 @@ def sync_logo_to_stytch(organization: Organization) -> None:
         )
     except StytchError as e:
         logger.warning(
-            "Failed to sync logo to Stytch for org %s: %s",
-            organization.stytch_org_id,
-            e.details.error_message,
+            "stytch_logo_sync_failed",
+            stytch_org_id=organization.stytch_org_id,
+            error=e.details.error_message,
         )
 
 

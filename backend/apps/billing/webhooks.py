@@ -6,8 +6,6 @@ This is a separate view (not Django Ninja) for raw request handling
 needed to verify Stripe signatures.
 """
 
-import logging
-
 import stripe
 from django.http import HttpRequest, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -19,9 +17,10 @@ from apps.billing.services import (
     handle_subscription_updated,
 )
 from apps.billing.stripe_client import get_stripe
+from apps.core.logging import get_logger
 from config.settings.base import settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @csrf_exempt
@@ -36,11 +35,11 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
     sig_header = request.headers.get("Stripe-Signature")
 
     if not sig_header:
-        logger.warning("Missing Stripe-Signature header")
+        logger.warning("stripe_webhook_missing_signature")
         return HttpResponse(status=400)
 
     if not settings.STRIPE_WEBHOOK_SECRET:
-        logger.error("STRIPE_WEBHOOK_SECRET not configured")
+        logger.error("stripe_webhook_secret_not_configured")
         return HttpResponse(status=500)
 
     # Verify signature
@@ -52,14 +51,14 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
             settings.STRIPE_WEBHOOK_SECRET,
         )
     except ValueError as e:
-        logger.warning("Invalid payload: %s", e)
+        logger.warning("stripe_webhook_invalid_payload", error=str(e))
         return HttpResponse(status=400)
     except stripe.SignatureVerificationError as e:
-        logger.warning("Invalid signature: %s", e)
+        logger.warning("stripe_webhook_invalid_signature", error=str(e))
         return HttpResponse(status=400)
 
     # Log event for debugging
-    logger.info("Received Stripe event: %s", event["type"])
+    logger.info("stripe_webhook_received", event_type=event["type"])
 
     # Dispatch to handlers
     try:
@@ -85,25 +84,25 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
                 # Log successful payment
                 invoice = event["data"]["object"]
                 logger.info(
-                    "Invoice paid: %s for customer %s",
-                    invoice["id"],
-                    invoice["customer"],
+                    "stripe_invoice_paid",
+                    invoice_id=invoice["id"],
+                    customer_id=invoice["customer"],
                 )
 
             case "invoice.payment_failed":
                 # Log failed payment - could trigger email notification
                 invoice = event["data"]["object"]
                 logger.warning(
-                    "Invoice payment failed: %s for customer %s",
-                    invoice["id"],
-                    invoice["customer"],
+                    "stripe_invoice_payment_failed",
+                    invoice_id=invoice["id"],
+                    customer_id=invoice["customer"],
                 )
 
             case _:
-                logger.debug("Unhandled event type: %s", event["type"])
+                logger.debug("stripe_webhook_unhandled_event", event_type=event["type"])
 
-    except Exception as e:
-        logger.exception("Error handling webhook: %s", e)
+    except Exception:
+        logger.exception("stripe_webhook_handler_error")
         # Return 500 so Stripe will retry with exponential backoff
         return HttpResponse(status=500)
 

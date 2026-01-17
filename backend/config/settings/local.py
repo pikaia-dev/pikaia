@@ -16,3 +16,12 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+# =============================================================================
+# Structured Logging Configuration (Development)
+# =============================================================================
+# Configure structlog with pretty console output for local development.
+# Colors and human-readable format make debugging easier.
+from apps.core.logging import configure_logging
+
+configure_logging(json_format=False, log_level="DEBUG")
