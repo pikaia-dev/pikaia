@@ -2,9 +2,6 @@
 Tests for structured logging configuration.
 """
 
-from io import StringIO
-from unittest.mock import patch
-
 import pytest
 import structlog
 
