@@ -62,10 +62,11 @@ The `.claude/` directory contains symlinks to `.agent/` for Claude Code compatib
 
 ```
 .claude/
-├── CLAUDE.md -> ../.agent/AGENTS.md
-├── commands  -> ../.agent/commands
-├── rules     -> ../.agent/rules
-└── skills    -> ../.agent/skills
+├── CLAUDE.md     -> ../.agent/AGENTS.md
+├── commands      -> ../.agent/commands
+├── rules         -> ../.agent/rules
+├── settings.json -> ../.agent/settings.json
+└── skills        -> ../.agent/skills
 ```
 
 ### Editing Guidelines
