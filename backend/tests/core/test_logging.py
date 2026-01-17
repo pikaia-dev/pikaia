@@ -2,7 +2,6 @@
 Tests for structured logging configuration.
 """
 
-import json
 from io import StringIO
 from unittest.mock import patch
 
