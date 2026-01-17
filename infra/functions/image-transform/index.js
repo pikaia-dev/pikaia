@@ -13,8 +13,9 @@
  * Example: /fit-in/200x300/avatars/1/photo.png
  */
 
-const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
-const sharp = require('sharp');
+// Lazy-load heavy dependencies to support Origin Request handler
+// (which doesn't have node_modules bundled)
+let S3Client, GetObjectCommand, sharp;
 
 /**
  * Regex pattern for parsing transform URLs.
@@ -58,8 +59,17 @@ let s3Client = null;
 /**
  * Get or create S3 client.
  * Uses environment variable for bucket region.
+ * Lazy-loads dependencies on first call.
  */
 function getS3Client(region) {
+    if (!S3Client) {
+        const sdk = require('@aws-sdk/client-s3');
+        S3Client = sdk.S3Client;
+        GetObjectCommand = sdk.GetObjectCommand;
+    }
+    if (!sharp) {
+        sharp = require('sharp');
+    }
     if (!s3Client) {
         s3Client = new S3Client({ region: region || 'us-east-1' });
     }

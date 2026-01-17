@@ -4,13 +4,11 @@ Core security - authentication and authorization for API.
 
 from collections.abc import Callable
 from functools import wraps
-from typing import Any, TypeVar
+from typing import Any
 
 from django.http import HttpRequest
 from ninja.errors import HttpError
 from ninja.security import HttpBearer
-
-F = TypeVar("F", bound=Callable[..., Any])
 
 
 class BearerAuth(HttpBearer):
@@ -35,7 +33,7 @@ class BearerAuth(HttpBearer):
         return token
 
 
-def require_admin(func: F) -> F:
+def require_admin[F: Callable[..., Any]](func: F) -> F:
     """
     Decorator that enforces admin role for an endpoint.
 

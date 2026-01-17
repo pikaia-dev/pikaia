@@ -2,7 +2,7 @@
 Event services - publishing events via transactional outbox.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -10,7 +10,7 @@ from django.db import models
 
 from apps.core.logging import get_logger
 from apps.events.models import AuditLog, OutboxEvent
-from apps.events.schemas import ActorSchema, EventEnvelope, MAX_PAYLOAD_SIZE_BYTES
+from apps.events.schemas import MAX_PAYLOAD_SIZE_BYTES, ActorSchema, EventEnvelope
 
 logger = get_logger(__name__)
 
@@ -92,7 +92,7 @@ def publish_event(
         event_id=event_id,
         event_type=event_type,
         schema_version=schema_version,
-        occurred_at=datetime.now(timezone.utc),
+        occurred_at=datetime.now(UTC),
         aggregate_id=aggregate_id,
         aggregate_type=aggregate_type,
         organization_id=organization_id,

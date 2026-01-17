@@ -1,3 +1,4 @@
+import { Users } from "lucide-react"
 import { useState } from "react"
 
 import {
@@ -27,8 +28,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select"
-import { MembersTable } from "../../features/members/components"
+import { BulkInviteDialog, MembersTable } from "../../features/members/components"
 import {
+  useBulkInviteMembers,
   useDeleteMember,
   useInviteMember,
   useMembers,
@@ -39,6 +41,7 @@ import type { DirectoryUser } from "../../lib/api"
 export default function MembersSettings() {
   const { data: membersData, isLoading, error } = useMembers()
   const inviteMutation = useInviteMember()
+  const bulkInviteMutation = useBulkInviteMembers()
   const updateRoleMutation = useUpdateMemberRole()
   const deleteMutation = useDeleteMember()
 
@@ -46,6 +49,9 @@ export default function MembersSettings() {
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteName, setInviteName] = useState("")
   const [inviteRole, setInviteRole] = useState<"admin" | "member">("member")
+
+  // Bulk invite dialog state
+  const [bulkInviteOpen, setBulkInviteOpen] = useState(false)
 
   // Delete confirmation dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -78,6 +84,25 @@ export default function MembersSettings() {
     if (user.name) {
       setInviteName(user.name)
     }
+  }
+
+  // Handle bulk invite
+  const handleBulkInvite = (members: { email: string; name: string; phone: string; role: string }[]) => {
+    bulkInviteMutation.mutate(
+      {
+        members: members.map((m) => ({
+          email: m.email,
+          name: m.name || undefined,
+          phone: m.phone || undefined,
+          role: m.role as "admin" | "member",
+        })),
+      },
+      {
+        onSuccess: () => {
+          setBulkInviteOpen(false)
+        },
+      }
+    )
   }
 
   const handleRoleChange = (memberId: number, newRole: "admin" | "member") => {
@@ -127,11 +152,21 @@ export default function MembersSettings() {
 
       {/* Invite Form */}
       <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-base">Invite Member</CardTitle>
-          <CardDescription>
-            Send an invitation email to add a new member
-          </CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between">
+          <div>
+            <CardTitle className="text-base">Invite Member</CardTitle>
+            <CardDescription>
+              Send an invitation email to add a new member
+            </CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setBulkInviteOpen(true); }}
+          >
+            <Users className="h-4 w-4 mr-2" />
+            Bulk Invite
+          </Button>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleInvite} className="flex flex-wrap gap-3 items-end">
@@ -220,6 +255,14 @@ export default function MembersSettings() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk Invite Dialog */}
+      <BulkInviteDialog
+        open={bulkInviteOpen}
+        onOpenChange={setBulkInviteOpen}
+        onInvite={handleBulkInvite}
+        isLoading={bulkInviteMutation.isPending}
+      />
     </div>
   )
 }

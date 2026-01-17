@@ -3,6 +3,7 @@ Tests for CorrelationIdMiddleware.
 """
 
 from uuid import UUID
+
 from django.test import RequestFactory
 
 from apps.core.middleware import CorrelationIdMiddleware

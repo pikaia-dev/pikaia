@@ -43,6 +43,11 @@ export function EmailLoginForm({
                     autoComplete="email"
                     autoFocus
                     disabled={isLoading}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                            void handleSubmit(onFormSubmit)()
+                        }
+                    }}
                 />
                 {errors.email && (
                     <p className="text-xs text-destructive">{errors.email.message}</p>

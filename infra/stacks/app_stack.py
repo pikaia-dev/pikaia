@@ -22,11 +22,11 @@ from aws_cdk import (
     aws_iam as iam,
     aws_logs as logs,
     aws_rds as rds,
+    aws_s3 as s3,
     aws_secretsmanager as secretsmanager,
 )
 from constructs import Construct
 
-import json
 
 
 class AppStack(Stack):
@@ -48,6 +48,8 @@ class AppStack(Stack):
         *,
         vpc: ec2.IVpc,
         database_security_group: ec2.ISecurityGroup,
+        media_bucket: s3.IBucket | None = None,
+        media_cdn_domain: str | None = None,
         certificate_arn: str | None = None,
         domain_name: str | None = None,
         min_capacity: int = 2,
@@ -114,8 +116,11 @@ class AppStack(Stack):
             container_insights_v2=ecs.ContainerInsights.ENABLED,
         )
 
-        # ECR repository for Django app (import existing or create new)
-        # Using from_repository_name to handle retained repositories from previous deployments
+        # ECR repository for Django app - PREREQUISITE: Repository must exist
+        # Using from_repository_name to handle retained repositories from previous deployments.
+        # The repository should be created via `aws ecr create-repository --repository-name tango-backend`
+        # or by running scripts/bootstrap-infra.sh before first deployment.
+        # If the repository doesn't exist, deployment will fail with image pull errors.
         self.ecr_repository = ecr.Repository.from_repository_name(
             self,
             "TangoBackendRepo",
@@ -134,6 +139,23 @@ class AppStack(Stack):
             memory_limit_mib=1024,
         )
 
+        # Build environment variables including S3 config if media bucket is provided
+        container_env = {
+            "DJANGO_SETTINGS_MODULE": "config.settings.production",
+            "ALLOWED_HOSTS": domain_name or "*",
+        }
+        if media_bucket:
+            container_env.update({
+                "USE_S3_STORAGE": "true",
+                "AWS_STORAGE_BUCKET_NAME": media_bucket.bucket_name,
+                "AWS_S3_REGION_NAME": self.region,
+            })
+            if media_cdn_domain:
+                container_env.update({
+                    "AWS_S3_CUSTOM_DOMAIN": media_cdn_domain,
+                    "IMAGE_TRANSFORM_URL": f"https://{media_cdn_domain}",
+                })
+
         # Container
         container = task_definition.add_container(
             "django",
@@ -142,10 +164,7 @@ class AppStack(Stack):
                 stream_prefix="tango-backend",
                 log_retention=logs.RetentionDays.ONE_MONTH,
             ),
-            environment={
-                "DJANGO_SETTINGS_MODULE": "config.settings.production",
-                "ALLOWED_HOSTS": domain_name or "*",
-            },
+            environment=container_env,
             secrets={
                 # RDS secret contains individual fields, not DATABASE_URL.
                 # Django settings should construct the URL from these at runtime.
@@ -201,6 +220,36 @@ class AppStack(Stack):
                     self.app_secrets,
                     field="CORS_ALLOWED_ORIGINS",
                 ),
+                # WebAuthn / Passkeys configuration
+                "WEBAUTHN_RP_ID": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="WEBAUTHN_RP_ID",
+                ),
+                "WEBAUTHN_RP_NAME": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="WEBAUTHN_RP_NAME",
+                ),
+                "WEBAUTHN_ORIGIN": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="WEBAUTHN_ORIGIN",
+                ),
+                # Stytch Trusted Auth Token (for passkey -> Stytch session)
+                "STYTCH_TRUSTED_AUTH_PROFILE_ID": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="STYTCH_TRUSTED_AUTH_PROFILE_ID",
+                ),
+                "STYTCH_TRUSTED_AUTH_AUDIENCE": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="STYTCH_TRUSTED_AUTH_AUDIENCE",
+                ),
+                "STYTCH_TRUSTED_AUTH_ISSUER": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="STYTCH_TRUSTED_AUTH_ISSUER",
+                ),
+                "PASSKEY_JWT_PRIVATE_KEY": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="PASSKEY_JWT_PRIVATE_KEY",
+                ),
             },
             health_check=ecs.HealthCheck(
                 command=["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"],
@@ -214,6 +263,11 @@ class AppStack(Stack):
         container.add_port_mappings(
             ecs.PortMapping(container_port=8000, protocol=ecs.Protocol.TCP)
         )
+
+        # Grant S3 access for media uploads if bucket is provided
+        if media_bucket:
+            media_bucket.grant_read_write(task_definition.task_role)
+
 
         # Security group for ECS
         ecs_security_group = ec2.SecurityGroup(

@@ -44,6 +44,7 @@ export function createApiClient(getToken: TokenProvider) {
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...options,
       headers,
+      credentials: "include",
     })
 
     if (!response.ok) {
@@ -95,6 +96,7 @@ export function createApiClient(getToken: TokenProvider) {
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: "GET",
         headers,
+        credentials: "include",
       })
       if (!response.ok) {
         throw new Error("Failed to fetch blob")
@@ -310,4 +312,110 @@ export interface DirectoryUser {
   email: string
   name: string
   avatar_url: string
+}
+
+// Bulk invite types
+export interface BulkInviteMemberItem {
+  email: string
+  name?: string
+  phone?: string
+  role?: "admin" | "member"
+}
+
+export interface BulkInviteRequest {
+  members: BulkInviteMemberItem[]
+}
+
+export interface BulkInviteResultItem {
+  email: string
+  success: boolean
+  error: string | null
+  stytch_member_id: string | null
+}
+
+export interface BulkInviteResponse {
+  results: BulkInviteResultItem[]
+  total: number
+  succeeded: number
+  failed: number
+}
+
+// Webhook types
+export interface WebhookEndpoint {
+  id: string
+  name: string
+  description: string
+  url: string
+  events: string[]
+  active: boolean
+  last_delivery_status: string
+  last_delivery_at: string | null
+  consecutive_failures: number
+  created_at: string
+  updated_at: string
+}
+
+export interface WebhookEndpointWithSecret extends WebhookEndpoint {
+  secret: string
+}
+
+export interface WebhookEndpointListResponse {
+  endpoints: WebhookEndpoint[]
+}
+
+export interface WebhookEndpointCreateRequest {
+  name: string
+  description?: string
+  url: string
+  events: string[]
+}
+
+export interface WebhookEndpointUpdateRequest {
+  name?: string
+  description?: string
+  url?: string
+  events?: string[]
+  active?: boolean
+}
+
+export interface WebhookDelivery {
+  id: string
+  event_id: string
+  event_type: string
+  status: "pending" | "success" | "failure"
+  error_type: string
+  http_status: number | null
+  duration_ms: number | null
+  response_snippet: string
+  attempt_number: number
+  attempted_at: string | null
+  created_at: string
+}
+
+export interface WebhookDeliveryListResponse {
+  deliveries: WebhookDelivery[]
+}
+
+export interface WebhookEventType {
+  type: string
+  description: string
+  category: string
+  payload_example: Record<string, unknown>
+}
+
+export interface WebhookEventListResponse {
+  events: WebhookEventType[]
+}
+
+export interface WebhookTestRequest {
+  event_type: string
+}
+
+export interface WebhookTestResponse {
+  success: boolean
+  http_status: number | null
+  duration_ms: number | null
+  signature: string
+  response_snippet: string
+  error_message: string
 }

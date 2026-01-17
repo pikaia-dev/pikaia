@@ -22,7 +22,7 @@ import { LoadingSpinner } from "./ui/loading-spinner"
 
 interface PaymentFormProps {
   quantity: number
-  onSuccess: () => void
+  onSuccess: (subscriptionId: string) => void
   onCancel: () => void
 }
 
@@ -36,12 +36,11 @@ function PaymentFormInner({
   onCancel,
 }: {
   subscriptionId: string
-  onSuccess: () => void
+  onSuccess: (subscriptionId: string) => void
   onCancel: () => void
 }) {
   const stripe = useStripe()
   const elements = useElements()
-  const { confirmSubscription } = useApi()
   const [processing, setProcessing] = useState(false)
   const [ready, setReady] = useState(false)
 
@@ -65,20 +64,11 @@ function PaymentFormInner({
     if (error) {
       toast.error(error.message || "Payment failed")
       setProcessing(false)
-    } else {
-      // Payment succeeded - now sync subscription status from Stripe
-      // This is needed because webhooks may not reach localhost in dev
-      try {
-        await confirmSubscription({ subscription_id: subscriptionId })
-        toast.success("Subscription activated!")
-        onSuccess()
-      } catch (syncError) {
-        // Payment succeeded but sync failed - user should refresh
-        console.error("Failed to sync subscription:", syncError)
-        toast.success("Payment successful! Refreshing...")
-        onSuccess()
-      }
+      return
     }
+
+    // Payment succeeded - let caller handle subscription sync
+    onSuccess(subscriptionId)
   }
 
   return (

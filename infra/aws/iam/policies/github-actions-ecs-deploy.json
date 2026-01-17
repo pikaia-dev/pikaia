@@ -81,6 +81,24 @@
         "cloudfront:ListInvalidations"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "CDKBootstrapSSM",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameter"
+      ],
+      "Resource": "arn:aws:ssm:us-east-1:603628786616:parameter/cdk-bootstrap/*"
+    },
+    {
+      "Sid": "STSAssumeRole",
+      "Effect": "Allow",
+      "Action": [
+        "sts:AssumeRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::603628786616:role/cdk-*"
+      ]
     }
   ]
 }

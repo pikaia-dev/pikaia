@@ -5,7 +5,7 @@ All Stripe API calls are isolated here for testability.
 External calls must NOT be inside database transactions.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from apps.billing.models import Subscription
 from apps.billing.stripe_client import get_stripe
@@ -348,15 +348,15 @@ def handle_subscription_created(stripe_subscription: dict) -> None:
 
     # Default to now if not available (shouldn't happen but be safe)
     if period_start_ts:
-        period_start = datetime.fromtimestamp(period_start_ts, tz=timezone.utc)
+        period_start = datetime.fromtimestamp(period_start_ts, tz=UTC)
     else:
-        period_start = datetime.now(tz=timezone.utc)
+        period_start = datetime.now(tz=UTC)
 
     if period_end_ts:
-        period_end = datetime.fromtimestamp(period_end_ts, tz=timezone.utc)
+        period_end = datetime.fromtimestamp(period_end_ts, tz=UTC)
     else:
         # Default to 30 days from now
-        period_end = datetime.now(tz=timezone.utc) + timedelta(days=30)
+        period_end = datetime.now(tz=UTC) + timedelta(days=30)
 
     # Get price ID from first item
     items = stripe_subscription.get("items", {}).get("data", [])
@@ -414,12 +414,12 @@ def handle_subscription_updated(stripe_subscription: dict) -> None:
     period_end_ts = current_period.get("end") or stripe_subscription.get("current_period_end")
 
     if period_start_ts:
-        period_start = datetime.fromtimestamp(period_start_ts, tz=timezone.utc)
+        period_start = datetime.fromtimestamp(period_start_ts, tz=UTC)
     else:
         period_start = subscription.current_period_start  # Keep existing
 
     if period_end_ts:
-        period_end = datetime.fromtimestamp(period_end_ts, tz=timezone.utc)
+        period_end = datetime.fromtimestamp(period_end_ts, tz=UTC)
     else:
         period_end = subscription.current_period_end  # Keep existing
 

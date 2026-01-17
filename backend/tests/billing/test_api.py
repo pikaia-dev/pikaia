@@ -24,9 +24,9 @@ from apps.billing.schemas import (
     PortalSessionRequest,
     SubscriptionIntentRequest,
 )
+from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
 
 from .factories import SubscriptionFactory
-from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
 
 
 @pytest.fixture

@@ -1,7 +1,9 @@
 import { useStytchB2BClient } from "@stytch/react/b2b"
-import { useCallback,useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
+import { useCallback, useState } from "react"
 
-import type { ImageResponse,UploadRequest } from "../lib/api"
+import { queryKeys } from "../features/shared/query-keys"
+import type { ImageResponse, UploadRequest } from "../lib/api"
 import { useApi } from "./useApi"
 
 interface UseImageUploadOptions {
@@ -14,6 +16,7 @@ export function useImageUpload(
   options: UseImageUploadOptions = {}
 ) {
   const stytch = useStytchB2BClient()
+  const queryClient = useQueryClient()
   const { requestUpload, confirmUpload } = useApi()
   const [isUploading, setIsUploading] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -49,7 +52,7 @@ export function useImageUpload(
             },
           })
           if (!response.ok) {
-            throw new Error("Upload failed")
+            throw new Error(`Failed to upload ${imageType}: server returned ${String(response.status)}`)
           }
         } else {
           // Local direct upload (POST with multipart form)
@@ -89,10 +92,16 @@ export function useImageUpload(
         })
 
         setProgress(100)
+
+        // Invalidate user cache when avatar is updated so sidebar refreshes
+        if (imageType === "avatar") {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.auth.me() })
+        }
+
         options.onSuccess?.(result)
         return result
       } catch (err) {
-        const error = err instanceof Error ? err : new Error("Upload failed")
+        const error = err instanceof Error ? err : new Error(`Failed to upload ${imageType}`)
         setError(error)
         options.onError?.(error)
         return null
@@ -100,7 +109,7 @@ export function useImageUpload(
         setIsUploading(false)
       }
     },
-    [imageType, requestUpload, confirmUpload, options, stytch]
+    [imageType, requestUpload, confirmUpload, options, stytch, queryClient]
   )
 
   const reset = useCallback(() => {

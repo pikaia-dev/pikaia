@@ -22,9 +22,9 @@ from apps.billing.services import (
     sync_subscription_from_stripe,
     sync_subscription_quantity,
 )
+from tests.accounts.factories import OrganizationFactory
 
 from .factories import SubscriptionFactory
-from tests.accounts.factories import OrganizationFactory
 
 
 @pytest.mark.django_db
