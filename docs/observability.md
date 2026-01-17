@@ -398,3 +398,96 @@ Response sent
    ```
 
 2. Check if published (status = 'published')
+
+---
+
+## CloudWatch Monitoring
+
+### Overview
+
+The `TangoObservability` CDK stack deploys CloudWatch dashboards and alarms for operational monitoring.
+
+### Dashboard: `tango-operations`
+
+The main operations dashboard includes:
+
+| Row | Widgets |
+|-----|---------|
+| **API Overview** | Request rate, 5xx errors, latency (p50, p99) |
+| **ECS Service** | CPU utilization, memory utilization, healthy host count |
+| **Database** | Connections, CPU, ACU capacity, read/write latency |
+| **Alarms** | Status of all configured alarms |
+
+Access: `https://{region}.console.aws.amazon.com/cloudwatch/home#dashboards:name=tango-operations`
+
+### Alarms
+
+| Alarm | Condition | Evaluation |
+|-------|-----------|------------|
+| `tango-high-error-rate` | 5xx errors > 5% of requests | 2 periods of 5 min |
+| `tango-high-latency` | p99 response time > 2 seconds | 3 periods of 1 min |
+| `tango-unhealthy-hosts` | Healthy hosts < 1 | 2 periods of 1 min |
+| `tango-ecs-high-cpu` | ECS CPU > 85% | 3 periods of 1 min |
+| `tango-ecs-high-memory` | ECS memory > 85% | 3 periods of 1 min |
+| `tango-db-high-cpu` | Database CPU > 80% | 3 periods of 1 min |
+| `tango-db-high-connections` | DB connections > 500 | 2 periods of 1 min |
+
+All alarms notify the `tango-alarms` SNS topic.
+
+### Deployment
+
+```bash
+# Deploy with alarm email notifications
+cdk deploy TangoObservability --context alarm_email=ops@example.com
+
+# Deploy all stacks (observability depends on TangoApp)
+cdk deploy --all
+```
+
+### Customization
+
+The observability stack is defined in `infra/stacks/observability_stack.py`. Common customizations:
+
+**Adjust alarm thresholds:**
+```python
+latency_alarm = cloudwatch.Alarm(
+    ...
+    threshold=3,  # Change from 2 to 3 seconds
+    evaluation_periods=5,  # More periods before alarming
+)
+```
+
+**Add custom metrics:**
+```python
+custom_metric = cloudwatch.Metric(
+    namespace="Custom/MyApp",
+    metric_name="OrdersProcessed",
+    statistic="Sum",
+    period=Duration.minutes(1),
+)
+dashboard.add_widgets(
+    cloudwatch.GraphWidget(title="Orders", left=[custom_metric])
+)
+```
+
+**Add PagerDuty/Slack notifications:**
+```python
+# Instead of email, use HTTPS endpoint for PagerDuty/Slack
+alarm_topic.add_subscription(
+    sns.subscriptions.UrlSubscription("https://events.pagerduty.com/...")
+)
+```
+
+### Correlation with Logs
+
+When an alarm fires:
+
+1. Note the **time window** from the alarm
+2. Query CloudWatch Logs Insights for that period:
+   ```sql
+   fields @timestamp, trace_id, event, @message
+   | filter @timestamp >= "2026-01-17T10:00:00"
+   | filter level = "ERROR"
+   | sort @timestamp
+   ```
+3. Use `trace_id` to find all logs from problematic requests
