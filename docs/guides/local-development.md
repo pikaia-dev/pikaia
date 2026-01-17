@@ -157,6 +157,24 @@ pnpm build
 pnpm dlx shadcn@latest add button dialog card
 ```
 
+## Logging
+
+In development, structured logs output as pretty-printed console text with colors. In production, they output as JSON for CloudWatch/Datadog.
+
+```python
+from apps.core.logging import get_logger
+
+logger = get_logger(__name__)
+logger.info("user_created", user_id="123", email="alice@example.com")
+```
+
+All logs automatically include request context (trace ID, user, organization) bound by middleware.
+
+See [Observability Guide](../observability.md) for:
+- Field naming conventions (Datadog-compatible)
+- Event vs audit log vs structured logging
+- CloudWatch Logs Insights queries
+
 ## Third-Party Service Setup
 
 ### Stytch
