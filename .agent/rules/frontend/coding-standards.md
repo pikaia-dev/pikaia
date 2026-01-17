@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-globs: "frontend/**/*.ts,frontend/**/*.tsx"
+globs: "frontend/**/*"
 ---
 
 # Frontend Rules

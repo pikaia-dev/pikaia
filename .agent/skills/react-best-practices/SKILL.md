@@ -1,10 +1,6 @@
 ---
 name: react-best-practices
 description: React performance optimization guidelines. This skill should be used when writing, reviewing, or refactoring React code to ensure optimal performance patterns. Triggers on tasks involving React components, data fetching, bundle optimization, or performance improvements.
-license: MIT
-metadata:
-  author: community
-  version: "1.0.0"
 ---
 
 # React Best Practices
