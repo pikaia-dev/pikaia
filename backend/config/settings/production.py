@@ -9,8 +9,6 @@ Missing secrets will cause the application to crash immediately with a clear err
 rather than failing silently at runtime.
 """
 
-import logging
-
 from .base import *  # noqa: F403
 from .base import parse_comma_list, settings
 
@@ -121,6 +119,6 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_CLOUDFRONT_FORWARDED_PROTO", "https")
 CORS_ALLOWED_ORIGINS = parse_comma_list(settings.CORS_ALLOWED_ORIGINS or "")
 
 if not CORS_ALLOWED_ORIGINS:
-    logging.getLogger(__name__).warning(
-        "CORS_ALLOWED_ORIGINS is empty. Frontend API calls may be blocked."
-    )
+    from apps.core.logging import get_logger
+
+    get_logger(__name__).warning("cors_allowed_origins_empty")
