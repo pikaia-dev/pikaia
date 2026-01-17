@@ -73,12 +73,16 @@ def configure_logging(json_format: bool = True, log_level: str = "INFO") -> None
     """
     Configure structlog for the application.
 
+    Uses stdlib integration for compatibility with Django and third-party libraries.
+
     Args:
         json_format: If True, output JSON (production). If False, pretty console output (development).
         log_level: Minimum log level to output.
     """
-    # Shared processors for all configurations
-    shared_processors: list[Processor] = [
+    log_level_int = getattr(logging, log_level.upper(), logging.INFO)
+
+    # Processors that run before passing to stdlib
+    pre_chain: list[Processor] = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
@@ -91,37 +95,41 @@ def configure_logging(json_format: bool = True, log_level: str = "INFO") -> None
     ]
 
     if json_format:
-        # Production: JSON output with exception formatting
-        processors: list[Processor] = [
-            *shared_processors,
-            structlog.processors.format_exc_info,
-            structlog.processors.JSONRenderer(),
-        ]
+        # Production: JSON output
+        renderer: Processor = structlog.processors.JSONRenderer()
+        pre_chain.append(structlog.processors.format_exc_info)
     else:
         # Development: Pretty console output with colors
-        processors = [
-            *shared_processors,
-            structlog.processors.ExceptionPrettyPrinter(),
-            structlog.dev.ConsoleRenderer(colors=True),
-        ]
+        renderer = structlog.dev.ConsoleRenderer(colors=True)
 
+    # Configure structlog to use stdlib LoggerFactory
     structlog.configure(
-        processors=processors,
-        wrapper_class=structlog.make_filtering_bound_logger(
-            getattr(logging, log_level.upper(), logging.INFO)
-        ),
+        processors=[
+            *pre_chain,
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
+        wrapper_class=structlog.stdlib.BoundLogger,
         context_class=dict,
-        logger_factory=structlog.PrintLoggerFactory(file=sys.stdout),
+        logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=True,
     )
 
-    # Configure standard library logging to use structlog
-    # This ensures third-party libraries (Django, etc.) also output structured logs
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stdout,
-        level=getattr(logging, log_level.upper(), logging.INFO),
+    # Configure stdlib logging with structlog formatter
+    formatter = structlog.stdlib.ProcessorFormatter(
+        foreign_pre_chain=pre_chain,
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            renderer,
+        ],
     )
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(formatter)
+
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    root_logger.addHandler(handler)
+    root_logger.setLevel(log_level_int)
 
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
