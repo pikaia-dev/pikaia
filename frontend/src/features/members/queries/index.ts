@@ -3,6 +3,8 @@ import { toast } from "sonner"
 
 import { useApi } from "../../../hooks/useApi"
 import type {
+    BulkInviteRequest,
+    BulkInviteResponse,
     InviteMemberRequest,
     InviteMemberResponse,
     MemberListResponse,
@@ -80,6 +82,30 @@ export function useDeleteMember() {
         },
         onError: (error) => {
             toast.error(error.message || "Failed to remove member")
+        },
+    })
+}
+
+/**
+ * Mutation hook for bulk inviting members.
+ */
+export function useBulkInviteMembers() {
+    const { bulkInviteMembers } = useApi()
+    const queryClient = useQueryClient()
+
+    return useMutation<BulkInviteResponse, Error, BulkInviteRequest>({
+        mutationFn: bulkInviteMembers,
+        onSuccess: (data) => {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.members.all })
+            if (data.succeeded > 0) {
+                toast.success(`${String(data.succeeded)} invitation${data.succeeded > 1 ? "s" : ""} sent`)
+            }
+            if (data.failed > 0) {
+                toast.error(`${String(data.failed)} invitation${data.failed > 1 ? "s" : ""} failed`)
+            }
+        },
+        onError: (error) => {
+            toast.error(error.message || "Failed to invite members")
         },
     })
 }

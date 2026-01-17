@@ -2,59 +2,10 @@ import { useStytchB2BClient } from "@stytch/react/b2b"
 import type { DiscoveredOrganization } from "@stytch/vanilla-js/b2b"
 import { useCallback, useState } from "react"
 
+import { directLoginOptions, SESSION_DURATION_MINUTES } from "./constants"
 import { initialLoginState, type LoginState } from "./types"
-
-// Session duration: 30 days
-const SESSION_DURATION_MINUTES = 30 * 24 * 60
-
-interface DirectLoginOptions {
-    status: boolean
-    ignoreInvites?: boolean
-    ignoreJitProvisioning?: boolean
-}
-
-const directLoginOptions: DirectLoginOptions = {
-    status: true,
-    ignoreInvites: true,
-    ignoreJitProvisioning: true,
-}
-
-/**
- * Determines if user should auto-login to a single organization.
- * Matches logic from directLoginForSingleMembership in StytchB2B component.
- */
-function getSingleLoginOrg(
-    organizations: DiscoveredOrganization[],
-    options: DirectLoginOptions
-): DiscoveredOrganization | null {
-    if (!options.status) return null
-
-    const activeMembers = organizations.filter(
-        (org) => org.membership.type === "active_member"
-    )
-
-    // Check if there are any pending/invited/JIT orgs that would show the picker
-    const hasPendingOrInvited = organizations.some((org) => {
-        const type = org.membership.type
-        if (
-            (type === "pending_member" || type === "invited_member") &&
-            !options.ignoreInvites
-        ) {
-            return true
-        }
-        if (type === "eligible_to_join_by_email_domain" && !options.ignoreJitProvisioning) {
-            return true
-        }
-        return false
-    })
-
-    // Auto-login only if exactly one active member and no pending/invited/JIT orgs
-    if (activeMembers.length === 1 && !hasPendingOrInvited) {
-        return activeMembers[0]
-    }
-
-    return null
-}
+import { getErrorMessage } from "./utils"
+import { getSingleLoginOrg } from "./utils/org-derivation"
 
 interface UseDiscoveryAuthReturn {
     state: LoginState
@@ -109,12 +60,10 @@ export function useDiscoveryAuth(): UseDiscoveryAuthReturn {
                     step: "check-email",
                 }))
             } catch (err) {
-                const message =
-                    err instanceof Error ? err.message : "Failed to send magic link"
                 setState((prev) => ({
                     ...prev,
                     isLoading: false,
-                    error: message,
+                    error: getErrorMessage(err, "Failed to send magic link"),
                 }))
             }
         },
@@ -125,7 +74,7 @@ export function useDiscoveryAuth(): UseDiscoveryAuthReturn {
      * Start Google OAuth Discovery flow.
      */
     const startGoogleOAuth = useCallback(() => {
-        stytch.oauth.google.discovery.start({
+        void stytch.oauth.google.discovery.start({
             discovery_redirect_url: `${window.location.origin}/auth/callback`,
             custom_scopes: [
                 "https://www.googleapis.com/auth/admin.directory.user.readonly",
@@ -149,14 +98,11 @@ export function useDiscoveryAuth(): UseDiscoveryAuthReturn {
                 const autoLoginOrg = getSingleLoginOrg(orgs, directLoginOptions)
 
                 if (autoLoginOrg) {
-                    // Auto-login to single org
                     await stytch.discovery.intermediateSessions.exchange({
                         organization_id: autoLoginOrg.organization.organization_id,
                         session_duration_minutes: SESSION_DURATION_MINUTES,
                     })
-                    // Session is set, navigation handled by caller
                 } else {
-                    // Show org selection
                     setState((prev) => ({
                         ...prev,
                         email: response.email_address,
@@ -166,12 +112,10 @@ export function useDiscoveryAuth(): UseDiscoveryAuthReturn {
                     }))
                 }
             } catch (err) {
-                const message =
-                    err instanceof Error ? err.message : "Authentication failed"
                 setState((prev) => ({
                     ...prev,
                     isLoading: false,
-                    error: message,
+                    error: getErrorMessage(err, "Authentication failed"),
                 }))
                 throw err
             }
@@ -195,14 +139,11 @@ export function useDiscoveryAuth(): UseDiscoveryAuthReturn {
                 const autoLoginOrg = getSingleLoginOrg(orgs, directLoginOptions)
 
                 if (autoLoginOrg) {
-                    // Auto-login to single org
                     await stytch.discovery.intermediateSessions.exchange({
                         organization_id: autoLoginOrg.organization.organization_id,
                         session_duration_minutes: SESSION_DURATION_MINUTES,
                     })
-                    // Session is set, navigation handled by caller
                 } else {
-                    // Show org selection
                     setState((prev) => ({
                         ...prev,
                         email: response.email_address,
@@ -212,12 +153,10 @@ export function useDiscoveryAuth(): UseDiscoveryAuthReturn {
                     }))
                 }
             } catch (err) {
-                const message =
-                    err instanceof Error ? err.message : "Authentication failed"
                 setState((prev) => ({
                     ...prev,
                     isLoading: false,
-                    error: message,
+                    error: getErrorMessage(err, "Authentication failed"),
                 }))
                 throw err
             }
@@ -237,14 +176,11 @@ export function useDiscoveryAuth(): UseDiscoveryAuthReturn {
                     organization_id: organizationId,
                     session_duration_minutes: SESSION_DURATION_MINUTES,
                 })
-                // Session is set, navigation handled by caller
             } catch (err) {
-                const message =
-                    err instanceof Error ? err.message : "Failed to join organization"
                 setState((prev) => ({
                     ...prev,
                     isLoading: false,
-                    error: message,
+                    error: getErrorMessage(err, "Failed to join organization"),
                 }))
                 throw err
             }

@@ -31,24 +31,25 @@ class TestStorageServiceInit:
             assert service.use_s3 is False
 
     def test_initializes_with_s3(self) -> None:
-        """Should initialize S3 client when USE_S3_STORAGE is True."""
-        with patch("boto3.client") as mock_boto_client:
-            with override_settings(
-                USE_S3_STORAGE=True,
-                AWS_ACCESS_KEY_ID="test-key",
-                AWS_SECRET_ACCESS_KEY="test-secret",
-                AWS_STORAGE_BUCKET_NAME="test-bucket",
-                AWS_S3_REGION_NAME="us-west-2",
-            ):
-                service = StorageService()
+        """Should initialize S3 client when USE_S3_STORAGE is True.
+        
+        Uses default credentials chain (no explicit keys) which works with:
+        - Fargate task IAM role
+        - Local AWS credentials file/env vars
+        - IAM instance profile
+        """
+        with patch("boto3.client") as mock_boto_client, override_settings(
+            USE_S3_STORAGE=True,
+            AWS_STORAGE_BUCKET_NAME="test-bucket",
+            AWS_S3_REGION_NAME="us-west-2",
+        ):
+            service = StorageService()
 
-                assert service.use_s3 is True
-                mock_boto_client.assert_called_once_with(
-                    "s3",
-                    aws_access_key_id="test-key",
-                    aws_secret_access_key="test-secret",
-                    region_name="us-west-2",
-                )
+            assert service.use_s3 is True
+            mock_boto_client.assert_called_once_with(
+                "s3",
+                region_name="us-west-2",
+            )
 
 
 class TestGenerateKey:
@@ -147,23 +148,20 @@ class TestGenerateUploadUrl:
         mock_s3 = MagicMock()
         mock_s3.generate_presigned_url.return_value = "https://s3.aws.com/presigned"
 
-        with patch("boto3.client", return_value=mock_s3):
-            with override_settings(
-                USE_S3_STORAGE=True,
-                AWS_ACCESS_KEY_ID="key",
-                AWS_SECRET_ACCESS_KEY="secret",
-                AWS_STORAGE_BUCKET_NAME="bucket",
-            ):
-                service = StorageService()
-                result = service.generate_upload_url(
-                    key="avatars/123/test.png",
-                    content_type="image/png",
-                    size_bytes=50000,
-                )
+        with patch("boto3.client", return_value=mock_s3), override_settings(
+            USE_S3_STORAGE=True,
+            AWS_STORAGE_BUCKET_NAME="bucket",
+        ):
+            service = StorageService()
+            result = service.generate_upload_url(
+                key="avatars/123/test.png",
+                content_type="image/png",
+                size_bytes=50000,
+            )
 
-                assert result.method == "PUT"
-                assert "presigned" in result.upload_url
-                mock_s3.generate_presigned_url.assert_called_once()
+            assert result.method == "PUT"
+            assert "presigned" in result.upload_url
+            mock_s3.generate_presigned_url.assert_called_once()
 
 
 class TestGetImageDimensions:
@@ -271,19 +269,16 @@ class TestGetImageUrl:
         """Should use custom domain for S3 URLs when configured."""
         mock_s3 = MagicMock()
 
-        with patch("boto3.client", return_value=mock_s3):
-            with override_settings(
-                USE_S3_STORAGE=True,
-                AWS_ACCESS_KEY_ID="key",
-                AWS_SECRET_ACCESS_KEY="secret",
-                AWS_STORAGE_BUCKET_NAME="bucket",
-                AWS_S3_CUSTOM_DOMAIN="cdn.example.com",
-            ):
-                service = StorageService()
+        with patch("boto3.client", return_value=mock_s3), override_settings(
+            USE_S3_STORAGE=True,
+            AWS_STORAGE_BUCKET_NAME="bucket",
+            AWS_S3_CUSTOM_DOMAIN="cdn.example.com",
+        ):
+            service = StorageService()
 
-                url = service.get_image_url("avatars/123/test.png")
+            url = service.get_image_url("avatars/123/test.png")
 
-                assert url == "https://cdn.example.com/avatars/123/test.png"
+            assert url == "https://cdn.example.com/avatars/123/test.png"
 
 
 class TestSanitizeSVGInStorage:

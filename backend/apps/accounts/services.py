@@ -36,8 +36,12 @@ def get_or_create_user_from_stytch(
     """
     try:
         user = User.objects.select_for_update().get(email=email)
-        user.name = name
-        update_fields = ["name", "updated_at"]
+        update_fields = ["updated_at"]
+        # Only update name if provided and user doesn't have one
+        # This preserves existing names when user joins additional orgs
+        if name and not user.name:
+            user.name = name
+            update_fields.append("name")
         # Only update avatar if provided and user doesn't have one
         if avatar_url and not user.avatar_url:
             user.avatar_url = avatar_url
@@ -222,6 +226,9 @@ def invite_member(
     from apps.accounts.stytch_client import get_stytch_client
 
     stytch = get_stytch_client()
+
+    # Normalize email to prevent search mismatches
+    email = email.strip().lower()
 
     # Map role to Stytch role IDs
     roles = [StytchRoles.ADMIN] if role == "admin" else []
@@ -424,3 +431,294 @@ def sync_logo_to_stytch(organization: Organization) -> None:
             stytch_org_id=organization.stytch_org_id,
             error=e.details.error_message,
         )
+
+
+# --- Bulk Invite Services ---
+
+
+def bulk_invite_members(
+    organization: Organization,
+    members_data: list[dict[str, str]],
+) -> dict[str, Any]:
+    """
+    Invite multiple members to the organization at once.
+
+    Processes each member individually, catching errors per-row to allow
+    partial success. Phone numbers are stored unverified on the User model
+    (will require OTP verification later).
+
+    Args:
+        organization: The organization to invite to
+        members_data: List of dicts with keys: email, name, phone, role
+
+    Returns:
+        Dict with results, total, succeeded, failed counts
+    """
+    import logging
+
+    from stytch.core.response_base import StytchError
+
+    logger = logging.getLogger(__name__)
+    results = []
+    succeeded = 0
+    failed = 0
+
+    for member_item in members_data:
+        email = member_item.get("email", "")
+        name = member_item.get("name", "")
+        phone = member_item.get("phone", "")
+        role = member_item.get("role", "member")
+
+        try:
+            member, invite_status = invite_member(
+                organization=organization,
+                email=email,
+                name=name,
+                role=role,
+            )
+
+            # Store phone number (unverified) on the User if provided
+            if phone:
+                user = member.user
+                # Only update phone if user doesn't have one or it's different
+                if not user.phone_number or user.phone_number != phone:
+                    user.phone_number = phone
+                    user.phone_verified_at = None  # Explicitly mark as unverified
+                    user.save(update_fields=["phone_number", "phone_verified_at", "updated_at"])
+
+            # Provide informative feedback based on invite status
+            if invite_status is False:
+                # Member already active - not an error, but no invite sent
+                results.append(
+                    {
+                        "email": email,
+                        "success": False,
+                        "error": "Member already active in this organization",
+                        "stytch_member_id": member.stytch_member_id,
+                    }
+                )
+                failed += 1
+            elif invite_status == "pending":
+                # Member already invited - not an error, but no new invite sent
+                results.append(
+                    {
+                        "email": email,
+                        "success": False,
+                        "error": "Member already has a pending invitation",
+                        "stytch_member_id": member.stytch_member_id,
+                    }
+                )
+                failed += 1
+            else:
+                # New invite sent successfully
+                results.append(
+                    {
+                        "email": email,
+                        "success": True,
+                        "error": None,
+                        "stytch_member_id": member.stytch_member_id,
+                    }
+                )
+                succeeded += 1
+
+        except StytchError as e:
+            error_msg = e.details.error_message if e.details else str(e)
+            logger.warning(
+                "Bulk invite failed for %s: %s",
+                email,
+                error_msg,
+            )
+            results.append(
+                {
+                    "email": email,
+                    "success": False,
+                    "error": error_msg,
+                    "stytch_member_id": None,
+                }
+            )
+            failed += 1
+
+        except Exception as e:
+            logger.exception("Unexpected error inviting %s", email)
+            results.append(
+                {
+                    "email": email,
+                    "success": False,
+                    "error": str(e),
+                    "stytch_member_id": None,
+                }
+            )
+            failed += 1
+
+    return {
+        "results": results,
+        "total": len(members_data),
+        "succeeded": succeeded,
+        "failed": failed,
+    }
+
+
+# --- Mobile Provisioning Services ---
+
+
+def provision_mobile_user(
+    email: str,
+    name: str = "",
+    phone_number: str = "",
+    organization_id: str | None = None,
+    organization_name: str | None = None,
+    organization_slug: str | None = None,
+) -> tuple[User, Member, Organization, str, str]:
+    """
+    Provision a mobile user and create a Stytch session via Trusted Auth.
+
+    Either joins an existing org (organization_id) or creates a new one
+    (organization_name + organization_slug).
+
+    Args:
+        email: User's email address
+        name: User's display name (optional)
+        phone_number: User's phone number in E.164 format (optional, stored unverified)
+        organization_id: Stytch org ID to join existing org
+        organization_name: Name for new organization (requires organization_slug)
+        organization_slug: Slug for new organization (requires organization_name)
+
+    Returns:
+        Tuple of (user, member, org, session_token, session_jwt)
+
+    Raises:
+        ValueError: If input validation fails
+        StytchError: If Stytch API call fails
+    """
+    from django.conf import settings as django_settings
+
+    from apps.accounts.stytch_client import get_stytch_client
+    from apps.passkeys.trusted_auth import create_trusted_auth_token
+
+    # Input validation
+    email = email.strip().lower()
+    creating_org = organization_name is not None or organization_slug is not None
+    joining_org = organization_id is not None
+
+    if creating_org and joining_org:
+        raise ValueError("Cannot specify both organization_id and organization_name/slug")
+
+    if not creating_org and not joining_org:
+        raise ValueError("Must specify either organization_id or organization_name and organization_slug")
+
+    if creating_org and (not organization_name or not organization_slug):
+        raise ValueError("Both organization_name and organization_slug are required to create an organization")
+
+    stytch = get_stytch_client()
+    stytch_org_id: str
+    stytch_member_id: str
+    stytch_member: Any  # Stytch Member object
+    stytch_organization: Any  # Stytch Organization object
+
+    if creating_org:
+        # Create new organization
+        org_response = stytch.organizations.create(
+            organization_name=organization_name,
+            organization_slug=organization_slug,
+        )
+        stytch_org_id = org_response.organization.organization_id
+        stytch_organization = org_response.organization
+
+        # Create member in the new org
+        member_response = stytch.organizations.members.create(
+            organization_id=stytch_org_id,
+            email_address=email,
+            name=name if name else None,
+        )
+        stytch_member_id = member_response.member.member_id
+        stytch_member = member_response.member
+
+        # Make the creator an admin
+        stytch.organizations.members.update(
+            organization_id=stytch_org_id,
+            member_id=stytch_member_id,
+            roles=[StytchRoles.ADMIN],
+        )
+    else:
+        # Join existing organization
+        stytch_org_id = organization_id  # type: ignore[assignment]
+
+        # Get org details
+        org_response = stytch.organizations.get(organization_id=stytch_org_id)
+        stytch_organization = org_response.organization
+
+        # Check if member already exists
+        search_result = stytch.organizations.members.search(
+            organization_ids=[stytch_org_id],
+            query={
+                "operator": "AND",
+                "operands": [{"filter_name": "member_emails", "filter_value": [email]}],
+            },
+        )
+
+        if search_result.members:
+            existing_member = search_result.members[0]
+            member_status = getattr(existing_member, "status", "active")
+
+            if member_status == "deleted":
+                # Reactivate deleted member
+                stytch.organizations.members.reactivate(
+                    organization_id=stytch_org_id,
+                    member_id=existing_member.member_id,
+                )
+
+            stytch_member_id = existing_member.member_id
+
+            # Update name if provided
+            if name:
+                stytch.organizations.members.update(
+                    organization_id=stytch_org_id,
+                    member_id=stytch_member_id,
+                    name=name,
+                )
+
+            # Fetch updated member
+            member_response = stytch.organizations.members.get(
+                organization_id=stytch_org_id,
+                member_id=stytch_member_id,
+            )
+            stytch_member = member_response.member
+        else:
+            # Create new member
+            member_response = stytch.organizations.members.create(
+                organization_id=stytch_org_id,
+                email_address=email,
+                name=name if name else None,
+            )
+            stytch_member_id = member_response.member.member_id
+            stytch_member = member_response.member
+
+    # Sync to local database
+    user, member, org = sync_session_to_local(
+        stytch_member=stytch_member,
+        stytch_organization=stytch_organization,
+    )
+
+    # Store phone number if provided (unverified)
+    if phone_number:
+        user.phone_number = phone_number
+        user.phone_verified_at = None
+        user.save(update_fields=["phone_number", "phone_verified_at", "updated_at"])
+
+    # Create trusted auth token for session attestation
+    trusted_token = create_trusted_auth_token(
+        email=user.email,
+        member_id=stytch_member_id,
+        organization_id=stytch_org_id,
+        user_id=user.id,
+    )
+
+    # Exchange for real Stytch session
+    attest_response = stytch.sessions.attest(
+        profile_id=django_settings.STYTCH_TRUSTED_AUTH_PROFILE_ID,
+        token=trusted_token,
+        organization_id=stytch_org_id,
+        session_duration_minutes=43200,  # 30 days
+    )
+
+    return user, member, org, attest_response.session_token, attest_response.session_jwt

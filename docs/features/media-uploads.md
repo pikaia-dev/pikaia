@@ -31,13 +31,33 @@ sequenceDiagram
 
 **Backend** (`config/settings/base.py`):
 ```python
+# Upload limits
 MEDIA_MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
 MEDIA_ALLOWED_IMAGE_TYPES = [
     "image/jpeg", "image/png", "image/webp",
     "image/svg+xml", "image/avif",
 ]
+
+# Storage backend (set via environment variables in production)
 USE_S3_STORAGE = False  # Set True in production
+AWS_STORAGE_BUCKET_NAME = ""  # S3 bucket name
+AWS_S3_REGION_NAME = "us-east-1"
+AWS_S3_CUSTOM_DOMAIN = ""  # CloudFront domain for CDN
+IMAGE_TRANSFORM_URL = ""  # URL for on-the-fly image resizing
 ```
+
+**Production Environment** (auto-configured by CDK):
+
+| Variable | Description |
+|----------|-------------|
+| `USE_S3_STORAGE` | `true` when media bucket is configured |
+| `AWS_STORAGE_BUCKET_NAME` | S3 bucket from `TangoMedia` stack |
+| `AWS_S3_REGION_NAME` | AWS region |
+| `AWS_S3_CUSTOM_DOMAIN` | CloudFront distribution domain |
+| `IMAGE_TRANSFORM_URL` | CloudFront URL for Lambda@Edge image transformation |
+
+> [!NOTE]
+> In production on Fargate, S3 credentials are obtained from the task's IAM role - no explicit keys needed.
 
 ### SVG Security
 

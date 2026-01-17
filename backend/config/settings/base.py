@@ -16,7 +16,14 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "django-insecure-change-me-in-production"
     DEBUG: bool = False
     ALLOWED_HOSTS: str = ""  # Comma-separated list, e.g. "localhost,127.0.0.1"
-    DATABASE_URL: PostgresDsn = "postgresql://postgres:postgres@localhost:5432/tango"
+
+    # Database - supports both DATABASE_URL (local) and individual DB_* vars (ECS)
+    DATABASE_URL: PostgresDsn | None = None
+    DB_HOST: str = ""
+    DB_PORT: str = "5432"
+    DB_NAME: str = ""
+    DB_USER: str = ""
+    DB_PASSWORD: str = ""
 
     # Stytch
     STYTCH_PROJECT_ID: str = ""
@@ -37,6 +44,32 @@ class Settings(BaseSettings):
     # Events
     EVENT_BACKEND: str = "local"  # "local" or "eventbridge"
     EVENT_BUS_NAME: str = ""  # AWS EventBridge bus name (required for eventbridge backend)
+
+    # S3 Media Storage (production)
+    USE_S3_STORAGE: bool = False
+    AWS_STORAGE_BUCKET_NAME: str = ""
+    AWS_S3_REGION_NAME: str = "us-east-1"
+    AWS_S3_CUSTOM_DOMAIN: str = ""  # CloudFront domain for media CDN
+    IMAGE_TRANSFORM_URL: str = ""  # URL for dynamic image transformation
+
+    # WebAuthn / Passkeys
+    WEBAUTHN_RP_ID: str = "localhost"
+    WEBAUTHN_ORIGIN: str = "http://localhost:5173"
+
+    # Stytch Trusted Auth Token (for passkey -> Stytch session)
+    STYTCH_TRUSTED_AUTH_PROFILE_ID: str = ""  # From Stytch dashboard
+    STYTCH_TRUSTED_AUTH_AUDIENCE: str = "stytch"  # Must match dashboard config
+    STYTCH_TRUSTED_AUTH_ISSUER: str = "passkey-auth"  # Must match dashboard config
+    PASSKEY_JWT_PRIVATE_KEY: str = ""  # RSA private key (PEM format)
+
+    # Mobile provisioning
+    MOBILE_PROVISION_API_KEY: str = ""  # API key for mobile app user provisioning
+
+    # AWS SMS (End User Messaging)
+    AWS_SMS_REGION: str = "us-east-1"  # AWS region for SMS service
+    AWS_SMS_ORIGINATION_IDENTITY: str = ""  # Phone number or sender ID
+    AWS_SMS_OTP_LENGTH: int = 4  # Length of OTP codes
+    AWS_SMS_OTP_EXPIRY_MINUTES: int = 30  # OTP expiration time
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
@@ -68,6 +101,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",
     # Third-party
     "corsheaders",
     "storages",
@@ -78,6 +112,9 @@ INSTALLED_APPS = [
     "apps.organizations",
     "apps.billing",
     "apps.media",
+    "apps.passkeys",
+    "apps.webhooks",
+    "apps.sms",
 ]
 
 MIDDLEWARE = [
@@ -89,7 +126,6 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "apps.core.middleware.StytchAuthMiddleware",
-    "apps.core.middleware.TenantContextMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -115,22 +151,61 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 
-# Database - parsed from DATABASE_URL
-def _parse_postgres_dsn(dsn: PostgresDsn) -> dict:
-    """Convert pydantic PostgresDsn to Django DATABASES format."""
-    # pydantic v2: hosts() returns list of dicts with username, password, host, port
-    host_info = dsn.hosts()[0] if dsn.hosts() else {}
-    return {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": dsn.path.lstrip("/") if dsn.path else "",
-        "USER": host_info.get("username") or "",
-        "PASSWORD": host_info.get("password") or "",
-        "HOST": host_info.get("host") or "localhost",
-        "PORT": str(host_info.get("port") or 5432),
-    }
+# CORS configuration
+CORS_ALLOW_CREDENTIALS = True
 
 
-DATABASES = {"default": _parse_postgres_dsn(settings.DATABASE_URL)}
+# Cookie security and cross-domain settings
+# Required for frontend/backend cross-origin session sharing
+SESSION_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SECURE = True
+CSRF_TRUSTED_ORIGINS = parse_comma_list(settings.WEBAUTHN_ORIGIN)
+
+
+# Database configuration
+def _get_database_config() -> dict:
+    """Build Django DATABASES config.
+    
+    For ECS: Uses individual DB_* environment variables directly (no URL encoding needed).
+    For local: Uses DATABASE_URL or default localhost.
+    """
+    if settings.DB_HOST:
+        # ECS: Use individual env vars directly - no URL parsing needed
+        return {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": settings.DB_NAME,
+            "USER": settings.DB_USER,
+            "PASSWORD": settings.DB_PASSWORD,
+            "HOST": settings.DB_HOST,
+            "PORT": settings.DB_PORT,
+        }
+    elif settings.DATABASE_URL:
+        # Local dev: Parse DATABASE_URL via pydantic
+        dsn = settings.DATABASE_URL
+        host_info = dsn.hosts()[0] if dsn.hosts() else {}
+        return {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": dsn.path.lstrip("/") if dsn.path else "",
+            "USER": host_info.get("username") or "",
+            "PASSWORD": host_info.get("password") or "",
+            "HOST": host_info.get("host") or "localhost",
+            "PORT": str(host_info.get("port") or 5432),
+        }
+    else:
+        # Default for local dev without DATABASE_URL
+        return {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": settings.DB_NAME or "app",
+            "USER": "postgres",
+            "PASSWORD": "postgres",
+            "HOST": "localhost",
+            "PORT": "5432",
+        }
+
+
+DATABASES = {"default": _get_database_config()}
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -146,6 +221,16 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
+# Cache - use database cache for passkey challenges
+# This ensures challenges persist across multiple ECS tasks/containers
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "django_cache",
+    }
+}
+
+
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "static/"
 
@@ -153,8 +238,14 @@ STATIC_URL = "static/"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Storage backend - defaults to local filesystem
-USE_S3_STORAGE = False
+# Storage backend - from environment variable
+USE_S3_STORAGE = settings.USE_S3_STORAGE
+
+# S3 storage settings (used when USE_S3_STORAGE=True)
+AWS_STORAGE_BUCKET_NAME = settings.AWS_STORAGE_BUCKET_NAME
+AWS_S3_REGION_NAME = settings.AWS_S3_REGION_NAME
+AWS_S3_CUSTOM_DOMAIN = settings.AWS_S3_CUSTOM_DOMAIN or None
+IMAGE_TRANSFORM_URL = settings.IMAGE_TRANSFORM_URL or None
 
 # Media upload limits
 MEDIA_MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
@@ -180,3 +271,23 @@ STYTCH_WEBHOOK_SECRET = settings.STYTCH_WEBHOOK_SECRET
 # Event-driven architecture
 EVENT_BACKEND = settings.EVENT_BACKEND
 EVENT_BUS_NAME = settings.EVENT_BUS_NAME
+
+# WebAuthn / Passkeys
+WEBAUTHN_RP_ID = settings.WEBAUTHN_RP_ID
+WEBAUTHN_RP_NAME = "Tango B2B"
+WEBAUTHN_ORIGIN = settings.WEBAUTHN_ORIGIN
+
+# Stytch Trusted Auth Token (for passkey -> Stytch session)
+STYTCH_TRUSTED_AUTH_PROFILE_ID = settings.STYTCH_TRUSTED_AUTH_PROFILE_ID
+STYTCH_TRUSTED_AUTH_AUDIENCE = settings.STYTCH_TRUSTED_AUTH_AUDIENCE
+STYTCH_TRUSTED_AUTH_ISSUER = settings.STYTCH_TRUSTED_AUTH_ISSUER
+PASSKEY_JWT_PRIVATE_KEY = settings.PASSKEY_JWT_PRIVATE_KEY
+
+# Mobile provisioning
+MOBILE_PROVISION_API_KEY = settings.MOBILE_PROVISION_API_KEY
+
+# AWS SMS (End User Messaging)
+AWS_SMS_REGION = settings.AWS_SMS_REGION
+AWS_SMS_ORIGINATION_IDENTITY = settings.AWS_SMS_ORIGINATION_IDENTITY
+AWS_SMS_OTP_LENGTH = settings.AWS_SMS_OTP_LENGTH
+AWS_SMS_OTP_EXPIRY_MINUTES = settings.AWS_SMS_OTP_EXPIRY_MINUTES

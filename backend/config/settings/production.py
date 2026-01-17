@@ -115,6 +115,10 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_CLOUDFRONT_FORWARDED_PROTO", "https")
 
+# Use the original host header from CloudFront, not the ALB's internal hostname
+# This ensures redirects go to b2b.demo.tango.agency, not the ALB DNS name
+USE_X_FORWARDED_HOST = True
+
 # CORS - read from environment, required for frontend to work
 CORS_ALLOWED_ORIGINS = parse_comma_list(settings.CORS_ALLOWED_ORIGINS or "")
 

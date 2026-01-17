@@ -3,6 +3,7 @@ Tests for event models.
 """
 
 import pytest
+from django.db import IntegrityError
 from django.utils import timezone
 
 from apps.events.models import AuditLog, OutboxEvent
@@ -104,7 +105,7 @@ class TestOutboxEvent:
             payload={"data": {}},
         )
 
-        with pytest.raises(Exception):  # IntegrityError
+        with pytest.raises(IntegrityError):
             OutboxEvent.objects.create(
                 event_id=event_id,
                 event_type="member.invited",

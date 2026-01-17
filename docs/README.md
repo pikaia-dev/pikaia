@@ -10,6 +10,7 @@ Technical documentation for the Tango Django SaaS Starter.
 
 ### Features
 - [Authentication](./features/authentication.md) — Stytch B2B auth flow
+- [Mobile Authentication](./features/mobile-authentication.md) — Mobile provisioning and phone OTP
 - [Organizations](./features/organizations.md) — Multi-tenancy and member management
 - [Billing](./features/billing.md) — Stripe integration and payment flows
 

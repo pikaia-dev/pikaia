@@ -7,6 +7,7 @@ Tests token retrieval from Stytch and directory user search.
 from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 from stytch.core.response_base import StytchError, StytchErrorDetails
 
@@ -91,20 +92,12 @@ class TestSearchDirectoryUsers:
             role="admin",
         )
 
-    def test_returns_empty_list_when_no_member_found(self) -> None:
-        """Should return empty list when user has no member."""
-        orphan_user = UserFactory(email="orphan@example.com")
-
-        result = search_directory_users(orphan_user, "test query")
-
-        assert result == []
-
     @patch("apps.accounts.google_directory.get_google_access_token")
     def test_returns_empty_list_when_no_oauth_token(self, mock_get_token: MagicMock) -> None:
         """Should return empty list when user has no Google OAuth token."""
         mock_get_token.return_value = None
 
-        result = search_directory_users(self.user, "test query")
+        result = search_directory_users(self.user, self.member, "test query")
 
         assert result == []
 
@@ -133,7 +126,7 @@ class TestSearchDirectoryUsers:
         }
         mock_httpx_get.return_value = mock_response
 
-        result = search_directory_users(self.user, "user")
+        result = search_directory_users(self.user, self.member, "user")
 
         assert len(result) == 2
         assert isinstance(result[0], DirectoryUser)
@@ -154,7 +147,7 @@ class TestSearchDirectoryUsers:
         mock_response.status_code = 403
         mock_httpx_get.return_value = mock_response
 
-        result = search_directory_users(self.user, "query")
+        result = search_directory_users(self.user, self.member, "query")
 
         assert result == []
 
@@ -164,23 +157,23 @@ class TestSearchDirectoryUsers:
         self, mock_get_token: MagicMock, mock_httpx_get: MagicMock
     ) -> None:
         """Should return empty list on HTTP errors."""
-        import httpx
-
         mock_get_token.return_value = "google-access-token"
         mock_httpx_get.side_effect = httpx.ConnectError("Connection failed")
 
-        result = search_directory_users(self.user, "query")
+        result = search_directory_users(self.user, self.member, "query")
 
         assert result == []
 
     def test_returns_empty_list_when_user_email_invalid(self) -> None:
         """Should return empty list when user email has no domain."""
         user_no_domain = UserFactory(email="invalid-email")
-        MemberFactory(user=user_no_domain, organization=self.org, role="member")
+        member_with_invalid_email = MemberFactory(
+            user=user_no_domain, organization=self.org, role="member"
+        )
 
         with patch("apps.accounts.google_directory.get_google_access_token") as mock_get_token:
             mock_get_token.return_value = "google-access-token"
-            result = search_directory_users(user_no_domain, "query")
+            result = search_directory_users(user_no_domain, member_with_invalid_email, "query")
 
         assert result == []
 
@@ -196,7 +189,7 @@ class TestSearchDirectoryUsers:
         mock_response.json.return_value = {"users": []}
         mock_httpx_get.return_value = mock_response
 
-        search_directory_users(self.user, "search query", limit=5)
+        search_directory_users(self.user, self.member, "search query", limit=5)
 
         mock_httpx_get.assert_called_once()
         call_args = mock_httpx_get.call_args

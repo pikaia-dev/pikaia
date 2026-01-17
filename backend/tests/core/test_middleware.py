@@ -23,11 +23,6 @@ class MockMemberSession:
 
 
 @dataclass
-class MockJWTAuthResponse:
-    member_session: MockMemberSession
-
-
-@dataclass
 class MockStytchMember:
     member_id: str
     email_address: str
@@ -43,7 +38,17 @@ class MockStytchOrg:
 
 
 @dataclass
+class MockJWTAuthResponse:
+    """Mock for sessions.authenticate_jwt response (local JWT verification)."""
+
+    member: MockStytchMember
+    member_session: MockMemberSession
+
+
+@dataclass
 class MockFullAuthResponse:
+    """Mock for sessions.authenticate response (full API call)."""
+
     member: MockStytchMember
     organization: MockStytchOrg
 
@@ -118,7 +123,7 @@ class TestJWTAuthentication:
         mock_get_client: MagicMock,
         middleware: StytchAuthMiddleware,
     ) -> None:
-        """Valid JWT with existing local member populates auth context."""
+        """Valid JWT with existing local member populates auth context (fast path)."""
         # Create local records
         user = User.objects.create(email="test@example.com", name="Test User")
         org = Organization.objects.create(
@@ -133,20 +138,16 @@ class TestJWTAuthentication:
             role="member",
         )
 
-        # Mock Stytch full authenticate response
+        # Mock local JWT verification (no API call)
         mock_client = MagicMock()
-        mock_client.sessions.authenticate.return_value = MockFullAuthResponse(
+        mock_client.sessions.authenticate_jwt.return_value = MockJWTAuthResponse(
             member=MockStytchMember(
                 member_id="member-123",
                 email_address="test@example.com",
                 name="Test User",
                 roles=[],
             ),
-            organization=MockStytchOrg(
-                organization_id="org-123",
-                organization_name="Test Org",
-                organization_slug="test-org",
-            ),
+            member_session=MockMemberSession(member_id="member-123"),
         )
         mock_get_client.return_value = mock_client
 
@@ -154,6 +155,8 @@ class TestJWTAuthentication:
         request = make_request("/api/v1/test", "Bearer valid-jwt")
         middleware(request)
 
+        # Fast path: should use local DB, NOT call sessions.authenticate
+        mock_client.sessions.authenticate.assert_not_called()
         assert request.auth_user.email == "test@example.com"
         assert request.auth_member.stytch_member_id == "member-123"
         assert request.auth_organization.stytch_org_id == "org-123"
@@ -166,7 +169,8 @@ class TestJWTAuthentication:
     ) -> None:
         """Invalid/expired JWT results in None auth context."""
         mock_client = MagicMock()
-        mock_client.sessions.authenticate.side_effect = StytchError(
+        # Local JWT verification fails
+        mock_client.sessions.authenticate_jwt.side_effect = StytchError(
             StytchErrorDetails(
                 status_code=401,
                 request_id="test-request-id",
@@ -195,13 +199,19 @@ class TestJITSync:
         middleware: StytchAuthMiddleware,
     ) -> None:
         """JIT sync creates User, Member, Organization when not in local DB."""
-        # Mock JWT validation succeeds
+        # Mock JWT validation succeeds with member data
         mock_client = MagicMock()
         mock_client.sessions.authenticate_jwt.return_value = MockJWTAuthResponse(
-            member_session=MockMemberSession(member_id="member-new-456")
+            member=MockStytchMember(
+                member_id="member-new-456",
+                email_address="new@example.com",
+                name="New User",
+                roles=[],
+            ),
+            member_session=MockMemberSession(member_id="member-new-456"),
         )
 
-        # Mock full authenticate for JIT sync
+        # Mock full authenticate for JIT sync (called when member not in local DB)
         mock_client.sessions.authenticate.return_value = MockFullAuthResponse(
             member=MockStytchMember(
                 member_id="member-new-456",
@@ -223,6 +233,9 @@ class TestJITSync:
         request = make_request("/api/v1/test", "Bearer valid-jwt")
         middleware(request)
 
+        # Slow path: should call full authenticate since member not in DB
+        mock_client.sessions.authenticate.assert_called_once()
+
         # Records should be created
         assert request.auth_user is not None
         assert request.auth_user.email == "new@example.com"
@@ -242,10 +255,16 @@ class TestJITSync:
         mock_get_client: MagicMock,
         middleware: StytchAuthMiddleware,
     ) -> None:
-        """Calling JIT sync twice for same member doesn't create duplicates."""
+        """First request syncs from Stytch, second uses local DB (fast path)."""
         mock_client = MagicMock()
         mock_client.sessions.authenticate_jwt.return_value = MockJWTAuthResponse(
-            member_session=MockMemberSession(member_id="member-idempotent-123")
+            member=MockStytchMember(
+                member_id="member-idempotent-123",
+                email_address="idempotent@example.com",
+                name="Idempotent User",
+                roles=[],
+            ),
+            member_session=MockMemberSession(member_id="member-idempotent-123"),
         )
         mock_client.sessions.authenticate.return_value = MockFullAuthResponse(
             member=MockStytchMember(
@@ -262,11 +281,11 @@ class TestJITSync:
         )
         mock_get_client.return_value = mock_client
 
-        # First request - creates records
+        # First request - creates records (slow path)
         request1 = make_request("/api/v1/test", "Bearer jwt1")
         middleware(request1)
 
-        # Second request - should reuse same records
+        # Second request - should use local DB (fast path)
         request2 = make_request("/api/v1/test", "Bearer jwt2")
         middleware(request2)
 
@@ -274,6 +293,9 @@ class TestJITSync:
         assert User.objects.filter(email="idempotent@example.com").count() == 1
         assert Member.objects.filter(stytch_member_id="member-idempotent-123").count() == 1
         assert Organization.objects.filter(stytch_org_id="org-idempotent-456").count() == 1
+
+        # Full authenticate should only be called once (first request)
+        assert mock_client.sessions.authenticate.call_count == 1
 
     @patch("apps.accounts.stytch_client.get_stytch_client")
     def test_jit_sync_failure_leaves_auth_none(
@@ -283,11 +305,17 @@ class TestJITSync:
     ) -> None:
         """If JIT sync fails, auth context remains None."""
         mock_client = MagicMock()
-        # JWT validates successfully
+        # JWT validates successfully locally
         mock_client.sessions.authenticate_jwt.return_value = MockJWTAuthResponse(
-            member_session=MockMemberSession(member_id="member-fail-123")
+            member=MockStytchMember(
+                member_id="member-fail-123",
+                email_address="fail@example.com",
+                name="Fail User",
+                roles=[],
+            ),
+            member_session=MockMemberSession(member_id="member-fail-123"),
         )
-        # But full authenticate fails
+        # But full authenticate fails (member not in local DB, so it tries to sync)
         mock_client.sessions.authenticate.side_effect = StytchError(
             StytchErrorDetails(
                 status_code=401,
@@ -319,7 +347,13 @@ class TestAdminRoleSync:
         """Member with stytch_admin role gets admin role locally."""
         mock_client = MagicMock()
         mock_client.sessions.authenticate_jwt.return_value = MockJWTAuthResponse(
-            member_session=MockMemberSession(member_id="member-admin-test")
+            member=MockStytchMember(
+                member_id="member-admin-test",
+                email_address="admin@example.com",
+                name="Admin User",
+                roles=[{"role_id": "stytch_admin"}, {"role_id": "editor"}],
+            ),
+            member_session=MockMemberSession(member_id="member-admin-test"),
         )
         mock_client.sessions.authenticate.return_value = MockFullAuthResponse(
             member=MockStytchMember(

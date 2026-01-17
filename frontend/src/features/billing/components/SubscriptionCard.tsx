@@ -11,8 +11,8 @@ import {
 } from "../../../components/ui/card"
 import type { SubscriptionInfo } from "../../../lib/api"
 import {
+    useConfirmSubscription,
     useCreatePortalSession,
-    useRefreshSubscription,
 } from "../queries"
 
 interface SubscriptionCardProps {
@@ -30,7 +30,7 @@ export function SubscriptionCard({
 }: SubscriptionCardProps) {
     const [showUpgradeForm, setShowUpgradeForm] = useState(false)
     const createPortalMutation = useCreatePortalSession()
-    const refreshSubscription = useRefreshSubscription()
+    const confirmSubscriptionMutation = useConfirmSubscription()
 
     const isSubscribed = subscription && subscription.status !== "none"
 
@@ -43,9 +43,9 @@ export function SubscriptionCard({
         })
     }
 
-    const handleUpgradeSuccess = () => {
+    const handleUpgradeSuccess = (subscriptionId: string) => {
         setShowUpgradeForm(false)
-        refreshSubscription()
+        confirmSubscriptionMutation.mutate({ subscription_id: subscriptionId })
     }
 
     const handleManageSubscription = () => {

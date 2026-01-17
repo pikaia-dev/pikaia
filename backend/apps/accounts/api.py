@@ -8,6 +8,8 @@ Handles Stytch B2B authentication flows:
 - User profile and organization settings
 """
 
+import contextlib
+
 from django.http import HttpRequest
 from ninja import Router
 from ninja.errors import HttpError
@@ -17,10 +19,14 @@ from apps.accounts.models import Member
 from apps.accounts.schemas import (
     BillingAddressSchema,
     BillingInfoResponse,
+    BulkInviteRequest,
+    BulkInviteResponse,
+    BulkInviteResultItem,
     DirectoryUserSchema,
     DiscoveredOrganization,
     DiscoveryCreateOrgRequest,
     DiscoveryExchangeRequest,
+    EmailUpdateResponse,
     InviteMemberRequest,
     InviteMemberResponse,
     MagicLinkAuthenticateRequest,
@@ -31,13 +37,13 @@ from apps.accounts.schemas import (
     MemberListResponse,
     MeResponse,
     MessageResponse,
+    MobileProvisionRequest,
     OrganizationDetailResponse,
     OrganizationInfo,
-    EmailUpdateResponse,
     PhoneOtpResponse,
     SendPhoneOtpRequest,
-    StartEmailUpdateRequest,
     SessionResponse,
+    StartEmailUpdateRequest,
     UpdateBillingRequest,
     UpdateMemberRoleRequest,
     UpdateOrganizationRequest,
@@ -46,8 +52,10 @@ from apps.accounts.schemas import (
     VerifyPhoneOtpRequest,
 )
 from apps.accounts.services import (
+    bulk_invite_members,
     invite_member,
     list_organization_members,
+    provision_mobile_user,
     soft_delete_member,
     sync_session_to_local,
     update_member_role,
@@ -161,6 +169,9 @@ def create_organization(
         if "slug" in error_msg or "duplicate" in error_msg:
             logger.warning("Organization slug conflict: %s", e.details.error_message)
             raise HttpError(409, "Organization slug already in use. Try a different one.") from e
+        if "name" in error_msg and ("use" in error_msg or "exist" in error_msg or "taken" in error_msg):
+            logger.warning("Organization name conflict: %s", e.details.error_message)
+            raise HttpError(409, "Organization name already in use. Try a different one.") from e
         logger.warning("Failed to create organization: %s", e.details.error_message)
         raise HttpError(400, "Failed to create organization.") from e
 
@@ -237,6 +248,96 @@ def exchange_session(
         session_jwt=response.session_jwt,
         member_id=response.member.member_id,
         organization_id=response.organization.organization_id,
+    )
+
+
+# --- Mobile Provisioning ---
+
+
+@router.post(
+    "/mobile/provision",
+    response={200: SessionResponse, 400: ErrorResponse, 401: ErrorResponse, 409: ErrorResponse},
+    operation_id="provisionMobileUser",
+    summary="Provision mobile user (API key auth)",
+)
+def provision_mobile_user_endpoint(
+    request: HttpRequest,
+    payload: MobileProvisionRequest,
+) -> SessionResponse:
+    """
+    Provision a user for mobile app and return session tokens.
+
+    Requires X-Mobile-API-Key header with valid API key.
+    Creates user/member in Stytch and local DB, returns session credentials.
+
+    Either provide organization_id to join an existing org,
+    or organization_name + organization_slug to create a new one.
+    """
+    from django.conf import settings as django_settings
+
+    # Validate API key
+    api_key = request.headers.get("X-Mobile-API-Key")
+    expected_key = django_settings.MOBILE_PROVISION_API_KEY
+
+    if not expected_key:
+        logger.error("MOBILE_PROVISION_API_KEY not configured")
+        raise HttpError(401, "Mobile provisioning not configured")
+
+    if not api_key or api_key != expected_key:
+        raise HttpError(401, "Invalid or missing API key")
+
+    try:
+        user, member, org, session_token, session_jwt = provision_mobile_user(
+            email=payload.email,
+            name=payload.name,
+            phone_number=payload.phone_number,
+            organization_id=payload.organization_id,
+            organization_name=payload.organization_name,
+            organization_slug=payload.organization_slug,
+        )
+    except ValueError as e:
+        raise HttpError(400, str(e)) from None
+    except StytchError as e:
+        error_msg = e.details.error_message.lower() if e.details.error_message else ""
+        if "slug" in error_msg or "duplicate" in error_msg:
+            logger.warning("Organization slug conflict: %s", e.details.error_message)
+            raise HttpError(409, "Organization slug already in use. Try a different one.") from None
+        logger.warning("Mobile provisioning failed: %s", e.details.error_message)
+        raise HttpError(400, f"Provisioning failed: {e.details.error_message}") from None
+
+    # Emit appropriate event
+    if payload.organization_id:
+        # Joined existing org
+        publish_event(
+            event_type="member.joined",
+            aggregate=member,
+            data={
+                "email": user.email,
+                "organization_name": org.name,
+                "source": "mobile_provision",
+            },
+            actor=user,
+        )
+    else:
+        # Created new org
+        publish_event(
+            event_type="organization.created",
+            aggregate=org,
+            data={
+                "name": org.name,
+                "slug": org.slug,
+                "stytch_org_id": org.stytch_org_id,
+                "created_by_member_id": str(member.id),
+                "source": "mobile_provision",
+            },
+            actor=user,
+        )
+
+    return SessionResponse(
+        session_token=session_token,
+        session_jwt=session_jwt,
+        member_id=member.stytch_member_id,
+        organization_id=org.stytch_org_id,
     )
 
 
@@ -409,7 +510,7 @@ def send_phone_otp(request: HttpRequest, payload: SendPhoneOtpRequest) -> PhoneO
         )
     except StytchError as e:
         logger.warning("Failed to send phone OTP: %s", e.details.error_message)
-        raise HttpError(400, e.details.error_message or "Failed to send verification code")
+        raise HttpError(400, e.details.error_message or "Failed to send verification code") from None
 
 
 @router.post(
@@ -432,7 +533,7 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
     member = request.auth_member  # type: ignore[attr-defined]
     org = request.auth_organization  # type: ignore[attr-defined]
 
-    # Extract session JWT from auth header
+    # Extract session JWT from auth header (required by Stytch B2B OTP)
     auth_header = request.headers.get("Authorization", "")
     session_jwt = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
 
@@ -440,6 +541,8 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
         client = get_stytch_client()
 
         # Verify the OTP with Stytch
+        # Note: Stytch B2B OTP requires a session field. For sessions created via
+        # trusted auth (passkeys), this will fail with "immutable session" error.
         client.otps.sms.authenticate(
             organization_id=org.stytch_org_id,
             member_id=member.stytch_member_id,
@@ -452,13 +555,11 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
 
         # Handle Stytch phone update (delete-then-update pattern)
         if old_phone:
-            try:
+            with contextlib.suppress(StytchError):
                 client.organizations.members.delete_mfa_phone_number(
                     organization_id=org.stytch_org_id,
                     member_id=member.stytch_member_id,
                 )
-            except StytchError:
-                pass  # No phone to delete
 
         # Set new phone number in Stytch
         client.organizations.members.update(
@@ -494,9 +595,17 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
     except StytchError as e:
         error_msg = e.details.error_message or "Verification failed"
         if "invalid" in error_msg.lower() or "expired" in error_msg.lower():
-            raise HttpError(400, "Invalid or expired verification code")
+            raise HttpError(400, "Invalid or expired verification code") from None
+        if "immutable" in error_msg.lower():
+            # Sessions created via passkey (trusted auth) are immutable and can't
+            # have MFA factors added. User needs to re-authenticate via magic link.
+            raise HttpError(
+                400,
+                "Phone verification is not available for passkey sessions. "
+                "Please log out and sign in with email to update your phone number.",
+            ) from None
         logger.warning("Phone OTP verification failed: %s", error_msg)
-        raise HttpError(400, error_msg)
+        raise HttpError(400, error_msg) from None
 
 
 # --- Email Update ---
@@ -544,7 +653,7 @@ def start_email_update(
     except StytchError as e:
         error_msg = e.details.error_message or "Failed to initiate email update"
         logger.warning("Failed to start email update: %s", error_msg)
-        raise HttpError(400, error_msg)
+        raise HttpError(400, error_msg) from None
 
 
 # --- Organization Settings (Admin Only) ---
@@ -704,14 +813,29 @@ def update_billing(
     summary="List organization members",
 )
 @require_admin
-def list_members(request: HttpRequest) -> MemberListResponse:
+def list_members(
+    request: HttpRequest,
+    offset: int = 0,
+    limit: int | None = None,
+) -> MemberListResponse:
     """
-    List all active members of the current organization.
+    List active members of the current organization with optional pagination.
 
     Admin only.
+
+    Args:
+        offset: Number of records to skip (default 0)
+        limit: Maximum records to return (default None = all)
     """
     org = request.auth_organization  # type: ignore[attr-defined]
-    members = list_organization_members(org)
+    all_members = list_organization_members(org)
+    total = len(all_members)
+
+    # Apply pagination
+    if limit is not None:
+        members = all_members[offset : offset + limit]
+    else:
+        members = all_members[offset:] if offset > 0 else all_members
 
     # Fetch member statuses from Stytch
     stytch = get_stytch_client()
@@ -740,7 +864,10 @@ def list_members(request: HttpRequest) -> MemberListResponse:
                 created_at=m.created_at.isoformat(),
             )
             for m in members
-        ]
+        ],
+        total=total,
+        offset=offset,
+        limit=limit,
     )
 
 
@@ -807,6 +934,110 @@ def invite_member_endpoint(
     return InviteMemberResponse(
         message=message,
         stytch_member_id=new_member.stytch_member_id,
+    )
+
+
+@router.post(
+    "/organization/members/bulk",
+    response={
+        200: BulkInviteResponse,
+        400: ErrorResponse,
+        401: ErrorResponse,
+        403: ErrorResponse,
+    },
+    auth=bearer_auth,
+    operation_id="bulkInviteMembers",
+    summary="Bulk invite multiple members",
+)
+@require_admin
+def bulk_invite_members_endpoint(
+    request: HttpRequest, payload: BulkInviteRequest
+) -> BulkInviteResponse:
+    """
+    Invite multiple members to the organization at once.
+
+    Admin only. Processes each invite individually, allowing partial success.
+    Phone numbers are stored unverified (will require OTP verification later).
+
+    Returns detailed results for each member attempted.
+    """
+    member = request.auth_member  # type: ignore[attr-defined]
+    org = request.auth_organization  # type: ignore[attr-defined]
+
+    current_user_email = member.user.email.lower()
+
+    # Filter out self-invites, normalize emails
+    members_data = []
+    skipped_results = []
+    for item in payload.members:
+        # Normalize email: strip whitespace and lowercase for comparison
+        normalized_email = item.email.strip().lower()
+
+        if normalized_email == current_user_email:
+            skipped_results.append({
+                "email": item.email.strip(),
+                "success": False,
+                "error": "Cannot invite yourself",
+                "stytch_member_id": None,
+            })
+            continue
+
+        members_data.append({
+            "email": item.email.strip(),  # Use stripped email
+            "name": item.name.strip() if item.name else "",
+            "phone": item.phone.strip() if item.phone else "",
+            "role": item.role,
+        })
+
+    if not members_data:
+        # All members were skipped (self-invites or existing members)
+        return BulkInviteResponse(
+            results=[
+                BulkInviteResultItem(
+                    email=r["email"],
+                    success=r["success"],
+                    error=r["error"],
+                    stytch_member_id=r["stytch_member_id"],
+                )
+                for r in skipped_results
+            ],
+            total=len(skipped_results),
+            succeeded=0,
+            failed=len(skipped_results),
+        )
+
+    result = bulk_invite_members(organization=org, members_data=members_data)
+
+    # Emit member.bulk_invited event for successful invites
+    successful_emails = [r["email"] for r in result["results"] if r["success"]]
+    if successful_emails:
+        publish_event(
+            event_type="member.bulk_invited",
+            aggregate=org,
+            data={
+                "emails": successful_emails,
+                "count": len(successful_emails),
+                "invited_by_member_id": str(member.id),
+            },
+            actor=member.user,
+        )
+
+    # Combine skipped results with actual invite results
+    all_results = skipped_results + result["results"]
+
+    return BulkInviteResponse(
+        results=[
+            BulkInviteResultItem(
+                email=r["email"],
+                success=r["success"],
+                error=r["error"],
+                stytch_member_id=r["stytch_member_id"],
+            )
+            for r in all_results
+        ],
+        total=len(all_results),
+        succeeded=result["succeeded"],
+        failed=result["failed"] + len(skipped_results),
     )
 
 
@@ -954,11 +1185,12 @@ def search_directory(request: HttpRequest, q: str = "") -> list[DirectoryUserSch
         return []
 
     user = request.auth_user  # type: ignore[attr-defined]
+    member = request.auth_member  # type: ignore[attr-defined]
 
     # Import here to avoid circular imports
     from apps.accounts.google_directory import search_directory_users
 
-    directory_users = search_directory_users(user, q, limit=10)
+    directory_users = search_directory_users(user, member, q, limit=10)
 
     return [
         DirectoryUserSchema(
@@ -972,7 +1204,7 @@ def search_directory(request: HttpRequest, q: str = "") -> list[DirectoryUserSch
 
 @router.get(
     "/directory/avatar",
-    response={200: bytes, 401: ErrorResponse, 404: ErrorResponse},
+    response={200: bytes, 400: ErrorResponse, 401: ErrorResponse, 404: ErrorResponse},
     auth=bearer_auth,
     operation_id="getDirectoryAvatar",
     summary="Proxy Google Workspace avatar image",
@@ -983,15 +1215,23 @@ def get_directory_avatar(request: HttpRequest, url: str = ""):
 
     Google Directory API avatar URLs require OAuth authentication.
     This endpoint fetches the image server-side and returns it.
+
+    Only allows fetching from Google user content domains (SSRF protection).
     """
     import httpx
     from django.http import HttpResponse as DjangoHttpResponse
 
+    from apps.core.url_validation import SSRFError, validate_avatar_url
+
     if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
         raise HttpError(401, "Not authenticated")
 
-    if not url or not url.startswith("https://"):
-        raise HttpError(404, "Invalid avatar URL")
+    # Validate URL against SSRF attacks
+    try:
+        validate_avatar_url(url)
+    except SSRFError as e:
+        logger.warning("Avatar URL validation failed: %s (url=%s)", e, url)
+        raise HttpError(400, "Invalid avatar URL") from None
 
     # Import here to avoid circular imports
     from apps.accounts.google_directory import get_google_access_token

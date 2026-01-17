@@ -25,4 +25,12 @@ export const queryKeys = {
         invoices: (params?: { limit?: number; starting_after?: string }) =>
             [...queryKeys.billing.all, "invoices", params] as const,
     },
+    webhooks: {
+        all: ["webhooks"] as const,
+        events: () => [...queryKeys.webhooks.all, "events"] as const,
+        endpoints: () => [...queryKeys.webhooks.all, "endpoints"] as const,
+        endpoint: (id: string) => [...queryKeys.webhooks.all, "endpoint", id] as const,
+        deliveries: (endpointId: string) =>
+            [...queryKeys.webhooks.all, "deliveries", endpointId] as const,
+    },
 } as const

@@ -19,6 +19,8 @@ The deployment creates:
 - **ECR** for Docker image storage
 - **Secrets Manager** for sensitive configuration
 - **EventBridge** for event-driven architecture
+- **S3 + CloudFront** for media storage with image transformation
+- **S3 + CloudFront** for frontend SPA hosting
 
 ## Step 1: Configure AWS Profile
 
@@ -56,6 +58,14 @@ Edit `.env.production` with real values:
 | `STRIPE_PRICE_ID` | [Stripe Dashboard](https://dashboard.stripe.com/products) → Your product → Price ID |
 | `STRIPE_WEBHOOK_SECRET` | See Step 5 below |
 | `RESEND_API_KEY` | [Resend Dashboard](https://resend.com/api-keys) |
+| `WEBAUTHN_RP_ID` | Your domain (e.g., `app.example.com`) |
+| `WEBAUTHN_RP_NAME` | Display name for passkey prompts |
+| `WEBAUTHN_ORIGIN` | Full HTTPS URL (e.g., `https://app.example.com`) |
+| `STYTCH_TRUSTED_AUTH_PROFILE_ID` | [Stytch Dashboard](https://stytch.com/dashboard/trusted-auth-tokens) → Create profile |
+| `STYTCH_TRUSTED_AUTH_AUDIENCE` | Must match Stytch profile (default: `stytch`) |
+| `STYTCH_TRUSTED_AUTH_ISSUER` | Must match Stytch profile (default: `passkey-auth`) |
+| `PASSKEY_JWT_PRIVATE_KEY` | RSA private key PEM (newlines escaped as `\n`) |
+| `CORS_ALLOWED_ORIGINS` | Frontend URL(s), comma-separated (e.g., `https://app.example.com`) |
 
 ### 3.3 Push secrets to AWS
 
@@ -163,10 +173,40 @@ curl http://YOUR_ALB_URL/api/v1/health
 - Verify the database security group allows inbound from ECS security group
 - Check secrets contain correct database credentials
 
+## Continuous Deployment (Push-to-Deploy)
+
+The repository includes GitHub Actions workflows for automatic deployment:
+
+### Backend (`deploy-ecs.yml`)
+- **Trigger**: Push to `main` with changes in `backend/`, `emails/`, or `infra/`
+- **Concurrency**: `cancel-in-progress: true` - rapid pushes cancel previous deployments
+- **Steps**: Build Docker image → Push to ECR → Update task definition → Deploy ECS service → Run migrations
+
+### Frontend (`deploy-frontend.yml`)
+- **Trigger**: Push to `main` with changes in `frontend/`
+- **Concurrency**: `cancel-in-progress: true` - rapid pushes cancel previous deployments
+- **Steps**: Build Vite app → Sync to S3 → Invalidate CloudFront cache
+
+### Required GitHub Secrets/Vars
+
+| Type | Name | Description |
+|------|------|-------------|
+| Secret | `AWS_OIDC_ROLE_ARN` | IAM role ARN for GitHub OIDC |
+| Var | `AWS_REGION` | AWS region (e.g., `us-east-1`) |
+| Var | `ECR_REPOSITORY` | Full ECR URI |
+| Var | `ECS_CLUSTER` | ECS cluster name |
+| Var | `ECS_SERVICE` | ECS service name |
+| Var | `ECS_TASK_DEFINITION` | Task definition family name |
+| Var | `FRONTEND_BUCKET` | S3 bucket for frontend |
+| Var | `CLOUDFRONT_DISTRIBUTION_ID` | Frontend CloudFront ID |
+| Var | `VITE_API_URL` | Backend API URL for frontend build |
+| Secret | `VITE_STYTCH_PUBLIC_TOKEN` | Stytch public token (required) |
+| Var | `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (optional) |
+| Var | `VITE_GOOGLE_PLACES_API_KEY` | Google Places API key (optional) |
+
+
 ## Next Steps
 
-- [ ] Set up CloudFront with SSL certificate for HTTPS
-- [ ] Configure custom domain
-- [ ] Set up CI/CD pipeline (GitHub Actions)
+- [ ] Configure custom domain with Route 53
+- [ ] Set up CloudWatch alarms for production monitoring
 - [ ] Enable ECS Exec for container access
-- [ ] Configure CloudWatch alarms

@@ -1,7 +1,7 @@
 import "./App.css"
 
 import { useStytchMemberSession } from "@stytch/react/b2b"
-import { lazy, Suspense } from "react"
+import { lazy, Suspense, useEffect, useState } from "react"
 import { Navigate, Route, Routes } from "react-router-dom"
 
 import { LoadingSpinner } from "./components/ui/loading-spinner"
@@ -18,19 +18,63 @@ const OrganizationSettings = lazy(
 )
 const MembersSettings = lazy(() => import("./pages/settings/MembersSettings"))
 const BillingSettings = lazy(() => import("./pages/settings/BillingSettings"))
+const SecuritySettings = lazy(() => import("./pages/settings/SecuritySettings"))
+const IntegrationsSettings = lazy(
+  () => import("./pages/settings/IntegrationsSettings")
+)
 
+// Basic ProtectedRoute component
+// Enhanced to prevent "flash of login" by handling undefined session state
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, isInitialized } = useStytchMemberSession()
+  const [waitingTimedOut, setWaitingTimedOut] = useState(false)
 
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isInitialized can be false
-  if (!isInitialized) {
+  // Check if we should wait for session (set during login flow)
+  // Read from sessionStorage on each render to get current value
+  const justLoggedIn =
+    sessionStorage.getItem("stytch_just_logged_in") === "true"
+
+  // Clear flag when session arrives
+  useEffect(() => {
+    if (session && justLoggedIn) {
+      sessionStorage.removeItem("stytch_just_logged_in")
+    }
+  }, [session, justLoggedIn])
+
+  // Timeout safety valve - only runs when waiting for session
+  useEffect(() => {
+    if (!justLoggedIn || session || waitingTimedOut) return
+
+    const timer = setTimeout(() => {
+      sessionStorage.removeItem("stytch_just_logged_in")
+      setWaitingTimedOut(true)
+    }, 5000) // 5s max wait time
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [justLoggedIn, session, waitingTimedOut])
+
+  // Derive waiting state from other values instead of syncing via setState
+  const isWaitingForSession = justLoggedIn && !session && !waitingTimedOut
+
+  // Wait for SDK initialization AND initial session check
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isInitialized can be false during SDK init
+  if (!isInitialized || isWaitingForSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <LoadingSpinner />
+        <div className="text-center">
+          <LoadingSpinner className="mx-auto" />
+          {isWaitingForSession && (
+            <p className="mt-4 text-sm text-muted-foreground">
+              Signing you in...
+            </p>
+          )}
+        </div>
       </div>
     )
   }
 
+  // If initialized but no session, redirect to login
   if (!session) {
     return <Navigate to="/login" replace />
   }
@@ -82,6 +126,22 @@ function App() {
           element={
             <Suspense fallback={<SettingsSkeleton />}>
               <BillingSettings />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/settings/security"
+          element={
+            <Suspense fallback={<SettingsSkeleton />}>
+              <SecuritySettings />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/settings/integrations"
+          element={
+            <Suspense fallback={<SettingsSkeleton />}>
+              <IntegrationsSettings />
             </Suspense>
           }
         />
