@@ -52,4 +52,5 @@ addopts = "-v --tb=short"
 [dependency-groups]
 dev = [
     "psycopg2-binary>=2.9.11",
+    "pytest-cov>=7.0.0",
 ]

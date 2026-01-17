@@ -112,35 +112,38 @@ class TestLogOutput:
         """Clear context after each test."""
         clear_contextvars()
 
-    def test_json_log_output_format(self, capsys):
+    def test_json_log_output_format(self, caplog):
         """Test that JSON logs are properly formatted."""
+        import logging
+
         logger = get_logger("test.json_output")
 
         # Bind some context
         bind_contextvars(correlation_id="test-correlation-123")
 
-        # Log a message
-        logger.info("test_event", key="value", count=42)
+        # Log a message with caplog capturing
+        with caplog.at_level(logging.DEBUG, logger="test.json_output"):
+            logger.info("test_event", key="value", count=42)
 
-        # Capture output
-        captured = capsys.readouterr()
+        # Should contain our event name in the log output
+        assert len(caplog.records) > 0
+        assert "test_event" in caplog.text
 
-        # Should contain JSON with our fields
-        # Note: structlog outputs to stdout
-        assert "test_event" in captured.out or "test_event" in captured.err
-
-    def test_log_with_exception(self, capsys):
+    def test_log_with_exception(self, caplog):
         """Test that exceptions are properly logged."""
+        import logging
+
         logger = get_logger("test.exception")
 
-        try:
-            raise ValueError("Test error")
-        except ValueError:
-            logger.exception("error_occurred")
+        with caplog.at_level(logging.DEBUG, logger="test.exception"):
+            try:
+                raise ValueError("Test error")
+            except ValueError:
+                logger.exception("error_occurred")
 
-        captured = capsys.readouterr()
         # Should contain exception info
-        output = captured.out + captured.err
+        assert len(caplog.records) > 0
+        output = caplog.text
         assert "error_occurred" in output or "ValueError" in output
 
 
@@ -156,30 +159,34 @@ class TestDatadogFieldRenaming:
         """Clear context after each test."""
         clear_contextvars()
 
-    def test_correlation_id_renamed_to_trace_id(self, capsys):
+    def test_correlation_id_renamed_to_trace_id(self, caplog):
         """Test that correlation_id is renamed to trace_id for Datadog."""
+        import logging
+
         logger = get_logger("test.trace_id")
 
         bind_contextvars(correlation_id="abc-123-def")
-        logger.info("test_message")
 
-        captured = capsys.readouterr()
-        output = captured.out + captured.err
+        with caplog.at_level(logging.DEBUG, logger="test.trace_id"):
+            logger.info("test_message")
 
         # The processor should rename correlation_id to trace_id
         # This test verifies the processor is in the chain
-        assert "test_message" in output
+        assert len(caplog.records) > 0
+        assert "test_message" in caplog.text
 
-    def test_duration_ms_converted_to_nanoseconds(self, capsys):
+    def test_duration_ms_converted_to_nanoseconds(self, caplog):
         """Test that duration_ms is converted to duration (nanoseconds)."""
+        import logging
+
         logger = get_logger("test.duration")
 
         bind_contextvars(duration_ms=150.5)
-        logger.info("request_complete")
 
-        captured = capsys.readouterr()
-        output = captured.out + captured.err
+        with caplog.at_level(logging.DEBUG, logger="test.duration"):
+            logger.info("request_complete")
 
         # The processor should convert duration_ms to duration in nanoseconds
         # 150.5ms = 150,500,000 nanoseconds
-        assert "request_complete" in output
+        assert len(caplog.records) > 0
+        assert "request_complete" in caplog.text
