@@ -69,9 +69,12 @@ class EventBridgeBackend(EventBackend):
     Publishes events in batches (up to 10 per PutEvents call).
     """
 
-    def __init__(self, event_bus_name: str, source: str = "app.events"):
+    def __init__(
+        self, event_bus_name: str, source: str = "app.events", endpoint_url: str | None = None
+    ):
         self.event_bus_name = event_bus_name
         self.source = source
+        self.endpoint_url = endpoint_url
         self._client = None
 
     @property
@@ -80,7 +83,14 @@ class EventBridgeBackend(EventBackend):
         if self._client is None:
             import boto3
 
-            self._client = boto3.client("events")
+            # Build client config - supports LocalStack via endpoint_url
+            client_kwargs: dict[str, str | None] = {
+                "endpoint_url": self.endpoint_url,
+            }
+            # Remove None values to let boto3 use defaults
+            client_kwargs = {k: v for k, v in client_kwargs.items() if v is not None}
+
+            self._client = boto3.client("events", **client_kwargs)  # type: ignore[arg-type]
         return self._client
 
     def publish(self, events: list[EventEnvelope]) -> list[dict[str, Any]]:
@@ -157,6 +167,7 @@ def get_backend() -> EventBackend:
         event_bus_name = getattr(settings, "EVENT_BUS_NAME", "")
         if not event_bus_name:
             raise ValueError("EVENT_BUS_NAME setting required for eventbridge backend")
-        return EventBridgeBackend(event_bus_name=event_bus_name)
+        endpoint_url = getattr(settings, "AWS_EVENTS_ENDPOINT_URL", None)
+        return EventBridgeBackend(event_bus_name=event_bus_name, endpoint_url=endpoint_url)
 
     return LocalBackend()
