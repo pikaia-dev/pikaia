@@ -285,8 +285,9 @@ class AppStack(Stack):
             scale_out_cooldown=Duration.seconds(60),
         )
 
-        # Expose ALB for frontend stack
+        # Expose ALB and target group for frontend and observability stacks
         self.alb = self.fargate_service.load_balancer
+        self.target_group = self.fargate_service.target_group
 
         # Health check configuration
         self.fargate_service.target_group.configure_health_check(
