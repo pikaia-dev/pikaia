@@ -42,3 +42,34 @@ refactor(api): extract pagination logic
 ## Code Style
 
 See [rules.md](./RULES.md) for detailed coding standards.
+
+## AI Agent Configuration
+
+This project uses a unified `.agent/` directory for AI coding assistant configuration:
+
+```
+.agent/
+├── AGENTS.md      # Main agent instructions
+├── commands/      # Custom slash commands
+├── rules/         # Coding standards (auto-loaded by agents)
+├── settings.json  # Agent settings
+└── skills/        # Reusable skill definitions
+```
+
+### Tool-Specific Symlinks
+
+The `.claude/` directory contains symlinks to `.agent/` for Claude Code compatibility:
+
+```
+.claude/
+├── CLAUDE.md -> ../.agent/AGENTS.md
+├── commands  -> ../.agent/commands
+├── rules     -> ../.agent/rules
+└── skills    -> ../.agent/skills
+```
+
+### Editing Guidelines
+
+**Always edit files in `.agent/`** - the source of truth. Changes propagate automatically via symlinks to tool-specific directories.
+
+Do NOT edit files directly in `.claude/` or other tool directories - your changes will be overwritten or cause conflicts.
