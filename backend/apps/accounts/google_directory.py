@@ -5,15 +5,15 @@ Uses Stytch's stored OAuth tokens - no local token storage needed.
 Stytch automatically refreshes tokens when calling their API.
 """
 
-import logging
 from dataclasses import dataclass
 
 import httpx
 from stytch.core.response_base import StytchError
 
 from apps.accounts.stytch_client import get_stytch_client
+from apps.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Google Directory API endpoint
 GOOGLE_DIRECTORY_API_URL = "https://admin.googleapis.com/admin/directory/v1"
@@ -46,9 +46,9 @@ def get_google_access_token(organization_id: str, member_id: str) -> str | None:
     except StytchError as e:
         # No Google OAuth tokens for this member
         logger.debug(
-            "No Google OAuth tokens for member %s: %s",
-            member_id,
-            e.details.error_message if e.details else str(e),
+            "google_oauth_token_not_found",
+            member_id=member_id,
+            error=e.details.error_message if e.details else str(e),
         )
         return None
 
@@ -111,7 +111,7 @@ def search_directory_users(
 
         if response.status_code == 403:
             # User doesn't have admin access to directory or scope not granted
-            logger.debug("User %s doesn't have Directory API access (403)", user.email)
+            logger.debug("google_directory_access_denied", user_email=user.email)
             return []
 
         response.raise_for_status()
@@ -135,5 +135,5 @@ def search_directory_users(
         return users
 
     except httpx.HTTPError as e:
-        logger.warning("Directory API search failed for user %s: %s", user.email, e)
+        logger.warning("google_directory_search_failed", user_email=user.email, error=str(e))
         return []

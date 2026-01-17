@@ -5,17 +5,16 @@ All Stripe API calls are isolated here for testability.
 External calls must NOT be inside database transactions.
 """
 
-import logging
 from datetime import datetime, timedelta, timezone
-
 
 from apps.billing.models import Subscription
 from apps.billing.stripe_client import get_stripe
+from apps.core.logging import get_logger
 from apps.events.services import publish_event
 from apps.organizations.models import Organization
 from config.settings.base import settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def get_or_create_stripe_customer(org: Organization) -> str:
@@ -83,9 +82,9 @@ def get_or_create_stripe_customer(org: Organization) -> str:
                     value=org.vat_id,
                 )
         except stripe.StripeError as e:
-            logger.warning("Failed to add VAT ID to Stripe customer: %s", e)
+            logger.warning("stripe_vat_id_add_failed", error=str(e), org_id=str(org.id))
 
-    logger.info("Created Stripe customer %s for org %s", customer.id, org.id)
+    logger.info("stripe_customer_created", customer_id=customer.id, org_id=str(org.id))
     return customer.id
 
 
@@ -129,9 +128,9 @@ def sync_billing_to_stripe(org: Organization) -> None:
 
     try:
         stripe.Customer.modify(org.stripe_customer_id, **update_data)
-        logger.info("Synced billing info to Stripe for org %s", org.id)
+        logger.info("stripe_billing_synced", org_id=str(org.id))
     except stripe.StripeError as e:
-        logger.error("Failed to sync billing to Stripe: %s", e)
+        logger.error("stripe_billing_sync_failed", error=str(e), org_id=str(org.id))
         raise
 
 
@@ -176,7 +175,7 @@ def create_checkout_session(
         automatic_tax={"enabled": True},
     )
 
-    logger.info("Created checkout session %s for org %s", session.id, org.id)
+    logger.info("stripe_checkout_session_created", session_id=session.id, org_id=str(org.id))
     return session.url
 
 
@@ -217,9 +216,9 @@ def create_subscription_intent(
     client_secret = subscription.latest_invoice.confirmation_secret.client_secret
 
     logger.info(
-        "Created subscription intent %s for org %s",
-        subscription.id,
-        org.id,
+        "stripe_subscription_intent_created",
+        subscription_id=subscription.id,
+        org_id=str(org.id),
     )
 
     return client_secret, subscription.id
@@ -239,7 +238,7 @@ def sync_subscription_from_stripe(subscription_id: str) -> bool:
     try:
         stripe_sub = stripe.Subscription.retrieve(subscription_id)
     except stripe.StripeError as e:
-        logger.error("Failed to retrieve subscription %s: %s", subscription_id, e)
+        logger.error("stripe_subscription_retrieve_failed", subscription_id=subscription_id, error=str(e))
         raise
 
     # Use the existing handler to sync the subscription
@@ -296,12 +295,12 @@ def sync_subscription_quantity(org: Organization) -> None:
         subscription.save(update_fields=["quantity", "updated_at"])
 
         logger.info(
-            "Synced subscription quantity to %d for org %s",
-            member_count,
-            org.id,
+            "stripe_subscription_quantity_synced",
+            quantity=member_count,
+            org_id=str(org.id),
         )
     except stripe.StripeError as e:
-        logger.error("Failed to sync subscription quantity: %s", e)
+        logger.error("stripe_subscription_quantity_sync_failed", error=str(e), org_id=str(org.id))
         raise
 
 
@@ -332,13 +331,13 @@ def handle_subscription_created(stripe_subscription: dict) -> None:
     """
     org_id = stripe_subscription.get("metadata", {}).get("organization_id")
     if not org_id:
-        logger.warning("Subscription has no organization_id in metadata")
+        logger.warning("stripe_subscription_missing_org_metadata", subscription_id=stripe_subscription.get("id"))
         return
 
     try:
         org = Organization.objects.get(id=int(org_id))
     except Organization.DoesNotExist:
-        logger.error("Organization %s not found for subscription", org_id)
+        logger.error("stripe_subscription_org_not_found", org_id=org_id, subscription_id=stripe_subscription.get("id"))
         return
 
     # Parse dates - Stripe 2025 API may nest these differently
@@ -393,7 +392,7 @@ def handle_subscription_created(stripe_subscription: dict) -> None:
             organization_id=str(org.id),
         )
 
-    logger.info("Created/updated subscription for org %s", org.id)
+    logger.info("stripe_subscription_synced", org_id=str(org.id), subscription_id=stripe_subscription["id"])
 
 
 def handle_subscription_updated(stripe_subscription: dict) -> None:
@@ -454,7 +453,7 @@ def handle_subscription_updated(stripe_subscription: dict) -> None:
             organization_id=str(subscription.organization_id),
         )
 
-    logger.info("Updated subscription %s", subscription.stripe_subscription_id)
+    logger.info("stripe_subscription_updated", subscription_id=subscription.stripe_subscription_id)
 
 
 def handle_subscription_deleted(stripe_subscription: dict) -> None:
@@ -482,7 +481,7 @@ def handle_subscription_deleted(stripe_subscription: dict) -> None:
         organization_id=str(subscription.organization_id),
     )
 
-    logger.info("Marked subscription %s as canceled", subscription.stripe_subscription_id)
+    logger.info("stripe_subscription_canceled", subscription_id=subscription.stripe_subscription_id)
 
 
 def _get_tax_id_type(country_code: str, vat_id: str) -> str | None:

@@ -2,13 +2,12 @@
 Media API endpoints for image uploads.
 """
 
-import logging
-
 from django.http import HttpRequest
 from ninja import File, Form, Router
 from ninja.errors import HttpError
 from ninja.files import UploadedFile
 
+from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth
 from apps.media.models import UploadedImage
@@ -21,7 +20,7 @@ from apps.media.schemas import (
 )
 from apps.media.services import get_storage_service
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = Router(tags=["media"])
 bearer_auth = BearerAuth()

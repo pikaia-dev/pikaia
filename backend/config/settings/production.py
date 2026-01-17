@@ -15,21 +15,22 @@ from .base import *  # noqa: F403
 from .base import parse_comma_list, settings
 
 # =============================================================================
-# Logging Configuration - Output errors to stdout for CloudWatch
+# Structured Logging Configuration
 # =============================================================================
+# Configure structlog for JSON output in production.
+# This enables easy querying in CloudWatch Logs Insights, Datadog, and Elastic.
+from apps.core.logging import configure_logging
+
+configure_logging(json_format=True, log_level="INFO")
+
+# Django's LOGGING config - minimal since structlog handles most logging.
+# This ensures Django's internal loggers (request errors, etc.) still work.
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "formatters": {
-        "verbose": {
-            "format": "{levelname} {asctime} {module} {message}",
-            "style": "{",
-        },
-    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "formatter": "verbose",
         },
     },
     "root": {

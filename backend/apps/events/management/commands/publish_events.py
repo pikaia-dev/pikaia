@@ -5,7 +5,6 @@ Polls the outbox table and publishes pending events to the configured backend.
 Uses SELECT FOR UPDATE SKIP LOCKED for safe concurrent execution.
 """
 
-import logging
 import random
 import signal
 import time
@@ -14,11 +13,12 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
+from apps.core.logging import get_logger
 from apps.events.backends import get_backend
 from apps.events.models import OutboxEvent
 from apps.events.schemas import EventEnvelope
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class Command(BaseCommand):

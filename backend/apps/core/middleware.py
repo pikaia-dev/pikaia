@@ -2,7 +2,7 @@
 Core middleware.
 """
 
-import logging
+import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
@@ -10,13 +10,14 @@ from uuid import UUID, uuid4
 from django.http import HttpRequest, HttpResponse
 from stytch.core.response_base import StytchError
 
+from apps.core.logging import bind_contextvars, clear_contextvars, get_logger
 from apps.events.services import set_correlation_id
 
 if TYPE_CHECKING:
     from apps.accounts.models import Member, User
     from apps.organizations.models import Organization
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class CorrelationIdMiddleware:
@@ -25,7 +26,13 @@ class CorrelationIdMiddleware:
 
     If X-Correlation-ID header is present, uses that value.
     Otherwise generates a new UUID4.
-    Stores in context for event publishing and logging.
+
+    Binds structured logging context with Datadog-compatible field names:
+    - trace_id: Correlation ID for distributed tracing
+    - http.method: Request method
+    - http.url_details.path: Request path
+    - http.status_code: Response status code (added on response)
+    - duration_ms: Request duration in milliseconds (added on response)
     """
 
     HEADER_NAME = "X-Correlation-ID"
@@ -51,15 +58,37 @@ class CorrelationIdMiddleware:
         # Set in event services context
         set_correlation_id(correlation_id)
 
-        response = self.get_response(request)
+        # Clear any stale context and bind request metadata for structured logging
+        clear_contextvars()
+        bind_contextvars(
+            correlation_id=str(correlation_id),
+            **{
+                "http.method": request.method,
+                "http.url_details.path": request.path,
+            },
+        )
 
-        # Add to response headers
-        response[self.HEADER_NAME] = str(correlation_id)
+        start_time = time.monotonic()
 
-        # Clear context after request
-        set_correlation_id(None)
+        try:
+            response = self.get_response(request)
 
-        return response
+            # Bind response metadata
+            duration_ms = (time.monotonic() - start_time) * 1000
+            bind_contextvars(
+                duration_ms=round(duration_ms, 2),
+                **{"http.status_code": response.status_code},
+            )
+
+            # Add correlation ID to response headers for client debugging
+            response[self.HEADER_NAME] = str(correlation_id)
+            response["X-Request-ID"] = str(correlation_id)  # Alias for compatibility
+
+            return response
+        finally:
+            # Clear context to prevent leakage between requests (especially in async workers)
+            set_correlation_id(None)
+            clear_contextvars()
 
 
 class StytchAuthMiddleware:
@@ -69,6 +98,11 @@ class StytchAuthMiddleware:
     Sets request.auth_user, request.auth_member, and request.auth_organization
     for authenticated requests. Allows unauthenticated requests to pass through
     (authorization enforced at endpoint level).
+
+    After successful authentication, binds user/org context to structured logging:
+    - usr.id: User identifier
+    - usr.email: User email
+    - organization.id: Organization Stytch ID
     """
 
     # Paths that don't require authentication
@@ -129,12 +163,21 @@ class StytchAuthMiddleware:
             request.auth_member = member  # type: ignore[attr-defined]
             request.auth_organization = org  # type: ignore[attr-defined]
 
+            # Bind user/org context to structured logging (Datadog-compatible field names)
+            bind_contextvars(
+                **{
+                    "usr.id": str(user.id),
+                    "usr.email": user.email,
+                    "organization.id": org.stytch_id if org else None,
+                }
+            )
+
         except StytchError as e:
             # Invalid/expired JWT - request continues unauthenticated
-            logger.debug("JWT authentication failed: %s", e.details.error_message)
-        except Exception as e:
+            logger.debug("jwt_auth_failed", error_message=e.details.error_message)
+        except Exception:
             # Catch any other exception (network errors, timeouts, etc.)
-            logger.exception("Unexpected error during JWT authentication: %s", e)
+            logger.exception("jwt_auth_unexpected_error")
 
 
 class TenantContextMiddleware:
