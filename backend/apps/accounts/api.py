@@ -8,8 +8,6 @@ Handles Stytch B2B authentication flows:
 - User profile and organization settings
 """
 
-import logging
-
 from django.http import HttpRequest
 from ninja import Router
 from ninja.errors import HttpError
@@ -56,11 +54,12 @@ from apps.accounts.services import (
 )
 from apps.accounts.stytch_client import get_stytch_client
 from apps.billing.services import sync_billing_to_stripe
+from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth, require_admin
 from apps.events.services import publish_event
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = Router(tags=["auth"])
 bearer_auth = BearerAuth()

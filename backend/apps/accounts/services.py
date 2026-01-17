@@ -320,10 +320,10 @@ def invite_member(
         sync_subscription_quantity(organization)
     except Exception:
         # Don't fail the invite if billing sync fails
-        import logging
+        from apps.core.logging import get_logger
 
-        logging.getLogger(__name__).warning(
-            "Failed to sync subscription quantity for org %s", organization.id
+        get_logger(__name__).warning(
+            "billing_subscription_quantity_sync_failed", org_id=str(organization.id)
         )
 
     return member, invite_sent
@@ -395,10 +395,10 @@ def soft_delete_member(member: Member) -> None:
         sync_subscription_quantity(organization)
     except Exception:
         # Don't fail the delete if billing sync fails
-        import logging
+        from apps.core.logging import get_logger
 
-        logging.getLogger(__name__).warning(
-            "Failed to sync subscription quantity for org %s", organization.id
+        get_logger(__name__).warning(
+            "billing_subscription_quantity_sync_failed", org_id=str(organization.id)
         )
 
 
@@ -409,13 +409,12 @@ def sync_logo_to_stytch(organization: Organization) -> None:
     Called after logo upload/delete in media API.
     Fails silently with a warning log on error to not break the upload flow.
     """
-    import logging
-
     from stytch.core.response_base import StytchError
 
     from apps.accounts.stytch_client import get_stytch_client
+    from apps.core.logging import get_logger
 
-    logger = logging.getLogger(__name__)
+    logger = get_logger(__name__)
 
     try:
         client = get_stytch_client()
@@ -425,7 +424,7 @@ def sync_logo_to_stytch(organization: Organization) -> None:
         )
     except StytchError as e:
         logger.warning(
-            "Failed to sync logo to Stytch for org %s: %s",
-            organization.stytch_org_id,
-            e.details.error_message,
+            "stytch_logo_sync_failed",
+            stytch_org_id=organization.stytch_org_id,
+            error=e.details.error_message,
         )

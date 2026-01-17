@@ -21,6 +21,7 @@ dependencies = [
     "defusedxml>=0.7",
     "lxml>=5.0",
     "svix>=1.84.1",
+    "structlog>=25.5",
 ]
 
 [project.optional-dependencies]

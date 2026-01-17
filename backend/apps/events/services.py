@@ -2,17 +2,17 @@
 Event services - publishing events via transactional outbox.
 """
 
-import logging
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
 from django.db import models
 
+from apps.core.logging import get_logger
 from apps.events.models import AuditLog, OutboxEvent
 from apps.events.schemas import ActorSchema, EventEnvelope, MAX_PAYLOAD_SIZE_BYTES
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # Context variable for correlation ID (set by middleware)
@@ -120,7 +120,7 @@ def publish_event(
         payload=envelope.model_dump(mode="json"),
     )
 
-    logger.debug("Created outbox event: %s (%s)", event_type, event_id)
+    logger.debug("outbox_event_created", event_type=event_type, event_id=str(event_id))
     return outbox_event
 
 
