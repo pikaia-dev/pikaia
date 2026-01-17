@@ -63,9 +63,9 @@ class Command(BaseCommand):
 
         backend = get_backend()
         logger.info(
-            "Starting event publisher (backend=%s, batch_size=%d)",
-            backend.__class__.__name__,
-            batch_size,
+            "event_publisher_started",
+            backend=backend.__class__.__name__,
+            batch_size=batch_size,
         )
 
         while not self._shutdown_requested:
@@ -73,12 +73,12 @@ class Command(BaseCommand):
                 published_count = self._publish_batch(backend, batch_size, max_attempts)
 
                 if published_count > 0:
-                    logger.info("Published %d events", published_count)
+                    logger.info("events_published", count=published_count)
                     # Continue immediately if we published events
                     continue
 
-            except Exception as e:
-                logger.exception("Error in publish loop: %s", e)
+            except Exception:
+                logger.exception("event_publisher_error")
 
             if once:
                 break
@@ -86,7 +86,7 @@ class Command(BaseCommand):
             # No events or error - wait before next poll
             self._sleep_with_jitter(poll_interval)
 
-        logger.info("Event publisher shutting down")
+        logger.info("event_publisher_shutdown")
 
     def _publish_batch(self, backend, batch_size: int, max_attempts: int) -> int:
         """
@@ -120,7 +120,7 @@ class Command(BaseCommand):
                 envelope = EventEnvelope(**event.payload)
                 envelopes.append(envelope)
             except Exception as e:
-                logger.error("Failed to parse event %s payload: %s", event.event_id, e)
+                logger.error("event_payload_parse_failed", event_id=str(event.event_id), error=str(e))
                 event.mark_failed(f"Payload parse error: {e}", max_attempts)
                 continue
 
@@ -141,7 +141,7 @@ class Command(BaseCommand):
             else:
                 error = result.get("error", "Unknown error")
                 event.mark_failed(error, max_attempts)
-                logger.warning("Failed to publish event %s: %s", event.event_id, error)
+                logger.warning("event_publish_failed", event_id=str(event.event_id), error=error)
 
         return published_count
 
@@ -156,5 +156,5 @@ class Command(BaseCommand):
             signal.signal(sig, self._handle_signal)
 
     def _handle_signal(self, signum, frame) -> None:
-        logger.info("Received signal %s, requesting shutdown", signum)
+        logger.info("event_publisher_signal_received", signal=signum)
         self._shutdown_requested = True

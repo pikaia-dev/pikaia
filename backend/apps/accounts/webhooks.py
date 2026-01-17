@@ -37,16 +37,16 @@ def handle_member_created(data: dict) -> None:
 
     if not all([stytch_member_id, stytch_org_id, email]):
         logger.warning(
-            "member.create event missing required fields: member_id=%s, org_id=%s, email=%s",
-            stytch_member_id,
-            stytch_org_id,
-            email,
+            "stytch_webhook_member_create_missing_fields",
+            member_id=stytch_member_id,
+            org_id=stytch_org_id,
+            email=email,
         )
         return
 
     # Check if member already exists (normal case - sync already worked)
     if Member.all_objects.filter(stytch_member_id=stytch_member_id).exists():
-        logger.debug("Member %s already exists locally, skipping create", stytch_member_id)
+        logger.debug("stytch_webhook_member_exists", stytch_member_id=stytch_member_id)
         return
 
     # Check if organization exists
@@ -54,9 +54,9 @@ def handle_member_created(data: dict) -> None:
         org = Organization.objects.get(stytch_org_id=stytch_org_id)
     except Organization.DoesNotExist:
         logger.warning(
-            "Organization %s not found for member %s, cannot create member",
-            stytch_org_id,
-            stytch_member_id,
+            "stytch_webhook_org_not_found_for_member",
+            stytch_org_id=stytch_org_id,
+            stytch_member_id=stytch_member_id,
         )
         return
 
@@ -70,10 +70,10 @@ def handle_member_created(data: dict) -> None:
 
     # Get or create user and member
     logger.info(
-        "Creating member %s from Stytch webhook (email=%s, org=%s)",
-        stytch_member_id,
-        email,
-        org.name,
+        "stytch_webhook_member_creating",
+        stytch_member_id=stytch_member_id,
+        email=email,
+        org_name=org.name,
     )
     user = get_or_create_user_from_stytch(
         email=email,
@@ -239,27 +239,24 @@ def handle_organization_deleted(data: dict) -> None:
     stytch_org_id = data.get("id") or data.get("organization", {}).get("organization_id")
 
     if not stytch_org_id:
-        logger.warning("organization.delete event missing organization id")
+        logger.warning("stytch_webhook_org_delete_missing_id")
         return
 
     # Use all_objects to find even if already soft-deleted
     try:
         org = Organization.all_objects.get(stytch_org_id=stytch_org_id)
     except Organization.DoesNotExist:
-        logger.debug(
-            "Organization %s not found, already deleted or never synced",
-            stytch_org_id,
-        )
+        logger.debug("stytch_webhook_org_not_found", stytch_org_id=stytch_org_id)
         return
 
     if org.deleted_at is not None:
-        logger.debug("Organization %s already soft-deleted", stytch_org_id)
+        logger.debug("stytch_webhook_org_already_deleted", stytch_org_id=stytch_org_id)
         return
 
     logger.info(
-        "Soft deleting organization %s (%s) from Stytch webhook",
-        stytch_org_id,
-        org.name,
+        "stytch_webhook_org_soft_deleting",
+        stytch_org_id=stytch_org_id,
+        org_name=org.name,
     )
 
     # Soft delete all members in the organization first
@@ -271,9 +268,9 @@ def handle_organization_deleted(data: dict) -> None:
 
     if member_count > 0:
         logger.info(
-            "Soft deleted %d members from organization %s",
-            member_count,
-            org.name,
+            "stytch_webhook_members_soft_deleted",
+            count=member_count,
+            org_name=org.name,
         )
 
     # Soft delete the organization
