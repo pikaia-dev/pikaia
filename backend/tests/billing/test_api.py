@@ -24,7 +24,6 @@ from apps.billing.schemas import (
     PortalSessionRequest,
     SubscriptionIntentRequest,
 )
-from apps.core.auth import AuthContext
 from tests.accounts.factories import MemberFactory, OrganizationFactory
 from tests.conftest import create_authenticated_request
 
