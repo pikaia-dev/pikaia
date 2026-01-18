@@ -46,8 +46,8 @@ bearer_auth = BearerAuth()
 )
 def get_registration_options(request: HttpRequest) -> PasskeyRegistrationOptionsResponse:
     """Generate registration options for the authenticated user."""
-    user = request.auth_user  # type: ignore[attr-defined]
-    member = request.auth_member  # type: ignore[attr-defined]
+    user = request.auth.user  # type: ignore[attr-defined]
+    member = request.auth.member  # type: ignore[attr-defined]
 
     service = get_passkey_service()
     result = service.generate_registration_options(user=user, member=member)
@@ -70,7 +70,7 @@ def verify_registration(
     payload: PasskeyRegistrationVerifyRequest,
 ) -> PasskeyRegistrationVerifyResponse:
     """Verify registration response and create passkey."""
-    user = request.auth_user  # type: ignore[attr-defined]
+    user = request.auth.user  # type: ignore[attr-defined]
 
     service = get_passkey_service()
 
@@ -187,7 +187,7 @@ def verify_authentication(
 )
 def list_passkeys(request: HttpRequest) -> PasskeyListResponse:
     """List all passkeys for the authenticated user."""
-    user = request.auth_user  # type: ignore[attr-defined]
+    user = request.auth.user  # type: ignore[attr-defined]
 
     passkeys = Passkey.objects.filter(user=user).order_by("-created_at")
 
@@ -215,7 +215,7 @@ def list_passkeys(request: HttpRequest) -> PasskeyListResponse:
 )
 def delete_passkey(request: HttpRequest, passkey_id: int) -> PasskeyDeleteResponse:
     """Delete a passkey owned by the authenticated user."""
-    user = request.auth_user  # type: ignore[attr-defined]
+    user = request.auth.user  # type: ignore[attr-defined]
 
     try:
         passkey = Passkey.objects.get(id=passkey_id, user=user)

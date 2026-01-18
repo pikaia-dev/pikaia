@@ -25,6 +25,8 @@ Example usage:
 import pytest
 from django.test import Client, RequestFactory
 
+from apps.core.auth import AuthContext
+
 
 @pytest.fixture
 def request_factory() -> RequestFactory:
@@ -36,10 +38,9 @@ def request_factory() -> RequestFactory:
 
     Example:
         def test_endpoint(request_factory):
+            from apps.core.auth import AuthContext
             request = request_factory.get("/api/v1/endpoint")
-            request.auth_user = UserFactory()
-            request.auth_member = MemberFactory()
-            request.auth_organization = member.organization
+            request.auth = AuthContext(user=user, member=member, organization=org)
             result = my_endpoint(request)
     """
     return RequestFactory()
@@ -96,9 +97,11 @@ def authenticated_request(request_factory):
             kwargs["content_type"] = content_type
 
         request = method_func(path, **kwargs)
-        request.auth_user = member.user
-        request.auth_member = member
-        request.auth_organization = member.organization
+        request.auth = AuthContext(
+            user=member.user,
+            member=member,
+            organization=member.organization,
+        )
         return request
 
     return _make_request

@@ -24,6 +24,7 @@ from apps.billing.schemas import (
     PortalSessionRequest,
     SubscriptionIntentRequest,
 )
+from apps.core.auth import AuthContext
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
 
 from .factories import SubscriptionFactory
@@ -47,9 +48,7 @@ def _create_authenticated_request(
     else:
         request = request_factory.post(path)
 
-    request.auth_user = user
-    request.auth_member = member
-    request.auth_organization = org
+    request.auth = AuthContext(user=user, member=member, organization=org)
     return request
 
 

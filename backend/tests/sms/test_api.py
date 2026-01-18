@@ -8,6 +8,7 @@ import pytest
 from django.test import RequestFactory
 from ninja.errors import HttpError
 
+from apps.core.auth import AuthContext
 from apps.sms.api import send_verification_otp, verify_phone_otp
 from apps.sms.schemas import SendOTPRequest, VerifyOTPRequest
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
@@ -24,9 +25,7 @@ class TestSendVerificationOTPEndpoint:
         _member = MemberFactory(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/phone/send")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = _member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=_member, organization=org)
 
         payload = SendOTPRequest(phone_number="+14155551234")
 
@@ -58,9 +57,7 @@ class TestSendVerificationOTPEndpoint:
         member = MemberFactory(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/phone/send")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = SendOTPRequest(phone_number="+14155551234")
 
@@ -86,9 +83,7 @@ class TestSendVerificationOTPEndpoint:
         member = MemberFactory(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/phone/send")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = SendOTPRequest(phone_number="+14155551234")
 
@@ -122,9 +117,7 @@ class TestVerifyPhoneOTPEndpoint:
 
         # Then verify
         request = request_factory.post("/api/v1/auth/phone/verify")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = VerifyOTPRequest(phone_number=phone, code=otp.code)
 
@@ -167,9 +160,7 @@ class TestVerifyPhoneOTPEndpoint:
 
         # Try to verify with wrong code
         request = request_factory.post("/api/v1/auth/phone/verify")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = VerifyOTPRequest(phone_number=phone, code="0000")
 
@@ -203,9 +194,7 @@ class TestVerifyPhoneOTPEndpoint:
 
         # Try to verify
         request = request_factory.post("/api/v1/auth/phone/verify")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = VerifyOTPRequest(phone_number=phone, code=otp.code)
 

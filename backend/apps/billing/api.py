@@ -57,8 +57,8 @@ def create_checkout(
 
     Admin only. Returns URL to redirect user to Stripe Checkout.
     """
-    assert request.auth_organization is not None  # Guaranteed by @require_admin
-    org = request.auth_organization
+    assert request.auth.organization is not None  # Guaranteed by @require_admin
+    org = request.auth.organization
 
     # Check if already subscribed
     try:
@@ -109,8 +109,8 @@ def create_portal(
 
     Admin only. Returns URL to redirect user to manage their subscription.
     """
-    assert request.auth_organization is not None  # Guaranteed by @require_admin
-    org = request.auth_organization
+    assert request.auth.organization is not None  # Guaranteed by @require_admin
+    org = request.auth.organization
 
     if not org.stripe_customer_id:
         raise HttpError(400, "No billing account set up")
@@ -140,10 +140,10 @@ def get_subscription(request: AuthenticatedHttpRequest) -> SubscriptionResponse:
 
     Returns subscription details or 'none' status if not subscribed.
     """
-    if not hasattr(request, "auth_organization") or request.auth_organization is None:
+    if not hasattr(request, "auth") or request.auth.organization is None:
         raise HttpError(401, "Not authenticated")
 
-    org = request.auth_organization
+    org = request.auth.organization
 
     try:
         subscription = org.subscription
@@ -190,8 +190,8 @@ def create_subscription_intent_endpoint(
     Admin only. Returns client_secret for PaymentElement.
     Use this for embedded Stripe Elements payment flow.
     """
-    assert request.auth_organization is not None  # Guaranteed by @require_admin
-    org = request.auth_organization
+    assert request.auth.organization is not None  # Guaranteed by @require_admin
+    org = request.auth.organization
 
     # Check if already subscribed
     try:
@@ -277,10 +277,10 @@ def list_invoices(
     Admin only. Returns invoices sorted by date (newest first).
     Use starting_after with an invoice ID for pagination.
     """
-    if not hasattr(request, "auth_organization") or request.auth_organization is None:
+    if not hasattr(request, "auth") or request.auth.organization is None:
         raise HttpError(401, "Not authenticated")
 
-    org = request.auth_organization
+    org = request.auth.organization
 
     if not org.stripe_customer_id:
         return InvoiceListResponse(invoices=[], has_more=False)

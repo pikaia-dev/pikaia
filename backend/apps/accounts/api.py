@@ -671,10 +671,10 @@ def get_organization(request: AuthenticatedHttpRequest) -> OrganizationDetailRes
 
     All authenticated members can view.
     """
-    if not hasattr(request, "auth_organization") or request.auth_organization is None:
+    if not hasattr(request, "auth") or request.auth.organization is None:
         raise HttpError(401, "Not authenticated")
 
-    org = request.auth_organization
+    org = request.auth.organization
 
     return OrganizationDetailResponse(
         id=org.id,
@@ -715,8 +715,8 @@ def update_organization(
 
     Admin only. Updates local database and syncs to Stytch.
     """
-    assert request.auth_organization is not None  # Guaranteed by @require_admin
-    org = request.auth_organization
+    assert request.auth.organization is not None  # Guaranteed by @require_admin
+    org = request.auth.organization
 
     # Update local database
     update_fields = ["name", "updated_at"]
@@ -749,7 +749,7 @@ def update_organization(
             "name": payload.name,
             "slug": payload.slug,
         },
-        actor=request.auth_user,
+        actor=request.auth.user,
     )
 
     return get_organization(request)
@@ -771,8 +771,8 @@ def update_billing(
 
     Admin only. This is our system's data - synced out to Stripe.
     """
-    assert request.auth_organization is not None  # Guaranteed by @require_admin
-    org = request.auth_organization
+    assert request.auth.organization is not None  # Guaranteed by @require_admin
+    org = request.auth.organization
 
     # Update billing fields
     org.use_billing_email = payload.use_billing_email
@@ -809,7 +809,7 @@ def update_billing(
             "vat_id": org.vat_id,
             "country": org.billing_country,
         },
-        actor=request.auth_user,
+        actor=request.auth.user,
     )
 
     return get_organization(request)
@@ -840,8 +840,8 @@ def list_members(
         offset: Number of records to skip (default 0)
         limit: Maximum records to return (default None = all)
     """
-    assert request.auth_organization is not None  # Guaranteed by @require_admin
-    org = request.auth_organization
+    assert request.auth.organization is not None  # Guaranteed by @require_admin
+    org = request.auth.organization
     all_members = list_organization_members(org)
     total = len(all_members)
 
@@ -906,15 +906,15 @@ def invite_member_endpoint(
 
     Admin only. Stytch sends the invite email with Magic Link.
     """
-    assert request.auth_member is not None  # Guaranteed by @require_admin
-    assert request.auth_organization is not None  # Guaranteed by @require_admin
-    member = request.auth_member
+    assert request.auth.member is not None  # Guaranteed by @require_admin
+    assert request.auth.organization is not None  # Guaranteed by @require_admin
+    member = request.auth.member
 
     # Prevent inviting yourself
     if payload.email.lower() == member.user.email.lower():
         raise HttpError(400, "Cannot invite yourself - you're already a member")
 
-    org = request.auth_organization
+    org = request.auth.organization
 
     try:
         new_member, invite_sent = invite_member(
@@ -977,10 +977,10 @@ def bulk_invite_members_endpoint(
 
     Returns detailed results for each member attempted.
     """
-    assert request.auth_member is not None  # Guaranteed by @require_admin
-    assert request.auth_organization is not None  # Guaranteed by @require_admin
-    member = request.auth_member
-    org = request.auth_organization
+    assert request.auth.member is not None  # Guaranteed by @require_admin
+    assert request.auth.organization is not None  # Guaranteed by @require_admin
+    member = request.auth.member
+    org = request.auth.organization
 
     current_user_email = member.user.email.lower()
 
@@ -1085,10 +1085,10 @@ def update_member_role_endpoint(
 
     Admin only. Cannot change your own role.
     """
-    assert request.auth_member is not None  # Guaranteed by @require_admin
-    assert request.auth_organization is not None  # Guaranteed by @require_admin
-    current_member = request.auth_member
-    org = request.auth_organization
+    assert request.auth.member is not None  # Guaranteed by @require_admin
+    assert request.auth.organization is not None  # Guaranteed by @require_admin
+    current_member = request.auth.member
+    org = request.auth.organization
 
     # Find the target member
     try:
@@ -1147,10 +1147,10 @@ def delete_member_endpoint(request: AuthenticatedHttpRequest, member_id: int) ->
     Admin only. Cannot remove yourself. Soft deletes locally
     and removes from Stytch.
     """
-    assert request.auth_member is not None  # Guaranteed by @require_admin
-    assert request.auth_organization is not None  # Guaranteed by @require_admin
-    current_member = request.auth_member
-    org = request.auth_organization
+    assert request.auth.member is not None  # Guaranteed by @require_admin
+    assert request.auth.organization is not None  # Guaranteed by @require_admin
+    current_member = request.auth.member
+    org = request.auth.organization
 
     # Find the target member
     try:

@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from ninja.errors import HttpError
 
+from apps.core.auth import AuthContext
 from apps.accounts.api import (
     authenticate_magic_link,
     create_organization,
@@ -514,9 +515,7 @@ class TestGetCurrentUser:
         )
 
         request = request_factory.get("/api/v1/auth/me")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         result = get_current_user(request)
 
@@ -549,9 +548,7 @@ class TestUpdateProfile:
         member = MemberFactory(user=user, organization=org)
 
         request = request_factory.patch("/api/v1/auth/me/profile")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = UpdateProfileRequest(name="New Name")
 
@@ -575,9 +572,7 @@ class TestUpdateProfile:
         member = MemberFactory(user=user, organization=org)
 
         request = request_factory.patch("/api/v1/auth/me/profile")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = UpdateProfileRequest(name="New Name")
 
@@ -620,9 +615,7 @@ class TestStartEmailUpdate:
         member = MemberFactory(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/email/start-update")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = StartEmailUpdateRequest(new_email="new@example.com")
 
@@ -647,9 +640,7 @@ class TestStartEmailUpdate:
         member = MemberFactory(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/email/start-update")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = StartEmailUpdateRequest(new_email="same@example.com")
 
@@ -668,9 +659,7 @@ class TestStartEmailUpdate:
         member = MemberFactory(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/email/start-update")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = StartEmailUpdateRequest(new_email="new@example.com")
 
@@ -727,9 +716,7 @@ class TestGetOrganization:
         member = MemberFactory(user=user, organization=org)
 
         request = request_factory.get("/api/v1/auth/organization")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         result = get_organization(request)
 
@@ -759,9 +746,7 @@ class TestUpdateOrganization:
         member = MemberFactory(user=user, organization=org, role="admin")
 
         request = request_factory.patch("/api/v1/auth/organization")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = UpdateOrganizationRequest(name="New Name")
 
@@ -783,9 +768,7 @@ class TestUpdateOrganization:
         member = MemberFactory(user=user, organization=org, role="member")
 
         request = request_factory.patch("/api/v1/auth/organization")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = UpdateOrganizationRequest(name="New Name")
 
@@ -809,9 +792,7 @@ class TestUpdateOrganization:
         member = MemberFactory(user=user, organization=org, role="admin")
 
         request = request_factory.patch("/api/v1/auth/organization")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = UpdateOrganizationRequest(name="Test Org", slug="new-slug")
 
@@ -851,9 +832,7 @@ class TestUpdateBilling:
         member = MemberFactory(user=user, organization=org, role="admin")
 
         request = request_factory.patch("/api/v1/auth/organization/billing")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = UpdateBillingRequest(
             billing_email="new-billing@example.com",
@@ -887,9 +866,7 @@ class TestUpdateBilling:
         member = MemberFactory(user=user, organization=org, role="member")
 
         request = request_factory.patch("/api/v1/auth/organization/billing")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = UpdateBillingRequest(
             billing_name="Test",
@@ -940,9 +917,7 @@ class TestListMembers:
         MemberFactory(user=member_user, organization=org, role="member")
 
         request = request_factory.get("/api/v1/auth/organization/members")
-        request.auth_user = admin_user  # type: ignore[attr-defined]
-        request.auth_member = admin_member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
 
         result = list_members(request)
 
@@ -959,9 +934,7 @@ class TestListMembers:
         member = MemberFactory(user=user, organization=org, role="member")
 
         request = request_factory.get("/api/v1/auth/organization/members")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         with pytest.raises(HttpError) as exc_info:
             list_members(request)
@@ -988,9 +961,7 @@ class TestListMembers:
             )
 
         request = request_factory.get("/api/v1/auth/organization/members")
-        request.auth_user = admin_user  # type: ignore[attr-defined]
-        request.auth_member = admin_member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
 
         result = list_members(request)
 
@@ -1012,9 +983,7 @@ class TestListMembers:
             )
 
         request = request_factory.get("/api/v1/auth/organization/members?limit=3")
-        request.auth_user = admin_user  # type: ignore[attr-defined]
-        request.auth_member = admin_member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
 
         result = list_members(request, limit=3)
 
@@ -1036,9 +1005,7 @@ class TestListMembers:
             )
 
         request = request_factory.get("/api/v1/auth/organization/members?offset=4")
-        request.auth_user = admin_user  # type: ignore[attr-defined]
-        request.auth_member = admin_member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
 
         result = list_members(request, offset=4)
 
@@ -1060,9 +1027,7 @@ class TestListMembers:
             )
 
         request = request_factory.get("/api/v1/auth/organization/members?offset=2&limit=3")
-        request.auth_user = admin_user  # type: ignore[attr-defined]
-        request.auth_member = admin_member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
 
         result = list_members(request, offset=2, limit=3)
 
@@ -1089,9 +1054,7 @@ class TestInviteMember:
         mock_client.magic_links.email.invite.return_value = MagicMock(member_id="member-new-123")
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = InviteMemberRequest(email="newuser@example.com", name="New User", role="member")
 
@@ -1113,9 +1076,7 @@ class TestInviteMember:
         member = MemberFactory(user=user, organization=org, role="member")
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = InviteMemberRequest(email="newuser@example.com")
 
@@ -1166,9 +1127,7 @@ class TestInviteMember:
         )
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request.auth_user = admin_user  # type: ignore[attr-defined]
-        request.auth_member = admin_member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
 
         payload = InviteMemberRequest(
             email="deleted@example.com", name="Deleted User", role="member"
@@ -1191,9 +1150,7 @@ class TestInviteMember:
         member = MemberFactory(user=user, organization=org, role="admin")
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = InviteMemberRequest(email="admin@example.com")
 
@@ -1243,9 +1200,7 @@ class TestInviteMember:
         )
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request.auth_user = admin_user  # type: ignore[attr-defined]
-        request.auth_member = admin_member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
 
         payload = InviteMemberRequest(email="existing@example.com", role="admin")
 
@@ -1284,9 +1239,7 @@ class TestInviteMember:
         )
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request.auth_user = admin_user  # type: ignore[attr-defined]
-        request.auth_member = admin_member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
 
         payload = InviteMemberRequest(email="pending@example.com", role="member")
 
@@ -1315,9 +1268,7 @@ class TestUpdateMemberRole:
         mock_client = MagicMock()
 
         request = request_factory.patch(f"/api/v1/auth/organization/members/{target_member.id}")
-        request.auth_user = admin_user  # type: ignore[attr-defined]
-        request.auth_member = admin_member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
 
         payload = UpdateMemberRoleRequest(role="admin")
 
@@ -1335,9 +1286,7 @@ class TestUpdateMemberRole:
         member = MemberFactory(user=user, organization=org, role="admin")
 
         request = request_factory.patch(f"/api/v1/auth/organization/members/{member.id}")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = UpdateMemberRoleRequest(role="member")
 
@@ -1355,9 +1304,7 @@ class TestUpdateMemberRole:
         target_member = MemberFactory(organization=org, role="member")
 
         request = request_factory.patch(f"/api/v1/auth/organization/members/{target_member.id}")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = UpdateMemberRoleRequest(role="admin")
 
@@ -1382,9 +1329,7 @@ class TestDeleteMember:
         mock_client = MagicMock()
 
         request = request_factory.delete(f"/api/v1/auth/organization/members/{target_member.id}")
-        request.auth_user = admin_user  # type: ignore[attr-defined]
-        request.auth_member = admin_member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
 
         with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
             result = delete_member_endpoint(request, target_member.id)
@@ -1400,9 +1345,7 @@ class TestDeleteMember:
         member = MemberFactory(user=user, organization=org, role="admin")
 
         request = request_factory.delete(f"/api/v1/auth/organization/members/{member.id}")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         with pytest.raises(HttpError) as exc_info:
             delete_member_endpoint(request, member.id)
@@ -1418,9 +1361,7 @@ class TestDeleteMember:
         target_member = MemberFactory(organization=org, role="member")
 
         request = request_factory.delete(f"/api/v1/auth/organization/members/{target_member.id}")
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         with pytest.raises(HttpError) as exc_info:
             delete_member_endpoint(request, target_member.id)
@@ -1442,9 +1383,7 @@ class TestDeleteMember:
         deleted_member.save()
 
         request = request_factory.get("/api/v1/auth/organization/members")
-        request.auth_user = admin_user  # type: ignore[attr-defined]
-        request.auth_member = admin_member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
 
         result = list_members(request)
 

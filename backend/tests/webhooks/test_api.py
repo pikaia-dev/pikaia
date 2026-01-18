@@ -10,6 +10,7 @@ import pytest
 from django.test import RequestFactory
 from ninja.errors import HttpError
 
+from apps.core.auth import AuthContext
 from apps.webhooks.api import (
     create_endpoint,
     delete_endpoint,
@@ -51,9 +52,7 @@ def _create_authenticated_request(
     else:
         request = request_factory.post(path)
 
-    request.auth_user = user
-    request.auth_member = member
-    request.auth_organization = org
+    request.auth = AuthContext(user=user, member=member, organization=org)
     request.organization = org
     request.user = user
     return request
