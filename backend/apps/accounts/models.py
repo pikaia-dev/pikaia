@@ -162,7 +162,12 @@ class Member(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-        unique_together = ["user", "organization"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "organization"],
+                name="unique_member_per_org",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.user.email} @ {self.organization.name} ({self.role})"
