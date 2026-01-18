@@ -86,7 +86,9 @@ def send_sms(phone_number: str, message: str) -> dict[str, Any]:
         raise SMSError(f"SMS service error: {str(e)}") from e
 
 
-def send_otp_message(phone_number: str, otp_code: str, app_name: str = "Snowball") -> dict[str, Any]:
+def send_otp_message(
+    phone_number: str, otp_code: str, app_name: str = "Snowball"
+) -> dict[str, Any]:
     """
     Send an OTP verification message.
 

@@ -257,9 +257,7 @@ class TestJWTAuthentication:
         assert request.auth_member is None
         assert request.auth_organization is None
 
-    def test_no_auth_header_sets_auth_failed_false(
-        self, middleware: StytchAuthMiddleware
-    ) -> None:
+    def test_no_auth_header_sets_auth_failed_false(self, middleware: StytchAuthMiddleware) -> None:
         """Request without auth header should have auth_failed=False."""
         request = make_request("/api/v1/test")
         middleware(request)
@@ -415,9 +413,7 @@ class TestJWTAuthentication:
         """Unexpected exception during auth should set auth_failed=True."""
         mock_client = MagicMock()
         # Simulate network error or other unexpected exception
-        mock_client.sessions.authenticate_jwt.side_effect = ConnectionError(
-            "Network unreachable"
-        )
+        mock_client.sessions.authenticate_jwt.side_effect = ConnectionError("Network unreachable")
         mock_get_client.return_value = mock_client
 
         request = make_request("/api/v1/test", "Bearer valid-jwt")

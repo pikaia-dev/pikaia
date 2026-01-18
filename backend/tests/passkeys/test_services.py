@@ -45,7 +45,7 @@ class TestPasskeyServiceRegistration:
 
         assert result.challenge_id is not None
         assert result.options_json is not None
-        
+
         options = json.loads(result.options_json)
         assert "challenge" in options
         assert "rp" in options
@@ -64,7 +64,7 @@ class TestPasskeyServiceRegistration:
     ):
         """Should exclude already registered credentials."""
         user, member = user_with_member
-        
+
         # Create an existing passkey for the user
         PasskeyFactory(user=user, credential_id=b"existing_cred_123")
 
@@ -236,7 +236,7 @@ class TestPasskeyServiceAuthentication:
 
         assert result.challenge_id is not None
         assert result.options_json is not None
-        
+
         options = json.loads(result.options_json)
         assert "challenge" in options
         assert "rpId" in options
@@ -310,9 +310,7 @@ class TestPasskeyServiceAuthentication:
 
     @pytest.mark.django_db
     @patch("apps.passkeys.services.verify_authentication_response")
-    def test_verify_authentication_success(
-        self, mock_verify, passkey_service: PasskeyService
-    ):
+    def test_verify_authentication_success(self, mock_verify, passkey_service: PasskeyService):
         """Should return authenticated user on successful verification."""
         # Create member with passkey
         member = MemberFactory()

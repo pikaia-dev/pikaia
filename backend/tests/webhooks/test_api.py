@@ -285,9 +285,7 @@ class TestGetEndpoint:
 
         assert exc_info.value.status_code == 403
 
-    def test_returns_404_for_nonexistent(
-        self, request_factory: RequestFactory
-    ) -> None:
+    def test_returns_404_for_nonexistent(self, request_factory: RequestFactory) -> None:
         """Should return 404 for nonexistent endpoint."""
         org = OrganizationFactory()
 
@@ -304,9 +302,7 @@ class TestGetEndpoint:
 
         assert exc_info.value.status_code == 404
 
-    def test_returns_404_for_other_org_endpoint(
-        self, request_factory: RequestFactory
-    ) -> None:
+    def test_returns_404_for_other_org_endpoint(self, request_factory: RequestFactory) -> None:
         """Should return 404 when endpoint belongs to different org."""
         org1 = OrganizationFactory()
         org2 = OrganizationFactory()
@@ -390,9 +386,7 @@ class TestUpdateEndpoint:
         assert result.name == "Updated"
         assert result.description == "Original desc"
 
-    def test_returns_404_for_nonexistent(
-        self, request_factory: RequestFactory
-    ) -> None:
+    def test_returns_404_for_nonexistent(self, request_factory: RequestFactory) -> None:
         """Should return 404 for nonexistent endpoint."""
         org = OrganizationFactory()
 
@@ -452,9 +446,7 @@ class TestDeleteEndpoint:
 
         assert exc_info.value.status_code == 403
 
-    def test_returns_404_for_nonexistent(
-        self, request_factory: RequestFactory
-    ) -> None:
+    def test_returns_404_for_nonexistent(self, request_factory: RequestFactory) -> None:
         """Should return 404 for nonexistent endpoint."""
         org = OrganizationFactory()
 
@@ -513,9 +505,7 @@ class TestListDeliveries:
 
         assert exc_info.value.status_code == 403
 
-    def test_returns_404_for_nonexistent_endpoint(
-        self, request_factory: RequestFactory
-    ) -> None:
+    def test_returns_404_for_nonexistent_endpoint(self, request_factory: RequestFactory) -> None:
         """Should return 404 for nonexistent endpoint."""
         org = OrganizationFactory()
 
@@ -557,9 +547,7 @@ class TestSendTestWebhook:
     """Tests for send_test_webhook endpoint."""
 
     @patch("apps.webhooks.api.WebhookDispatcher.send_test")
-    def test_admin_can_send_test(
-        self, mock_send_test, request_factory: RequestFactory
-    ) -> None:
+    def test_admin_can_send_test(self, mock_send_test, request_factory: RequestFactory) -> None:
         """Admin should be able to send test webhook."""
         from apps.webhooks.services import DeliveryResult
 
@@ -608,9 +596,7 @@ class TestSendTestWebhook:
 
         assert exc_info.value.status_code == 403
 
-    def test_returns_404_for_nonexistent_endpoint(
-        self, request_factory: RequestFactory
-    ) -> None:
+    def test_returns_404_for_nonexistent_endpoint(self, request_factory: RequestFactory) -> None:
         """Should return 404 for nonexistent endpoint."""
         org = OrganizationFactory()
 
@@ -629,9 +615,7 @@ class TestSendTestWebhook:
         assert exc_info.value.status_code == 404
 
     @patch("apps.webhooks.api.WebhookDispatcher.send_test")
-    def test_returns_failure_result(
-        self, mock_send_test, request_factory: RequestFactory
-    ) -> None:
+    def test_returns_failure_result(self, mock_send_test, request_factory: RequestFactory) -> None:
         """Should return failure result when test fails."""
         from apps.webhooks.services import DeliveryResult
 

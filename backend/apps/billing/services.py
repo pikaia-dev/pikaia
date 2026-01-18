@@ -238,7 +238,9 @@ def sync_subscription_from_stripe(subscription_id: str) -> bool:
     try:
         stripe_sub = stripe.Subscription.retrieve(subscription_id)
     except stripe.StripeError as e:
-        logger.error("stripe_subscription_retrieve_failed", subscription_id=subscription_id, error=str(e))
+        logger.error(
+            "stripe_subscription_retrieve_failed", subscription_id=subscription_id, error=str(e)
+        )
         raise
 
     # Use the existing handler to sync the subscription
@@ -331,13 +333,20 @@ def handle_subscription_created(stripe_subscription: dict) -> None:
     """
     org_id = stripe_subscription.get("metadata", {}).get("organization_id")
     if not org_id:
-        logger.warning("stripe_subscription_missing_org_metadata", subscription_id=stripe_subscription.get("id"))
+        logger.warning(
+            "stripe_subscription_missing_org_metadata",
+            subscription_id=stripe_subscription.get("id"),
+        )
         return
 
     try:
         org = Organization.objects.get(id=int(org_id))
     except Organization.DoesNotExist:
-        logger.error("stripe_subscription_org_not_found", org_id=org_id, subscription_id=stripe_subscription.get("id"))
+        logger.error(
+            "stripe_subscription_org_not_found",
+            org_id=org_id,
+            subscription_id=stripe_subscription.get("id"),
+        )
         return
 
     # Parse dates - Stripe 2025 API may nest these differently
@@ -392,7 +401,9 @@ def handle_subscription_created(stripe_subscription: dict) -> None:
             organization_id=str(org.id),
         )
 
-    logger.info("stripe_subscription_synced", org_id=str(org.id), subscription_id=stripe_subscription["id"])
+    logger.info(
+        "stripe_subscription_synced", org_id=str(org.id), subscription_id=stripe_subscription["id"]
+    )
 
 
 def handle_subscription_updated(stripe_subscription: dict) -> None:

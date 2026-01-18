@@ -175,7 +175,6 @@ def verify_authentication(
         raise HttpError(500, f"Failed to create session: {e}") from None
 
 
-
 # --- Management (requires authentication) ---
 
 

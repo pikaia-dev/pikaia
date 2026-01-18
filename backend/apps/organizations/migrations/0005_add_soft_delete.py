@@ -4,15 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('organizations', '0004_organization_logo_url'),
+        ("organizations", "0004_organization_logo_url"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='organization',
-            name='deleted_at',
-            field=models.DateTimeField(blank=True, db_index=True, help_text='Soft delete timestamp. NULL = active organization.', null=True),
+            model_name="organization",
+            name="deleted_at",
+            field=models.DateTimeField(
+                blank=True,
+                db_index=True,
+                help_text="Soft delete timestamp. NULL = active organization.",
+                null=True,
+            ),
         ),
     ]

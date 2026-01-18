@@ -241,7 +241,9 @@ class StytchAuthMiddleware:
                 **{
                     "usr.id": str(member.user.id),
                     "usr.email": member.user.email,
-                    "organization.id": member.organization.stytch_org_id if member.organization else None,
+                    "organization.id": member.organization.stytch_org_id
+                    if member.organization
+                    else None,
                 }
             )
 
@@ -255,5 +257,3 @@ class StytchAuthMiddleware:
             # Also mark as failed - potential security issue
             request.auth_failed = True  # type: ignore[attr-defined]
             logger.exception("jwt_auth_unexpected_error")
-
-

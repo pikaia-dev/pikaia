@@ -206,9 +206,7 @@ class TestMobileProvisionEndpointCreateOrg:
     """Tests for mobile provision endpoint - create organization flow."""
 
     @override_settings(MOBILE_PROVISION_API_KEY="test-api-key")
-    def test_success_creates_org_and_returns_session(
-        self, request_factory: RequestFactory
-    ) -> None:
+    def test_success_creates_org_and_returns_session(self, request_factory: RequestFactory) -> None:
         """Should create org, member, user and return session tokens."""
         mock_stytch = MagicMock()
 
@@ -319,9 +317,7 @@ class TestMobileProvisionEndpointJoinOrg:
     """Tests for mobile provision endpoint - join existing organization flow."""
 
     @override_settings(MOBILE_PROVISION_API_KEY="test-api-key")
-    def test_success_joins_org_and_returns_session(
-        self, request_factory: RequestFactory
-    ) -> None:
+    def test_success_joins_org_and_returns_session(self, request_factory: RequestFactory) -> None:
         """Should create member in existing org and return session tokens."""
         mock_stytch = MagicMock()
 
@@ -335,9 +331,7 @@ class TestMobileProvisionEndpointJoinOrg:
         )
 
         # Mock member search (no existing member)
-        mock_stytch.organizations.members.search.return_value = MockMemberSearchResponse(
-            members=[]
-        )
+        mock_stytch.organizations.members.search.return_value = MockMemberSearchResponse(members=[])
 
         # Mock member creation
         mock_stytch.organizations.members.create.return_value = MockMemberCreateResponse(
@@ -614,9 +608,7 @@ class TestProvisionMobileUserService:
                 organization_slug="local-test",
             )
         )
-        mock_stytch.organizations.members.search.return_value = MockMemberSearchResponse(
-            members=[]
-        )
+        mock_stytch.organizations.members.search.return_value = MockMemberSearchResponse(members=[])
         mock_stytch.organizations.members.create.return_value = MockMemberCreateResponse(
             member=MockStytchMember(
                 member_id="member-local-456",

@@ -9,78 +9,261 @@ import apps.webhooks.models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('organizations', '0005_add_soft_delete'),
+        ("organizations", "0005_add_soft_delete"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='WebhookEndpoint',
+            name="WebhookEndpoint",
             fields=[
-                ('id', models.CharField(default=apps.webhooks.models.generate_webhook_id, editable=False, max_length=32, primary_key=True, serialize=False)),
-                ('name', models.CharField(help_text='Human-readable name for this endpoint', max_length=100)),
-                ('description', models.TextField(blank=True, help_text='Optional description of what this endpoint is used for')),
-                ('url', models.URLField(help_text='HTTPS URL to receive webhook events', max_length=2048)),
-                ('events', django.contrib.postgres.fields.ArrayField(base_field=models.CharField(max_length=100), help_text="List of event types to receive (supports wildcards like 'member.*')")),
-                ('secret', models.CharField(default=apps.webhooks.models.generate_webhook_secret, help_text='Secret used to sign webhook payloads (HMAC-SHA256)', max_length=64)),
-                ('active', models.BooleanField(default=True, help_text='Whether this endpoint receives events')),
-                ('last_delivery_status', models.CharField(blank=True, help_text='Status of most recent delivery: success, failure, pending', max_length=20)),
-                ('last_delivery_at', models.DateTimeField(blank=True, help_text='Timestamp of most recent delivery attempt', null=True)),
-                ('consecutive_failures', models.PositiveIntegerField(default=0, help_text='Number of consecutive failed deliveries (resets on success)')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('created_by', models.ForeignKey(blank=True, help_text='User who created this endpoint', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='created_webhook_endpoints', to=settings.AUTH_USER_MODEL)),
-                ('organization', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='webhook_endpoints', to='organizations.organization')),
+                (
+                    "id",
+                    models.CharField(
+                        default=apps.webhooks.models.generate_webhook_id,
+                        editable=False,
+                        max_length=32,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "name",
+                    models.CharField(
+                        help_text="Human-readable name for this endpoint", max_length=100
+                    ),
+                ),
+                (
+                    "description",
+                    models.TextField(
+                        blank=True,
+                        help_text="Optional description of what this endpoint is used for",
+                    ),
+                ),
+                (
+                    "url",
+                    models.URLField(
+                        help_text="HTTPS URL to receive webhook events", max_length=2048
+                    ),
+                ),
+                (
+                    "events",
+                    django.contrib.postgres.fields.ArrayField(
+                        base_field=models.CharField(max_length=100),
+                        help_text="List of event types to receive (supports wildcards like 'member.*')",
+                    ),
+                ),
+                (
+                    "secret",
+                    models.CharField(
+                        default=apps.webhooks.models.generate_webhook_secret,
+                        help_text="Secret used to sign webhook payloads (HMAC-SHA256)",
+                        max_length=64,
+                    ),
+                ),
+                (
+                    "active",
+                    models.BooleanField(
+                        default=True, help_text="Whether this endpoint receives events"
+                    ),
+                ),
+                (
+                    "last_delivery_status",
+                    models.CharField(
+                        blank=True,
+                        help_text="Status of most recent delivery: success, failure, pending",
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "last_delivery_at",
+                    models.DateTimeField(
+                        blank=True, help_text="Timestamp of most recent delivery attempt", null=True
+                    ),
+                ),
+                (
+                    "consecutive_failures",
+                    models.PositiveIntegerField(
+                        default=0,
+                        help_text="Number of consecutive failed deliveries (resets on success)",
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        help_text="User who created this endpoint",
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="created_webhook_endpoints",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "organization",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="webhook_endpoints",
+                        to="organizations.organization",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-created_at'],
+                "ordering": ["-created_at"],
             },
         ),
         migrations.CreateModel(
-            name='WebhookDelivery',
+            name="WebhookDelivery",
             fields=[
-                ('id', models.CharField(default=apps.webhooks.models.generate_delivery_id, editable=False, max_length=32, primary_key=True, serialize=False)),
-                ('event_id', models.CharField(db_index=True, help_text='Unique event ID (from OutboxEvent.event_id)', max_length=64)),
-                ('event_type', models.CharField(help_text="Event type, e.g. 'member.created'", max_length=100)),
-                ('url_snapshot', models.URLField(help_text='URL at time of delivery (snapshot)', max_length=2048)),
-                ('status', models.CharField(choices=[('pending', 'Pending'), ('success', 'Success'), ('failure', 'Failure')], db_index=True, default='pending', max_length=20)),
-                ('error_type', models.CharField(blank=True, choices=[('', 'None'), ('timeout', 'Timeout'), ('connection_error', 'Connection Error'), ('http_error', 'HTTP Error'), ('invalid_response', 'Invalid Response'), ('ssl_error', 'SSL Error')], default='', max_length=30)),
-                ('http_status', models.PositiveSmallIntegerField(blank=True, help_text='HTTP response status code', null=True)),
-                ('duration_ms', models.PositiveIntegerField(blank=True, help_text='Request duration in milliseconds', null=True)),
-                ('response_snippet', models.TextField(blank=True, help_text='First 500 chars of response body (for debugging, no PII)', max_length=500)),
-                ('error_message', models.TextField(blank=True, help_text='Error message if delivery failed')),
-                ('attempt_number', models.PositiveSmallIntegerField(default=1, help_text='Current attempt number (1-6)')),
-                ('next_retry_at', models.DateTimeField(blank=True, db_index=True, help_text='When to retry (null if no retry scheduled)', null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('attempted_at', models.DateTimeField(blank=True, help_text='When the delivery was last attempted', null=True)),
-                ('endpoint', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='deliveries', to='webhooks.webhookendpoint')),
+                (
+                    "id",
+                    models.CharField(
+                        default=apps.webhooks.models.generate_delivery_id,
+                        editable=False,
+                        max_length=32,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "event_id",
+                    models.CharField(
+                        db_index=True,
+                        help_text="Unique event ID (from OutboxEvent.event_id)",
+                        max_length=64,
+                    ),
+                ),
+                (
+                    "event_type",
+                    models.CharField(help_text="Event type, e.g. 'member.created'", max_length=100),
+                ),
+                (
+                    "url_snapshot",
+                    models.URLField(
+                        help_text="URL at time of delivery (snapshot)", max_length=2048
+                    ),
+                ),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("pending", "Pending"),
+                            ("success", "Success"),
+                            ("failure", "Failure"),
+                        ],
+                        db_index=True,
+                        default="pending",
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "error_type",
+                    models.CharField(
+                        blank=True,
+                        choices=[
+                            ("", "None"),
+                            ("timeout", "Timeout"),
+                            ("connection_error", "Connection Error"),
+                            ("http_error", "HTTP Error"),
+                            ("invalid_response", "Invalid Response"),
+                            ("ssl_error", "SSL Error"),
+                        ],
+                        default="",
+                        max_length=30,
+                    ),
+                ),
+                (
+                    "http_status",
+                    models.PositiveSmallIntegerField(
+                        blank=True, help_text="HTTP response status code", null=True
+                    ),
+                ),
+                (
+                    "duration_ms",
+                    models.PositiveIntegerField(
+                        blank=True, help_text="Request duration in milliseconds", null=True
+                    ),
+                ),
+                (
+                    "response_snippet",
+                    models.TextField(
+                        blank=True,
+                        help_text="First 500 chars of response body (for debugging, no PII)",
+                        max_length=500,
+                    ),
+                ),
+                (
+                    "error_message",
+                    models.TextField(blank=True, help_text="Error message if delivery failed"),
+                ),
+                (
+                    "attempt_number",
+                    models.PositiveSmallIntegerField(
+                        default=1, help_text="Current attempt number (1-6)"
+                    ),
+                ),
+                (
+                    "next_retry_at",
+                    models.DateTimeField(
+                        blank=True,
+                        db_index=True,
+                        help_text="When to retry (null if no retry scheduled)",
+                        null=True,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "attempted_at",
+                    models.DateTimeField(
+                        blank=True, help_text="When the delivery was last attempted", null=True
+                    ),
+                ),
+                (
+                    "endpoint",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="deliveries",
+                        to="webhooks.webhookendpoint",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-created_at'],
+                "ordering": ["-created_at"],
             },
         ),
         migrations.AddIndex(
-            model_name='webhookendpoint',
-            index=models.Index(fields=['organization', 'active'], name='webhooks_we_organiz_86ce66_idx'),
+            model_name="webhookendpoint",
+            index=models.Index(
+                fields=["organization", "active"], name="webhooks_we_organiz_86ce66_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='webhookdelivery',
-            index=models.Index(fields=['endpoint', 'created_at'], name='webhooks_we_endpoin_2b680e_idx'),
+            model_name="webhookdelivery",
+            index=models.Index(
+                fields=["endpoint", "created_at"], name="webhooks_we_endpoin_2b680e_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='webhookdelivery',
-            index=models.Index(fields=['event_id', 'endpoint'], name='webhooks_we_event_i_35fb55_idx'),
+            model_name="webhookdelivery",
+            index=models.Index(
+                fields=["event_id", "endpoint"], name="webhooks_we_event_i_35fb55_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='webhookdelivery',
-            index=models.Index(fields=['status', 'next_retry_at'], name='webhooks_we_status_eb2625_idx'),
+            model_name="webhookdelivery",
+            index=models.Index(
+                fields=["status", "next_retry_at"], name="webhooks_we_status_eb2625_idx"
+            ),
         ),
         migrations.AddConstraint(
-            model_name='webhookdelivery',
-            constraint=models.UniqueConstraint(fields=('event_id', 'endpoint'), name='unique_delivery_per_event_endpoint'),
+            model_name="webhookdelivery",
+            constraint=models.UniqueConstraint(
+                fields=("event_id", "endpoint"), name="unique_delivery_per_event_endpoint"
+            ),
         ),
     ]

@@ -93,9 +93,7 @@ def list_events(request: HttpRequest) -> WebhookEventListResponse:
     This endpoint is the single source of truth for what events can be subscribed to.
     """
     events = get_available_events()
-    return WebhookEventListResponse(
-        events=[WebhookEventTypeResponse(**e) for e in events]
-    )
+    return WebhookEventListResponse(events=[WebhookEventTypeResponse(**e) for e in events])
 
 
 # =============================================================================
@@ -120,9 +118,7 @@ def list_endpoints(request: HttpRequest) -> WebhookEndpointListResponse:
     service = WebhookService(request.auth_organization)
     endpoints = service.list_endpoints()
 
-    return WebhookEndpointListResponse(
-        endpoints=[_endpoint_to_response(ep) for ep in endpoints]
-    )
+    return WebhookEndpointListResponse(endpoints=[_endpoint_to_response(ep) for ep in endpoints])
 
 
 @router.post(
@@ -296,9 +292,7 @@ def list_deliveries(
 
     deliveries = service.list_deliveries(endpoint_id, limit=min(limit, 100))
 
-    return WebhookDeliveryListResponse(
-        deliveries=[_delivery_to_response(d) for d in deliveries]
-    )
+    return WebhookDeliveryListResponse(deliveries=[_delivery_to_response(d) for d in deliveries])
 
 
 # =============================================================================

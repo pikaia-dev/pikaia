@@ -47,6 +47,7 @@ class RestHookEndpointData:
     url: str
     events: list[str]
 
+
 logger = logging.getLogger(__name__)
 
 router = Router(tags=["hooks"])

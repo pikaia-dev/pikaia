@@ -177,7 +177,7 @@ jobs:
             --query 'services[0].taskDefinition' \
             --output text)
           echo "taskDefinitionArn=${TD_ARN}" >> "$GITHUB_OUTPUT"
-          
+
           MIGRATE_CONTAINER=$(aws ecs describe-task-definition \
             --task-definition "${TD_ARN}" \
             --query 'taskDefinition.containerDefinitions[0].name' \

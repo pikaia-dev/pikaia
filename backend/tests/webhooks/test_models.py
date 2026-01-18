@@ -2,7 +2,6 @@
 Tests for webhook models.
 """
 
-
 import pytest
 
 from apps.webhooks.models import (
