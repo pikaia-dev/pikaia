@@ -36,6 +36,10 @@ cd frontend
 cp .env.example .env  # Edit with your API keys
 pnpm install
 pnpm dev  # http://localhost:5173
+
+# Pre-commit hooks (from repo root)
+cd ..
+uvx pre-commit install  # Runs ruff format/check on commit
 ```
 
 ### Common Commands

@@ -5,8 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("accounts", "0008_add_role_and_status_indexes"),
-        ("organizations", "0005_add_soft_delete"),
+        ("accounts", "0009_add_member_organization_deleted_at_index"),
     ]
 
     operations = [

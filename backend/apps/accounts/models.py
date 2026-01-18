@@ -168,6 +168,9 @@ class Member(models.Model):
                 name="unique_member_per_org",
             ),
         ]
+        indexes = [
+            models.Index(fields=["organization", "deleted_at"]),
+        ]
 
     def __str__(self) -> str:
         return f"{self.user.email} @ {self.organization.name} ({self.role})"
