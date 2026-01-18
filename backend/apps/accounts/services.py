@@ -441,6 +441,9 @@ def sync_logo_to_stytch(organization: Organization) -> None:
 
 # --- Bulk Invite Services ---
 
+# Maximum members allowed in a single bulk invite (enforced at schema level too)
+MAX_BULK_INVITE_SIZE = 100
+
 
 def bulk_invite_members(
     organization: Organization,
@@ -453,23 +456,49 @@ def bulk_invite_members(
     partial success. Phone numbers are stored unverified on the User model
     (will require OTP verification later).
 
+    Deduplicates emails (case-insensitive) - only the first occurrence is processed.
+
     Args:
         organization: The organization to invite to
         members_data: List of dicts with keys: email, name, phone, role
 
     Returns:
         Dict with results, total, succeeded, failed counts
+
+    Raises:
+        ValueError: If members_data exceeds MAX_BULK_INVITE_SIZE
     """
     import logging
 
     from stytch.core.response_base import StytchError
+
+    if len(members_data) > MAX_BULK_INVITE_SIZE:
+        raise ValueError(f"Bulk invite limited to {MAX_BULK_INVITE_SIZE} members")
 
     logger = logging.getLogger(__name__)
     results = []
     succeeded = 0
     failed = 0
 
+    # Dedupe emails (case-insensitive), keeping first occurrence
+    seen_emails: set[str] = set()
+    unique_members_data = []
     for member_item in members_data:
+        email_lower = member_item.get("email", "").lower()
+        if email_lower in seen_emails:
+            # Skip duplicate, report as failed
+            results.append({
+                "email": member_item.get("email", ""),
+                "success": False,
+                "error": "Duplicate email in request",
+                "stytch_member_id": None,
+            })
+            failed += 1
+            continue
+        seen_emails.add(email_lower)
+        unique_members_data.append(member_item)
+
+    for member_item in unique_members_data:
         email = member_item.get("email", "")
         name = member_item.get("name", "")
         phone = member_item.get("phone", "")
