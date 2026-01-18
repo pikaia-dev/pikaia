@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -15,28 +14,99 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Passkey',
+            name="Passkey",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('credential_id', models.BinaryField(help_text='Base64URL-decoded credential ID from authenticator', unique=True)),
-                ('public_key', models.BinaryField(help_text='COSE public key for signature verification')),
-                ('sign_count', models.PositiveIntegerField(default=0, help_text='Signature counter for replay attack detection')),
-                ('name', models.CharField(help_text="User-friendly name (e.g., 'iPhone 15', 'YubiKey')", max_length=100)),
-                ('aaguid', models.CharField(blank=True, default='', help_text='Authenticator Attestation GUID (identifies authenticator model)', max_length=36)),
-                ('is_discoverable', models.BooleanField(default=True, help_text='Whether this is a discoverable (resident) credential')),
-                ('backup_eligible', models.BooleanField(default=False, help_text='Whether the credential is eligible for backup (e.g., iCloud Keychain)')),
-                ('backup_state', models.BooleanField(default=False, help_text='Whether the credential is currently backed up')),
-                ('transports', models.JSONField(blank=True, default=list, help_text='Supported transports: usb, nfc, ble, internal, hybrid')),
-                ('last_used_at', models.DateTimeField(blank=True, help_text='Last time this passkey was used for authentication', null=True)),
-                ('user', models.ForeignKey(help_text='User who owns this passkey', on_delete=django.db.models.deletion.CASCADE, related_name='passkeys', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "credential_id",
+                    models.BinaryField(
+                        help_text="Base64URL-decoded credential ID from authenticator", unique=True
+                    ),
+                ),
+                (
+                    "public_key",
+                    models.BinaryField(help_text="COSE public key for signature verification"),
+                ),
+                (
+                    "sign_count",
+                    models.PositiveIntegerField(
+                        default=0, help_text="Signature counter for replay attack detection"
+                    ),
+                ),
+                (
+                    "name",
+                    models.CharField(
+                        help_text="User-friendly name (e.g., 'iPhone 15', 'YubiKey')",
+                        max_length=100,
+                    ),
+                ),
+                (
+                    "aaguid",
+                    models.CharField(
+                        blank=True,
+                        default="",
+                        help_text="Authenticator Attestation GUID (identifies authenticator model)",
+                        max_length=36,
+                    ),
+                ),
+                (
+                    "is_discoverable",
+                    models.BooleanField(
+                        default=True,
+                        help_text="Whether this is a discoverable (resident) credential",
+                    ),
+                ),
+                (
+                    "backup_eligible",
+                    models.BooleanField(
+                        default=False,
+                        help_text="Whether the credential is eligible for backup (e.g., iCloud Keychain)",
+                    ),
+                ),
+                (
+                    "backup_state",
+                    models.BooleanField(
+                        default=False, help_text="Whether the credential is currently backed up"
+                    ),
+                ),
+                (
+                    "transports",
+                    models.JSONField(
+                        blank=True,
+                        default=list,
+                        help_text="Supported transports: usb, nfc, ble, internal, hybrid",
+                    ),
+                ),
+                (
+                    "last_used_at",
+                    models.DateTimeField(
+                        blank=True,
+                        help_text="Last time this passkey was used for authentication",
+                        null=True,
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        help_text="User who owns this passkey",
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="passkeys",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Passkey',
-                'verbose_name_plural': 'Passkeys',
-                'ordering': ['-created_at'],
-                'indexes': [models.Index(fields=['user'], name='passkeys_pa_user_id_29321b_idx')],
+                "verbose_name": "Passkey",
+                "verbose_name_plural": "Passkeys",
+                "ordering": ["-created_at"],
+                "indexes": [models.Index(fields=["user"], name="passkeys_pa_user_id_29321b_idx")],
             },
         ),
     ]

@@ -171,7 +171,7 @@ CSRF_TRUSTED_ORIGINS = parse_comma_list(settings.WEBAUTHN_ORIGIN)
 # Database configuration
 def _get_database_config() -> dict:
     """Build Django DATABASES config.
-    
+
     For ECS: Uses individual DB_* environment variables directly (no URL encoding needed).
     For local: Uses DATABASE_URL or default localhost.
     """

@@ -5,7 +5,6 @@ Handles passkey registration and authentication using the webauthn library.
 Integrates with Stytch for session management after successful authentication.
 """
 
-
 import logging
 import secrets
 from dataclasses import dataclass
@@ -37,6 +36,13 @@ logger = logging.getLogger(__name__)
 REGISTRATION_CHALLENGE_PREFIX = "passkey:reg:"
 AUTHENTICATION_CHALLENGE_PREFIX = "passkey:auth:"
 CHALLENGE_TTL_SECONDS = 300  # 5 minutes
+
+
+def _parse_transports(transports: list[str] | None) -> list[AuthenticatorTransport] | None:
+    """Convert transport strings to AuthenticatorTransport enums."""
+    if not transports:
+        return None
+    return [AuthenticatorTransport(t) for t in transports]
 
 
 @dataclass
@@ -98,7 +104,7 @@ class PasskeyService:
         existing_credentials = [
             PublicKeyCredentialDescriptor(
                 id=passkey.credential_id,
-                transports=[AuthenticatorTransport(t) for t in passkey.transports] if passkey.transports else None,
+                transports=_parse_transports(passkey.transports),
             )
             for passkey in user.passkeys.all()
         ]
@@ -182,9 +188,11 @@ class PasskeyService:
             raise ValueError(f"Registration verification failed: {e}") from e
 
         # Check if credential already exists
-        existing_passkey = Passkey.objects.filter(
-            credential_id=verification.credential_id
-        ).select_related("user").first()
+        existing_passkey = (
+            Passkey.objects.filter(credential_id=verification.credential_id)
+            .select_related("user")
+            .first()
+        )
 
         if existing_passkey:
             if existing_passkey.user_id == user.id:
@@ -215,7 +223,12 @@ class PasskeyService:
 
         # Extract transports from the response if available
         transports = []
-        if hasattr(credential_json, "response") and hasattr(credential_json["response"], "transports") or isinstance(credential_json, dict) and "response" in credential_json:
+        if (
+            hasattr(credential_json, "response")
+            and hasattr(credential_json["response"], "transports")
+            or isinstance(credential_json, dict)
+            and "response" in credential_json
+        ):
             transports = credential_json["response"].get("transports", [])
 
         # Create passkey record
@@ -228,7 +241,9 @@ class PasskeyService:
             aaguid=str(verification.aaguid) if verification.aaguid else "",
             is_discoverable=True,  # We require resident keys
             backup_eligible=verification.credential_backed_up is not None,
-            backup_state=verification.credential_backed_up if verification.credential_backed_up is not None else False,
+            backup_state=verification.credential_backed_up
+            if verification.credential_backed_up is not None
+            else False,
             transports=transports,
         )
 
@@ -259,7 +274,7 @@ class PasskeyService:
                 allowed_credentials = [
                     PublicKeyCredentialDescriptor(
                         id=passkey.credential_id,
-                        transports=[AuthenticatorTransport(t) for t in passkey.transports] if passkey.transports else None,
+                        transports=_parse_transports(passkey.transports),
                     )
                     for passkey in user.passkeys.all()
                 ]

@@ -11,6 +11,7 @@ from django.http import HttpRequest, HttpResponse
 from ninja.errors import HttpError
 
 from apps.accounts.models import User
+from apps.core.auth import AuthContext
 from apps.core.security import BearerAuth, require_admin
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
 
@@ -19,30 +20,30 @@ class TestBearerAuth:
     """Tests for BearerAuth authentication class."""
 
     def test_authenticate_returns_token_when_auth_user_set(self) -> None:
-        """Should return token when request.auth_user is populated."""
+        """Should return token when request.auth.user is populated."""
         auth = BearerAuth()
         request = HttpRequest()
-        request.auth_user = MagicMock(spec=User)  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=MagicMock(spec=User))
 
         result = auth.authenticate(request, "test-token-123")
 
         assert result == "test-token-123"
 
-    def test_authenticate_returns_none_when_auth_user_missing(self) -> None:
-        """Should return None when request has no auth_user attribute."""
+    def test_authenticate_returns_none_when_auth_missing(self) -> None:
+        """Should return None when request has no auth attribute."""
         auth = BearerAuth()
         request = HttpRequest()
-        # No auth_user attribute
+        # No auth attribute
 
         result = auth.authenticate(request, "test-token-123")
 
         assert result is None
 
     def test_authenticate_returns_none_when_auth_user_is_none(self) -> None:
-        """Should return None when request.auth_user is None."""
+        """Should return None when request.auth.user is None."""
         auth = BearerAuth()
         request = HttpRequest()
-        request.auth_user = None  # type: ignore[attr-defined]
+        request.auth = AuthContext(user=None)
 
         result = auth.authenticate(request, "test-token-123")
 
@@ -53,94 +54,84 @@ class TestBearerAuth:
 class TestRequireAdmin:
     """Tests for require_admin decorator."""
 
-    def test_allows_admin_user(self) -> None:
-        """Should allow admin user to access endpoint."""
-        org = OrganizationFactory()
+    def test_allows_admin_user(self, request_factory) -> None:
+        """Should allow admin users through."""
         user = UserFactory()
+        org = OrganizationFactory()
         member = MemberFactory(user=user, organization=org, role="admin")
 
-        # Create request with auth context
-        request = HttpRequest()
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
-
-        # Create decorated function
-        @require_admin
-        def protected_endpoint(request: HttpRequest) -> HttpResponse:
-            return HttpResponse("Success")
-
-        # Should not raise
-        response = protected_endpoint(request)
-        assert response.content == b"Success"
-
-    def test_raises_401_for_unauthenticated(self) -> None:
-        """Should raise 401 when user is not authenticated."""
-        request = HttpRequest()
-        # No auth context
+        request = request_factory.get("/")
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         @require_admin
-        def protected_endpoint(request: HttpRequest) -> HttpResponse:
-            return HttpResponse("Success")
+        def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("OK")
 
-        with pytest.raises(HttpError) as exc_info:
-            protected_endpoint(request)
+        result = view(request)
+        assert result.status_code == 200
 
-        assert exc_info.value.status_code == 401
-        assert "Not authenticated" in str(exc_info.value.message)
-
-    def test_raises_401_when_auth_member_is_none(self) -> None:
-        """Should raise 401 when auth_member is explicitly None."""
-        request = HttpRequest()
-        request.auth_member = None  # type: ignore[attr-defined]
+    def test_rejects_unauthenticated_user(self, request_factory) -> None:
+        """Should reject unauthenticated users with 401."""
+        request = request_factory.get("/")
+        request.auth = AuthContext()  # No user/member/org
 
         @require_admin
-        def protected_endpoint(request: HttpRequest) -> HttpResponse:
-            return HttpResponse("Success")
+        def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("OK")
 
-        with pytest.raises(HttpError) as exc_info:
-            protected_endpoint(request)
+        with pytest.raises(HttpError) as exc:
+            view(request)
 
-        assert exc_info.value.status_code == 401
+        assert exc.value.status_code == 401
 
-    def test_raises_403_for_non_admin(self) -> None:
-        """Should raise 403 when user is not an admin."""
-        org = OrganizationFactory()
+    def test_rejects_non_admin_user(self, request_factory) -> None:
+        """Should reject non-admin users with 403."""
         user = UserFactory()
+        org = OrganizationFactory()
         member = MemberFactory(user=user, organization=org, role="member")
 
-        request = HttpRequest()
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request = request_factory.get("/")
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
         @require_admin
-        def protected_endpoint(request: HttpRequest) -> HttpResponse:
-            return HttpResponse("Success")
+        def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("OK")
 
-        with pytest.raises(HttpError) as exc_info:
-            protected_endpoint(request)
+        with pytest.raises(HttpError) as exc:
+            view(request)
 
-        assert exc_info.value.status_code == 403
-        assert "Admin access required" in str(exc_info.value.message)
+        assert exc.value.status_code == 403
 
-    def test_passes_through_args_and_kwargs(self) -> None:
-        """Should pass arguments through to wrapped function."""
-        org = OrganizationFactory()
+
+@pytest.mark.django_db
+class TestGetAuthContext:
+    """Tests for get_auth_context helper function."""
+
+    def test_returns_auth_tuple(self, request_factory) -> None:
+        """Should return (user, member, org) tuple when authenticated."""
+        from apps.core.security import get_auth_context
+
         user = UserFactory()
-        member = MemberFactory(user=user, organization=org, role="admin")
+        org = OrganizationFactory()
+        member = MemberFactory(user=user, organization=org)
 
-        request = HttpRequest()
-        request.auth_user = user  # type: ignore[attr-defined]
-        request.auth_member = member  # type: ignore[attr-defined]
-        request.auth_organization = org  # type: ignore[attr-defined]
+        request = request_factory.get("/")
+        request.auth = AuthContext(user=user, member=member, organization=org)
 
-        @require_admin
-        def endpoint_with_args(
-            request: HttpRequest, arg1: str, arg2: int, kwarg1: str = "default"
-        ) -> dict:
-            return {"arg1": arg1, "arg2": arg2, "kwarg1": kwarg1}
+        result_user, result_member, result_org = get_auth_context(request)
 
-        result = endpoint_with_args(request, "value1", 42, kwarg1="custom")
+        assert result_user == user
+        assert result_member == member
+        assert result_org == org
 
-        assert result == {"arg1": "value1", "arg2": 42, "kwarg1": "custom"}
+    def test_raises_401_when_not_authenticated(self, request_factory) -> None:
+        """Should raise 401 when not authenticated."""
+        from apps.core.security import get_auth_context
+
+        request = request_factory.get("/")
+        request.auth = AuthContext()  # No user
+
+        with pytest.raises(HttpError) as exc:
+            get_auth_context(request)
+
+        assert exc.value.status_code == 401

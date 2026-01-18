@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -15,24 +14,72 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='OTPVerification',
+            name="OTPVerification",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('phone_number', models.CharField(db_index=True, help_text='Phone number in E.164 format', max_length=20)),
-                ('code', models.CharField(help_text='The OTP code', max_length=10)),
-                ('purpose', models.CharField(choices=[('phone_verify', 'Phone Verification'), ('login', 'Login')], default='phone_verify', max_length=20)),
-                ('is_verified', models.BooleanField(default=False)),
-                ('attempts', models.PositiveSmallIntegerField(default=0, help_text='Number of verification attempts')),
-                ('max_attempts', models.PositiveSmallIntegerField(default=5, help_text='Maximum allowed attempts')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('expires_at', models.DateTimeField()),
-                ('verified_at', models.DateTimeField(blank=True, null=True)),
-                ('aws_message_id', models.CharField(blank=True, help_text='AWS SMS message ID for tracking', max_length=255)),
-                ('user', models.ForeignKey(blank=True, help_text='User requesting verification (null for login flow)', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='otp_verifications', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                (
+                    "phone_number",
+                    models.CharField(
+                        db_index=True, help_text="Phone number in E.164 format", max_length=20
+                    ),
+                ),
+                ("code", models.CharField(help_text="The OTP code", max_length=10)),
+                (
+                    "purpose",
+                    models.CharField(
+                        choices=[("phone_verify", "Phone Verification"), ("login", "Login")],
+                        default="phone_verify",
+                        max_length=20,
+                    ),
+                ),
+                ("is_verified", models.BooleanField(default=False)),
+                (
+                    "attempts",
+                    models.PositiveSmallIntegerField(
+                        default=0, help_text="Number of verification attempts"
+                    ),
+                ),
+                (
+                    "max_attempts",
+                    models.PositiveSmallIntegerField(
+                        default=5, help_text="Maximum allowed attempts"
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("expires_at", models.DateTimeField()),
+                ("verified_at", models.DateTimeField(blank=True, null=True)),
+                (
+                    "aws_message_id",
+                    models.CharField(
+                        blank=True, help_text="AWS SMS message ID for tracking", max_length=255
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        blank=True,
+                        help_text="User requesting verification (null for login flow)",
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="otp_verifications",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-created_at'],
-                'indexes': [models.Index(fields=['phone_number', 'purpose', 'is_verified'], name='sms_otpveri_phone_n_3e1489_idx'), models.Index(fields=['expires_at'], name='sms_otpveri_expires_bc1e36_idx')],
+                "ordering": ["-created_at"],
+                "indexes": [
+                    models.Index(
+                        fields=["phone_number", "purpose", "is_verified"],
+                        name="sms_otpveri_phone_n_3e1489_idx",
+                    ),
+                    models.Index(fields=["expires_at"], name="sms_otpveri_expires_bc1e36_idx"),
+                ],
             },
         ),
     ]

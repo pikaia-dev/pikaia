@@ -164,17 +164,13 @@ class TestValidateAvatarUrl:
     def test_rejects_http_scheme(self) -> None:
         """Should reject HTTP (non-HTTPS) URLs."""
         with pytest.raises(SSRFError) as exc_info:
-            validate_avatar_url(
-                "http://lh3.googleusercontent.com/photo", resolve_dns=False
-            )
+            validate_avatar_url("http://lh3.googleusercontent.com/photo", resolve_dns=False)
         assert "HTTPS" in str(exc_info.value)
 
     def test_rejects_ftp_scheme(self) -> None:
         """Should reject FTP scheme."""
         with pytest.raises(SSRFError) as exc_info:
-            validate_avatar_url(
-                "ftp://lh3.googleusercontent.com/photo", resolve_dns=False
-            )
+            validate_avatar_url("ftp://lh3.googleusercontent.com/photo", resolve_dns=False)
         assert "HTTPS" in str(exc_info.value)
 
     def test_rejects_file_scheme(self) -> None:
@@ -224,18 +220,14 @@ class TestValidateAvatarUrl:
     def test_rejects_aws_metadata_in_url(self) -> None:
         """Should reject AWS metadata endpoint."""
         with pytest.raises(SSRFError) as exc_info:
-            validate_avatar_url(
-                "https://169.254.169.254/latest/meta-data/", resolve_dns=False
-            )
+            validate_avatar_url("https://169.254.169.254/latest/meta-data/", resolve_dns=False)
         assert "not allowed" in str(exc_info.value)
 
     def test_rejects_domain_with_allowed_suffix(self) -> None:
         """Should reject domains that merely contain allowed domain as suffix."""
         # evil-lh3.googleusercontent.com is NOT a subdomain of lh3.googleusercontent.com
         with pytest.raises(SSRFError) as exc_info:
-            validate_avatar_url(
-                "https://evil-lh3.googleusercontent.com/photo", resolve_dns=False
-            )
+            validate_avatar_url("https://evil-lh3.googleusercontent.com/photo", resolve_dns=False)
         assert "not allowed" in str(exc_info.value)
 
     def test_rejects_similar_looking_domain(self) -> None:
@@ -257,9 +249,7 @@ class TestValidateAvatarUrl:
         ]
 
         with pytest.raises(SSRFError) as exc_info:
-            validate_avatar_url(
-                "https://lh3.googleusercontent.com/photo", resolve_dns=True
-            )
+            validate_avatar_url("https://lh3.googleusercontent.com/photo", resolve_dns=True)
         assert "private IP" in str(exc_info.value)
 
     @patch("apps.core.url_validation.socket.getaddrinfo")
@@ -270,9 +260,7 @@ class TestValidateAvatarUrl:
         ]
 
         with pytest.raises(SSRFError) as exc_info:
-            validate_avatar_url(
-                "https://lh3.googleusercontent.com/photo", resolve_dns=True
-            )
+            validate_avatar_url("https://lh3.googleusercontent.com/photo", resolve_dns=True)
         assert "private IP" in str(exc_info.value)
 
     @patch("apps.core.url_validation.socket.getaddrinfo")
@@ -283,9 +271,7 @@ class TestValidateAvatarUrl:
         ]
 
         with pytest.raises(SSRFError) as exc_info:
-            validate_avatar_url(
-                "https://lh3.googleusercontent.com/photo", resolve_dns=True
-            )
+            validate_avatar_url("https://lh3.googleusercontent.com/photo", resolve_dns=True)
         assert "private IP" in str(exc_info.value)
 
     @patch("apps.core.url_validation.socket.getaddrinfo")
@@ -307,9 +293,7 @@ class TestValidateAvatarUrl:
         mock_getaddrinfo.side_effect = socket.gaierror("DNS failed")
 
         with pytest.raises(SSRFError) as exc_info:
-            validate_avatar_url(
-                "https://lh3.googleusercontent.com/photo", resolve_dns=True
-            )
+            validate_avatar_url("https://lh3.googleusercontent.com/photo", resolve_dns=True)
         assert "DNS resolution failed" in str(exc_info.value)
 
 

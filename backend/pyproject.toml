@@ -46,6 +46,21 @@ addopts = "-v --tb=short"
 
 [dependency-groups]
 dev = [
+    "django-stubs>=5.2.8",
+    "mypy>=1.19.1",
     "psycopg2-binary>=2.9.11",
+    "pyright>=1.1.408",
     "pytest-cov>=7.0.0",
 ]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["mypy_django_plugin.main"]
+strict = false
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+exclude = ["migrations"]
+
+[tool.django-stubs]
+django_settings_module = "config.settings.local"

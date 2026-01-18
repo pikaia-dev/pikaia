@@ -24,9 +24,8 @@ def drop_cache_table(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('passkeys', '0001_create_passkey_model'),
+        ("passkeys", "0001_create_passkey_model"),
     ]
 
     operations = [

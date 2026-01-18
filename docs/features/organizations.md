@@ -11,18 +11,18 @@ graph TB
     subgraph "Shared Database"
         U1[User: alice@example.com]
         U2[User: bob@example.com]
-        
+
         O1[Organization: Acme Corp]
         O2[Organization: Beta Inc]
-        
+
         M1[Member: Alice @ Acme]
         M2[Member: Alice @ Beta]
         M3[Member: Bob @ Acme]
-        
+
         U1 --> M1
         U1 --> M2
         U2 --> M3
-        
+
         M1 --> O1
         M2 --> O2
         M3 --> O1
@@ -38,13 +38,13 @@ flowchart LR
     subgraph User
         email["alice@example.com"]
     end
-    
+
     subgraph Memberships
         M1[Admin @ Acme Corp]
         M2[Member @ Beta Inc]
         M3[Viewer @ Gamma LLC]
     end
-    
+
     email --> M1
     email --> M2
     email --> M3
@@ -59,7 +59,7 @@ stateDiagram-v2
     Active --> Upgraded: User upgrades
     Upgraded --> Active: Subscription ends
     Active --> [*]: Org deleted
-    
+
     note right of Created: User creates org via Stytch
     note right of Active: Free tier
     note right of Upgraded: Paid subscription
