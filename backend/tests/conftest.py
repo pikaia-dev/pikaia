@@ -107,6 +107,46 @@ def authenticated_request(request_factory):
     return _make_request
 
 
+def create_authenticated_request(
+    request_factory: RequestFactory,
+    method: str,
+    path: str,
+    org=None,
+    role: str = "admin",
+):
+    """
+    Helper to create an authenticated request with member/org attached.
+
+    Creates organization, user, and member if not provided.
+    Sets request.auth with AuthContext and legacy attributes (user, organization).
+
+    Args:
+        request_factory: Django RequestFactory instance
+        method: HTTP method (get, post, delete, patch, put)
+        path: Request path
+        org: Optional Organization instance (created if None)
+        role: Member role (default: "admin")
+
+    Returns:
+        Request object with auth attributes set
+    """
+    from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
+
+    if org is None:
+        org = OrganizationFactory()
+    user = UserFactory()
+    member = MemberFactory(user=user, organization=org, role=role)
+
+    method_func = getattr(request_factory, method.lower())
+    request = method_func(path)
+
+    request.auth = AuthContext(user=user, member=member, organization=org)
+    # Legacy attributes for backward compatibility
+    request.organization = org
+    request.user = user
+    return request
+
+
 @pytest.fixture
 def admin_member(db):
     """

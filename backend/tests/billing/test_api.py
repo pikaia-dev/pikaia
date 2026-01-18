@@ -25,31 +25,10 @@ from apps.billing.schemas import (
     SubscriptionIntentRequest,
 )
 from apps.core.auth import AuthContext
-from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
+from tests.accounts.factories import MemberFactory, OrganizationFactory
+from tests.conftest import create_authenticated_request
 
 from .factories import SubscriptionFactory
-
-
-def _create_authenticated_request(
-    request_factory: RequestFactory,
-    method: str,
-    path: str,
-    org=None,
-    role: str = "admin",
-):
-    """Helper to create an authenticated request with member/org attached."""
-    if org is None:
-        org = OrganizationFactory()
-    user = UserFactory()
-    member = MemberFactory(user=user, organization=org, role=role)
-
-    if method == "get":
-        request = request_factory.get(path)
-    else:
-        request = request_factory.post(path)
-
-    request.auth = AuthContext(user=user, member=member, organization=org)
-    return request
 
 
 @pytest.mark.django_db
@@ -61,7 +40,7 @@ class TestGetSubscription:
         sub = SubscriptionFactory(status=Subscription.Status.ACTIVE, quantity=5)
         org = sub.organization
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "get", "/api/v1/billing/subscription", org=org
         )
 
@@ -78,7 +57,7 @@ class TestGetSubscription:
         org = OrganizationFactory()
         MemberFactory(organization=org)  # Add at least one member
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "get", "/api/v1/billing/subscription", org=org
         )
 
@@ -109,7 +88,7 @@ class TestCreateCheckout:
         mock_create_session.return_value = "https://checkout.stripe.com/test"
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/checkout", org=org, role="admin"
         )
         payload = CheckoutSessionRequest(
@@ -127,7 +106,7 @@ class TestCreateCheckout:
         """Non-admin should be rejected with 403."""
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/checkout", org=org, role="member"
         )
         payload = CheckoutSessionRequest(
@@ -145,7 +124,7 @@ class TestCreateCheckout:
         sub = SubscriptionFactory(status=Subscription.Status.ACTIVE)
         org = sub.organization
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/checkout", org=org, role="admin"
         )
         payload = CheckoutSessionRequest(
@@ -172,7 +151,7 @@ class TestCreatePortal:
         mock_create_portal.return_value = "https://billing.stripe.com/portal"
         org = OrganizationFactory(stripe_customer_id="cus_test")
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/portal", org=org, role="admin"
         )
         payload = PortalSessionRequest(return_url="https://example.com/billing")
@@ -185,7 +164,7 @@ class TestCreatePortal:
         """Non-admin should be rejected with 403."""
         org = OrganizationFactory(stripe_customer_id="cus_test")
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/portal", org=org, role="member"
         )
         payload = PortalSessionRequest(return_url="https://example.com/billing")
@@ -199,7 +178,7 @@ class TestCreatePortal:
         """Should return 400 if org has no Stripe customer."""
         org = OrganizationFactory(stripe_customer_id="")
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/portal", org=org, role="admin"
         )
         payload = PortalSessionRequest(return_url="https://example.com/billing")
@@ -222,7 +201,7 @@ class TestCreateSubscriptionIntent:
         mock_create_intent.return_value = ("pi_secret_test", "sub_test_123")
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/subscription-intent", org=org, role="admin"
         )
         payload = SubscriptionIntentRequest(quantity=5)
@@ -244,7 +223,7 @@ class TestCreateSubscriptionIntent:
         MemberFactory(organization=org)
         MemberFactory(organization=org)
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/subscription-intent", org=org, role="admin"
         )
         payload = SubscriptionIntentRequest(quantity=None)
@@ -259,7 +238,7 @@ class TestCreateSubscriptionIntent:
         """Non-admin should be rejected with 403."""
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/subscription-intent", org=org, role="member"
         )
         payload = SubscriptionIntentRequest()
@@ -274,7 +253,7 @@ class TestCreateSubscriptionIntent:
         sub = SubscriptionFactory(status=Subscription.Status.ACTIVE)
         org = sub.organization
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/subscription-intent", org=org, role="admin"
         )
         payload = SubscriptionIntentRequest()
@@ -297,7 +276,7 @@ class TestConfirmSubscription:
         mock_sync.return_value = True
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/confirm-subscription", org=org, role="admin"
         )
         payload = ConfirmSubscriptionRequest(subscription_id="sub_test_123")
@@ -315,7 +294,7 @@ class TestConfirmSubscription:
         mock_sync.return_value = False
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/confirm-subscription", org=org, role="admin"
         )
         payload = ConfirmSubscriptionRequest(subscription_id="sub_incomplete")
@@ -328,7 +307,7 @@ class TestConfirmSubscription:
         """Non-admin should be rejected with 403."""
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/confirm-subscription", org=org, role="member"
         )
         payload = ConfirmSubscriptionRequest(subscription_id="sub_test")
@@ -344,7 +323,7 @@ class TestConfirmSubscription:
         mock_sync.side_effect = Exception("Stripe API error")
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/confirm-subscription", org=org, role="admin"
         )
         payload = ConfirmSubscriptionRequest(subscription_id="sub_test")
@@ -389,7 +368,7 @@ class TestListInvoices:
 
         org = OrganizationFactory(stripe_customer_id="cus_test")
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "get", "/api/v1/billing/invoices", org=org, role="admin"
         )
 
@@ -408,7 +387,7 @@ class TestListInvoices:
 
         org = OrganizationFactory(stripe_customer_id="")
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "get", "/api/v1/billing/invoices", org=org, role="admin"
         )
 
@@ -433,7 +412,7 @@ class TestListInvoices:
 
         org = OrganizationFactory(stripe_customer_id="cus_test")
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "get", "/api/v1/billing/invoices", org=org, role="admin"
         )
 
@@ -451,7 +430,7 @@ class TestListInvoices:
 
         org = OrganizationFactory(stripe_customer_id="cus_test")
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "get", "/api/v1/billing/invoices", org=org, role="member"
         )
 
@@ -473,7 +452,7 @@ class TestListInvoices:
 
         org = OrganizationFactory(stripe_customer_id="cus_test")
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "get", "/api/v1/billing/invoices", org=org, role="admin"
         )
 

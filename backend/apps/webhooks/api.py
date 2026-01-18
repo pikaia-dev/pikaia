@@ -10,7 +10,7 @@ from ninja import Router
 from ninja.errors import HttpError
 
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth, require_admin
+from apps.core.security import BearerAuth, get_auth_context, require_admin
 from apps.core.types import AuthenticatedHttpRequest
 
 from .schemas import (
@@ -115,8 +115,8 @@ def list_endpoints(request: AuthenticatedHttpRequest) -> WebhookEndpointListResp
 
     Requires admin role.
     """
-    assert request.auth.organization is not None  # Guaranteed by @require_admin
-    service = WebhookService(request.auth.organization)
+    _, _, org = get_auth_context(request)
+    service = WebhookService(org)
     endpoints = service.list_endpoints()
 
     return WebhookEndpointListResponse(endpoints=[_endpoint_to_response(ep) for ep in endpoints])
@@ -142,17 +142,17 @@ def create_endpoint(
 
     Requires admin role.
     """
-    assert request.auth.organization is not None  # Guaranteed by @require_admin
-    service = WebhookService(request.auth.organization)
+    _, member, org = get_auth_context(request)
+    service = WebhookService(org)
     endpoint = service.create_endpoint(
         data=payload,
-        created_by_id=request.auth.member.user_id if request.auth.member else None,
+        created_by_id=member.user_id,
     )
 
     logger.info(
         "Created webhook endpoint %s for org %s",
         endpoint.id,
-        request.auth.organization.id,
+        org.id,
     )
 
     return 201, WebhookEndpointWithSecretResponse(
@@ -185,8 +185,8 @@ def get_endpoint(request: AuthenticatedHttpRequest, endpoint_id: str) -> Webhook
 
     Requires admin role.
     """
-    assert request.auth.organization is not None  # Guaranteed by @require_admin
-    service = WebhookService(request.auth.organization)
+    _, _, org = get_auth_context(request)
+    service = WebhookService(org)
     endpoint = service.get_endpoint(endpoint_id)
 
     if not endpoint:
@@ -215,8 +215,8 @@ def update_endpoint(
 
     Requires admin role.
     """
-    assert request.auth.organization is not None  # Guaranteed by @require_admin
-    service = WebhookService(request.auth.organization)
+    _, _, org = get_auth_context(request)
+    service = WebhookService(org)
     endpoint = service.update_endpoint(endpoint_id, payload)
 
     if not endpoint:
@@ -225,7 +225,7 @@ def update_endpoint(
     logger.info(
         "Updated webhook endpoint %s for org %s",
         endpoint_id,
-        request.auth.organization.id,
+        org.id,
     )
 
     return _endpoint_to_response(endpoint)
@@ -247,8 +247,8 @@ def delete_endpoint(request: AuthenticatedHttpRequest, endpoint_id: str) -> tupl
 
     Requires admin role.
     """
-    assert request.auth.organization is not None  # Guaranteed by @require_admin
-    service = WebhookService(request.auth.organization)
+    _, _, org = get_auth_context(request)
+    service = WebhookService(org)
     deleted = service.delete_endpoint(endpoint_id)
 
     if not deleted:
@@ -257,7 +257,7 @@ def delete_endpoint(request: AuthenticatedHttpRequest, endpoint_id: str) -> tupl
     logger.info(
         "Deleted webhook endpoint %s for org %s",
         endpoint_id,
-        request.auth.organization.id,
+        org.id,
     )
 
     return 204, None
@@ -288,8 +288,8 @@ def list_deliveries(
 
     Requires admin role.
     """
-    assert request.auth.organization is not None  # Guaranteed by @require_admin
-    service = WebhookService(request.auth.organization)
+    _, _, org = get_auth_context(request)
+    service = WebhookService(org)
 
     # Verify endpoint exists and belongs to org
     endpoint = service.get_endpoint(endpoint_id)
@@ -327,8 +327,8 @@ def send_test_webhook(
 
     Requires admin role.
     """
-    assert request.auth.organization is not None  # Guaranteed by @require_admin
-    service = WebhookService(request.auth.organization)
+    _, _, org = get_auth_context(request)
+    service = WebhookService(org)
     endpoint = service.get_endpoint(endpoint_id)
 
     if not endpoint:

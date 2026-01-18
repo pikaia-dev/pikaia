@@ -10,7 +10,6 @@ import pytest
 from django.test import RequestFactory
 from ninja.errors import HttpError
 
-from apps.core.auth import AuthContext
 from apps.webhooks.api import (
     create_endpoint,
     delete_endpoint,
@@ -27,35 +26,10 @@ from apps.webhooks.schemas import (
     WebhookEndpointUpdate,
     WebhookTestRequest,
 )
-from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
+from tests.accounts.factories import OrganizationFactory
+from tests.conftest import create_authenticated_request
 
 from .factories import WebhookDeliveryFactory, WebhookEndpointFactory
-
-
-def _create_authenticated_request(
-    request_factory: RequestFactory,
-    method: str,
-    path: str,
-    org=None,
-    role: str = "admin",
-):
-    """Helper to create an authenticated request with member/org attached."""
-    if org is None:
-        org = OrganizationFactory()
-    user = UserFactory()
-    member = MemberFactory(user=user, organization=org, role=role)
-
-    if method == "get":
-        request = request_factory.get(path)
-    elif method == "delete":
-        request = request_factory.delete(path)
-    else:
-        request = request_factory.post(path)
-
-    request.auth = AuthContext(user=user, member=member, organization=org)
-    request.organization = org
-    request.user = user
-    return request
 
 
 @pytest.mark.django_db
@@ -65,7 +39,7 @@ class TestListEvents:
     def test_returns_event_catalog(self, request_factory: RequestFactory) -> None:
         """Should return list of available events."""
         org = OrganizationFactory()
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "get", "/api/v1/webhooks/events", org=org
         )
 
@@ -79,7 +53,7 @@ class TestListEvents:
     def test_includes_member_events(self, request_factory: RequestFactory) -> None:
         """Should include member events in catalog."""
         org = OrganizationFactory()
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "get", "/api/v1/webhooks/events", org=org
         )
 
@@ -100,7 +74,7 @@ class TestListEndpoints:
         _ep1 = WebhookEndpointFactory(organization=org, name="Endpoint 1")
         _ep2 = WebhookEndpointFactory(organization=org, name="Endpoint 2")
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "get", "/api/v1/webhooks/endpoints", org=org, role="admin"
         )
 
@@ -113,7 +87,7 @@ class TestListEndpoints:
         org = OrganizationFactory()
         endpoint = WebhookEndpointFactory(organization=org)
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "get", "/api/v1/webhooks/endpoints", org=org, role="admin"
         )
 
@@ -130,7 +104,7 @@ class TestListEndpoints:
         """Non-admin should be rejected with 403."""
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "get", "/api/v1/webhooks/endpoints", org=org, role="member"
         )
 
@@ -146,7 +120,7 @@ class TestListEndpoints:
         _ep1 = WebhookEndpointFactory(organization=org1)
         _ep2 = WebhookEndpointFactory(organization=org2)
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "get", "/api/v1/webhooks/endpoints", org=org1, role="admin"
         )
 
@@ -163,7 +137,7 @@ class TestCreateEndpoint:
         """Admin should be able to create endpoint."""
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "post", "/api/v1/webhooks/endpoints", org=org, role="admin"
         )
         payload = WebhookEndpointCreate(
@@ -184,7 +158,7 @@ class TestCreateEndpoint:
         """Non-admin should be rejected with 403."""
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "post",
             "/api/v1/webhooks/endpoints",
@@ -206,7 +180,7 @@ class TestCreateEndpoint:
         """Created endpoint should be persisted."""
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory, "post", "/api/v1/webhooks/endpoints", org=org, role="admin"
         )
         payload = WebhookEndpointCreate(
@@ -232,7 +206,7 @@ class TestGetEndpoint:
         org = OrganizationFactory()
         endpoint = WebhookEndpointFactory(organization=org, name="My Endpoint")
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "get",
             f"/api/v1/webhooks/endpoints/{endpoint.id}",
@@ -250,7 +224,7 @@ class TestGetEndpoint:
         org = OrganizationFactory()
         endpoint = WebhookEndpointFactory(organization=org)
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "get",
             f"/api/v1/webhooks/endpoints/{endpoint.id}",
@@ -271,7 +245,7 @@ class TestGetEndpoint:
         org = OrganizationFactory()
         endpoint = WebhookEndpointFactory(organization=org)
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "get",
             f"/api/v1/webhooks/endpoints/{endpoint.id}",
@@ -288,7 +262,7 @@ class TestGetEndpoint:
         """Should return 404 for nonexistent endpoint."""
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "get",
             "/api/v1/webhooks/endpoints/wh_nonexistent",
@@ -307,7 +281,7 @@ class TestGetEndpoint:
         org2 = OrganizationFactory()
         endpoint = WebhookEndpointFactory(organization=org2)
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "get",
             f"/api/v1/webhooks/endpoints/{endpoint.id}",
@@ -330,7 +304,7 @@ class TestUpdateEndpoint:
         org = OrganizationFactory()
         endpoint = WebhookEndpointFactory(organization=org, name="Old Name")
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "post",
             f"/api/v1/webhooks/endpoints/{endpoint.id}",
@@ -348,7 +322,7 @@ class TestUpdateEndpoint:
         org = OrganizationFactory()
         endpoint = WebhookEndpointFactory(organization=org)
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "post",
             f"/api/v1/webhooks/endpoints/{endpoint.id}",
@@ -371,7 +345,7 @@ class TestUpdateEndpoint:
             organization=org, name="Original", description="Original desc"
         )
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "post",
             f"/api/v1/webhooks/endpoints/{endpoint.id}",
@@ -389,7 +363,7 @@ class TestUpdateEndpoint:
         """Should return 404 for nonexistent endpoint."""
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "post",
             "/api/v1/webhooks/endpoints/wh_nonexistent",
@@ -414,7 +388,7 @@ class TestDeleteEndpoint:
         endpoint = WebhookEndpointFactory(organization=org)
         endpoint_id = endpoint.id
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "delete",
             f"/api/v1/webhooks/endpoints/{endpoint_id}",
@@ -432,7 +406,7 @@ class TestDeleteEndpoint:
         org = OrganizationFactory()
         endpoint = WebhookEndpointFactory(organization=org)
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "delete",
             f"/api/v1/webhooks/endpoints/{endpoint.id}",
@@ -449,7 +423,7 @@ class TestDeleteEndpoint:
         """Should return 404 for nonexistent endpoint."""
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "delete",
             "/api/v1/webhooks/endpoints/wh_nonexistent",
@@ -474,7 +448,7 @@ class TestListDeliveries:
         _delivery1 = WebhookDeliveryFactory(endpoint=endpoint)
         _delivery2 = WebhookDeliveryFactory(endpoint=endpoint)
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "get",
             f"/api/v1/webhooks/endpoints/{endpoint.id}/deliveries",
@@ -491,7 +465,7 @@ class TestListDeliveries:
         org = OrganizationFactory()
         endpoint = WebhookEndpointFactory(organization=org)
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "get",
             f"/api/v1/webhooks/endpoints/{endpoint.id}/deliveries",
@@ -508,7 +482,7 @@ class TestListDeliveries:
         """Should return 404 for nonexistent endpoint."""
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "get",
             "/api/v1/webhooks/endpoints/wh_nonexistent/deliveries",
@@ -528,7 +502,7 @@ class TestListDeliveries:
         for _ in range(10):
             WebhookDeliveryFactory(endpoint=endpoint)
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "get",
             f"/api/v1/webhooks/endpoints/{endpoint.id}/deliveries",
@@ -561,7 +535,7 @@ class TestSendTestWebhook:
         org = OrganizationFactory()
         endpoint = WebhookEndpointFactory(organization=org)
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "post",
             f"/api/v1/webhooks/endpoints/{endpoint.id}/test",
@@ -581,7 +555,7 @@ class TestSendTestWebhook:
         org = OrganizationFactory()
         endpoint = WebhookEndpointFactory(organization=org)
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "post",
             f"/api/v1/webhooks/endpoints/{endpoint.id}/test",
@@ -599,7 +573,7 @@ class TestSendTestWebhook:
         """Should return 404 for nonexistent endpoint."""
         org = OrganizationFactory()
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "post",
             "/api/v1/webhooks/endpoints/wh_nonexistent/test",
@@ -631,7 +605,7 @@ class TestSendTestWebhook:
         org = OrganizationFactory()
         endpoint = WebhookEndpointFactory(organization=org)
 
-        request = _create_authenticated_request(
+        request = create_authenticated_request(
             request_factory,
             "post",
             f"/api/v1/webhooks/endpoints/{endpoint.id}/test",
