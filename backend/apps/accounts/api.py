@@ -860,8 +860,8 @@ def list_members(
         for stytch_member in search_result.members:
             stytch_statuses[stytch_member.member_id] = stytch_member.status
     except Exception:
-        # If Stytch call fails, default to 'active'
-        pass
+        # If Stytch call fails, log and default to 'active'
+        logger.warning("stytch_member_status_fetch_failed", org_id=org.id)
 
     return MemberListResponse(
         members=[

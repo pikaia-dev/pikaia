@@ -77,7 +77,7 @@ class Command(BaseCommand):
 
         insert_sql = f"""INSERT INTO {table_name} (id, {columns})
 VALUES (gen_random_uuid(), {placeholders})
-ON CONFLICT (event_id) DO NOTHING"""
+ON CONFLICT (event_id) DO NOTHING"""  # nosec B608 - table_name from Django model meta, not user input
 
         # Generate Python module (includes event types for single source of truth)
         output_content = f'''"""

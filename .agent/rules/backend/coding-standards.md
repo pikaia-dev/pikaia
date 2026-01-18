@@ -12,6 +12,7 @@ Coding standards for Python/Django backend. Scoped to `*.py` files.
 - Python 3.12+
 - Use type hints everywhere; allow `Any` at integration boundaries (ORM, 3rd-party libs) with a comment
 - Format with `ruff format`, lint with `ruff check`
+- Security scan with `bandit` (runs in CI)
 - Imports: stdlib → third-party → local (enforced by ruff/isort)
 
 ## Code Style & Readability
