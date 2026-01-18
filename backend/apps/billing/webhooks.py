@@ -7,6 +7,7 @@ needed to verify Stripe signatures.
 """
 
 import stripe
+from django.db import transaction
 from django.http import HttpRequest, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -60,58 +61,63 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
 
     event_id = event["id"]
 
-    # Idempotency check - skip if already processed
-    if not mark_webhook_processed("stripe", event_id):
-        logger.info("stripe_webhook_duplicate", event_id=event_id, event_type=event["type"])
-        return HttpResponse(status=200)
-
     # Log event for debugging
     logger.info("stripe_webhook_received", event_id=event_id, event_type=event["type"])
 
-    # Dispatch to handlers
+    # Use transaction to ensure idempotency marker is rolled back if handler fails
     try:
-        match event["type"]:
-            case "checkout.session.completed":
-                # Get the subscription from the session
-                session = event["data"]["object"]
-                if session.get("subscription"):
-                    # Fetch full subscription details
-                    subscription = stripe.Subscription.retrieve(session["subscription"])
-                    handle_subscription_created(subscription)
-
-            case "customer.subscription.created":
-                handle_subscription_created(event["data"]["object"])
-
-            case "customer.subscription.updated":
-                handle_subscription_updated(event["data"]["object"])
-
-            case "customer.subscription.deleted":
-                handle_subscription_deleted(event["data"]["object"])
-
-            case "invoice.paid":
-                # Log successful payment
-                invoice = event["data"]["object"]
+        with transaction.atomic():
+            # Idempotency check - skip if already processed
+            if not mark_webhook_processed("stripe", event_id):
                 logger.info(
-                    "stripe_invoice_paid",
-                    invoice_id=invoice["id"],
-                    customer_id=invoice["customer"],
+                    "stripe_webhook_duplicate", event_id=event_id, event_type=event["type"]
                 )
+                return HttpResponse(status=200)
 
-            case "invoice.payment_failed":
-                # Log failed payment - could trigger email notification
-                invoice = event["data"]["object"]
-                logger.warning(
-                    "stripe_invoice_payment_failed",
-                    invoice_id=invoice["id"],
-                    customer_id=invoice["customer"],
-                )
+            # Dispatch to handlers
+            match event["type"]:
+                case "checkout.session.completed":
+                    # Get the subscription from the session
+                    session = event["data"]["object"]
+                    if session.get("subscription"):
+                        # Fetch full subscription details
+                        subscription = stripe.Subscription.retrieve(session["subscription"])
+                        handle_subscription_created(subscription)
 
-            case _:
-                logger.debug("stripe_webhook_unhandled_event", event_type=event["type"])
+                case "customer.subscription.created":
+                    handle_subscription_created(event["data"]["object"])
+
+                case "customer.subscription.updated":
+                    handle_subscription_updated(event["data"]["object"])
+
+                case "customer.subscription.deleted":
+                    handle_subscription_deleted(event["data"]["object"])
+
+                case "invoice.paid":
+                    # Log successful payment
+                    invoice = event["data"]["object"]
+                    logger.info(
+                        "stripe_invoice_paid",
+                        invoice_id=invoice["id"],
+                        customer_id=invoice["customer"],
+                    )
+
+                case "invoice.payment_failed":
+                    # Log failed payment - could trigger email notification
+                    invoice = event["data"]["object"]
+                    logger.warning(
+                        "stripe_invoice_payment_failed",
+                        invoice_id=invoice["id"],
+                        customer_id=invoice["customer"],
+                    )
+
+                case _:
+                    logger.debug("stripe_webhook_unhandled_event", event_type=event["type"])
 
     except Exception:
         logger.exception("stripe_webhook_handler_error")
         # Return 500 so Stripe will retry with exponential backoff
+        # Transaction rollback ensures idempotency marker is not committed
         return HttpResponse(status=500)
 
     return HttpResponse(status=200)
