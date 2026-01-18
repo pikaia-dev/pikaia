@@ -163,6 +163,9 @@ class Member(models.Model):
     class Meta:
         ordering = ["-created_at"]
         unique_together = ["user", "organization"]
+        indexes = [
+            models.Index(fields=["organization", "deleted_at"]),
+        ]
 
     def __str__(self) -> str:
         return f"{self.user.email} @ {self.organization.name} ({self.role})"
