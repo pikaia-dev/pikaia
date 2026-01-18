@@ -20,15 +20,21 @@ This template is a **production-quality B2B SaaS foundation** with enterprise-gr
 - Comprehensive AWS CDK infrastructure (Aurora Serverless, ECS Fargate, EventBridge)
 - Strong typing throughout (Pydantic schemas, TypeScript strict)
 
-### Critical Gaps
-1. **WSGI/ASGI default to local settings** (security risk if env var not set)
-2. **Single NAT gateway** (availability risk in production)
-3. **No WAF protection** on ALB or CloudFront
+### Critical Gaps (Remaining)
+1. **Single NAT gateway** (availability risk in production)
+2. **No WAF protection** on ALB or CloudFront
+
+### Recently Completed
+- ✅ WSGI/ASGI now defaults to production settings
+- ✅ HTTPS enforcement via CDK context validation
+- ✅ CORS origin validation for production
+- ✅ Lambda and EventBridge alarms added
+- ✅ 8 Architecture Decision Records documented
 
 ### Recommended Priority Actions
-1. Fix WSGI/ASGI default settings module (Critical)
-2. Add WAF to ALB and CloudFront (High)
-3. Add second NAT gateway for production HA (High)
+1. Add WAF to ALB and CloudFront (High)
+2. Add second NAT gateway for production HA (High)
+3. Add admin IP whitelist middleware (High)
 4. Implement free trial/grace period billing logic (Medium)
 5. Add frontend test workflow (Medium)
 
@@ -249,14 +255,9 @@ Core Models Needed:
 
 ### Critical Infrastructure Issues
 
-#### 1. HTTPS Not Enforced on API (Critical)
-**File:** `infra/stacks/app_stack.py:317-338`
-```python
-# Current: HTTPS only if certificate provided
-redirect_http=certificate is not None
-```
-**Risk:** Production without custom domain runs on HTTP
-**Fix:** Require certificate for production deployments
+#### 1. ~~HTTPS Not Enforced on API~~ ✅ FIXED
+**Status:** CDK now validates `require_https=true` requires `certificate_arn`
+**Fix Applied:** `infra/app.py` raises `ValueError` if HTTPS required without certificate
 
 #### 2. Single NAT Gateway (High)
 **File:** `infra/stacks/network_stack.py:21`
@@ -271,13 +272,9 @@ nat_gateways=1
 **Risk:** No OWASP Top 10 protection, no rate limiting at edge
 **Fix:** Add WAF WebACL with managed rules
 
-#### 4. CORS Allows All Origins by Default (High)
-**File:** `infra/app.py:63`
-```python
-cors_origins = app.node.try_get_context("cors_origins") or ["*"]
-```
-**Risk:** Media bucket accepts uploads from any origin
-**Fix:** Require explicit CORS origins in production
+#### 4. ~~CORS Allows All Origins by Default~~ ✅ FIXED
+**Status:** CDK now validates CORS origins when `require_https=true`
+**Fix Applied:** `infra/app.py` raises `ValueError` if `cors_origins=["*"]` with HTTPS required
 
 #### 5. ALB Origin Uses HTTP Only (Medium)
 **File:** `infra/stacks/frontend_stack.py:77-84`
@@ -288,11 +285,11 @@ cors_origins = app.node.try_get_context("cors_origins") or ["*"]
 
 | Item | Priority | Effort | Status |
 |------|----------|--------|--------|
+| Enforce HTTPS in production | Critical | Low | ✅ Done |
+| Restrict CORS origins | High | Low | ✅ Done |
 | Add WAF to ALB | High | Medium | ❌ |
 | Add WAF to CloudFront | High | Medium | ❌ |
 | Add second NAT gateway | High | Low | ❌ |
-| Enforce HTTPS in production | Critical | Low | ❌ |
-| Restrict CORS origins | High | Low | ❌ |
 | Add X-Ray tracing | Medium | Medium | ❌ |
 | Add Lambda concurrency limits | Medium | Low | ❌ |
 | Add S3 lifecycle policies | Low | Low | ❌ |
@@ -306,12 +303,12 @@ cors_origins = app.node.try_get_context("cors_origins") or ["*"]
 - ✅ 7 critical alarms (error rate, latency, CPU, memory, DB)
 - ✅ SNS email notifications
 - ✅ Structured logging to CloudWatch
+- ✅ Lambda alarms (errors, duration, throttling) - *Added*
+- ✅ EventBridge delivery metrics and alarms - *Added*
 
 **Missing:**
 - ❌ AWS X-Ray distributed tracing
-- ❌ Lambda-specific alarms (duration, throttling)
 - ❌ RDS Proxy pool exhaustion alarm
-- ❌ EventBridge delivery failure alarm
 
 ---
 
@@ -330,13 +327,9 @@ cors_origins = app.node.try_get_context("cors_origins") or ["*"]
 
 ### Critical Backend Issues
 
-#### 1. WSGI/ASGI Default to Local Settings (Critical)
-**Files:** `backend/config/wsgi.py`, `backend/config/asgi.py`
-```python
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
-```
-**Risk:** If `DJANGO_SETTINGS_MODULE` not set in ECS, production runs with DEBUG=True
-**Fix:** Change default to `config.settings.production`
+#### 1. ~~WSGI/ASGI Default to Local Settings~~ ✅ FIXED
+**Status:** Now defaults to `config.settings.production`
+**Fix Applied:** Commit `1acf405` - Changed default in both `wsgi.py` and `asgi.py`
 
 #### 2. Admin Interface Exposed (Medium)
 **File:** `backend/config/urls.py`
@@ -358,15 +351,15 @@ path("admin/", admin.site.urls)
 
 ### Recommended Backend Improvements
 
-| Item | Priority | Effort |
-|------|----------|--------|
-| Fix WSGI/ASGI default settings | Critical | 5 min |
-| Add rate limiting middleware | High | 2 hours |
-| Add admin IP whitelist | High | 1 hour |
-| Add free trial billing logic | High | 4 hours |
-| Add admin impersonation | Medium | 4 hours |
-| Add database read replicas | Medium | 2 hours |
-| Add feature flags | Medium | 8 hours |
+| Item | Priority | Effort | Status |
+|------|----------|--------|--------|
+| Fix WSGI/ASGI default settings | Critical | 5 min | ✅ Done |
+| Add rate limiting middleware | High | 2 hours | ❌ |
+| Add admin IP whitelist | High | 1 hour | ❌ |
+| Add free trial billing logic | High | 4 hours | ❌ |
+| Add admin impersonation | Medium | 4 hours | ❌ |
+| Add database read replicas | Medium | 2 hours | ❌ |
+| Add feature flags | Medium | 8 hours | ❌ |
 
 ---
 
@@ -466,7 +459,7 @@ No test workflow exists for frontend. Recommend adding:
 
 ### Missing Documentation
 
-1. **Architecture Decision Records (ADRs)** - Why Stytch? Why outbox pattern?
+1. ~~**Architecture Decision Records (ADRs)**~~ ✅ Added 8 ADRs in `docs/adr/`
 2. **Runbooks** - Deployment, rollback, incident response
 3. **API changelog** - Breaking changes between versions
 4. **Environment setup guide** - Step-by-step local setup
@@ -475,13 +468,13 @@ No test workflow exists for frontend. Recommend adding:
 
 ### Documentation Improvements
 
-| Item | Priority | Effort |
-|------|----------|--------|
-| Add ADR folder with key decisions | Medium | 4 hours |
-| Add deployment runbook | High | 2 hours |
-| Add local setup guide | High | 2 hours |
-| Document event types catalog | Medium | 2 hours |
-| Add API versioning guide | Medium | 1 hour |
+| Item | Priority | Effort | Status |
+|------|----------|--------|--------|
+| Add ADR folder with key decisions | Medium | 4 hours | ✅ Done (8 ADRs) |
+| Add deployment runbook | High | 2 hours | ❌ |
+| Add local setup guide | High | 2 hours | ❌ |
+| Document event types catalog | Medium | 2 hours | ❌ |
+| Add API versioning guide | Medium | 1 hour | ❌ |
 
 ---
 
@@ -489,12 +482,12 @@ No test workflow exists for frontend. Recommend adding:
 
 ### Critical (Do First - Security/Stability)
 
-| # | Item | Effort | Impact |
-|---|------|--------|--------|
-| 1 | Add test workflow to CI/CD | 2h | Prevents deploying broken code |
-| 2 | Fix WSGI/ASGI default settings | 5m | Prevents DEBUG=True in prod |
-| 3 | Enforce HTTPS in production | 1h | Security compliance |
-| 4 | Restrict CORS origins | 30m | Prevent unauthorized uploads |
+| # | Item | Effort | Impact | Status |
+|---|------|--------|--------|--------|
+| 1 | Add test workflow to CI/CD | 2h | Prevents deploying broken code | ✅ Done |
+| 2 | Fix WSGI/ASGI default settings | 5m | Prevents DEBUG=True in prod | ✅ Done |
+| 3 | Enforce HTTPS in production | 1h | Security compliance | ✅ Done |
+| 4 | Restrict CORS origins | 30m | Prevent unauthorized uploads | ✅ Done |
 
 ### High Priority (Do This Week)
 
@@ -535,50 +528,54 @@ No test workflow exists for frontend. Recommend adding:
 
 ### Infrastructure Files with Issues
 
-| File | Line | Issue | Severity |
-|------|------|-------|----------|
-| `infra/stacks/network_stack.py` | 21 | Single NAT gateway | High |
-| `infra/stacks/app_stack.py` | 317-338 | HTTPS not enforced | Critical |
-| `infra/stacks/frontend_stack.py` | 77-84 | ALB origin HTTP only | Medium |
-| `infra/app.py` | 63 | CORS allows all origins | High |
-| `infra/stacks/events_stack.py` | 267 | No Lambda concurrency limit | Medium |
+| File | Line | Issue | Severity | Status |
+|------|------|-------|----------|--------|
+| `infra/stacks/network_stack.py` | 21 | Single NAT gateway | High | ❌ |
+| `infra/stacks/app_stack.py` | 317-338 | HTTPS not enforced | Critical | ✅ Fixed |
+| `infra/stacks/frontend_stack.py` | 77-84 | ALB origin HTTP only | Medium | ❌ |
+| `infra/app.py` | 63 | CORS allows all origins | High | ✅ Fixed |
+| `infra/stacks/events_stack.py` | 267 | No Lambda concurrency limit | Medium | ❌ |
 
 ### Backend Files with Issues
 
-| File | Line | Issue | Severity |
-|------|------|-------|----------|
-| `backend/config/wsgi.py` | 1 | Defaults to local settings | Critical |
-| `backend/config/asgi.py` | 1 | Defaults to local settings | Critical |
-| `backend/config/urls.py` | - | Admin exposed publicly | Medium |
+| File | Line | Issue | Severity | Status |
+|------|------|-------|----------|--------|
+| `backend/config/wsgi.py` | 1 | Defaults to local settings | Critical | ✅ Fixed |
+| `backend/config/asgi.py` | 1 | Defaults to local settings | Critical | ✅ Fixed |
+| `backend/config/urls.py` | - | Admin exposed publicly | Medium | ❌ |
 
 ---
 
 ## Appendix B: Recommended New Files
 
-### 1. `.github/workflows/test-backend.yml`
-Backend test pipeline (see Section 7)
+### 1. `.github/workflows/test-backend.yml` ✅ EXISTS
+Backend test pipeline with pytest, ruff, mypy, pip-audit
 
-### 2. `.github/workflows/test-frontend.yml`
-Frontend test pipeline
+### 2. `.github/workflows/test-frontend.yml` ❌ TODO
+Frontend test pipeline (lint, typecheck, test)
 
-### 3. `docs/adr/` folder
-Architecture Decision Records:
-- `001-stytch-b2b-auth.md`
-- `002-transactional-outbox.md`
+### 3. `docs/adr/` folder ✅ CREATED
+Architecture Decision Records (8 ADRs):
+- `001-stytch-b2b-authentication.md`
+- `002-transactional-outbox-events.md`
 - `003-aurora-serverless.md`
-- `004-django-ninja-vs-drf.md`
+- `004-django-ninja.md`
+- `005-resend-email.md`
+- `006-s3-direct-upload.md`
+- `007-soft-deletes-audit-trail.md`
+- `008-rds-proxy-connection-pooling.md`
 
-### 4. `docs/runbooks/`
+### 4. `docs/runbooks/` ❌ TODO
 Operational runbooks:
 - `deployment.md`
 - `rollback.md`
 - `incident-response.md`
 - `secrets-rotation.md`
 
-### 5. `backend/apps/core/rate_limiting.py`
+### 5. `backend/apps/core/rate_limiting.py` ❌ TODO
 Rate limiting middleware
 
-### 6. `backend/apps/billing/trials.py`
+### 6. `backend/apps/billing/trials.py` ❌ TODO
 Free trial logic
 
 ---
