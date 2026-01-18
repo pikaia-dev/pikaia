@@ -2,7 +2,6 @@
 Media API endpoints for image uploads.
 """
 
-from django.http import HttpRequest
 from ninja import File, Form, Router
 from ninja.errors import HttpError
 from ninja.files import UploadedFile
@@ -10,6 +9,7 @@ from ninja.files import UploadedFile
 from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth
+from apps.core.types import AuthenticatedHttpRequest
 from apps.media.models import UploadedImage
 from apps.media.schemas import (
     ConfirmUploadSchema,
@@ -33,7 +33,7 @@ bearer_auth = BearerAuth()
     operation_id="requestImageUpload",
     summary="Request an image upload URL",
 )
-def request_upload(request: HttpRequest, payload: UploadRequestSchema) -> UploadResponseSchema:
+def request_upload(request: AuthenticatedHttpRequest, payload: UploadRequestSchema) -> UploadResponseSchema:
     """
     Request a presigned URL for uploading an image.
 
@@ -41,11 +41,11 @@ def request_upload(request: HttpRequest, payload: UploadRequestSchema) -> Upload
     1. Upload the file to the returned URL using the specified method
     2. Call /confirm endpoint after successful upload
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+    if not hasattr(request, "auth_user") or request.auth_user is None:
         raise HttpError(401, "Not authenticated")
 
-    user = request.auth_user  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    user = request.auth_user
+    org = request.auth_organization
 
     storage = get_storage_service()
 
@@ -89,17 +89,17 @@ def request_upload(request: HttpRequest, payload: UploadRequestSchema) -> Upload
     operation_id="confirmImageUpload",
     summary="Confirm an image upload",
 )
-def confirm_upload(request: HttpRequest, payload: ConfirmUploadSchema) -> ImageResponseSchema:
+def confirm_upload(request: AuthenticatedHttpRequest, payload: ConfirmUploadSchema) -> ImageResponseSchema:
     """
     Confirm that an image was successfully uploaded.
 
     Verifies the file exists in storage and saves metadata to the database.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+    if not hasattr(request, "auth_user") or request.auth_user is None:
         raise HttpError(401, "Not authenticated")
 
-    user = request.auth_user  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    user = request.auth_user
+    org = request.auth_organization
 
     storage = get_storage_service()
 
@@ -166,7 +166,7 @@ def confirm_upload(request: HttpRequest, payload: ConfirmUploadSchema) -> ImageR
     summary="Direct upload for local development",
 )
 def direct_upload(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     file: UploadedFile = File(...),  # noqa: B008
     key: str = Form(""),  # noqa: B008
     content_type: str = Form(""),  # noqa: B008
@@ -177,7 +177,7 @@ def direct_upload(
     In production, files are uploaded directly to S3 using presigned URLs.
     This endpoint is only used in local development.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+    if not hasattr(request, "auth_user") or request.auth_user is None:
         raise HttpError(401, "Not authenticated")
 
     if not key:
@@ -216,19 +216,19 @@ def direct_upload(
     operation_id="deleteImage",
     summary="Delete an uploaded image",
 )
-def delete_image(request: HttpRequest, image_id: str) -> dict:
+def delete_image(request: AuthenticatedHttpRequest, image_id: str) -> dict:
     """
     Delete an uploaded image.
 
     Users can only delete their own avatars.
     Admins can delete organization logos.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+    if not hasattr(request, "auth_user") or request.auth_user is None:
         raise HttpError(401, "Not authenticated")
 
-    user = request.auth_user  # type: ignore[attr-defined]
-    member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    user = request.auth_user
+    member = request.auth_member
+    org = request.auth_organization
 
     try:
         image = UploadedImage.objects.get(id=image_id)

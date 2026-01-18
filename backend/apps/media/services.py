@@ -7,6 +7,7 @@ import uuid
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
+from typing import cast
 
 from django.conf import settings
 from django.core.files.storage import default_storage
@@ -223,7 +224,7 @@ class StorageService:
         """Extract image dimensions from binary data."""
         try:
             with Image.open(BytesIO(image_data)) as img:
-                return img.size
+                return cast(tuple[int, int], img.size)
         except Exception:
             return (0, 0)
 

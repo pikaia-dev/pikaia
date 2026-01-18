@@ -18,12 +18,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from urllib.parse import urlparse
 
-from django.http import HttpRequest
 from ninja import Router
 from ninja.errors import HttpError
 
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth, require_admin
+from apps.core.types import AuthenticatedHttpRequest
 
 from .events import WEBHOOK_EVENTS, get_event_type
 from .models import WebhookEndpoint
@@ -81,7 +81,7 @@ def _detect_source(target_url: str) -> str:
 )
 @require_admin
 def subscribe(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     payload: RestHookSubscribeRequest,
 ) -> tuple[int, RestHookSubscribeResponse]:
     """
@@ -141,7 +141,7 @@ def subscribe(
     summary="List webhook subscriptions",
 )
 @require_admin
-def list_subscriptions(request: HttpRequest) -> RestHookListResponse:
+def list_subscriptions(request: AuthenticatedHttpRequest) -> RestHookListResponse:
     """
     List all REST Hook subscriptions for the organization.
 
@@ -175,7 +175,7 @@ def list_subscriptions(request: HttpRequest) -> RestHookListResponse:
 )
 @require_admin
 def unsubscribe(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     subscription_id: str,
 ) -> tuple[int, None]:
     """
@@ -216,7 +216,7 @@ def unsubscribe(
 )
 @require_admin
 def get_sample(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     event_type: str,
 ) -> EventSampleResponse:
     """
@@ -263,7 +263,7 @@ def get_sample(
     summary="Test authentication",
 )
 @require_admin
-def verify_auth(request: HttpRequest) -> AuthTestResponse:
+def verify_auth(request: AuthenticatedHttpRequest) -> AuthTestResponse:
     """
     Test that authentication is working.
 

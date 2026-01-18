@@ -6,12 +6,12 @@ Allows organization admins to manage webhook endpoints and view delivery logs.
 
 import logging
 
-from django.http import HttpRequest
 from ninja import Router
 from ninja.errors import HttpError
 
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth, require_admin
+from apps.core.types import AuthenticatedHttpRequest
 
 from .schemas import (
     WebhookDeliveryListResponse,
@@ -85,7 +85,7 @@ def _delivery_to_response(delivery) -> WebhookDeliveryResponse:
     operation_id="listWebhookEvents",
     summary="List available webhook events",
 )
-def list_events(request: HttpRequest) -> WebhookEventListResponse:
+def list_events(request: AuthenticatedHttpRequest) -> WebhookEventListResponse:
     """
     Get the catalog of all available webhook event types.
 
@@ -109,7 +109,7 @@ def list_events(request: HttpRequest) -> WebhookEventListResponse:
     summary="List webhook endpoints",
 )
 @require_admin
-def list_endpoints(request: HttpRequest) -> WebhookEndpointListResponse:
+def list_endpoints(request: AuthenticatedHttpRequest) -> WebhookEndpointListResponse:
     """
     List all webhook endpoints for the organization.
 
@@ -130,7 +130,7 @@ def list_endpoints(request: HttpRequest) -> WebhookEndpointListResponse:
 )
 @require_admin
 def create_endpoint(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     payload: WebhookEndpointCreate,
 ) -> tuple[int, WebhookEndpointWithSecretResponse]:
     """
@@ -177,7 +177,7 @@ def create_endpoint(
     summary="Get webhook endpoint",
 )
 @require_admin
-def get_endpoint(request: HttpRequest, endpoint_id: str) -> WebhookEndpointResponse:
+def get_endpoint(request: AuthenticatedHttpRequest, endpoint_id: str) -> WebhookEndpointResponse:
     """
     Get a specific webhook endpoint.
 
@@ -201,7 +201,7 @@ def get_endpoint(request: HttpRequest, endpoint_id: str) -> WebhookEndpointRespo
 )
 @require_admin
 def update_endpoint(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     endpoint_id: str,
     payload: WebhookEndpointUpdate,
 ) -> WebhookEndpointResponse:
@@ -235,7 +235,7 @@ def update_endpoint(
     summary="Delete webhook endpoint",
 )
 @require_admin
-def delete_endpoint(request: HttpRequest, endpoint_id: str) -> tuple[int, None]:
+def delete_endpoint(request: AuthenticatedHttpRequest, endpoint_id: str) -> tuple[int, None]:
     """
     Delete a webhook endpoint.
 
@@ -272,7 +272,7 @@ def delete_endpoint(request: HttpRequest, endpoint_id: str) -> tuple[int, None]:
 )
 @require_admin
 def list_deliveries(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     endpoint_id: str,
     limit: int = 50,
 ) -> WebhookDeliveryListResponse:
@@ -309,7 +309,7 @@ def list_deliveries(
 )
 @require_admin
 def send_test_webhook(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     endpoint_id: str,
     payload: WebhookTestRequest,
 ) -> WebhookTestResponse:
