@@ -1,0 +1,213 @@
+# Claude Code Damage Control - Project-specific patterns
+# See: https://github.com/disler/claude-code-damage-control
+
+# =============================================================================
+# Bash Command Patterns
+# =============================================================================
+# action: block = hard block, ask = require confirmation
+
+bashToolPatterns:
+  # --- Destructive file operations ---
+  - pattern: 'rm\s+(-[rfR]+|--recursive|--force)\s.*(/|~|\$HOME)'
+    description: "Recursive/force delete on root or home"
+    action: block
+
+  # Matches: rm -rf ., rm -r ./, rm -rf ./path (requires r/R flag, . must be path not filename)
+  - pattern: 'rm\s+-[fR]*[rR][fR]*\s+\.(\/\S*)?(\s|$)'
+    description: "Recursive delete in current directory"
+    action: ask
+
+  # --- Permission changes ---
+  - pattern: 'chmod\s+(-R\s+)?777'
+    description: "World-writable permissions"
+    action: block
+
+  - pattern: 'chown\s+-R'
+    description: "Recursive ownership change"
+    action: ask
+
+  # --- Git operations ---
+  - pattern: 'git\s+push\s+.*(--force|-f)\b'
+    description: "Force push"
+    action: block
+
+  - pattern: 'git\s+reset\s+--hard'
+    description: "Hard reset (discards changes)"
+    action: block
+
+  - pattern: 'git\s+clean\s+-[a-z]*f'
+    description: "Force clean untracked files"
+    action: block
+
+  - pattern: 'git\s+checkout\s+--\s+\.'
+    description: "Discard all local changes"
+    action: block
+
+  - pattern: 'git\s+filter-branch'
+    description: "Rewrite git history"
+    action: block
+
+  - pattern: 'git\s+commit\s+.*--amend'
+    description: "Amend last commit"
+    action: block
+
+  - pattern: 'git\s+branch\s+-D'
+    description: "Force delete branch"
+    action: ask
+
+  - pattern: 'git\s+stash\s+drop'
+    description: "Drop stash entry"
+    action: ask
+
+  - pattern: 'git\s+rebase\s+-i'
+    description: "Interactive rebase"
+    action: ask
+
+  # --- System destruction ---
+  - pattern: 'mkfs\.'
+    description: "Format filesystem"
+    action: block
+
+  - pattern: 'dd\s+.*of=/dev/'
+    description: "Direct disk write"
+    action: block
+
+  # Covers: SATA/SCSI (sda), NVMe (nvme0n1), VirtIO (vda), Xen (xvda), eMMC (mmcblk0)
+  - pattern: '>\s*/dev/(sd[a-z]|nvme[0-9]+n[0-9]+|vd[a-z]|xvd[a-z]|mmcblk[0-9]+)'
+    description: "Redirect to block device"
+    action: block
+
+  # --- Cloud platform operations (Firebase only) ---
+  # Match actual delete commands, not config values containing 'delete'
+  - pattern: 'firebase\s+\S*:?delete\b'
+    description: "Firebase delete operation"
+    action: ask
+
+  # --force is dangerous with deploy/delete operations
+  - pattern: 'firebase\s+(deploy|firestore:delete|functions:delete|database:remove|hosting:disable)\b.*--force'
+    description: "Firebase force operation"
+    action: ask
+
+  # --- AWS operations ---
+  - pattern: 'aws\s+.*delete'
+    description: "AWS delete operation"
+    action: ask
+
+  - pattern: 'aws\s+.*--force'
+    description: "AWS force operation"
+    action: ask
+
+  - pattern: 'aws\s+s3\s+rm\s+.*--recursive'
+    description: "AWS S3 recursive delete"
+    action: block
+
+  - pattern: 'aws\s+ec2\s+terminate-instances'
+    description: "Terminate EC2 instances"
+    action: ask
+
+  - pattern: 'aws\s+rds\s+delete-db'
+    description: "Delete RDS database"
+    action: block
+
+  # --- CDK operations ---
+  - pattern: 'cdk\s+destroy'
+    description: "CDK destroy stack"
+    action: ask
+
+  # --- Database operations ---
+  - pattern: 'DROP\s+(DATABASE|TABLE|SCHEMA)'
+    description: "SQL DROP statement"
+    action: block
+
+  - pattern: 'TRUNCATE\s+TABLE'
+    description: "SQL TRUNCATE statement"
+    action: block
+
+  # Catches DELETE FROM table without WHERE (including comments, newlines)
+  - pattern: 'DELETE\s+FROM\s+\w+\s*(?=\s*;|\s*$|\s*--)'
+    description: "DELETE without WHERE clause"
+    action: block
+
+  # --- Docker/K8s destruction ---
+  - pattern: 'docker\s+system\s+prune\s+-a'
+    description: "Docker prune all"
+    action: ask
+
+  - pattern: 'docker\s+rm\s+-f'
+    description: "Docker force remove"
+    action: ask
+
+  - pattern: 'kubectl\s+delete\s+(namespace|ns)'
+    description: "Delete Kubernetes namespace"
+    action: block
+
+  - pattern: 'kubectl\s+delete\s+.*--all'
+    description: "Kubernetes delete all"
+    action: block
+
+# =============================================================================
+# Path Access Control
+# =============================================================================
+
+# Paths requiring confirmation for any access
+askAccessPaths:
+  - '.claude/'
+  - '~/.ssh/'
+  - '.env'
+  # .env.* includes .env.example, .env.local, etc.
+  - '.env.*'
+  - 'cdk.context.json'
+
+# Paths that are read-only (no writes)
+readOnlyPaths:
+  # Lock files
+  - 'uv.lock'
+  - 'pnpm-lock.yaml'
+  - 'package-lock.json'
+  - 'yarn.lock'
+  - 'Cargo.lock'
+  - 'poetry.lock'
+
+  # System directories
+  - '/etc/'
+  - '/usr/'
+  - '/bin/'
+  - '/sbin/'
+
+  # Build artifacts (shouldn't be edited directly)
+  - 'node_modules/'
+  - '.venv/'
+  - '__pycache__/'
+  - 'dist/'
+  - 'build/'
+  - '.next/'
+  - 'htmlcov/'
+
+# Paths that cannot be deleted but can be edited
+noDeletePaths:
+  - '.git/'
+  - '.gitignore'
+  - '.gitattributes'
+  - 'LICENSE'
+  - 'README.md'
+  - '.github/'
+  - 'Dockerfile'
+  - 'docker-compose.yml'
+
+# Zero access paths (completely blocked)
+zeroAccessPaths:
+  # Credentials and secrets
+  - '~/.aws/credentials'
+  - '~/.aws/config'
+  - '~/.kube/config'
+  - '~/.docker/config.json'
+
+  # Private keys
+  - '*.pem'
+  - '*.key'
+  - 'id_rsa'
+  - 'id_ed25519'
+
+  # Terraform state (contains secrets)
+  - '*.tfstate'
+  - '*.tfstate.backup'
