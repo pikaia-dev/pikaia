@@ -9,7 +9,7 @@ from ninja import Router
 from ninja.errors import HttpError
 
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth
+from apps.core.security import BearerAuth, get_auth_context
 from apps.core.types import AuthenticatedHttpRequest
 from apps.events.services import publish_event
 from apps.sms.aws_client import SMSError
@@ -52,10 +52,7 @@ def send_verification_otp(
     The OTP expires after the configured time (default: 30 minutes).
     Rate limited to 3 requests per phone number per hour.
     """
-    if not hasattr(request, "auth") or request.auth.user is None:
-        raise HttpError(401, "Not authenticated")
-
-    user = request.auth.user
+    user, _, _ = get_auth_context(request)
 
     try:
         send_phone_verification_otp(
@@ -91,11 +88,7 @@ def verify_phone_otp(
 
     On success, updates the user's phone_number and sets phone_verified_at.
     """
-    if not hasattr(request, "auth") or request.auth.user is None:
-        raise HttpError(401, "Not authenticated")
-
-    user = request.auth.user
-    org = request.auth.organization
+    user, _, org = get_auth_context(request)
 
     try:
         verify_phone_for_user(

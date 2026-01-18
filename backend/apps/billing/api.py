@@ -32,7 +32,7 @@ from apps.billing.services import (
 from apps.billing.stripe_client import get_stripe
 from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth, require_admin
+from apps.core.security import BearerAuth, get_auth_context, require_admin
 from apps.core.types import AuthenticatedHttpRequest
 
 logger = get_logger(__name__)
@@ -57,8 +57,7 @@ def create_checkout(
 
     Admin only. Returns URL to redirect user to Stripe Checkout.
     """
-    assert request.auth.organization is not None  # Guaranteed by @require_admin
-    org = request.auth.organization
+    _, _, org = get_auth_context(request)
 
     # Check if already subscribed
     try:
@@ -109,8 +108,7 @@ def create_portal(
 
     Admin only. Returns URL to redirect user to manage their subscription.
     """
-    assert request.auth.organization is not None  # Guaranteed by @require_admin
-    org = request.auth.organization
+    _, _, org = get_auth_context(request)
 
     if not org.stripe_customer_id:
         raise HttpError(400, "No billing account set up")
@@ -140,10 +138,7 @@ def get_subscription(request: AuthenticatedHttpRequest) -> SubscriptionResponse:
 
     Returns subscription details or 'none' status if not subscribed.
     """
-    if not hasattr(request, "auth") or request.auth.organization is None:
-        raise HttpError(401, "Not authenticated")
-
-    org = request.auth.organization
+    _, _, org = get_auth_context(request)
 
     try:
         subscription = org.subscription
@@ -190,8 +185,7 @@ def create_subscription_intent_endpoint(
     Admin only. Returns client_secret for PaymentElement.
     Use this for embedded Stripe Elements payment flow.
     """
-    assert request.auth.organization is not None  # Guaranteed by @require_admin
-    org = request.auth.organization
+    _, _, org = get_auth_context(request)
 
     # Check if already subscribed
     try:
@@ -277,10 +271,7 @@ def list_invoices(
     Admin only. Returns invoices sorted by date (newest first).
     Use starting_after with an invoice ID for pagination.
     """
-    if not hasattr(request, "auth") or request.auth.organization is None:
-        raise HttpError(401, "Not authenticated")
-
-    org = request.auth.organization
+    _, _, org = get_auth_context(request)
 
     if not org.stripe_customer_id:
         return InvoiceListResponse(invoices=[], has_more=False)
