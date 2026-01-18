@@ -180,20 +180,41 @@ def sync_session_to_local(
 # --- Member Management Services ---
 
 
-def list_organization_members(organization: Organization) -> list[Member]:
+def list_organization_members(
+    organization: Organization,
+    offset: int = 0,
+    limit: int | None = None,
+) -> tuple[list[Member], int]:
     """
-    List all active members of an organization.
+    List active members of an organization with database-level pagination.
 
-    Uses select_related to avoid N+1 queries.
+    Uses select_related to avoid N+1 queries and database-level
+    slicing to prevent loading all records into memory.
+
+    Args:
+        organization: The organization to list members for
+        offset: Number of records to skip (default 0)
+        limit: Maximum records to return (default None = all)
 
     Returns:
-        List of active (non-deleted) Member objects.
+        Tuple of (members list, total count)
     """
-    return list(
+    queryset = (
         Member.objects.filter(organization=organization)
         .select_related("user")
         .order_by("created_at")
     )
+
+    total = queryset.count()
+
+    if limit is not None:
+        members = list(queryset[offset : offset + limit])
+    elif offset > 0:
+        members = list(queryset[offset:])
+    else:
+        members = list(queryset)
+
+    return members, total
 
 
 def invite_member(
