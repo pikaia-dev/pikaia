@@ -371,6 +371,9 @@ def soft_delete_member(member: Member) -> None:
     The member is marked as deleted locally (deleted_at set) and
     removed from Stytch so they can no longer authenticate.
 
+    Uses transaction.atomic() with select_for_update() to prevent
+    concurrent deletion race conditions.
+
     Args:
         member: The Member to delete
     """
@@ -385,8 +388,11 @@ def soft_delete_member(member: Member) -> None:
         member_id=member.stytch_member_id,
     )
 
-    # Soft delete locally
-    member.soft_delete()
+    # Soft delete locally with row lock to prevent concurrent updates
+    with transaction.atomic():
+        locked_member = Member.all_objects.select_for_update().get(pk=member.pk)
+        if not locked_member.is_deleted:
+            locked_member.soft_delete()
 
     # Sync subscription quantity to Stripe (outside transaction - external call)
     _sync_subscription_quantity_safe(organization)
