@@ -847,14 +847,7 @@ def list_members(
         limit: Maximum records to return (default None = all)
     """
     _, _, org = get_auth_context(request)
-    all_members = list_organization_members(org)
-    total = len(all_members)
-
-    # Apply pagination
-    if limit is not None:
-        members = all_members[offset : offset + limit]
-    else:
-        members = all_members[offset:] if offset > 0 else all_members
+    members, total = list_organization_members(org, offset=offset, limit=limit)
 
     # Fetch member statuses from Stytch
     stytch = get_stytch_client()

@@ -333,9 +333,10 @@ class TestListOrganizationMembers:
         member1 = MemberFactory(organization=org, role="admin")
         member2 = MemberFactory(organization=org, role="member")
 
-        members = list_organization_members(org)
+        members, total = list_organization_members(org)
 
         assert len(members) == 2
+        assert total == 2
         assert member1 in members
         assert member2 in members
 
@@ -343,9 +344,10 @@ class TestListOrganizationMembers:
         """Should return empty list when organization has no members."""
         org = OrganizationFactory()
 
-        members = list_organization_members(org)
+        members, total = list_organization_members(org)
 
         assert members == []
+        assert total == 0
 
     def test_excludes_members_from_other_orgs(self) -> None:
         """Should only return members from the specified organization."""
@@ -354,9 +356,10 @@ class TestListOrganizationMembers:
         member1 = MemberFactory(organization=org1)
         MemberFactory(organization=org2)  # Should not be included
 
-        members = list_organization_members(org1)
+        members, total = list_organization_members(org1)
 
         assert len(members) == 1
+        assert total == 1
         assert members[0] == member1
 
     def test_uses_select_related_for_user(self) -> None:
@@ -365,7 +368,7 @@ class TestListOrganizationMembers:
         MemberFactory(organization=org)
         MemberFactory(organization=org)
 
-        members = list_organization_members(org)
+        members, _ = list_organization_members(org)
 
         # Access user without triggering additional queries
         for member in members:
@@ -378,11 +381,51 @@ class TestListOrganizationMembers:
         member1 = MemberFactory(organization=org)
         member2 = MemberFactory(organization=org)
 
-        members = list_organization_members(org)
+        members, _ = list_organization_members(org)
 
         # First member should come before second
         assert members[0].id == member1.id
         assert members[1].id == member2.id
+
+    def test_pagination_with_limit(self) -> None:
+        """Should return only limited number of members."""
+        org = OrganizationFactory()
+        MemberFactory(organization=org)
+        MemberFactory(organization=org)
+        MemberFactory(organization=org)
+
+        members, total = list_organization_members(org, limit=2)
+
+        assert len(members) == 2
+        assert total == 3
+
+    def test_pagination_with_offset(self) -> None:
+        """Should skip members with offset."""
+        org = OrganizationFactory()
+        _first = MemberFactory(organization=org)
+        second = MemberFactory(organization=org)
+        third = MemberFactory(organization=org)
+
+        members, total = list_organization_members(org, offset=1)
+
+        assert len(members) == 2
+        assert total == 3
+        assert members[0] == second
+        assert members[1] == third
+
+    def test_pagination_with_offset_and_limit(self) -> None:
+        """Should apply both offset and limit."""
+        org = OrganizationFactory()
+        _first = MemberFactory(organization=org)
+        second = MemberFactory(organization=org)
+        _third = MemberFactory(organization=org)
+        _fourth = MemberFactory(organization=org)
+
+        members, total = list_organization_members(org, offset=1, limit=1)
+
+        assert len(members) == 1
+        assert total == 4
+        assert members[0] == second
 
 
 @pytest.mark.django_db
