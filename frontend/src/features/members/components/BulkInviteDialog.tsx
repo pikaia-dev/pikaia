@@ -1,8 +1,8 @@
-import { AlertCircle, Check, ChevronsUpDown, Info, Upload, Users } from "lucide-react"
-import Papa from "papaparse"
-import { useCallback, useMemo, useRef, useState } from "react"
+import { AlertCircle, Check, ChevronsUpDown, Info, Upload, Users } from 'lucide-react'
+import Papa from 'papaparse'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
-import { Button } from "@/components/ui/button"
+import { Button } from '@/components/ui/button'
 import {
   Command,
   CommandEmpty,
@@ -11,7 +11,7 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "@/components/ui/command"
+} from '@/components/ui/command'
 import {
   Dialog,
   DialogContent,
@@ -19,24 +19,20 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { EmailTagInput } from "@/components/ui/email-tag-input"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+} from '@/components/ui/dialog'
+import { EmailTagInput } from '@/components/ui/email-tag-input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { useCurrentUser } from "@/features/auth/queries"
-import { useOrganization } from "@/features/organization/queries"
-import { COUNTRIES, type Country, getCountryByCode } from "@/lib/countries"
-import { cn } from "@/lib/utils"
+} from '@/components/ui/select'
+import { useCurrentUser } from '@/features/auth/queries'
+import { useOrganization } from '@/features/organization/queries'
+import { COUNTRIES, type Country, getCountryByCode } from '@/lib/countries'
+import { cn } from '@/lib/utils'
 
 import {
   analyzePhones,
@@ -46,13 +42,13 @@ import {
   parseCsvData,
   type ParsedRow,
   parseRowsWithMappings,
-} from "../utils/csv-import"
+} from '../utils/csv-import'
 
-type Tab = "manual" | "csv"
-type CsvStep = "upload" | "mapping" | "preview"
+type Tab = 'manual' | 'csv'
+type CsvStep = 'upload' | 'mapping' | 'preview'
 
 // Popular countries for the country code selector
-const POPULAR_CODES = ["US", "GB", "CA", "DE", "PL", "FR"]
+const POPULAR_CODES = ['US', 'GB', 'CA', 'DE', 'PL', 'FR']
 const POPULAR_COUNTRIES = POPULAR_CODES.map((code) =>
   COUNTRIES.find((c) => c.code === code)
 ).filter((c): c is Country => c !== undefined)
@@ -87,14 +83,14 @@ export function BulkInviteDialog({
   const { data: currentUser } = useCurrentUser()
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<Tab>("manual")
+  const [activeTab, setActiveTab] = useState<Tab>('manual')
 
   // Manual entry state
   const [emails, setEmails] = useState<string[]>([])
-  const [role, setRole] = useState<"member" | "admin">("member")
+  const [role, setRole] = useState<'member' | 'admin'>('member')
 
   // CSV import state
-  const [csvStep, setCsvStep] = useState<CsvStep>("upload")
+  const [csvStep, setCsvStep] = useState<CsvStep>('upload')
   const [headers, setHeaders] = useState<string[]>([])
   const [rawData, setRawData] = useState<string[][]>([])
   const [columnMappings, setColumnMappings] = useState<Record<number, ColumnType>>({})
@@ -127,9 +123,9 @@ export function BulkInviteDialog({
 
   const reset = () => {
     setEmails([])
-    setRole("member")
-    setActiveTab("manual")
-    setCsvStep("upload")
+    setRole('member')
+    setActiveTab('manual')
+    setCsvStep('upload')
     setHeaders([])
     setRawData([])
     setColumnMappings({})
@@ -149,8 +145,8 @@ export function BulkInviteDialog({
 
     const members: BulkInviteMember[] = emails.map((email) => ({
       email,
-      name: "",
-      phone: "",
+      name: '',
+      phone: '',
       role,
     }))
 
@@ -173,13 +169,13 @@ export function BulkInviteDialog({
         setHeaders(parsed.headers)
         setRawData(parsed.rows)
         setColumnMappings(parsed.columnMappings)
-        setCsvStep("mapping")
+        setCsvStep('mapping')
       },
       skipEmptyLines: true,
     })
 
     // Reset file input so same file can be selected again
-    e.target.value = ""
+    e.target.value = ''
   }, [])
 
   const openFilePicker = () => {
@@ -192,10 +188,10 @@ export function BulkInviteDialog({
       const updated = { ...prev }
 
       // If another column already has this type (except 'skip'), clear it
-      if (type !== "skip") {
+      if (type !== 'skip') {
         Object.entries(updated).forEach(([key, value]) => {
           if (value === type && Number(key) !== colIndex) {
-            updated[Number(key)] = "skip"
+            updated[Number(key)] = 'skip'
           }
         })
       }
@@ -207,21 +203,18 @@ export function BulkInviteDialog({
 
   // Parse rows and move to preview step
   const handleContinueToPreview = useCallback(() => {
-    if (!Object.values(columnMappings).includes("email")) {
+    if (!Object.values(columnMappings).includes('email')) {
       setParsedRows([])
       return
     }
 
     // Get phone column to analyze phones
-    const phoneColIndex = Object.entries(columnMappings).find(([, t]) => t === "phone")?.[0]
-    const rawPhones = phoneColIndex !== undefined
-      ? rawData.map((row) => row[Number(phoneColIndex)] || "")
-      : []
+    const phoneColIndex = Object.entries(columnMappings).find(([, t]) => t === 'phone')?.[0]
+    const rawPhones =
+      phoneColIndex !== undefined ? rawData.map((row) => row[Number(phoneColIndex)] || '') : []
 
     // Analyze phones to determine if we need to assume a country code
-    const userCountry = userPhoneNumber
-      ? extractCountryFromPhone(userPhoneNumber)
-      : null
+    const userCountry = userPhoneNumber ? extractCountryFromPhone(userPhoneNumber) : null
     const phoneAnalysis = analyzePhones(rawPhones, userCountry)
 
     // Track how many phones need country codes
@@ -234,77 +227,78 @@ export function BulkInviteDialog({
     let countryCodeToAssume: Country | null = null
     if (phoneAnalysis.phonesNeedingCode > 0) {
       if (phoneAnalysis.looksLikeUS) {
-        countryCodeToAssume = COUNTRIES.find((c) => c.code === "US") ?? null
+        countryCodeToAssume = COUNTRIES.find((c) => c.code === 'US') ?? null
       } else if (defaultCountryCode) {
         countryCodeToAssume = defaultCountryCode
       } else {
         // No default available - default to US as fallback
-        countryCodeToAssume = COUNTRIES.find((c) => c.code === "US") ?? null
+        countryCodeToAssume = COUNTRIES.find((c) => c.code === 'US') ?? null
       }
     }
     setAssumedCountryCode(countryCodeToAssume)
 
     // Parse rows with the assumed dial code
-    const parsed = parseRowsWithMappings(
-      rawData,
-      columnMappings,
-      countryCodeToAssume?.dialCode
-    )
+    const parsed = parseRowsWithMappings(rawData, columnMappings, countryCodeToAssume?.dialCode)
 
     setParsedRows(parsed)
-    setCsvStep("preview")
+    setCsvStep('preview')
   }, [rawData, columnMappings, userPhoneNumber, defaultCountryCode])
 
   // Handle assumed country code change - re-parse all rows
-  const handleAssumedCountryCodeChange = useCallback((countryCode: string) => {
-    const newCountryCode = countryCode === "none"
-      ? null
-      : COUNTRIES.find((c) => c.code === countryCode) ?? null
-    setAssumedCountryCode(newCountryCode)
-    setCountryCodePopoverOpen(false)
+  const handleAssumedCountryCodeChange = useCallback(
+    (countryCode: string) => {
+      const newCountryCode =
+        countryCode === 'none' ? null : (COUNTRIES.find((c) => c.code === countryCode) ?? null)
+      setAssumedCountryCode(newCountryCode)
+      setCountryCodePopoverOpen(false)
 
-    // Re-parse rows with the new assumed dial code
-    const parsed = parseRowsWithMappings(
-      rawData,
-      columnMappings,
-      newCountryCode?.dialCode
-    )
-    setParsedRows(parsed)
-  }, [rawData, columnMappings])
+      // Re-parse rows with the new assumed dial code
+      const parsed = parseRowsWithMappings(rawData, columnMappings, newCountryCode?.dialCode)
+      setParsedRows(parsed)
+    },
+    [rawData, columnMappings]
+  )
 
   // Update a parsed row
-  const updateParsedRow = useCallback((index: number, field: keyof ParsedRow, value: string) => {
-    setParsedRows((prev) => {
-      const updated = [...prev]
-      const row = { ...updated[index] }
+  const updateParsedRow = useCallback(
+    (index: number, field: keyof ParsedRow, value: string) => {
+      setParsedRows((prev) => {
+        const updated = [...prev]
+        const row = { ...updated[index] }
 
-      if (field === "email") {
-        row.email = value.toLowerCase()
-        row.errors = row.errors.filter((e) => !e.includes("email"))
-        if (!EMAIL_REGEX.test(row.email)) {
-          row.errors.push("Invalid email format")
+        if (field === 'email') {
+          row.email = value.toLowerCase()
+          row.errors = row.errors.filter((e) => !e.includes('email'))
+          if (!EMAIL_REGEX.test(row.email)) {
+            row.errors.push('Invalid email format')
+          }
+        } else if (field === 'name') {
+          row.name = value
+        } else if (field === 'phone') {
+          // When manually editing phone, store the raw value and mark as not assumed
+          row.rawPhone = value
+          row.phoneAssumed = false
+          // Re-parse with assumed dial code if needed
+          const parsed = parseRowsWithMappings(
+            [[value]],
+            { 0: 'phone' },
+            assumedCountryCode?.dialCode
+          )
+          row.phone = parsed[0]?.phone ?? ''
+          row.errors = row.errors.filter((e) => !e.includes('phone'))
+          if (value && !row.phone) {
+            row.errors.push('Invalid phone format')
+          }
+        } else if (field === 'role') {
+          row.role = value === 'admin' ? 'admin' : 'member'
         }
-      } else if (field === "name") {
-        row.name = value
-      } else if (field === "phone") {
-        // When manually editing phone, store the raw value and mark as not assumed
-        row.rawPhone = value
-        row.phoneAssumed = false
-        // Re-parse with assumed dial code if needed
-        const parsed = parseRowsWithMappings([[value]], { 0: "phone" }, assumedCountryCode?.dialCode)
-        row.phone = parsed[0]?.phone ?? ""
-        row.errors = row.errors.filter((e) => !e.includes("phone"))
-        if (value && !row.phone) {
-          row.errors.push("Invalid phone format")
-        }
-      } else if (field === "role") {
-        row.role = value === "admin" ? "admin" : "member"
-      }
 
-      updated[index] = row
-      return updated
-    })
-  }, [assumedCountryCode?.dialCode])
+        updated[index] = row
+        return updated
+      })
+    },
+    [assumedCountryCode?.dialCode]
+  )
 
   // Remove a row
   const removeRow = useCallback((index: number) => {
@@ -327,26 +321,28 @@ export function BulkInviteDialog({
   }, [parsedRows, onInvite])
 
   // Computed values
-  const hasEmailColumn = Object.values(columnMappings).includes("email")
+  const hasEmailColumn = Object.values(columnMappings).includes('email')
   const validRowCount = parsedRows.filter((r) => r.errors.length === 0 && r.email).length
   const errorRowCount = parsedRows.filter((r) => r.errors.length > 0).length
 
   // Dialog should be wider when showing CSV preview
-  const dialogWidth = activeTab === "csv" && csvStep === "preview" ? "sm:max-w-4xl" : "sm:max-w-lg"
+  const dialogWidth = activeTab === 'csv' && csvStep === 'preview' ? 'sm:max-w-4xl' : 'sm:max-w-lg'
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className={cn(dialogWidth, "max-h-[85vh] overflow-hidden flex flex-col")}>
+      <DialogContent className={cn(dialogWidth, 'max-h-[85vh] overflow-hidden flex flex-col')}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
             Bulk Invite Members
           </DialogTitle>
           <DialogDescription>
-            {activeTab === "manual" && "Invite multiple members to your organization at once"}
-            {activeTab === "csv" && csvStep === "upload" && "Upload a CSV file with member data"}
-            {activeTab === "csv" && csvStep === "mapping" && "Map CSV columns to member fields"}
-            {activeTab === "csv" && csvStep === "preview" && "Review and edit data before importing"}
+            {activeTab === 'manual' && 'Invite multiple members to your organization at once'}
+            {activeTab === 'csv' && csvStep === 'upload' && 'Upload a CSV file with member data'}
+            {activeTab === 'csv' && csvStep === 'mapping' && 'Map CSV columns to member fields'}
+            {activeTab === 'csv' &&
+              csvStep === 'preview' &&
+              'Review and edit data before importing'}
           </DialogDescription>
         </DialogHeader>
 
@@ -354,24 +350,28 @@ export function BulkInviteDialog({
         <div className="flex gap-1 p-1 bg-muted rounded-lg">
           <button
             type="button"
-            onClick={() => { setActiveTab("manual"); }}
+            onClick={() => {
+              setActiveTab('manual')
+            }}
             className={cn(
-              "flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-              activeTab === "manual"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+              'flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+              activeTab === 'manual'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             )}
           >
             Enter Emails
           </button>
           <button
             type="button"
-            onClick={() => { setActiveTab("csv"); }}
+            onClick={() => {
+              setActiveTab('csv')
+            }}
             className={cn(
-              "flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-              activeTab === "csv"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+              'flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+              activeTab === 'csv'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             )}
           >
             Import CSV
@@ -381,12 +381,10 @@ export function BulkInviteDialog({
         {/* Tab content - px-0.5 provides space for focus ring outside overflow boundary */}
         <div className="flex-1 overflow-auto py-2 px-0.5">
           {/* Manual entry tab */}
-          {activeTab === "manual" && (
+          {activeTab === 'manual' && (
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium block mb-2">
-                  Email addresses
-                </label>
+                <span className="text-sm font-medium block mb-2">Email addresses</span>
                 <EmailTagInput
                   value={emails}
                   onChange={setEmails}
@@ -394,17 +392,18 @@ export function BulkInviteDialog({
                   disabled={isLoading}
                 />
                 <p className="text-xs text-muted-foreground mt-1.5">
-                  Press Enter, Tab, or comma to add. Paste multiple emails separated by commas or newlines.
+                  Press Enter, Tab, or comma to add. Paste multiple emails separated by commas or
+                  newlines.
                 </p>
               </div>
 
               <div>
-                <label className="text-sm font-medium block mb-2">
-                  Role for all invitees
-                </label>
+                <span className="text-sm font-medium block mb-2">Role for all invitees</span>
                 <Select
                   value={role}
-                  onValueChange={(value) => { setRole(value as "member" | "admin"); }}
+                  onValueChange={(value) => {
+                    setRole(value as 'member' | 'admin')
+                  }}
                   disabled={isLoading}
                 >
                   <SelectTrigger>
@@ -420,7 +419,7 @@ export function BulkInviteDialog({
           )}
 
           {/* CSV tab - Upload step */}
-          {activeTab === "csv" && csvStep === "upload" && (
+          {activeTab === 'csv' && csvStep === 'upload' && (
             <div className="space-y-4">
               <input
                 ref={fileInputRef}
@@ -430,8 +429,17 @@ export function BulkInviteDialog({
                 className="hidden"
               />
 
+              {/* biome-ignore lint/a11y/useSemanticElements: Div with role used for drop zone styling */}
               <div
+                role="button"
+                tabIndex={0}
                 onClick={openFilePicker}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    openFilePicker()
+                  }
+                }}
                 className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors hover:border-primary/50"
               >
                 <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
@@ -453,17 +461,22 @@ export function BulkInviteDialog({
           )}
 
           {/* CSV tab - Mapping step */}
-          {activeTab === "csv" && csvStep === "mapping" && (
+          {activeTab === 'csv' && csvStep === 'mapping' && (
             <div className="space-y-4">
               <div className="grid gap-3">
                 {headers.map((header, index) => (
-                  <div key={index} className="flex items-center gap-3">
+                  <div
+                    key={`header-${header}-${String(index)}`}
+                    className="flex items-center gap-3"
+                  >
                     <span className="w-28 text-sm truncate" title={header}>
                       {header}
                     </span>
                     <Select
-                      value={columnMappings[index] ?? "skip"}
-                      onValueChange={(value) => { handleColumnMappingChange(index, value as ColumnType); }}
+                      value={columnMappings[index] ?? 'skip'}
+                      onValueChange={(value) => {
+                        handleColumnMappingChange(index, value as ColumnType)
+                      }}
                     >
                       <SelectTrigger className="w-32">
                         <SelectValue />
@@ -477,7 +490,7 @@ export function BulkInviteDialog({
                       </SelectContent>
                     </Select>
                     <span className="text-xs text-muted-foreground truncate flex-1">
-                      {rawData[0]?.[index] || "(empty)"}
+                      {rawData[0]?.[index] || '(empty)'}
                     </span>
                   </div>
                 ))}
@@ -493,7 +506,7 @@ export function BulkInviteDialog({
           )}
 
           {/* CSV tab - Preview step */}
-          {activeTab === "csv" && csvStep === "preview" && (
+          {activeTab === 'csv' && csvStep === 'preview' && (
             <div className="space-y-4">
               {/* Assumed country code banner */}
               {phonesNeedingCountryCode > 0 && (
@@ -501,14 +514,19 @@ export function BulkInviteDialog({
                   <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
                   <div className="flex-1 space-y-2">
                     <p>
-                      {phonesNeedingCountryCode} phone {phonesNeedingCountryCode === 1 ? "number doesn't" : "numbers don't"} have a country code.
+                      {phonesNeedingCountryCode} phone{' '}
+                      {phonesNeedingCountryCode === 1 ? "number doesn't" : "numbers don't"} have a
+                      country code.
                       {assumedCountryCode
                         ? ` We assumed ${assumedCountryCode.flag} ${assumedCountryCode.name} (${assumedCountryCode.dialCode}).`
-                        : " Please select a country code to apply."}
+                        : ' Please select a country code to apply.'}
                     </p>
                     <div className="flex items-center gap-2">
                       <span>Country code:</span>
-                      <Popover open={countryCodePopoverOpen} onOpenChange={setCountryCodePopoverOpen}>
+                      <Popover
+                        open={countryCodePopoverOpen}
+                        onOpenChange={setCountryCodePopoverOpen}
+                      >
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
@@ -520,7 +538,9 @@ export function BulkInviteDialog({
                               <span className="flex items-center gap-1.5 truncate">
                                 <span>{assumedCountryCode.flag}</span>
                                 <span className="truncate">{assumedCountryCode.name}</span>
-                                <span className="text-muted-foreground">({assumedCountryCode.dialCode})</span>
+                                <span className="text-muted-foreground">
+                                  ({assumedCountryCode.dialCode})
+                                </span>
                               </span>
                             ) : (
                               <span className="text-muted-foreground">Don't add country code</span>
@@ -536,12 +556,14 @@ export function BulkInviteDialog({
                               <CommandGroup>
                                 <CommandItem
                                   value="none"
-                                  onSelect={() => { handleAssumedCountryCodeChange("none"); }}
+                                  onSelect={() => {
+                                    handleAssumedCountryCodeChange('none')
+                                  }}
                                 >
                                   <Check
                                     className={cn(
-                                      "mr-2 h-4 w-4",
-                                      !assumedCountryCode ? "opacity-100" : "opacity-0"
+                                      'mr-2 h-4 w-4',
+                                      !assumedCountryCode ? 'opacity-100' : 'opacity-0'
                                     )}
                                   />
                                   <span>Don't add country code</span>
@@ -553,17 +575,23 @@ export function BulkInviteDialog({
                                   <CommandItem
                                     key={country.code}
                                     value={`${country.name} ${country.code} ${country.dialCode}`}
-                                    onSelect={() => { handleAssumedCountryCodeChange(country.code); }}
+                                    onSelect={() => {
+                                      handleAssumedCountryCodeChange(country.code)
+                                    }}
                                   >
                                     <Check
                                       className={cn(
-                                        "mr-2 h-4 w-4",
-                                        assumedCountryCode?.code === country.code ? "opacity-100" : "opacity-0"
+                                        'mr-2 h-4 w-4',
+                                        assumedCountryCode?.code === country.code
+                                          ? 'opacity-100'
+                                          : 'opacity-0'
                                       )}
                                     />
                                     <span className="mr-1.5">{country.flag}</span>
                                     <span className="truncate">{country.name}</span>
-                                    <span className="ml-auto text-xs text-muted-foreground">{country.dialCode}</span>
+                                    <span className="ml-auto text-xs text-muted-foreground">
+                                      {country.dialCode}
+                                    </span>
                                   </CommandItem>
                                 ))}
                               </CommandGroup>
@@ -573,17 +601,23 @@ export function BulkInviteDialog({
                                   <CommandItem
                                     key={country.code}
                                     value={`${country.name} ${country.code} ${country.dialCode}`}
-                                    onSelect={() => { handleAssumedCountryCodeChange(country.code); }}
+                                    onSelect={() => {
+                                      handleAssumedCountryCodeChange(country.code)
+                                    }}
                                   >
                                     <Check
                                       className={cn(
-                                        "mr-2 h-4 w-4",
-                                        assumedCountryCode?.code === country.code ? "opacity-100" : "opacity-0"
+                                        'mr-2 h-4 w-4',
+                                        assumedCountryCode?.code === country.code
+                                          ? 'opacity-100'
+                                          : 'opacity-0'
                                       )}
                                     />
                                     <span className="mr-1.5">{country.flag}</span>
                                     <span className="truncate">{country.name}</span>
-                                    <span className="ml-auto text-xs text-muted-foreground">{country.dialCode}</span>
+                                    <span className="ml-auto text-xs text-muted-foreground">
+                                      {country.dialCode}
+                                    </span>
                                   </CommandItem>
                                 ))}
                               </CommandGroup>
@@ -599,12 +633,10 @@ export function BulkInviteDialog({
               {/* Summary */}
               <div className="flex items-center gap-4 text-sm">
                 <span className="text-muted-foreground">
-                  {validRowCount} valid {validRowCount === 1 ? "row" : "rows"}
+                  {validRowCount} valid {validRowCount === 1 ? 'row' : 'rows'}
                 </span>
                 {errorRowCount > 0 && (
-                  <span className="text-destructive">
-                    {errorRowCount} with errors
-                  </span>
+                  <span className="text-destructive">{errorRowCount} with errors</span>
                 )}
               </div>
 
@@ -623,26 +655,28 @@ export function BulkInviteDialog({
                   <tbody className="divide-y">
                     {parsedRows.map((row, index) => (
                       <tr
-                        key={index}
-                        className={cn(row.errors.length > 0 && "bg-destructive/5")}
+                        key={`row-${row.email || ''}-${String(index)}`}
+                        className={cn(row.errors.length > 0 && 'bg-destructive/5')}
                       >
                         <td className="px-3 py-2">
                           <div className="relative">
                             <input
                               type="text"
                               value={row.email}
-                              onChange={(e) => { updateParsedRow(index, "email", e.target.value); }}
+                              onChange={(e) => {
+                                updateParsedRow(index, 'email', e.target.value)
+                              }}
                               className={cn(
-                                "w-full px-2 py-1 text-sm bg-transparent border rounded",
-                                row.errors.some((e) => e.toLowerCase().includes("email"))
-                                  ? "border-destructive pr-6"
-                                  : "border-transparent hover:border-border focus:border-ring"
+                                'w-full px-2 py-1 text-sm bg-transparent border rounded',
+                                row.errors.some((e) => e.toLowerCase().includes('email'))
+                                  ? 'border-destructive pr-6'
+                                  : 'border-transparent hover:border-border focus:border-ring'
                               )}
                             />
-                            {row.errors.some((e) => e.toLowerCase().includes("email")) && (
+                            {row.errors.some((e) => e.toLowerCase().includes('email')) && (
                               <span
                                 className="absolute right-1 top-1/2 -translate-y-1/2 text-destructive cursor-help"
-                                title={row.errors.find((e) => e.toLowerCase().includes("email"))}
+                                title={row.errors.find((e) => e.toLowerCase().includes('email'))}
                               >
                                 ⚠
                               </span>
@@ -653,7 +687,9 @@ export function BulkInviteDialog({
                           <input
                             type="text"
                             value={row.name}
-                            onChange={(e) => { updateParsedRow(index, "name", e.target.value); }}
+                            onChange={(e) => {
+                              updateParsedRow(index, 'name', e.target.value)
+                            }}
                             className="w-full px-2 py-1 text-sm bg-transparent border border-transparent rounded hover:border-border focus:border-ring"
                           />
                         </td>
@@ -662,19 +698,21 @@ export function BulkInviteDialog({
                             <input
                               type="text"
                               value={row.phone}
-                              onChange={(e) => { updateParsedRow(index, "phone", e.target.value); }}
+                              onChange={(e) => {
+                                updateParsedRow(index, 'phone', e.target.value)
+                              }}
                               placeholder="+1..."
                               className={cn(
-                                "w-full px-2 py-1 text-sm bg-transparent border rounded",
-                                row.errors.some((e) => e.toLowerCase().includes("phone"))
-                                  ? "border-destructive pr-6"
-                                  : "border-transparent hover:border-border focus:border-ring"
+                                'w-full px-2 py-1 text-sm bg-transparent border rounded',
+                                row.errors.some((e) => e.toLowerCase().includes('phone'))
+                                  ? 'border-destructive pr-6'
+                                  : 'border-transparent hover:border-border focus:border-ring'
                               )}
                             />
-                            {row.errors.some((e) => e.toLowerCase().includes("phone")) && (
+                            {row.errors.some((e) => e.toLowerCase().includes('phone')) && (
                               <span
                                 className="absolute right-1 top-1/2 -translate-y-1/2 text-destructive cursor-help"
-                                title={row.errors.find((e) => e.toLowerCase().includes("phone"))}
+                                title={row.errors.find((e) => e.toLowerCase().includes('phone'))}
                               >
                                 ⚠
                               </span>
@@ -684,7 +722,9 @@ export function BulkInviteDialog({
                         <td className="px-3 py-2">
                           <Select
                             value={row.role}
-                            onValueChange={(value) => { updateParsedRow(index, "role", value); }}
+                            onValueChange={(value) => {
+                              updateParsedRow(index, 'role', value)
+                            }}
                           >
                             <SelectTrigger className="h-7 text-sm">
                               <SelectValue />
@@ -698,7 +738,9 @@ export function BulkInviteDialog({
                         <td className="px-3 py-2">
                           <button
                             type="button"
-                            onClick={() => { removeRow(index); }}
+                            onClick={() => {
+                              removeRow(index)
+                            }}
                             className="text-muted-foreground hover:text-destructive text-xs"
                           >
                             Remove
@@ -722,44 +764,67 @@ export function BulkInviteDialog({
         {/* Footer buttons */}
         <DialogFooter>
           {/* Cancel / Back button */}
-          {activeTab === "manual" && (
-            <Button variant="outline" onClick={() => { handleClose(false); }} disabled={isLoading}>
+          {activeTab === 'manual' && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                handleClose(false)
+              }}
+              disabled={isLoading}
+            >
               Cancel
             </Button>
           )}
-          {activeTab === "csv" && csvStep === "upload" && (
-            <Button variant="outline" onClick={() => { handleClose(false); }} disabled={isLoading}>
+          {activeTab === 'csv' && csvStep === 'upload' && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                handleClose(false)
+              }}
+              disabled={isLoading}
+            >
               Cancel
             </Button>
           )}
-          {activeTab === "csv" && csvStep === "mapping" && (
-            <Button variant="outline" onClick={() => { setCsvStep("upload"); }}>
+          {activeTab === 'csv' && csvStep === 'mapping' && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCsvStep('upload')
+              }}
+            >
               Back
             </Button>
           )}
-          {activeTab === "csv" && csvStep === "preview" && (
-            <Button variant="outline" onClick={() => { setCsvStep("mapping"); }}>
+          {activeTab === 'csv' && csvStep === 'preview' && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCsvStep('mapping')
+              }}
+            >
               Back
             </Button>
           )}
 
           {/* Action button */}
-          {activeTab === "manual" && (
-            <Button
-              onClick={handleManualInvite}
-              disabled={emails.length === 0 || isLoading}
-            >
-              {isLoading ? "Inviting..." : `Invite ${emails.length > 0 ? String(emails.length) : ""} ${emails.length === 1 ? "Member" : "Members"}`}
+          {activeTab === 'manual' && (
+            <Button onClick={handleManualInvite} disabled={emails.length === 0 || isLoading}>
+              {isLoading
+                ? 'Inviting...'
+                : `Invite ${emails.length > 0 ? String(emails.length) : ''} ${emails.length === 1 ? 'Member' : 'Members'}`}
             </Button>
           )}
-          {activeTab === "csv" && csvStep === "mapping" && (
+          {activeTab === 'csv' && csvStep === 'mapping' && (
             <Button onClick={handleContinueToPreview} disabled={!hasEmailColumn}>
               Continue
             </Button>
           )}
-          {activeTab === "csv" && csvStep === "preview" && (
+          {activeTab === 'csv' && csvStep === 'preview' && (
             <Button onClick={handleCsvImport} disabled={validRowCount === 0 || isLoading}>
-              {isLoading ? "Inviting..." : `Invite ${String(validRowCount)} ${validRowCount === 1 ? "Member" : "Members"}`}
+              {isLoading
+                ? 'Inviting...'
+                : `Invite ${String(validRowCount)} ${validRowCount === 1 ? 'Member' : 'Members'}`}
             </Button>
           )}
         </DialogFooter>

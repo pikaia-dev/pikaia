@@ -5,10 +5,14 @@ Tests signature verification, event dispatching, and error handling.
 """
 
 import json
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
 import stripe
+
+if TYPE_CHECKING:
+    from django.test import Client
 
 
 @pytest.fixture

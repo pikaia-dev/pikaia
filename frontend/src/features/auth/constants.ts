@@ -9,9 +9,9 @@ export const SESSION_DURATION_MINUTES = 30 * 24 * 60
  * - ignoreJitProvisioning: Don't show org picker for JIT-eligible domains
  */
 export const directLoginOptions = {
-    status: true,
-    ignoreInvites: true,
-    ignoreJitProvisioning: true,
+  status: true,
+  ignoreInvites: true,
+  ignoreJitProvisioning: true,
 } as const
 
 export type DirectLoginOptions = typeof directLoginOptions

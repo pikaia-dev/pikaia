@@ -1,20 +1,17 @@
-import { useStytchB2BClient } from "@stytch/react/b2b"
-import { useQueryClient } from "@tanstack/react-query"
-import { useCallback, useState } from "react"
+import { useStytchB2BClient } from '@stytch/react/b2b'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCallback, useState } from 'react'
 
-import { queryKeys } from "../features/shared/query-keys"
-import type { ImageResponse, UploadRequest } from "../lib/api"
-import { useApi } from "./useApi"
+import { queryKeys } from '../features/shared/query-keys'
+import type { ImageResponse, UploadRequest } from '../lib/api'
+import { useApi } from './useApi'
 
 interface UseImageUploadOptions {
   onSuccess?: (result: ImageResponse) => void
   onError?: (error: Error) => void
 }
 
-export function useImageUpload(
-  imageType: "avatar" | "logo",
-  options: UseImageUploadOptions = {}
-) {
+export function useImageUpload(imageType: 'avatar' | 'logo', options: UseImageUploadOptions = {}) {
   const stytch = useStytchB2BClient()
   const queryClient = useQueryClient()
   const { requestUpload, confirmUpload } = useApi()
@@ -33,7 +30,7 @@ export function useImageUpload(
         setProgress(10)
         const uploadRequest: UploadRequest = {
           filename,
-          content_type: file.type || "image/png",
+          content_type: file.type || 'image/png',
           size_bytes: file.size,
           image_type: imageType,
         }
@@ -42,24 +39,26 @@ export function useImageUpload(
         // Step 2: Upload to storage
         setProgress(30)
 
-        if (uploadInfo.method === "PUT") {
+        if (uploadInfo.method === 'PUT') {
           // S3 presigned PUT
           const response = await fetch(uploadInfo.upload_url, {
-            method: "PUT",
+            method: 'PUT',
             body: file,
             headers: {
-              "Content-Type": file.type || "image/png",
+              'Content-Type': file.type || 'image/png',
             },
           })
           if (!response.ok) {
-            throw new Error(`Failed to upload ${imageType}: server returned ${String(response.status)}`)
+            throw new Error(
+              `Failed to upload ${imageType}: server returned ${String(response.status)}`
+            )
           }
         } else {
           // Local direct upload (POST with multipart form)
           const formData = new FormData()
-          formData.append("file", file, filename)
-          formData.append("key", uploadInfo.key)
-          formData.append("content_type", file.type || "image/png")
+          formData.append('file', file, filename)
+          formData.append('key', uploadInfo.key)
+          formData.append('content_type', file.type || 'image/png')
 
           // Add any additional fields
           for (const [key, value] of Object.entries(uploadInfo.fields)) {
@@ -70,17 +69,17 @@ export function useImageUpload(
           const tokens = stytch.session.getTokens()
           const headers: HeadersInit = {}
           if (tokens?.session_jwt) {
-            headers["Authorization"] = `Bearer ${tokens.session_jwt}`
+            headers.Authorization = `Bearer ${tokens.session_jwt}`
           }
 
           const response = await fetch(uploadInfo.upload_url, {
-            method: "POST",
+            method: 'POST',
             body: formData,
             headers,
           })
           if (!response.ok) {
             const errorText = await response.text()
-            throw new Error(errorText || "Upload failed")
+            throw new Error(errorText || 'Upload failed')
           }
         }
 
@@ -94,7 +93,7 @@ export function useImageUpload(
         setProgress(100)
 
         // Invalidate user cache when avatar is updated so sidebar refreshes
-        if (imageType === "avatar") {
+        if (imageType === 'avatar') {
           void queryClient.invalidateQueries({ queryKey: queryKeys.auth.me() })
         }
 

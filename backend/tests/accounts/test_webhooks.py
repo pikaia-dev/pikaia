@@ -5,9 +5,13 @@ Tests event handling for member and organization updates.
 """
 
 import json
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+if TYPE_CHECKING:
+    from django.test import RequestFactory
 
 from apps.accounts.webhooks import (
     handle_member_created,

@@ -22,6 +22,6 @@ CORS_ALLOW_CREDENTIALS = True
 # =============================================================================
 # Configure structlog with pretty console output for local development.
 # Colors and human-readable format make debugging easier.
-from apps.core.logging import configure_logging
+from apps.core.logging import configure_logging  # noqa: E402
 
 configure_logging(json_format=False, log_level="DEBUG")

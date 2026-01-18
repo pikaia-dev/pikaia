@@ -1,27 +1,23 @@
-import "./App.css"
+import './App.css'
 
-import { useStytchMemberSession } from "@stytch/react/b2b"
-import { lazy, Suspense, useEffect, useState } from "react"
-import { Navigate, Route, Routes } from "react-router-dom"
+import { useStytchMemberSession } from '@stytch/react/b2b'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { Navigate, Route, Routes } from 'react-router-dom'
 
-import { LoadingSpinner } from "./components/ui/loading-spinner"
-import { SettingsSkeleton } from "./components/ui/skeleton"
-import AppLayout from "./layouts/AppLayout"
-import AuthCallback from "./pages/AuthCallback"
-import Dashboard from "./pages/Dashboard"
-import Login from "./pages/Login"
+import { LoadingSpinner } from './components/ui/loading-spinner'
+import { SettingsSkeleton } from './components/ui/skeleton'
+import AppLayout from './layouts/AppLayout'
+import AuthCallback from './pages/AuthCallback'
+import Dashboard from './pages/Dashboard'
+import Login from './pages/Login'
 
 // Lazy-load settings pages for code splitting
-const ProfileSettings = lazy(() => import("./pages/settings/ProfileSettings"))
-const OrganizationSettings = lazy(
-  () => import("./pages/settings/OrganizationSettings")
-)
-const MembersSettings = lazy(() => import("./pages/settings/MembersSettings"))
-const BillingSettings = lazy(() => import("./pages/settings/BillingSettings"))
-const SecuritySettings = lazy(() => import("./pages/settings/SecuritySettings"))
-const IntegrationsSettings = lazy(
-  () => import("./pages/settings/IntegrationsSettings")
-)
+const ProfileSettings = lazy(() => import('./pages/settings/ProfileSettings'))
+const OrganizationSettings = lazy(() => import('./pages/settings/OrganizationSettings'))
+const MembersSettings = lazy(() => import('./pages/settings/MembersSettings'))
+const BillingSettings = lazy(() => import('./pages/settings/BillingSettings'))
+const SecuritySettings = lazy(() => import('./pages/settings/SecuritySettings'))
+const IntegrationsSettings = lazy(() => import('./pages/settings/IntegrationsSettings'))
 
 // Basic ProtectedRoute component
 // Enhanced to prevent "flash of login" by handling undefined session state
@@ -31,13 +27,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   // Check if we should wait for session (set during login flow)
   // Read from sessionStorage on each render to get current value
-  const justLoggedIn =
-    sessionStorage.getItem("stytch_just_logged_in") === "true"
+  const justLoggedIn = sessionStorage.getItem('stytch_just_logged_in') === 'true'
 
   // Clear flag when session arrives
   useEffect(() => {
     if (session && justLoggedIn) {
-      sessionStorage.removeItem("stytch_just_logged_in")
+      sessionStorage.removeItem('stytch_just_logged_in')
     }
   }, [session, justLoggedIn])
 
@@ -46,7 +41,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     if (!justLoggedIn || session || waitingTimedOut) return
 
     const timer = setTimeout(() => {
-      sessionStorage.removeItem("stytch_just_logged_in")
+      sessionStorage.removeItem('stytch_just_logged_in')
       setWaitingTimedOut(true)
     }, 5000) // 5s max wait time
     return () => {
@@ -65,9 +60,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
         <div className="text-center">
           <LoadingSpinner className="mx-auto" />
           {isWaitingForSession && (
-            <p className="mt-4 text-sm text-muted-foreground">
-              Signing you in...
-            </p>
+            <p className="mt-4 text-sm text-muted-foreground">Signing you in...</p>
           )}
         </div>
       </div>
@@ -145,10 +138,7 @@ function App() {
             </Suspense>
           }
         />
-        <Route
-          path="/settings"
-          element={<Navigate to="/settings/profile" replace />}
-        />
+        <Route path="/settings" element={<Navigate to="/settings/profile" replace />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

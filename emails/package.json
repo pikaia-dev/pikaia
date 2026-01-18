@@ -1,18 +1,22 @@
 {
-    "name": "emails",
-    "version": "0.1.0",
-    "private": true,
-    "scripts": {
-        "dev": "email dev",
-        "build": "email export --outDir build"
-    },
-    "dependencies": {
-        "@react-email/components": "^1.0.2",
-        "react": "^19.0.0",
-        "react-email": "^5.0.9"
-    },
-    "devDependencies": {
-        "@types/react": "^19.0.0",
-        "typescript": "^5.7.0"
-    }
+  "name": "emails",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'No dev server for emails'",
+    "build": "email export --dir ./src/templates --outDir build",
+    "lint": "biome lint src",
+    "format": "biome format --write src",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf build .turbo"
+  },
+  "dependencies": {
+    "@react-email/components": "^1.0.2",
+    "react": "^19.0.0",
+    "react-email": "^5.0.9"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
 }

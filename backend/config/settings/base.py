@@ -45,7 +45,9 @@ class Settings(BaseSettings):
     EVENT_BACKEND: str = "local"  # "local" or "eventbridge"
     EVENT_BUS_NAME: str = ""  # AWS EventBridge bus name (required for eventbridge backend)
 
-    # S3 Media Storage (production)
+    # S3 Media Storage (production or LocalStack for local dev)
+    # For LocalStack, set AWS_ENDPOINT_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY env vars
+    # boto3 reads these automatically - no need to configure in Django settings
     USE_S3_STORAGE: bool = False
     AWS_STORAGE_BUCKET_NAME: str = ""
     AWS_S3_REGION_NAME: str = "us-east-1"
@@ -184,7 +186,7 @@ def _get_database_config() -> dict:
     elif settings.DATABASE_URL:
         # Local dev: Parse DATABASE_URL via pydantic
         dsn = settings.DATABASE_URL
-        host_info = dsn.hosts()[0] if dsn.hosts() else {}
+        host_info = dsn.hosts()[0] if dsn.hosts() else {}  # type: ignore[typeddict-item]
         return {
             "ENGINE": "django.db.backends.postgresql",
             "NAME": dsn.path.lstrip("/") if dsn.path else "",

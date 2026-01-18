@@ -1,0 +1,23 @@
+# Shared ruff configuration for all Python code
+# Project-specific overrides go in each pyproject.toml
+
+line-length = 100
+target-version = "py312"
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "SIM108", # use ternary operator (can reduce readability)
+]
+
+[format]
+quote-style = "double"
+indent-style = "space"

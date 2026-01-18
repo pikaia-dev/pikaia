@@ -1,5 +1,5 @@
-import { useStytchB2BClient } from "@stytch/react/b2b"
-import { useMemo } from "react"
+import { useStytchB2BClient } from '@stytch/react/b2b'
+import { useMemo } from 'react'
 
 import {
   type BillingAddress,
@@ -39,7 +39,7 @@ import {
   type WebhookEventListResponse,
   type WebhookTestRequest,
   type WebhookTestResponse,
-} from "../lib/api"
+} from '../lib/api'
 
 /**
  * Hook that provides an authenticated API client using the Stytch SDK.
@@ -61,33 +61,32 @@ export function useApi() {
       api,
 
       // Auth
-      getCurrentUser: () => api.get<MeResponse>("/auth/me"),
+      getCurrentUser: () => api.get<MeResponse>('/auth/me'),
 
       // Profile
-      updateProfile: (data: { name: string }) =>
-        api.patch<UserInfo>("/auth/me/profile", data),
+      updateProfile: (data: { name: string }) => api.patch<UserInfo>('/auth/me/profile', data),
 
       // Phone verification
       sendPhoneOtp: (phone_number: string) =>
-        api.post<PhoneOtpResponse>("/auth/phone/send-otp", { phone_number }),
+        api.post<PhoneOtpResponse>('/auth/phone/send-otp', { phone_number }),
 
       verifyPhoneOtp: (phone_number: string, otp_code: string) =>
-        api.post<UserInfo>("/auth/phone/verify-otp", {
+        api.post<UserInfo>('/auth/phone/verify-otp', {
           phone_number,
           otp_code,
         }),
 
       // Email update
       startEmailUpdate: (new_email: string) =>
-        api.post<EmailUpdateResponse>("/auth/email/start-update", {
+        api.post<EmailUpdateResponse>('/auth/email/start-update', {
           new_email,
         }),
 
       // Organization
-      getOrganization: () => api.get<OrganizationDetail>("/auth/organization"),
+      getOrganization: () => api.get<OrganizationDetail>('/auth/organization'),
 
       updateOrganization: (data: { name: string; slug?: string }) =>
-        api.patch<OrganizationDetail>("/auth/organization", data),
+        api.patch<OrganizationDetail>('/auth/organization', data),
 
       updateBilling: (data: {
         use_billing_email: boolean
@@ -95,74 +94,58 @@ export function useApi() {
         billing_name: string
         address?: BillingAddress
         vat_id: string
-      }) => api.patch<OrganizationDetail>("/auth/organization/billing", data),
+      }) => api.patch<OrganizationDetail>('/auth/organization/billing', data),
 
       // Members
-      listMembers: () =>
-        api.get<MemberListResponse>("/auth/organization/members"),
+      listMembers: () => api.get<MemberListResponse>('/auth/organization/members'),
 
       inviteMember: (data: InviteMemberRequest) =>
-        api.post<InviteMemberResponse>("/auth/organization/members", data),
+        api.post<InviteMemberResponse>('/auth/organization/members', data),
 
       bulkInviteMembers: (data: BulkInviteRequest) =>
-        api.post<BulkInviteResponse>("/auth/organization/members/bulk", data),
+        api.post<BulkInviteResponse>('/auth/organization/members/bulk', data),
 
       updateMemberRole: (memberId: number, data: UpdateMemberRoleRequest) =>
-        api.patch<MessageResponse>(
-          `/auth/organization/members/${String(memberId)}`,
-          data
-        ),
+        api.patch<MessageResponse>(`/auth/organization/members/${String(memberId)}`, data),
 
       deleteMember: (memberId: number) =>
         api.delete<MessageResponse>(`/auth/organization/members/${String(memberId)}`),
 
       // Billing
-      getSubscription: () => api.get<SubscriptionInfo>("/billing/subscription"),
+      getSubscription: () => api.get<SubscriptionInfo>('/billing/subscription'),
 
       createCheckoutSession: (data: CheckoutSessionRequest) =>
-        api.post<CheckoutSessionResponse>("/billing/checkout", data),
+        api.post<CheckoutSessionResponse>('/billing/checkout', data),
 
       createPortalSession: (data: PortalSessionRequest) =>
-        api.post<PortalSessionResponse>("/billing/portal", data),
+        api.post<PortalSessionResponse>('/billing/portal', data),
 
       createSubscriptionIntent: (data: SubscriptionIntentRequest) =>
-        api.post<SubscriptionIntentResponse>(
-          "/billing/subscription-intent",
-          data
-        ),
+        api.post<SubscriptionIntentResponse>('/billing/subscription-intent', data),
 
       confirmSubscription: (data: ConfirmSubscriptionRequest) =>
-        api.post<ConfirmSubscriptionResponse>(
-          "/billing/confirm-subscription",
-          data
-        ),
+        api.post<ConfirmSubscriptionResponse>('/billing/confirm-subscription', data),
 
       listInvoices: (params?: { limit?: number; starting_after?: string }) => {
         const queryParams = new URLSearchParams()
-        if (params?.limit) queryParams.set("limit", params.limit.toString())
-        if (params?.starting_after)
-          queryParams.set("starting_after", params.starting_after)
+        if (params?.limit) queryParams.set('limit', params.limit.toString())
+        if (params?.starting_after) queryParams.set('starting_after', params.starting_after)
         const query = queryParams.toString()
-        return api.get<InvoiceListResponse>(
-          `/billing/invoices${query ? `?${query}` : ""}`
-        )
+        return api.get<InvoiceListResponse>(`/billing/invoices${query ? `?${query}` : ''}`)
       },
 
       // Media
       requestUpload: (data: UploadRequest) =>
-        api.post<UploadResponse>("/media/upload-request", data),
+        api.post<UploadResponse>('/media/upload-request', data),
 
       confirmUpload: (data: ConfirmUploadRequest) =>
-        api.post<ImageResponse>("/media/confirm", data),
+        api.post<ImageResponse>('/media/confirm', data),
 
-      deleteImage: (imageId: string) =>
-        api.delete<MessageResponse>(`/media/${imageId}`),
+      deleteImage: (imageId: string) => api.delete<MessageResponse>(`/media/${imageId}`),
 
       // Directory search (Google Workspace)
       searchDirectory: (q: string) =>
-        api.get<DirectoryUser[]>(
-          `/auth/directory/search?q=${encodeURIComponent(q)}`
-        ),
+        api.get<DirectoryUser[]>(`/auth/directory/search?q=${encodeURIComponent(q)}`),
 
       // Directory avatar (fetch via authenticated request, return blob URL)
       getDirectoryAvatar: async (googleUrl: string): Promise<string | null> => {
@@ -177,20 +160,15 @@ export function useApi() {
       },
 
       // Webhooks
-      listWebhookEvents: () =>
-        api.get<WebhookEventListResponse>("/webhooks/events"),
+      listWebhookEvents: () => api.get<WebhookEventListResponse>('/webhooks/events'),
 
-      listWebhookEndpoints: () =>
-        api.get<WebhookEndpointListResponse>("/webhooks/endpoints"),
+      listWebhookEndpoints: () => api.get<WebhookEndpointListResponse>('/webhooks/endpoints'),
 
       createWebhookEndpoint: (data: WebhookEndpointCreateRequest) =>
-        api.post<WebhookEndpointWithSecret>("/webhooks/endpoints", data),
+        api.post<WebhookEndpointWithSecret>('/webhooks/endpoints', data),
 
-      updateWebhookEndpoint: (
-        endpointId: string,
-        data: WebhookEndpointUpdateRequest
-      ) =>
-        api.patch<WebhookEndpointListResponse["endpoints"][0]>(
+      updateWebhookEndpoint: (endpointId: string, data: WebhookEndpointUpdateRequest) =>
+        api.patch<WebhookEndpointListResponse['endpoints'][0]>(
           `/webhooks/endpoints/${endpointId}`,
           data
         ),
@@ -199,17 +177,14 @@ export function useApi() {
         api.delete<void>(`/webhooks/endpoints/${endpointId}`),
 
       listWebhookDeliveries: (endpointId: string, limit?: number) => {
-        const query = limit ? `?limit=${String(limit)}` : ""
+        const query = limit ? `?limit=${String(limit)}` : ''
         return api.get<WebhookDeliveryListResponse>(
           `/webhooks/endpoints/${endpointId}/deliveries${query}`
         )
       },
 
       testWebhookEndpoint: (endpointId: string, data: WebhookTestRequest) =>
-        api.post<WebhookTestResponse>(
-          `/webhooks/endpoints/${endpointId}/test`,
-          data
-        ),
+        api.post<WebhookTestResponse>(`/webhooks/endpoints/${endpointId}/test`, data),
     }),
     [api]
   )

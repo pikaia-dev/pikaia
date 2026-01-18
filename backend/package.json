@@ -1,0 +1,15 @@
+{
+  "name": "backend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "uv run python manage.py runserver",
+    "build": "echo 'No build step for Django backend'",
+    "lint": "uv run ruff check .",
+    "lint:fix": "uv run ruff check --fix .",
+    "format": "uv run ruff format .",
+    "type-check": "uv run mypy .",
+    "test": "uv run pytest",
+    "clean": "rm -rf .ruff_cache .pytest_cache .mypy_cache .turbo **/__pycache__"
+  }
+}

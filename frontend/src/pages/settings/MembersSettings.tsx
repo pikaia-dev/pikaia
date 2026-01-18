@@ -1,5 +1,5 @@
-import { Users } from "lucide-react"
-import { useState } from "react"
+import { Users } from 'lucide-react'
+import { useState } from 'react'
 
 import {
   AlertDialog,
@@ -10,33 +10,27 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "../../components/ui/alert-dialog"
-import { Button } from "../../components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card"
-import { EmailAutocomplete } from "../../components/ui/email-autocomplete"
-import { LoadingSpinner } from "../../components/ui/loading-spinner"
+} from '../../components/ui/alert-dialog'
+import { Button } from '../../components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
+import { EmailAutocomplete } from '../../components/ui/email-autocomplete'
+import { LoadingSpinner } from '../../components/ui/loading-spinner'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../components/ui/select"
-import { BulkInviteDialog, MembersTable } from "../../features/members/components"
+} from '../../components/ui/select'
+import { BulkInviteDialog, MembersTable } from '../../features/members/components'
 import {
   useBulkInviteMembers,
   useDeleteMember,
   useInviteMember,
   useMembers,
   useUpdateMemberRole,
-} from "../../features/members/queries"
-import type { DirectoryUser } from "../../lib/api"
+} from '../../features/members/queries'
+import type { DirectoryUser } from '../../lib/api'
 
 export default function MembersSettings() {
   const { data: membersData, isLoading, error } = useMembers()
@@ -46,9 +40,9 @@ export default function MembersSettings() {
   const deleteMutation = useDeleteMember()
 
   // Invite form state
-  const [inviteEmail, setInviteEmail] = useState("")
-  const [inviteName, setInviteName] = useState("")
-  const [inviteRole, setInviteRole] = useState<"admin" | "member">("member")
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteName, setInviteName] = useState('')
+  const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member')
 
   // Bulk invite dialog state
   const [bulkInviteOpen, setBulkInviteOpen] = useState(false)
@@ -70,9 +64,9 @@ export default function MembersSettings() {
       { email: inviteEmail, name: inviteName, role: inviteRole },
       {
         onSuccess: () => {
-          setInviteEmail("")
-          setInviteName("")
-          setInviteRole("member")
+          setInviteEmail('')
+          setInviteName('')
+          setInviteRole('member')
         },
       }
     )
@@ -87,14 +81,16 @@ export default function MembersSettings() {
   }
 
   // Handle bulk invite
-  const handleBulkInvite = (members: { email: string; name: string; phone: string; role: string }[]) => {
+  const handleBulkInvite = (
+    members: { email: string; name: string; phone: string; role: string }[]
+  ) => {
     bulkInviteMutation.mutate(
       {
         members: members.map((m) => ({
           email: m.email,
           name: m.name || undefined,
           phone: m.phone || undefined,
-          role: m.role as "admin" | "member",
+          role: m.role as 'admin' | 'member',
         })),
       },
       {
@@ -105,7 +101,7 @@ export default function MembersSettings() {
     )
   }
 
-  const handleRoleChange = (memberId: number, newRole: "admin" | "member") => {
+  const handleRoleChange = (memberId: number, newRole: 'admin' | 'member') => {
     updateRoleMutation.mutate({ memberId, role: newRole })
   }
 
@@ -145,9 +141,7 @@ export default function MembersSettings() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">Members</h1>
-        <p className="text-muted-foreground">
-          Manage your organization members
-        </p>
+        <p className="text-muted-foreground">Manage your organization members</p>
       </div>
 
       {/* Invite Form */}
@@ -155,14 +149,14 @@ export default function MembersSettings() {
         <CardHeader className="flex flex-row items-start justify-between">
           <div>
             <CardTitle className="text-base">Invite Member</CardTitle>
-            <CardDescription>
-              Send an invitation email to add a new member
-            </CardDescription>
+            <CardDescription>Send an invitation email to add a new member</CardDescription>
           </div>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => { setBulkInviteOpen(true); }}
+            onClick={() => {
+              setBulkInviteOpen(true)
+            }}
           >
             <Users className="h-4 w-4 mr-2" />
             Bulk Invite
@@ -204,7 +198,7 @@ export default function MembersSettings() {
               <Select
                 value={inviteRole}
                 onValueChange={(value) => {
-                  setInviteRole(value as "admin" | "member")
+                  setInviteRole(value as 'admin' | 'member')
                 }}
               >
                 <SelectTrigger className="w-full">
@@ -216,22 +210,15 @@ export default function MembersSettings() {
                 </SelectContent>
               </Select>
             </div>
-            <Button
-              type="submit"
-              disabled={inviteMutation.isPending || !inviteEmail}
-            >
-              {inviteMutation.isPending ? "Sending..." : "Send Invite"}
+            <Button type="submit" disabled={inviteMutation.isPending || !inviteEmail}>
+              {inviteMutation.isPending ? 'Sending...' : 'Send Invite'}
             </Button>
           </form>
         </CardContent>
       </Card>
 
       {/* Members Table */}
-      <MembersTable
-        members={members}
-        onRoleChange={handleRoleChange}
-        onRemove={openDeleteDialog}
-      />
+      <MembersTable members={members} onRoleChange={handleRoleChange} onRemove={openDeleteDialog} />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -239,9 +226,8 @@ export default function MembersSettings() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove member</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove{" "}
-              <strong>{memberToDelete?.email}</strong> from this organization?
-              They will lose access immediately.
+              Are you sure you want to remove <strong>{memberToDelete?.email}</strong> from this
+              organization? They will lose access immediately.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

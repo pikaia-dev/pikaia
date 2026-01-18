@@ -4,7 +4,7 @@
  * Extracted for testability - all parsing and detection logic lives here.
  */
 
-import { COUNTRIES, type Country } from "@/lib/countries"
+import { COUNTRIES, type Country } from '@/lib/countries'
 
 /** Email validation regex */
 export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -13,12 +13,13 @@ export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export const PHONE_REGEX = /^\+[0-9]{8,15}$/
 
 /** Common dial codes sorted by length (longest first for matching) */
-const DIAL_CODES_BY_LENGTH = COUNTRIES
-  .map((c) => ({ code: c.code, dialCode: c.dialCode.replace("+", "") }))
-  .sort((a, b) => b.dialCode.length - a.dialCode.length)
+const DIAL_CODES_BY_LENGTH = COUNTRIES.map((c) => ({
+  code: c.code,
+  dialCode: c.dialCode.replace('+', ''),
+})).sort((a, b) => b.dialCode.length - a.dialCode.length)
 
 /** Column types we can map */
-export type ColumnType = "email" | "name" | "phone" | "role" | "skip"
+export type ColumnType = 'email' | 'name' | 'phone' | 'role' | 'skip'
 
 /** Parsed row with validation errors */
 export interface ParsedRow {
@@ -42,7 +43,7 @@ export interface CsvParseResult {
 }
 
 /** Common header keywords */
-const HEADER_KEYWORDS = ["email", "e-mail", "name", "phone", "mobile", "role", "type", "permission"]
+const HEADER_KEYWORDS = ['email', 'e-mail', 'name', 'phone', 'mobile', 'role', 'type', 'permission']
 
 /**
  * Detect if the first row is a header row.
@@ -76,41 +77,41 @@ export function detectColumnType(header: string, samples: string[]): ColumnType 
   const h = header.toLowerCase()
 
   // Check header name first
-  if (h.includes("email") || h.includes("e-mail")) return "email"
-  if (h.includes("name") || h.includes("full_name") || h.includes("fullname")) return "name"
-  if (h.includes("phone") || h.includes("mobile") || h.includes("tel")) return "phone"
-  if (h.includes("role") || h.includes("type") || h.includes("permission")) return "role"
+  if (h.includes('email') || h.includes('e-mail')) return 'email'
+  if (h.includes('name') || h.includes('full_name') || h.includes('fullname')) return 'name'
+  if (h.includes('phone') || h.includes('mobile') || h.includes('tel')) return 'phone'
+  if (h.includes('role') || h.includes('type') || h.includes('permission')) return 'role'
 
   // Check content patterns
   const validSamples = samples.filter((s) => s.trim().length > 0).slice(0, 10)
-  if (validSamples.length === 0) return "skip"
+  if (validSamples.length === 0) return 'skip'
 
   // Check if most samples look like emails (>= 50% with @, and most pass email regex)
-  const emailLikeSamples = validSamples.filter((s) => s.includes("@"))
+  const emailLikeSamples = validSamples.filter((s) => s.includes('@'))
   if (emailLikeSamples.length >= validSamples.length * 0.5) {
     const validEmailCount = validSamples.filter((s) => EMAIL_REGEX.test(s.trim())).length
-    if (validEmailCount >= validSamples.length * 0.5) return "email"
+    if (validEmailCount >= validSamples.length * 0.5) return 'email'
   }
 
   // Check if most samples look like phone numbers (>= 50%)
   const phoneLikeSamples = validSamples.filter((s) => {
-    const cleaned = s.replace(/[\s\-()]/g, "")
+    const cleaned = s.replace(/[\s\-()]/g, '')
     return /^\+?\d{7,}$/.test(cleaned)
   })
-  if (phoneLikeSamples.length >= validSamples.length * 0.5) return "phone"
+  if (phoneLikeSamples.length >= validSamples.length * 0.5) return 'phone'
 
   // Check if most samples look like roles (>= 50%)
-  const rolePatterns = ["admin", "member", "user", "viewer", "owner"]
+  const rolePatterns = ['admin', 'member', 'user', 'viewer', 'owner']
   const roleLikeSamples = validSamples.filter((s) =>
     rolePatterns.some((r) => s.toLowerCase().includes(r))
   )
-  if (roleLikeSamples.length >= validSamples.length * 0.5) return "role"
+  if (roleLikeSamples.length >= validSamples.length * 0.5) return 'role'
 
   // Default to name if most samples look like text (letters, spaces, hyphens, apostrophes)
   const nameLikeSamples = validSamples.filter((s) => /^[a-zA-Z\s\-']+$/.test(s.trim()))
-  if (nameLikeSamples.length >= validSamples.length * 0.5) return "name"
+  if (nameLikeSamples.length >= validSamples.length * 0.5) return 'name'
 
-  return "skip"
+  return 'skip'
 }
 
 /**
@@ -139,7 +140,7 @@ export function parseCsvData(data: string[][]): CsvParseResult {
   // Auto-detect column mappings
   const columnMappings: Record<number, ColumnType> = {}
   headers.forEach((header, index) => {
-    const samples = rows.map((row) => row[index] || "")
+    const samples = rows.map((row) => row[index] || '')
     columnMappings[index] = detectColumnType(header, samples)
   })
 
@@ -163,16 +164,20 @@ export interface PhoneParseResult {
  * Handles formats like: (555) 123-4567, 555.123.4567, +1-555-123-4567
  */
 export function cleanPhoneString(phone: string): string {
-  return phone.replace(/[\s\-().]/g, "")
+  return phone.replace(/[\s\-().]/g, '')
 }
 
 /**
  * Check if a cleaned phone number already has a country code.
  * Handles formats: +48..., 0048..., 1-555-123-4567 (US with leading 1)
  */
-export function phoneHasCountryCode(cleaned: string): { hasCode: boolean; countryCode: string | null; nationalNumber: string } {
+export function phoneHasCountryCode(cleaned: string): {
+  hasCode: boolean
+  countryCode: string | null
+  nationalNumber: string
+} {
   // Starts with + → definitely has country code
-  if (cleaned.startsWith("+")) {
+  if (cleaned.startsWith('+')) {
     const digits = cleaned.slice(1)
     for (const { code, dialCode } of DIAL_CODES_BY_LENGTH) {
       if (digits.startsWith(dialCode)) {
@@ -184,7 +189,7 @@ export function phoneHasCountryCode(cleaned: string): { hasCode: boolean; countr
   }
 
   // Starts with 00 → international format (00 = +)
-  if (cleaned.startsWith("00")) {
+  if (cleaned.startsWith('00')) {
     const digits = cleaned.slice(2)
     for (const { code, dialCode } of DIAL_CODES_BY_LENGTH) {
       if (digits.startsWith(dialCode)) {
@@ -195,8 +200,8 @@ export function phoneHasCountryCode(cleaned: string): { hasCode: boolean; countr
 
   // US number with leading 1: 11 digits starting with 1 (e.g., 1-555-123-4567 → 15551234567)
   // This is the NANP format (North American Numbering Plan)
-  if (cleaned.startsWith("1") && cleaned.length === 11 && /^\d+$/.test(cleaned)) {
-    return { hasCode: true, countryCode: "US", nationalNumber: cleaned.slice(1) }
+  if (cleaned.startsWith('1') && cleaned.length === 11 && /^\d+$/.test(cleaned)) {
+    return { hasCode: true, countryCode: 'US', nationalNumber: cleaned.slice(1) }
   }
 
   // No explicit country code prefix
@@ -219,8 +224,8 @@ export function looksLikeUSPhones(phones: string[]): boolean {
     // - Uses dots as separators
     // - Uses parentheses for area code
     const isUSLength = /^\d{10}$/.test(cleaned)
-    const hasDots = phone.includes(".")
-    const hasParens = phone.includes("(") && phone.includes(")")
+    const hasDots = phone.includes('.')
+    const hasParens = phone.includes('(') && phone.includes(')')
 
     if (isUSLength || hasDots || hasParens) {
       usLikeCount++
@@ -254,7 +259,7 @@ export function extractCountryFromPhone(phone: string): Country | null {
  * @param assumedDialCode - Optional dial code to apply if phone has no country code (e.g., "+48")
  */
 export function normalizePhone(phone: string, assumedDialCode?: string): string {
-  if (!phone) return ""
+  if (!phone) return ''
 
   const cleaned = cleanPhoneString(phone)
   const { hasCode, nationalNumber } = phoneHasCountryCode(cleaned)
@@ -262,28 +267,28 @@ export function normalizePhone(phone: string, assumedDialCode?: string): string 
   let normalized: string
   if (hasCode) {
     // Already has country code - normalize to + format
-    if (cleaned.startsWith("+")) {
+    if (cleaned.startsWith('+')) {
       normalized = cleaned
-    } else if (cleaned.startsWith("00")) {
-      normalized = "+" + cleaned.slice(2)
+    } else if (cleaned.startsWith('00')) {
+      normalized = `+${cleaned.slice(2)}`
     } else {
-      normalized = "+" + cleaned
+      normalized = `+${cleaned}`
     }
   } else if (assumedDialCode) {
     // Apply assumed country code
-    const dialCode = assumedDialCode.startsWith("+") ? assumedDialCode : `+${assumedDialCode}`
-    normalized = dialCode + nationalNumber
+    const dialCode = assumedDialCode.startsWith('+') ? assumedDialCode : `+${assumedDialCode}`
+    normalized = `${dialCode}${nationalNumber}`
   } else {
     // No country code and none assumed - keep as-is if it looks like a valid local number
     // Must be 7-15 digits only (no letters, no special chars except what was cleaned)
     if (/^\d{7,15}$/.test(cleaned)) {
       return cleaned
     }
-    return "" // Invalid - not a recognizable phone number
+    return '' // Invalid - not a recognizable phone number
   }
 
   if (!PHONE_REGEX.test(normalized)) {
-    return "" // Invalid
+    return '' // Invalid
   }
 
   return normalized
@@ -294,7 +299,7 @@ export function normalizePhone(phone: string, assumedDialCode?: string): string 
  */
 export function parsePhone(phone: string, assumedDialCode?: string): PhoneParseResult {
   if (!phone) {
-    return { phone: "", hadCountryCode: false, countryCode: null, assumedCountryCode: false }
+    return { phone: '', hadCountryCode: false, countryCode: null, assumedCountryCode: false }
   }
 
   const cleaned = cleanPhoneString(phone)
@@ -304,8 +309,12 @@ export function parsePhone(phone: string, assumedDialCode?: string): PhoneParseR
   return {
     phone: normalized,
     hadCountryCode: hasCode,
-    countryCode: hasCode ? countryCode : (assumedDialCode ? extractCountryCodeFromDialCode(assumedDialCode) : null),
-    assumedCountryCode: !hasCode && !!assumedDialCode && normalized !== "",
+    countryCode: hasCode
+      ? countryCode
+      : assumedDialCode
+        ? extractCountryCodeFromDialCode(assumedDialCode)
+        : null,
+    assumedCountryCode: !hasCode && !!assumedDialCode && normalized !== '',
   }
 }
 
@@ -313,7 +322,7 @@ export function parsePhone(phone: string, assumedDialCode?: string): PhoneParseR
  * Get country code from a dial code string.
  */
 function extractCountryCodeFromDialCode(dialCode: string): string | null {
-  const digits = dialCode.replace(/^\+/, "")
+  const digits = dialCode.replace(/^\+/, '')
   for (const { code, dialCode: dc } of DIAL_CODES_BY_LENGTH) {
     if (dc === digits) return code
   }
@@ -365,7 +374,7 @@ export function analyzePhones(phones: string[], userCountry: Country | null): Ph
   if (phonesNeedingCode > 0) {
     if (isUS) {
       // If phones look like US format, suggest US
-      suggestedCountry = COUNTRIES.find((c) => c.code === "US") ?? null
+      suggestedCountry = COUNTRIES.find((c) => c.code === 'US') ?? null
     } else if (userCountry) {
       // Otherwise use the current user's country
       suggestedCountry = userCountry
@@ -388,10 +397,10 @@ export function analyzePhones(phones: string[], userCountry: Country | null): Ph
 export function normalizeRole(role: string): string {
   const lower = role.toLowerCase().trim()
 
-  if (lower === "admin" || lower.includes("admin")) return "admin"
-  if (lower === "member" || lower === "user" || lower === "") return "member"
+  if (lower === 'admin' || lower.includes('admin')) return 'admin'
+  if (lower === 'member' || lower === 'user' || lower === '') return 'member'
 
-  return "member" // Default
+  return 'member' // Default
 }
 
 /**
@@ -422,43 +431,36 @@ export function parseRowsWithMappings(
   columnMappings: Record<number, ColumnType>,
   assumedDialCode?: string
 ): ParsedRow[] {
-  const emailColIndex = Object.entries(columnMappings).find(([, t]) => t === "email")?.[0]
-  const nameColIndex = Object.entries(columnMappings).find(([, t]) => t === "name")?.[0]
-  const phoneColIndex = Object.entries(columnMappings).find(([, t]) => t === "phone")?.[0]
-  const roleColIndex = Object.entries(columnMappings).find(([, t]) => t === "role")?.[0]
+  const emailColIndex = Object.entries(columnMappings).find(([, t]) => t === 'email')?.[0]
+  const nameColIndex = Object.entries(columnMappings).find(([, t]) => t === 'name')?.[0]
+  const phoneColIndex = Object.entries(columnMappings).find(([, t]) => t === 'phone')?.[0]
+  const roleColIndex = Object.entries(columnMappings).find(([, t]) => t === 'role')?.[0]
 
-  const isUSAssumed = assumedDialCode === "+1"
+  const isUSAssumed = assumedDialCode === '+1'
 
   return rows.map((row) => {
-    const email = emailColIndex !== undefined
-      ? (row[Number(emailColIndex)] || "").trim().toLowerCase()
-      : ""
-    const name = nameColIndex !== undefined
-      ? (row[Number(nameColIndex)] || "").trim()
-      : ""
-    const rawPhone = phoneColIndex !== undefined
-      ? (row[Number(phoneColIndex)] || "").trim()
-      : ""
-    const rawRole = roleColIndex !== undefined
-      ? (row[Number(roleColIndex)] || "").trim()
-      : ""
+    const email =
+      emailColIndex !== undefined ? (row[Number(emailColIndex)] || '').trim().toLowerCase() : ''
+    const name = nameColIndex !== undefined ? (row[Number(nameColIndex)] || '').trim() : ''
+    const rawPhone = phoneColIndex !== undefined ? (row[Number(phoneColIndex)] || '').trim() : ''
+    const rawRole = roleColIndex !== undefined ? (row[Number(roleColIndex)] || '').trim() : ''
 
     const errors: string[] = []
 
     // Validate email
     if (!email) {
-      errors.push("Email is required")
+      errors.push('Email is required')
     } else if (!EMAIL_REGEX.test(email)) {
-      errors.push("Invalid email format")
+      errors.push('Invalid email format')
     }
 
     // Parse phone with assumed dial code
     const phoneResult = parsePhone(rawPhone, assumedDialCode)
     if (rawPhone && !phoneResult.phone) {
-      errors.push("Invalid phone format")
+      errors.push('Invalid phone format')
     } else if (rawPhone && isUSAssumed && !isValidUSPhoneLength(rawPhone)) {
       // US phone validation - must be 10 digits
-      errors.push("US phone must be 10 digits")
+      errors.push('US phone must be 10 digits')
     }
 
     // Normalize role (defaults to member)

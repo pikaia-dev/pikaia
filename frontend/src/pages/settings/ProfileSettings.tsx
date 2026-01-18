@@ -1,34 +1,28 @@
-import { useStytchMemberSession } from "@stytch/react/b2b"
-import { useRef, useState } from "react"
-import { toast } from "sonner"
+import { useStytchMemberSession } from '@stytch/react/b2b'
+import { useRef, useState } from 'react'
+import { toast } from 'sonner'
 
-import { Alert, AlertDescription } from "../../components/ui/alert"
-import { Button } from "../../components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card"
+import { Alert, AlertDescription } from '../../components/ui/alert'
+import { Button } from '../../components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "../../components/ui/dialog"
-import { ImageUploader } from "../../components/ui/image-uploader"
-import { LoadingSpinner } from "../../components/ui/loading-spinner"
-import { PhoneNumberInput } from "../../components/ui/phone-number-input"
-import { useCurrentUser } from "../../features/auth/queries"
+} from '../../components/ui/dialog'
+import { ImageUploader } from '../../components/ui/image-uploader'
+import { LoadingSpinner } from '../../components/ui/loading-spinner'
+import { PhoneNumberInput } from '../../components/ui/phone-number-input'
+import { useCurrentUser } from '../../features/auth/queries'
 import {
   useSendPhoneOtp,
   useStartEmailUpdate,
   useUpdateProfile,
   useVerifyPhoneOtp,
-} from "../../features/profile/queries"
-import { PasskeySettings } from "../../features/settings/components/PasskeySettings"
+} from '../../features/profile/queries'
+import { PasskeySettings } from '../../features/settings/components/PasskeySettings'
 
 // Delay before updating state after dialog close animation
 const DIALOG_CLOSE_DELAY_MS = 150
@@ -44,30 +38,28 @@ export default function ProfileSettings() {
   // Detect if user logged in with passkey (trusted_auth_token type)
   // Passkey sessions are immutable and cannot have phone factors added
   const isPasskeySession = session?.authentication_factors.some(
-    (factor) => factor.type === "trusted_auth_token"
+    (factor) => factor.type === 'trusted_auth_token'
   )
 
   // Edited values (null = use server value)
   const [editedName, setEditedName] = useState<string | null>(null)
-  const [editedPhoneNumber, setEditedPhoneNumber] = useState<string | null>(
-    null
-  )
+  const [editedPhoneNumber, setEditedPhoneNumber] = useState<string | null>(null)
   const [editedEmail, setEditedEmail] = useState<string | null>(null)
   const [editedAvatarUrl, setEditedAvatarUrl] = useState<string | null>(null)
 
   // Phone verification dialog state
   const [showVerifyDialog, setShowVerifyDialog] = useState(false)
-  const [otpCode, setOtpCode] = useState("")
-  const [pendingPhone, setPendingPhone] = useState("")
+  const [otpCode, setOtpCode] = useState('')
+  const [pendingPhone, setPendingPhone] = useState('')
   const otpInputRef = useRef<HTMLInputElement>(null)
 
   // Derive current values
-  const name = editedName ?? userData?.user.name ?? ""
-  const email = userData?.user.email ?? ""
+  const name = editedName ?? userData?.user.name ?? ''
+  const email = userData?.user.email ?? ''
   const newEmail = editedEmail ?? email
-  const phoneNumber = editedPhoneNumber ?? userData?.user.phone_number ?? ""
-  const savedPhoneNumber = userData?.user.phone_number ?? ""
-  const avatarUrl = editedAvatarUrl ?? userData?.user.avatar_url ?? ""
+  const phoneNumber = editedPhoneNumber ?? userData?.user.phone_number ?? ''
+  const savedPhoneNumber = userData?.user.phone_number ?? ''
+  const avatarUrl = editedAvatarUrl ?? userData?.user.avatar_url ?? ''
 
   const isNameChanged = editedName !== null && editedName !== userData?.user.name
   const isPhoneChanged = phoneNumber !== savedPhoneNumber
@@ -101,9 +93,9 @@ export default function ProfileSettings() {
     sendPhoneOtpMutation.mutate(phoneNumber, {
       onSuccess: () => {
         setPendingPhone(phoneNumber)
-        setOtpCode("")
+        setOtpCode('')
         setShowVerifyDialog(true)
-        toast.success("Verification code sent!")
+        toast.success('Verification code sent!')
         // Focus OTP input after dialog opens
         setTimeout(() => otpInputRef.current?.focus(), 100)
       },
@@ -112,7 +104,7 @@ export default function ProfileSettings() {
 
   const handleVerifyOtp = () => {
     if (!otpCode || otpCode.length !== 6) {
-      toast.error("Please enter a 6-digit code")
+      toast.error('Please enter a 6-digit code')
       return
     }
 
@@ -125,8 +117,8 @@ export default function ProfileSettings() {
           // Update phone state after dialog close animation
           setTimeout(() => {
             setEditedPhoneNumber(updatedUser.phone_number)
-            setOtpCode("")
-            setPendingPhone("")
+            setOtpCode('')
+            setPendingPhone('')
           }, DIALOG_CLOSE_DELAY_MS)
         },
       }
@@ -136,8 +128,8 @@ export default function ProfileSettings() {
   const handleResendOtp = () => {
     sendPhoneOtpMutation.mutate(pendingPhone, {
       onSuccess: () => {
-        setOtpCode("")
-        toast.success("New verification code sent!")
+        setOtpCode('')
+        toast.success('New verification code sent!')
         setTimeout(() => otpInputRef.current?.focus(), 100)
       },
     })
@@ -163,9 +155,7 @@ export default function ProfileSettings() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">Profile</h1>
-        <p className="text-muted-foreground">
-          Manage your personal information
-        </p>
+        <p className="text-muted-foreground">Manage your personal information</p>
       </div>
 
       <div className="space-y-6 max-w-lg">
@@ -173,16 +163,10 @@ export default function ProfileSettings() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Profile Picture</CardTitle>
-            <CardDescription>
-              Upload a photo to personalize your account
-            </CardDescription>
+            <CardDescription>Upload a photo to personalize your account</CardDescription>
           </CardHeader>
           <CardContent>
-            <ImageUploader
-              type="avatar"
-              value={avatarUrl}
-              onChange={setEditedAvatarUrl}
-            />
+            <ImageUploader type="avatar" value={avatarUrl} onChange={setEditedAvatarUrl} />
           </CardContent>
         </Card>
 
@@ -215,7 +199,7 @@ export default function ProfileSettings() {
                   disabled={updateProfileMutation.isPending}
                   className="mt-2 h-10"
                 >
-                  {updateProfileMutation.isPending ? "Saving..." : "Save name"}
+                  {updateProfileMutation.isPending ? 'Saving...' : 'Save name'}
                 </Button>
               )}
             </div>
@@ -248,6 +232,7 @@ export default function ProfileSettings() {
                       className="h-3.5 w-3.5"
                       fill="currentColor"
                       viewBox="0 0 20 20"
+                      aria-hidden="true"
                     >
                       <path
                         fillRule="evenodd"
@@ -258,8 +243,7 @@ export default function ProfileSettings() {
                     A verification link will be sent to {newEmail}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    If you signed in with Google, changing email will disconnect
-                    that login method.
+                    If you signed in with Google, changing email will disconnect that login method.
                   </p>
                   <Button
                     type="button"
@@ -267,9 +251,7 @@ export default function ProfileSettings() {
                     disabled={startEmailUpdateMutation.isPending}
                     className="mt-2 h-10"
                   >
-                    {startEmailUpdateMutation.isPending
-                      ? "Sending..."
-                      : "Send verification link"}
+                    {startEmailUpdateMutation.isPending ? 'Sending...' : 'Send verification link'}
                   </Button>
                 </>
               )}
@@ -277,9 +259,7 @@ export default function ProfileSettings() {
 
             {/* Phone Number */}
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Phone number
-              </label>
+              <span className="block text-sm font-medium mb-1">Phone number</span>
               <PhoneNumberInput
                 value={phoneNumber}
                 onChange={setEditedPhoneNumber}
@@ -289,9 +269,8 @@ export default function ProfileSettings() {
               {isPasskeySession && (
                 <Alert className="mt-3 border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950">
                   <AlertDescription className="text-amber-800 dark:text-amber-200 text-xs">
-                    Phone verification is not available when logged in with a
-                    passkey. To add or update your phone number, please log out
-                    and sign in with email instead.
+                    Phone verification is not available when logged in with a passkey. To add or
+                    update your phone number, please log out and sign in with email instead.
                   </AlertDescription>
                 </Alert>
               )}
@@ -302,6 +281,7 @@ export default function ProfileSettings() {
                     className="h-3.5 w-3.5"
                     fill="currentColor"
                     viewBox="0 0 20 20"
+                    aria-hidden="true"
                   >
                     <path
                       fillRule="evenodd"
@@ -319,6 +299,7 @@ export default function ProfileSettings() {
                       className="h-3.5 w-3.5"
                       fill="currentColor"
                       viewBox="0 0 20 20"
+                      aria-hidden="true"
                     >
                       <path
                         fillRule="evenodd"
@@ -334,9 +315,7 @@ export default function ProfileSettings() {
                     disabled={sendPhoneOtpMutation.isPending}
                     className="mt-2 h-10"
                   >
-                    {sendPhoneOtpMutation.isPending
-                      ? "Sending..."
-                      : "Send verification code"}
+                    {sendPhoneOtpMutation.isPending ? 'Sending...' : 'Send verification code'}
                   </Button>
                 </>
               )}
@@ -359,8 +338,8 @@ export default function ProfileSettings() {
           <DialogHeader>
             <DialogTitle>Verify your phone number</DialogTitle>
             <DialogDescription>
-              We sent a 6-digit verification code to {pendingPhone}. Enter it
-              below to verify your phone.
+              We sent a 6-digit verification code to {pendingPhone}. Enter it below to verify your
+              phone.
             </DialogDescription>
           </DialogHeader>
 
@@ -378,7 +357,7 @@ export default function ProfileSettings() {
                 maxLength={6}
                 value={otpCode}
                 onChange={(e) => {
-                  setOtpCode(e.target.value.replace(/\D/g, ""))
+                  setOtpCode(e.target.value.replace(/\D/g, ''))
                 }}
                 placeholder="123456"
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm text-center text-2xl tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-ring"
@@ -389,9 +368,7 @@ export default function ProfileSettings() {
               <Button
                 type="button"
                 onClick={handleVerifyOtp}
-                disabled={
-                  verifyPhoneOtpMutation.isPending || otpCode.length !== 6
-                }
+                disabled={verifyPhoneOtpMutation.isPending || otpCode.length !== 6}
                 className="flex-1"
               >
                 {verifyPhoneOtpMutation.isPending ? (
@@ -400,7 +377,7 @@ export default function ProfileSettings() {
                     Verifying...
                   </>
                 ) : (
-                  "Verify"
+                  'Verify'
                 )}
               </Button>
               <Button

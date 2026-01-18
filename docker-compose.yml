@@ -1,0 +1,85 @@
+# Docker Compose for Local Development
+# Run: docker compose up -d
+#
+# Services:
+#   - PostgreSQL: Database (port 5432)
+#   - LocalStack: AWS services mock - S3, EventBridge (port 4566)
+#   - Mailpit: SMTP mock for email testing (SMTP: 1025, Web UI: 8025)
+#
+# Access Points:
+#   - LocalStack: http://localhost:4566
+#   - Mailpit UI: http://localhost:8025
+
+name: tango-saas
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tango-saas-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tango
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: tango-saas-localstack
+    ports:
+      - "4566:4566"  # LocalStack Gateway (all AWS services)
+    environment:
+      SERVICES: s3,events  # S3 and EventBridge
+      DEBUG: 0
+      PERSISTENCE: 1
+    volumes:
+      - localstack_data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Init container to create S3 bucket and EventBridge event bus
+  localstack-init:
+    image: amazon/aws-cli:latest
+    container_name: tango-saas-localstack-init
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Creating S3 bucket...';
+      aws --endpoint-url=http://localstack:4566 s3 mb s3://tango-media || true;
+      echo 'Creating EventBridge event bus...';
+      aws --endpoint-url=http://localstack:4566 events create-event-bus --name tango-events || true;
+      echo 'LocalStack initialization complete';
+      "
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: tango-saas-mailpit
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    volumes:
+      - mailpit_data:/data
+
+volumes:
+  postgres_data:
+  localstack_data:
+  mailpit_data:

@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query"
+import { useQuery } from '@tanstack/react-query'
 
-import { useApi } from "../../../hooks/useApi"
-import type { MeResponse } from "../../../lib/api"
-import { queryKeys } from "../../shared/query-keys"
+import { useApi } from '../../../hooks/useApi'
+import type { MeResponse } from '../../../lib/api'
+import { queryKeys } from '../../shared/query-keys'
 
 /**
  * Query hook for fetching the current authenticated user.
@@ -11,10 +11,10 @@ import { queryKeys } from "../../shared/query-keys"
  * Automatically caches and deduplicates requests.
  */
 export function useCurrentUser() {
-    const { getCurrentUser } = useApi()
+  const { getCurrentUser } = useApi()
 
-    return useQuery<MeResponse>({
-        queryKey: queryKeys.auth.me(),
-        queryFn: getCurrentUser,
-    })
+  return useQuery<MeResponse>({
+    queryKey: queryKeys.auth.me(),
+    queryFn: getCurrentUser,
+  })
 }

@@ -17,7 +17,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 import psycopg2
-
 from generated_schema import AUDIT_EVENT_TYPES, FIELDS, INSERT_SQL
 
 logger = logging.getLogger()

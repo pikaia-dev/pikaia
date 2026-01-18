@@ -3,9 +3,9 @@
  * Initializes Stripe.js and provides context for payment forms.
  */
 
-import { loadStripe, type Stripe } from "@stripe/stripe-js"
+import { loadStripe, type Stripe } from '@stripe/stripe-js'
 
-import { config } from "./env"
+import { config } from './env'
 
 let stripePromise: Promise<Stripe | null> | null = null
 
@@ -15,7 +15,7 @@ let stripePromise: Promise<Stripe | null> | null = null
  */
 export function getStripe(): Promise<Stripe | null> {
   if (!config.stripePublishableKey) {
-    console.warn("VITE_STRIPE_PUBLISHABLE_KEY not configured")
+    console.warn('VITE_STRIPE_PUBLISHABLE_KEY not configured')
     return Promise.resolve(null)
   }
 

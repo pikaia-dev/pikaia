@@ -1,28 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from "react"
-import { toast } from "sonner"
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
-import { AddressAutocomplete } from "../../components/ui/address-autocomplete"
-import { Button } from "../../components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card"
-import { Checkbox } from "../../components/ui/checkbox"
-import { CountryCombobox } from "../../components/ui/country-combobox"
-import { LoadingSpinner } from "../../components/ui/loading-spinner"
-import {
-  InvoiceHistoryCard,
-  SubscriptionCard,
-} from "../../features/billing/components"
-import { useInvoices, useSubscription } from "../../features/billing/queries"
-import {
-  useOrganization,
-  useUpdateBilling,
-} from "../../features/organization/queries"
-import type { BillingAddress, Invoice } from "../../lib/api"
+import { AddressAutocomplete } from '../../components/ui/address-autocomplete'
+import { Button } from '../../components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
+import { Checkbox } from '../../components/ui/checkbox'
+import { CountryCombobox } from '../../components/ui/country-combobox'
+import { LoadingSpinner } from '../../components/ui/loading-spinner'
+import { InvoiceHistoryCard, SubscriptionCard } from '../../features/billing/components'
+import { useInvoices, useSubscription } from '../../features/billing/queries'
+import { useOrganization, useUpdateBilling } from '../../features/organization/queries'
+import type { BillingAddress, Invoice } from '../../lib/api'
 import {
   DEFAULT_COUNTRY,
   getPostalCodeLabel,
@@ -30,8 +18,8 @@ import {
   getVatPrefix,
   shouldShowTaxId,
   updateVatIdForCountryChange,
-} from "../../lib/countries"
-import type { ParsedAddress } from "../../lib/google-places"
+} from '../../lib/countries'
+import type { ParsedAddress } from '../../lib/google-places'
 
 export default function BillingSettings() {
   const billingEmailRef = useRef<HTMLInputElement>(null)
@@ -61,21 +49,18 @@ export default function BillingSettings() {
   const [loadingMoreInvoices, setLoadingMoreInvoices] = useState(false)
 
   // Derived values from server data or edited values
-  const currentUseBillingEmail =
-    useBillingEmail ?? organization?.billing.use_billing_email ?? false
-  const currentBillingEmail =
-    billingEmail ?? organization?.billing.billing_email ?? ""
-  const currentBillingName =
-    billingName ?? organization?.billing.billing_name ?? ""
+  const currentUseBillingEmail = useBillingEmail ?? organization?.billing.use_billing_email ?? false
+  const currentBillingEmail = billingEmail ?? organization?.billing.billing_email ?? ''
+  const currentBillingName = billingName ?? organization?.billing.billing_name ?? ''
   const currentAddress = address ?? {
-    line1: organization?.billing.address.line1 ?? "",
-    line2: organization?.billing.address.line2 ?? "",
-    city: organization?.billing.address.city ?? "",
-    state: organization?.billing.address.state ?? "",
-    postal_code: organization?.billing.address.postal_code ?? "",
+    line1: organization?.billing.address.line1 ?? '',
+    line2: organization?.billing.address.line2 ?? '',
+    city: organization?.billing.address.city ?? '',
+    state: organization?.billing.address.state ?? '',
+    postal_code: organization?.billing.address.postal_code ?? '',
     country: organization?.billing.address.country || DEFAULT_COUNTRY,
   }
-  const currentVatId = vatId ?? organization?.billing.vat_id ?? ""
+  const currentVatId = vatId ?? organization?.billing.vat_id ?? ''
 
   // Update invoices pagination state when data changes
   useEffect(() => {
@@ -85,10 +70,7 @@ export default function BillingSettings() {
   }, [invoicesData])
 
   // Combine base invoices with additional loaded invoices
-  const allInvoices = [
-    ...(invoicesData?.invoices ?? []),
-    ...additionalInvoices,
-  ]
+  const allInvoices = [...(invoicesData?.invoices ?? []), ...additionalInvoices]
 
   // Focus billing email input when checkbox is enabled
   useEffect(() => {
@@ -102,7 +84,7 @@ export default function BillingSettings() {
     setLoadingMoreInvoices(true)
     try {
       const lastInvoice = allInvoices[allInvoices.length - 1]
-      const session = localStorage.getItem("stytch_session_jwt") ?? ""
+      const session = localStorage.getItem('stytch_session_jwt') ?? ''
       const response = await fetch(
         `/api/v1/billing/invoices?limit=6&starting_after=${lastInvoice.id}`,
         {
@@ -111,7 +93,7 @@ export default function BillingSettings() {
           },
         }
       )
-      if (!response.ok) throw new Error("Failed to load more invoices")
+      if (!response.ok) throw new Error('Failed to load more invoices')
       const data = (await response.json()) as {
         invoices: Invoice[]
         has_more: boolean
@@ -119,7 +101,7 @@ export default function BillingSettings() {
       setAdditionalInvoices((prev) => [...prev, ...data.invoices])
       setInvoicesHasMore(data.has_more)
     } catch {
-      toast.error("Failed to load more invoices")
+      toast.error('Failed to load more invoices')
     } finally {
       setLoadingMoreInvoices(false)
     }
@@ -136,7 +118,7 @@ export default function BillingSettings() {
         address: currentAddress,
         vat_id: currentVatId,
       })
-      toast.success("Invoice delivery settings saved")
+      toast.success('Invoice delivery settings saved')
       // Reset edit state
       setUseBillingEmail(null)
       setBillingEmail(null)
@@ -158,7 +140,7 @@ export default function BillingSettings() {
         address: currentAddress,
         vat_id: currentVatId,
       })
-      toast.success("Billing address saved")
+      toast.success('Billing address saved')
       // Reset edit state
       setBillingName(null)
       setAddress(null)
@@ -178,13 +160,9 @@ export default function BillingSettings() {
     }))
 
     // When country changes, update VAT prefix if EU country
-    if (field === "country") {
+    if (field === 'country') {
       setVatId((currentVat) =>
-        updateVatIdForCountryChange(
-          currentVat ?? currentVatId,
-          previousCountry,
-          value
-        )
+        updateVatIdForCountryChange(currentVat ?? currentVatId, previousCountry, value)
       )
     }
   }
@@ -196,7 +174,7 @@ export default function BillingSettings() {
       // Update address fields from parsed Google Places result
       setAddress({
         line1: parsed.street_address || parsed.formatted_address,
-        line2: "", // User can fill manually if needed
+        line2: '', // User can fill manually if needed
         city: parsed.city,
         state: parsed.state,
         postal_code: parsed.postal_code,
@@ -206,11 +184,7 @@ export default function BillingSettings() {
       // Trigger VAT prefix update for the new country
       const countryCode = parsed.country_code.toUpperCase()
       setVatId((currentVat) =>
-        updateVatIdForCountryChange(
-          currentVat ?? currentVatId,
-          previousCountry,
-          countryCode
-        )
+        updateVatIdForCountryChange(currentVat ?? currentVatId, previousCountry, countryCode)
       )
     },
     [currentAddress.country, currentVatId]
@@ -229,16 +203,14 @@ export default function BillingSettings() {
     )
   }
 
-  const isSubscribed = subscription && subscription.status !== "none"
+  const isSubscribed = subscription && subscription.status !== 'none'
   const memberCount = subscription?.quantity || 1
 
   return (
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">Billing</h1>
-        <p className="text-muted-foreground">
-          Manage billing information for invoices
-        </p>
+        <p className="text-muted-foreground">Manage billing information for invoices</p>
       </div>
 
       <div className="space-y-6 max-w-2xl">
@@ -249,9 +221,7 @@ export default function BillingSettings() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Invoice Delivery</CardTitle>
-            <CardDescription>
-              Choose where to receive your invoices
-            </CardDescription>
+            <CardDescription>Choose where to receive your invoices</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleDeliverySubmit} className="space-y-4">
@@ -272,7 +242,7 @@ export default function BillingSettings() {
                           address: currentAddress,
                           vat_id: currentVatId,
                         })
-                        toast.success("Invoice delivery settings saved")
+                        toast.success('Invoice delivery settings saved')
                         setUseBillingEmail(null)
                         setBillingEmail(null)
                       } catch {
@@ -301,10 +271,7 @@ export default function BillingSettings() {
               {currentUseBillingEmail && (
                 <>
                   <div className="pl-7">
-                    <label
-                      htmlFor="billingEmail"
-                      className="block text-sm font-medium mb-1"
-                    >
+                    <label htmlFor="billingEmail" className="block text-sm font-medium mb-1">
                       Billing email
                     </label>
                     <input
@@ -322,7 +289,7 @@ export default function BillingSettings() {
                   </div>
                   <div className="pl-7">
                     <Button type="submit" disabled={savingDelivery}>
-                      {savingDelivery ? "Saving..." : "Save"}
+                      {savingDelivery ? 'Saving...' : 'Save'}
                     </Button>
                   </div>
                 </>
@@ -336,16 +303,11 @@ export default function BillingSettings() {
           <form onSubmit={handleAddressSubmit}>
             <CardHeader>
               <CardTitle className="text-base">Billing Address</CardTitle>
-              <CardDescription>
-                This information will appear on your invoices
-              </CardDescription>
+              <CardDescription>This information will appear on your invoices</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label
-                  htmlFor="billingName"
-                  className="block text-sm font-medium mb-1"
-                >
+                <label htmlFor="billingName" className="block text-sm font-medium mb-1">
                   Legal / company name
                 </label>
                 <input
@@ -362,17 +324,14 @@ export default function BillingSettings() {
 
               {/* Street Address with autocomplete */}
               <div>
-                <label
-                  htmlFor="line1"
-                  className="block text-sm font-medium mb-1"
-                >
+                <label htmlFor="line1" className="block text-sm font-medium mb-1">
                   Street Address
                 </label>
                 <AddressAutocomplete
                   id="line1"
                   value={currentAddress.line1}
                   onChange={(value) => {
-                    updateAddress("line1", value)
+                    updateAddress('line1', value)
                   }}
                   onAddressSelect={handleAddressSelect}
                   placeholder="Start typing to search..."
@@ -384,10 +343,7 @@ export default function BillingSettings() {
 
               {/* Address Line 2 */}
               <div>
-                <label
-                  htmlFor="line2"
-                  className="block text-sm font-medium mb-1"
-                >
+                <label htmlFor="line2" className="block text-sm font-medium mb-1">
                   Address Line 2
                 </label>
                 <input
@@ -395,7 +351,7 @@ export default function BillingSettings() {
                   type="text"
                   value={currentAddress.line2}
                   onChange={(e) => {
-                    updateAddress("line2", e.target.value)
+                    updateAddress('line2', e.target.value)
                   }}
                   className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   placeholder="Apt, Suite, Floor (optional)"
@@ -404,10 +360,7 @@ export default function BillingSettings() {
 
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
-                  <label
-                    htmlFor="city"
-                    className="block text-sm font-medium mb-1"
-                  >
+                  <label htmlFor="city" className="block text-sm font-medium mb-1">
                     City
                   </label>
                   <input
@@ -415,17 +368,14 @@ export default function BillingSettings() {
                     type="text"
                     value={currentAddress.city}
                     onChange={(e) => {
-                      updateAddress("city", e.target.value)
+                      updateAddress('city', e.target.value)
                     }}
                     className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
 
                 <div>
-                  <label
-                    htmlFor="state"
-                    className="block text-sm font-medium mb-1"
-                  >
+                  <label htmlFor="state" className="block text-sm font-medium mb-1">
                     {getStateLabel(currentAddress.country)}
                   </label>
                   <input
@@ -433,17 +383,14 @@ export default function BillingSettings() {
                     type="text"
                     value={currentAddress.state}
                     onChange={(e) => {
-                      updateAddress("state", e.target.value)
+                      updateAddress('state', e.target.value)
                     }}
                     className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
 
                 <div>
-                  <label
-                    htmlFor="postalCode"
-                    className="block text-sm font-medium mb-1"
-                  >
+                  <label htmlFor="postalCode" className="block text-sm font-medium mb-1">
                     {getPostalCodeLabel(currentAddress.country)}
                   </label>
                   <input
@@ -451,7 +398,7 @@ export default function BillingSettings() {
                     type="text"
                     value={currentAddress.postal_code}
                     onChange={(e) => {
-                      updateAddress("postal_code", e.target.value)
+                      updateAddress('postal_code', e.target.value)
                     }}
                     className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
@@ -460,16 +407,13 @@ export default function BillingSettings() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label
-                    htmlFor="country"
-                    className="block text-sm font-medium mb-1"
-                  >
+                  <label htmlFor="country" className="block text-sm font-medium mb-1">
                     Country
                   </label>
                   <CountryCombobox
                     value={currentAddress.country}
                     onValueChange={(value) => {
-                      updateAddress("country", value)
+                      updateAddress('country', value)
                     }}
                     placeholder="Select country..."
                   />
@@ -477,10 +421,7 @@ export default function BillingSettings() {
 
                 {shouldShowTaxId(currentAddress.country) && (
                   <div>
-                    <label
-                      htmlFor="vatId"
-                      className="block text-sm font-medium mb-1"
-                    >
+                    <label htmlFor="vatId" className="block text-sm font-medium mb-1">
                       VAT ID
                     </label>
                     {currentVatPrefix ? (
@@ -516,16 +457,14 @@ export default function BillingSettings() {
                       />
                     )}
                     <p className="text-xs text-muted-foreground mt-1">
-                      {currentVatPrefix
-                        ? "EU VAT number for tax exemption"
-                        : "VAT ID (optional)"}
+                      {currentVatPrefix ? 'EU VAT number for tax exemption' : 'VAT ID (optional)'}
                     </p>
                   </div>
                 )}
               </div>
 
               <Button type="submit" disabled={savingAddress}>
-                {savingAddress ? "Saving..." : "Save billing info"}
+                {savingAddress ? 'Saving...' : 'Save billing info'}
               </Button>
             </CardContent>
           </form>

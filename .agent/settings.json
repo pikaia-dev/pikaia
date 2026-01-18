@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(.env.example)",
+      "Read(.env.*.example)",
+      "Bash(uv run pytest*)",
+      "Bash(pnpm test*)",
+      "Bash(pnpm lint*)",
+      "Bash(uv run ruff*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(git checkout*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git stash*)"
+    ]
+  }
+}
