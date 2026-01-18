@@ -27,12 +27,8 @@ def create_test_image_bytes(width: int = 100, height: int = 100) -> bytes:
 
 
 @pytest.fixture
-def request_factory() -> RequestFactory:
-    return RequestFactory()
-
-
-@pytest.fixture
 def storage_service() -> StorageService:
+    """Storage service for media uploads (module-specific)."""
     return StorageService()
 
 

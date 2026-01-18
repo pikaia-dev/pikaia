@@ -93,13 +93,24 @@ jobs:
         with:
           version: "0.5.x"
 
+      - name: Validate audit schema
+        if: needs.changes.outputs.infra == 'true'
+        working-directory: backend
+        run: |
+          uv sync
+          uv run python manage.py generate_audit_schema --check
+
       - name: Install CDK and deploy infrastructure
         if: needs.changes.outputs.infra == 'true'
         working-directory: infra
         run: |
           npm install -g aws-cdk
           uv sync
-          uv run cdk deploy TangoMedia TangoApp --require-approval never
+          # Deploy TangoApp exclusively first to handle cross-stack export changes
+          # (prevents "Cannot delete export" errors when moving resources between stacks)
+          uv run cdk deploy TangoApp --exclusively --require-approval never
+          # Then deploy all stacks including TangoNetwork
+          uv run cdk deploy TangoNetwork TangoMedia TangoApp TangoEvents TangoObservability --require-approval never
 
       # Update ECS task definition when backend changes but not infra
       # (CDK deploy already handles this when infra changes)

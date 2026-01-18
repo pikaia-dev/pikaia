@@ -2,7 +2,7 @@
 Core middleware.
 """
 
-import logging
+import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
@@ -10,13 +10,30 @@ from uuid import UUID, uuid4
 from django.http import HttpRequest, HttpResponse
 from stytch.core.response_base import StytchError
 
+from apps.core.logging import bind_contextvars, clear_contextvars, get_logger
 from apps.events.services import set_correlation_id
 
 if TYPE_CHECKING:
     from apps.accounts.models import Member, User
     from apps.organizations.models import Organization
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+
+# Truncate user-agent to avoid bloating event payloads
+MAX_USER_AGENT_LENGTH = 512
+
+
+def get_client_ip(request: HttpRequest) -> str | None:
+    """
+    Extract client IP from X-Forwarded-For or REMOTE_ADDR.
+
+    Handles the case where X-Forwarded-For contains multiple IPs
+    (from proxy chain) by taking the first (original client).
+    """
+    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR")
 
 
 class CorrelationIdMiddleware:
@@ -25,7 +42,13 @@ class CorrelationIdMiddleware:
 
     If X-Correlation-ID header is present, uses that value.
     Otherwise generates a new UUID4.
-    Stores in context for event publishing and logging.
+
+    Binds structured logging context with Datadog-compatible field names:
+    - trace_id: Correlation ID for distributed tracing
+    - http.method: Request method
+    - http.url_details.path: Request path
+    - http.status_code: Response status code (added on response)
+    - duration_ms: Request duration in milliseconds (added on response)
     """
 
     HEADER_NAME = "X-Correlation-ID"
@@ -51,15 +74,43 @@ class CorrelationIdMiddleware:
         # Set in event services context
         set_correlation_id(correlation_id)
 
-        response = self.get_response(request)
+        # Extract request context for audit logging
+        client_ip = get_client_ip(request)
+        user_agent = request.META.get("HTTP_USER_AGENT", "")[:MAX_USER_AGENT_LENGTH]
 
-        # Add to response headers
-        response[self.HEADER_NAME] = str(correlation_id)
+        # Clear any stale context and bind request metadata for structured logging
+        clear_contextvars()
+        bind_contextvars(
+            correlation_id=str(correlation_id),
+            **{
+                "http.method": request.method,
+                "http.url_details.path": request.path,
+                "request.ip_address": client_ip,
+                "request.user_agent": user_agent,
+            },
+        )
 
-        # Clear context after request
-        set_correlation_id(None)
+        start_time = time.monotonic()
 
-        return response
+        try:
+            response = self.get_response(request)
+
+            # Bind response metadata
+            duration_ms = (time.monotonic() - start_time) * 1000
+            bind_contextvars(
+                duration_ms=round(duration_ms, 2),
+                **{"http.status_code": response.status_code},
+            )
+
+            # Add correlation ID to response headers for client debugging
+            response[self.HEADER_NAME] = str(correlation_id)
+            response["X-Request-ID"] = str(correlation_id)  # Alias for compatibility
+
+            return response
+        finally:
+            # Clear context to prevent leakage between requests (especially in async workers)
+            set_correlation_id(None)
+            clear_contextvars()
 
 
 class StytchAuthMiddleware:
@@ -69,6 +120,15 @@ class StytchAuthMiddleware:
     Sets request.auth_user, request.auth_member, and request.auth_organization
     for authenticated requests. Allows unauthenticated requests to pass through
     (authorization enforced at endpoint level).
+
+    Also sets request.auth_failed to distinguish between:
+    - No auth attempted (auth_failed=False, auth_user=None)
+    - Auth attempted but failed (auth_failed=True, auth_user=None)
+
+    After successful authentication, binds user/org context to structured logging:
+    - usr.id: User identifier
+    - usr.email: User email
+    - organization.id: Organization Stytch ID
     """
 
     # Paths that don't require authentication
@@ -90,6 +150,7 @@ class StytchAuthMiddleware:
         request.auth_user: User | None = None  # type: ignore[attr-defined]
         request.auth_member: Member | None = None  # type: ignore[attr-defined]
         request.auth_organization: Organization | None = None  # type: ignore[attr-defined]
+        request.auth_failed: bool = False  # type: ignore[attr-defined]
 
         # Skip auth for public paths
         if self._is_public_path(request.path):
@@ -175,11 +236,24 @@ class StytchAuthMiddleware:
                 request.auth_member = member  # type: ignore[attr-defined]
                 request.auth_organization = org  # type: ignore[attr-defined]
 
+            # Bind user/org context to structured logging (Datadog-compatible field names)
+            bind_contextvars(
+                **{
+                    "usr.id": str(member.user.id),
+                    "usr.email": member.user.email,
+                    "organization.id": member.organization.stytch_org_id if member.organization else None,
+                }
+            )
+
         except StytchError as e:
-            # Invalid/expired JWT - request continues unauthenticated
-            logger.debug("JWT authentication failed: %s", e.details.error_message)
-        except Exception as e:
+            # Invalid/expired JWT - mark as failed so endpoints can distinguish
+            # "no auth attempted" from "auth attempted but failed"
+            request.auth_failed = True  # type: ignore[attr-defined]
+            logger.debug("jwt_auth_failed", error_message=e.details.error_message)
+        except Exception:
             # Catch any other exception (network errors, timeouts, etc.)
-            logger.exception("Unexpected error during JWT authentication: %s", e)
+            # Also mark as failed - potential security issue
+            request.auth_failed = True  # type: ignore[attr-defined]
+            logger.exception("jwt_auth_unexpected_error")
 
 

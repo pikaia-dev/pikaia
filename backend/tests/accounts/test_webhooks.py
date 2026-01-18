@@ -8,7 +8,6 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
-from django.test import RequestFactory
 
 from apps.accounts.webhooks import (
     handle_member_created,
@@ -20,12 +19,6 @@ from apps.accounts.webhooks import (
 )
 
 from .factories import MemberFactory, OrganizationFactory, UserFactory
-
-
-@pytest.fixture
-def request_factory() -> RequestFactory:
-    """Django request factory for unit testing views."""
-    return RequestFactory()
 
 
 @pytest.mark.django_db

@@ -190,3 +190,94 @@ class TestCorrelationId:
 
         set_correlation_id(None)
         assert get_correlation_id() is None
+
+
+@pytest.mark.django_db
+class TestPublishEventRequestContext:
+    """Tests for request context enrichment in publish_event."""
+
+    def test_publish_event_includes_request_context_from_structlog(self):
+        """Test that publish_event enriches data with IP and user-agent from contextvars."""
+        import structlog
+
+        org = OrganizationFactory()
+        user = UserFactory()
+
+        # Simulate middleware binding request context
+        structlog.contextvars.bind_contextvars(
+            **{
+                "request.ip_address": "203.0.113.50",
+                "request.user_agent": "TestBrowser/1.0",
+            }
+        )
+
+        try:
+            event = publish_event(
+                event_type="organization.updated",
+                aggregate=org,
+                data={"name": "Test Org"},
+                actor=user,
+            )
+
+            # Request context should be in the event data
+            assert event.payload["data"]["ip_address"] == "203.0.113.50"
+            assert event.payload["data"]["user_agent"] == "TestBrowser/1.0"
+            # Original data should still be present
+            assert event.payload["data"]["name"] == "Test Org"
+        finally:
+            structlog.contextvars.unbind_contextvars("request.ip_address", "request.user_agent")
+
+    def test_publish_event_handles_missing_request_context(self):
+        """Test that publish_event handles missing request context gracefully."""
+        import structlog
+
+        org = OrganizationFactory()
+
+        # Ensure no request context is bound
+        structlog.contextvars.clear_contextvars()
+
+        event = publish_event(
+            event_type="organization.created",
+            aggregate=org,
+            data={"name": "New Org"},
+        )
+
+        # Should have None/empty values for request context
+        assert event.payload["data"]["ip_address"] is None
+        assert event.payload["data"]["user_agent"] == ""
+        # Original data should still be present
+        assert event.payload["data"]["name"] == "New Org"
+
+    def test_explicit_data_takes_precedence_over_context(self):
+        """Test that explicit data takes precedence over auto-enriched context."""
+        import structlog
+
+        org = OrganizationFactory()
+
+        # Bind context with middleware IP
+        structlog.contextvars.bind_contextvars(
+            **{
+                "request.ip_address": "10.0.0.1",
+                "request.user_agent": "ContextAgent/1.0",
+            }
+        )
+
+        try:
+            # Caller explicitly provides ip_address - should take precedence
+            event = publish_event(
+                event_type="organization.updated",
+                aggregate=org,
+                data={
+                    "name": "Test",
+                    "ip_address": "192.168.1.100",  # Explicit IP should win
+                },
+            )
+
+            # Explicit IP should take precedence over context
+            assert event.payload["data"]["ip_address"] == "192.168.1.100"
+            # Context user_agent should still be added (no conflict)
+            assert event.payload["data"]["user_agent"] == "ContextAgent/1.0"
+            # Other data should be preserved
+            assert event.payload["data"]["name"] == "Test"
+        finally:
+            structlog.contextvars.unbind_contextvars("request.ip_address", "request.user_agent")

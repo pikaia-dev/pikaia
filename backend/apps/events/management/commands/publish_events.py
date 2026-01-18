@@ -5,7 +5,6 @@ Polls the outbox table and publishes pending events to the configured backend.
 Uses SELECT FOR UPDATE SKIP LOCKED for safe concurrent execution.
 """
 
-import logging
 import random
 import signal
 import time
@@ -14,11 +13,13 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from apps.events.backends import get_backend
-from apps.events.models import OutboxEvent
+from apps.core.logging import get_logger
+from apps.events.backends import LocalBackend, get_backend
+from apps.events.management.commands.generate_audit_schema import AUDIT_EVENT_TYPES
+from apps.events.models import AuditLog, OutboxEvent
 from apps.events.schemas import EventEnvelope
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class Command(BaseCommand):
@@ -63,9 +64,9 @@ class Command(BaseCommand):
 
         backend = get_backend()
         logger.info(
-            "Starting event publisher (backend=%s, batch_size=%d)",
-            backend.__class__.__name__,
-            batch_size,
+            "event_publisher_started",
+            backend=backend.__class__.__name__,
+            batch_size=batch_size,
         )
 
         while not self._shutdown_requested:
@@ -73,12 +74,12 @@ class Command(BaseCommand):
                 published_count = self._publish_batch(backend, batch_size, max_attempts)
 
                 if published_count > 0:
-                    logger.info("Published %d events", published_count)
+                    logger.info("events_published", count=published_count)
                     # Continue immediately if we published events
                     continue
 
-            except Exception as e:
-                logger.exception("Error in publish loop: %s", e)
+            except Exception:
+                logger.exception("event_publisher_error")
 
             if once:
                 break
@@ -86,7 +87,7 @@ class Command(BaseCommand):
             # No events or error - wait before next poll
             self._sleep_with_jitter(poll_interval)
 
-        logger.info("Event publisher shutting down")
+        logger.info("event_publisher_shutdown")
 
     def _publish_batch(self, backend, batch_size: int, max_attempts: int) -> int:
         """
@@ -120,7 +121,7 @@ class Command(BaseCommand):
                 envelope = EventEnvelope(**event.payload)
                 envelopes.append(envelope)
             except Exception as e:
-                logger.error("Failed to parse event %s payload: %s", event.event_id, e)
+                logger.error("event_payload_parse_failed", event_id=str(event.event_id), error=str(e))
                 event.mark_failed(f"Payload parse error: {e}", max_attempts)
                 continue
 
@@ -132,18 +133,56 @@ class Command(BaseCommand):
 
         # Process results
         published_count = 0
+        is_local_backend = isinstance(backend, LocalBackend)
+
         for event, result in zip(events, results, strict=True):
             if result.get("status") == "success":
                 event.status = OutboxEvent.Status.PUBLISHED
                 event.published_at = timezone.now()
                 event.save(update_fields=["status", "published_at"])
                 published_count += 1
+
+                # Local dev fallback: create audit logs directly for LocalBackend
+                if is_local_backend and event.event_type in AUDIT_EVENT_TYPES:
+                    self._create_local_audit_log(event)
             else:
                 error = result.get("error", "Unknown error")
                 event.mark_failed(error, max_attempts)
-                logger.warning("Failed to publish event %s: %s", event.event_id, error)
+                logger.warning("event_publish_failed", event_id=str(event.event_id), error=error)
 
         return published_count
+
+    def _create_local_audit_log(self, event: OutboxEvent) -> None:
+        """
+        Create audit log entry for local development.
+
+        In production, the Lambda consumer creates audit logs from EventBridge events.
+        This fallback ensures local development still gets audit logs.
+        """
+        payload = event.payload
+        data = dict(payload.get("data", {}))
+        actor = payload.get("actor", {})
+
+        # Extract request context from data
+        ip_address = data.pop("ip_address", None)
+        user_agent = data.pop("user_agent", "")
+
+        # Use get_or_create for idempotency (event_id is unique)
+        AuditLog.objects.get_or_create(
+            event_id=event.event_id,
+            defaults={
+                "action": event.event_type,
+                "aggregate_type": event.aggregate_type,
+                "aggregate_id": event.aggregate_id,
+                "organization_id": event.organization_id,
+                "actor_id": actor.get("id") or "system",
+                "actor_email": actor.get("email") or "",
+                "correlation_id": payload.get("correlation_id"),
+                "ip_address": ip_address,
+                "user_agent": user_agent,
+                "diff": data,
+            },
+        )
 
     def _sleep_with_jitter(self, base_seconds: float) -> None:
         """Sleep with random jitter to avoid thundering herd."""
@@ -156,5 +195,5 @@ class Command(BaseCommand):
             signal.signal(sig, self._handle_signal)
 
     def _handle_signal(self, signum, frame) -> None:
-        logger.info("Received signal %s, requesting shutdown", signum)
+        logger.info("event_publisher_signal_received", signal=signum)
         self._shutdown_requested = True

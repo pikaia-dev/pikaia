@@ -9,27 +9,26 @@ Missing secrets will cause the application to crash immediately with a clear err
 rather than failing silently at runtime.
 """
 
-import logging
+# =============================================================================
+# Structured Logging Configuration
+# =============================================================================
+# Configure structlog for JSON output in production.
+# This enables easy querying in CloudWatch Logs Insights, Datadog, and Elastic.
+from apps.core.logging import configure_logging
 
 from .base import *  # noqa: F403
 from .base import parse_comma_list, settings
 
-# =============================================================================
-# Logging Configuration - Output errors to stdout for CloudWatch
-# =============================================================================
+configure_logging(json_format=True, log_level="INFO")
+
+# Django's LOGGING config - minimal since structlog handles most logging.
+# This ensures Django's internal loggers (request errors, etc.) still work.
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "formatters": {
-        "verbose": {
-            "format": "{levelname} {asctime} {module} {message}",
-            "style": "{",
-        },
-    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "formatter": "verbose",
         },
     },
     "root": {
@@ -116,6 +115,12 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_CLOUDFRONT_FORWARDED_PROTO", "https")
 
+# Additional security headers (OWASP recommendations)
+SECURE_CONTENT_TYPE_NOSNIFF = True  # Prevent MIME-type sniffing
+X_FRAME_OPTIONS = "DENY"  # Clickjacking protection (explicit, don't rely on default)
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"  # Control referrer leakage
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"  # Isolate browsing context
+
 # Use the original host header from CloudFront, not the ALB's internal hostname
 # This ensures redirects go to b2b.demo.tango.agency, not the ALB DNS name
 USE_X_FORWARDED_HOST = True
@@ -124,6 +129,19 @@ USE_X_FORWARDED_HOST = True
 CORS_ALLOWED_ORIGINS = parse_comma_list(settings.CORS_ALLOWED_ORIGINS or "")
 
 if not CORS_ALLOWED_ORIGINS:
-    logging.getLogger(__name__).warning(
-        "CORS_ALLOWED_ORIGINS is empty. Frontend API calls may be blocked."
-    )
+    from apps.core.logging import get_logger
+
+    get_logger(__name__).warning("cors_allowed_origins_empty")
+
+# Validate S3 storage configuration
+if settings.USE_S3_STORAGE:
+    _required_s3_settings = {
+        "AWS_STORAGE_BUCKET_NAME": settings.AWS_STORAGE_BUCKET_NAME,
+        "IMAGE_TRANSFORM_URL": settings.IMAGE_TRANSFORM_URL,
+    }
+    missing_s3 = [k for k, v in _required_s3_settings.items() if not v]
+    if missing_s3:
+        raise ValueError(
+            "Production configuration error!\n"
+            f"  - USE_S3_STORAGE is enabled but missing: {', '.join(missing_s3)}"
+        )
