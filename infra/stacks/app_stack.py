@@ -47,7 +47,6 @@ class AppStack(Stack):
         construct_id: str,
         *,
         vpc: ec2.IVpc,
-        database_security_group: ec2.ISecurityGroup,
         media_bucket: s3.IBucket | None = None,
         media_cdn_domain: str | None = None,
         certificate_arn: str | None = None,
@@ -64,8 +63,15 @@ class AppStack(Stack):
         # Database
         # =================================================================
 
-        # Security group from NetworkStack (avoids cyclic dependencies)
-        self.database_security_group = database_security_group
+        # Database security group - created here to avoid cyclic dependencies
+        # between stacks. Shared with EventsStack via parameter.
+        self.database_security_group = ec2.SecurityGroup(
+            self,
+            "DatabaseSG",
+            vpc=vpc,
+            description="Security group for Aurora PostgreSQL",
+            allow_all_outbound=False,
+        )
 
         # Aurora Serverless v2 cluster
         self.database = rds.DatabaseCluster(

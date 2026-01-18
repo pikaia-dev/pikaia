@@ -33,12 +33,3 @@ class NetworkStack(Stack):
             ],
         )
 
-        # Database security group (shared by AppStack and EventsStack)
-        # Created here to avoid cyclic dependencies between stacks
-        self.database_security_group = ec2.SecurityGroup(
-            self,
-            "DatabaseSG",
-            vpc=self.vpc,
-            description="Security group for Aurora PostgreSQL",
-            allow_all_outbound=False,
-        )
