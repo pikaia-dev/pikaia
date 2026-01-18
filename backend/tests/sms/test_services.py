@@ -3,7 +3,7 @@ Tests for SMS/OTP services.
 """
 
 from datetime import timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from django.utils import timezone
