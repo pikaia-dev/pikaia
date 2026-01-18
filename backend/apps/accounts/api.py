@@ -74,6 +74,21 @@ router = Router(tags=["auth"])
 bearer_auth = BearerAuth()
 
 
+def _extract_bearer_token(request: HttpRequest) -> str | None:
+    """Extract JWT from Authorization: Bearer header."""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header.replace("Bearer ", "")
+    return None
+
+
+def _get_stytch_error_message(error: StytchError) -> str:
+    """Extract error message from StytchError, lowercase for comparison."""
+    if error.details and error.details.error_message:
+        return error.details.error_message.lower()
+    return ""
+
+
 @router.post(
     "/magic-link/send",
     response={200: MessageResponse, 400: ErrorResponse},
@@ -167,7 +182,7 @@ def create_organization(
             organization_slug=payload.organization_slug,
         )
     except StytchError as e:
-        error_msg = e.details.error_message.lower() if e.details.error_message else ""
+        error_msg = _get_stytch_error_message(e)
         if "slug" in error_msg or "duplicate" in error_msg:
             logger.warning("Organization slug conflict: %s", e.details.error_message)
             raise HttpError(409, "Organization slug already in use. Try a different one.") from e
@@ -303,7 +318,7 @@ def provision_mobile_user_endpoint(
     except ValueError as e:
         raise HttpError(400, str(e)) from None
     except StytchError as e:
-        error_msg = e.details.error_message.lower() if e.details.error_message else ""
+        error_msg = _get_stytch_error_message(e)
         if "slug" in error_msg or "duplicate" in error_msg:
             logger.warning("Organization slug conflict: %s", e.details.error_message)
             raise HttpError(409, "Organization slug already in use. Try a different one.") from None
@@ -499,9 +514,7 @@ def send_phone_otp(
     """
     _, member, org = get_auth_context(request)
 
-    # Extract session JWT from auth header
-    auth_header = request.headers.get("Authorization", "")
-    session_jwt = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
+    session_jwt = _extract_bearer_token(request)
 
     try:
         client = get_stytch_client()
@@ -537,9 +550,7 @@ def verify_phone_otp(request: AuthenticatedHttpRequest, payload: VerifyPhoneOtpR
     """
     user, member, org = get_auth_context(request)
 
-    # Extract session JWT from auth header (required by Stytch B2B OTP)
-    auth_header = request.headers.get("Authorization", "")
-    session_jwt = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
+    session_jwt = _extract_bearer_token(request)
 
     try:
         client = get_stytch_client()

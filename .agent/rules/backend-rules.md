@@ -14,6 +14,17 @@ Coding standards for Python/Django backend. Scoped to `*.py` files.
 - Format with `ruff format`, lint with `ruff check`
 - Imports: stdlib → third-party → local (enforced by ruff/isort)
 
+## Code Style & Readability
+
+- **Ternary expressions**: Prefer explicit `if/else` blocks over inline ternary expressions when:
+    - The expression involves method calls or attribute access (e.g., `x.foo() if x else y`)
+    - The expression would span multiple lines
+    - Either branch contains a list comprehension or complex expression
+    - The condition and branches aren't immediately obvious at a glance
+- **Good ternary** (simple, obvious): `status = "active" if user.is_active else "inactive"`
+- **Bad ternary** (use if/else instead): `result = obj.method().value if obj and obj.method() else default`
+- **Redundant patterns**: Avoid `x if x else None` — use `x or None` or just `x` if None is acceptable
+
 ## Package Manager
 
 - Use `uv` for all Python dependency and command management

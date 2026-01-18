@@ -276,7 +276,7 @@ def invite_member(
         stytch.organizations.members.update(
             organization_id=organization.stytch_org_id,
             member_id=stytch_member_id,
-            name=name if name else None,
+            name=name or None,
             roles=roles,
         )
     else:
@@ -293,7 +293,7 @@ def invite_member(
             stytch.organizations.members.update(
                 organization_id=organization.stytch_org_id,
                 member_id=stytch_member_id,
-                name=name if name else None,
+                name=name or None,
                 roles=roles,
             )
 
@@ -669,7 +669,7 @@ def provision_mobile_user(
         member_response = stytch.organizations.members.create(
             organization_id=stytch_org_id,
             email_address=email,
-            name=name if name else None,
+            name=name or None,
         )
         stytch_member_id = member_response.member.member_id
         stytch_member = member_response.member
@@ -729,7 +729,7 @@ def provision_mobile_user(
             member_response = stytch.organizations.members.create(
                 organization_id=stytch_org_id,
                 email_address=email,
-                name=name if name else None,
+                name=name or None,
             )
             stytch_member_id = member_response.member.member_id
             stytch_member = member_response.member

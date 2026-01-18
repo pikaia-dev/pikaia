@@ -55,10 +55,11 @@ def get_google_access_token(organization_id: str, member_id: str) -> str | None:
         return response.access_token
     except StytchError as e:
         # No Google OAuth tokens for this member
+        error_message = e.details.error_message if e.details else str(e)
         logger.debug(
             "google_oauth_token_not_found",
             member_id=member_id,
-            error=e.details.error_message if e.details else str(e),
+            error=error_message,
         )
         return None
 
