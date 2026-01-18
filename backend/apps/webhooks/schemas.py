@@ -183,3 +183,79 @@ class WebhookPayload(Schema):
     timestamp: datetime = Field(..., description="When the event occurred")
     organization_id: str = Field(..., description="Organization this event belongs to")
     data: dict = Field(..., description="Event-specific payload data")
+
+
+# =============================================================================
+# REST Hooks Schemas (for Zapier/Make integration)
+# =============================================================================
+
+
+class RestHookSubscribeRequest(Schema):
+    """
+    Schema for REST Hooks subscribe request.
+
+    This is what Zapier/Make sends to create a webhook subscription.
+    """
+
+    target_url: str = Field(
+        ...,
+        min_length=1,
+        max_length=2048,
+        description="URL to receive webhook events",
+    )
+    event_type: str = Field(
+        ...,
+        description="Event type to subscribe to (e.g., 'member.created')",
+    )
+
+    @field_validator("target_url")
+    @classmethod
+    def validate_target_url(cls, v: str) -> str:
+        """Ensure URL is HTTPS."""
+        if not v.startswith("https://"):
+            raise ValueError("Webhook URL must use HTTPS")
+        return v
+
+    @field_validator("event_type")
+    @classmethod
+    def validate_event_type(cls, v: str) -> str:
+        """Ensure event type is valid."""
+        if not is_valid_event_type(v):
+            raise ValueError(f"Invalid event type: {v}")
+        return v
+
+
+class RestHookSubscribeResponse(Schema):
+    """
+    Schema for REST Hooks subscribe response.
+
+    Returns the subscription ID that Zapier/Make uses to unsubscribe.
+    """
+
+    id: str = Field(..., description="Subscription ID for unsubscribe")
+    target_url: str
+    event_type: str
+    status: str = Field(default="active")
+    created_at: datetime
+
+
+class RestHookListResponse(Schema):
+    """Schema for listing REST Hook subscriptions."""
+
+    subscriptions: list[RestHookSubscribeResponse]
+
+
+class EventSampleResponse(Schema):
+    """Schema for event sample payload response."""
+
+    event_type: str
+    description: str
+    sample_payload: dict
+
+
+class AuthTestResponse(Schema):
+    """Schema for auth test endpoint response."""
+
+    ok: bool = True
+    organization_id: str
+    organization_name: str

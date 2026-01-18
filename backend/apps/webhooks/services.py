@@ -59,6 +59,7 @@ class WebhookService:
         self,
         data: WebhookEndpointCreate,
         created_by_id: int | None = None,
+        source: str = WebhookEndpoint.Source.MANUAL,
     ) -> WebhookEndpoint:
         """Create a new webhook endpoint."""
         return WebhookEndpoint.objects.create(
@@ -68,6 +69,7 @@ class WebhookService:
             description=data.description,
             url=data.url,
             events=data.events,
+            source=source,
         )
 
     def update_endpoint(

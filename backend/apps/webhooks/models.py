@@ -34,6 +34,21 @@ class WebhookEndpoint(models.Model):
     different event types and receiving signed HTTP POST requests.
     """
 
+    class Source(models.TextChoices):
+        """How this endpoint was created."""
+
+        MANUAL = "manual", "Manual (UI/API)"
+        ZAPIER = "zapier", "Zapier"
+        MAKE = "make", "Make"
+        REST_HOOKS = "rest_hooks", "REST Hooks (generic)"
+
+    # Sources that are considered REST Hook subscriptions (not manual)
+    REST_HOOK_SOURCES: ClassVar[list[str]] = [
+        Source.ZAPIER,
+        Source.MAKE,
+        Source.REST_HOOKS,
+    ]
+
     id = models.CharField(
         primary_key=True,
         max_length=32,
@@ -74,6 +89,14 @@ class WebhookEndpoint(models.Model):
     events = ArrayField(
         models.CharField(max_length=100),
         help_text="List of event types to receive (supports wildcards like 'member.*')",
+    )
+
+    # Source tracking (how this endpoint was created)
+    source = models.CharField(
+        max_length=20,
+        choices=Source.choices,
+        default=Source.MANUAL,
+        help_text="How this endpoint was created (manual, zapier, make, rest_hooks)",
     )
 
     # Signing secret
