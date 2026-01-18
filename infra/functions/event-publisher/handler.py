@@ -12,7 +12,7 @@ Triggered by:
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import boto3
 import psycopg2
@@ -60,106 +60,108 @@ def publish_pending_events() -> int:
     """
     eventbridge = boto3.client("events")
 
-    with psycopg2.connect(DATABASE_URL) as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Fetch and lock pending events
+    with (
+        psycopg2.connect(DATABASE_URL) as conn,
+        conn.cursor(cursor_factory=RealDictCursor) as cur,
+    ):
+        # Fetch and lock pending events
+        cur.execute(
+            """
+            SELECT id, event_type, payload
+            FROM events_outboxevent
+            WHERE status = 'pending'
+              AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
+            ORDER BY created_at
+            LIMIT %s
+            FOR UPDATE SKIP LOCKED
+            """,
+            (BATCH_SIZE,),
+        )
+        events = cur.fetchall()
+
+        if not events:
+            logger.info("No pending events to publish")
+            return 0
+
+        logger.info("Publishing %d events", len(events))
+
+        # Publish to EventBridge (max 10 per PutEvents call)
+        published_ids = []
+        failed_events = []
+
+        for batch_start in range(0, len(events), 10):
+            batch = events[batch_start : batch_start + 10]
+            entries = []
+
+            for event in batch:
+                payload = event["payload"]
+                if isinstance(payload, str):
+                    payload = json.loads(payload)
+
+                entries.append(
+                    {
+                        "Source": "app.outbox",
+                        "DetailType": event["event_type"],
+                        "Detail": json.dumps(payload),
+                        "EventBusName": EVENT_BUS_NAME,
+                    }
+                )
+
+            try:
+                response = eventbridge.put_events(Entries=entries)
+
+                for i, result in enumerate(response.get("Entries", [])):
+                    event_row = batch[i]
+                    if "EventId" in result:
+                        published_ids.append(event_row["id"])
+                    else:
+                        error = result.get("ErrorMessage", "Unknown error")
+                        failed_events.append((event_row["id"], error))
+                        logger.warning(
+                            "Failed to publish event %s: %s",
+                            event_row["id"],
+                            error,
+                        )
+
+            except Exception as e:
+                logger.error("Batch publish failed: %s", e)
+                for event_row in batch:
+                    failed_events.append((event_row["id"], str(e)))
+
+        # Mark successful events as published
+        if published_ids:
             cur.execute(
                 """
-                SELECT id, event_type, payload
-                FROM events_outboxevent
-                WHERE status = 'pending'
-                  AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
-                ORDER BY created_at
-                LIMIT %s
-                FOR UPDATE SKIP LOCKED
+                UPDATE events_outboxevent
+                SET status = 'published', published_at = %s
+                WHERE id = ANY(%s)
                 """,
-                (BATCH_SIZE,),
+                (datetime.now(UTC), published_ids),
             )
-            events = cur.fetchall()
 
-            if not events:
-                logger.info("No pending events to publish")
-                return 0
-
-            logger.info("Publishing %d events", len(events))
-
-            # Publish to EventBridge (max 10 per PutEvents call)
-            published_ids = []
-            failed_events = []
-
-            for batch_start in range(0, len(events), 10):
-                batch = events[batch_start : batch_start + 10]
-                entries = []
-
-                for event in batch:
-                    payload = event["payload"]
-                    if isinstance(payload, str):
-                        payload = json.loads(payload)
-
-                    entries.append(
-                        {
-                            "Source": "app.outbox",
-                            "DetailType": event["event_type"],
-                            "Detail": json.dumps(payload),
-                            "EventBusName": EVENT_BUS_NAME,
-                        }
-                    )
-
-                try:
-                    response = eventbridge.put_events(Entries=entries)
-
-                    for i, result in enumerate(response.get("Entries", [])):
-                        event_row = batch[i]
-                        if "EventId" in result:
-                            published_ids.append(event_row["id"])
-                        else:
-                            error = result.get("ErrorMessage", "Unknown error")
-                            failed_events.append((event_row["id"], error))
-                            logger.warning(
-                                "Failed to publish event %s: %s",
-                                event_row["id"],
-                                error,
-                            )
-
-                except Exception as e:
-                    logger.error("Batch publish failed: %s", e)
-                    for event_row in batch:
-                        failed_events.append((event_row["id"], str(e)))
-
-            # Mark successful events as published
-            if published_ids:
-                cur.execute(
-                    """
-                    UPDATE events_outboxevent
-                    SET status = 'published', published_at = %s
-                    WHERE id = ANY(%s)
-                    """,
-                    (datetime.now(timezone.utc), published_ids),
-                )
-
-            # Mark failed events for retry (with exponential backoff)
-            for event_id, error in failed_events:
-                cur.execute(
-                    """
-                    UPDATE events_outboxevent
-                    SET
-                        attempts = attempts + 1,
-                        last_error = %s,
-                        next_attempt_at = NOW() + (INTERVAL '1 minute' * POWER(2, attempts)),
-                        status = CASE
-                            WHEN attempts + 1 >= %s THEN 'failed'
-                            ELSE 'pending'
-                        END
-                    WHERE id = %s
-                    """,
-                    (error, MAX_ATTEMPTS, event_id),
-                )
-
-            conn.commit()
-
-            logger.info(
-                "Published %d events, %d failed",
-                len(published_ids),
-                len(failed_events),
+        # Mark failed events for retry (with exponential backoff)
+        for event_id, error in failed_events:
+            cur.execute(
+                """
+                UPDATE events_outboxevent
+                SET
+                    attempts = attempts + 1,
+                    last_error = %s,
+                    next_attempt_at = NOW() + (INTERVAL '1 minute' * POWER(2, attempts)),
+                    status = CASE
+                        WHEN attempts + 1 >= %s THEN 'failed'
+                        ELSE 'pending'
+                    END
+                WHERE id = %s
+                """,
+                (error, MAX_ATTEMPTS, event_id),
             )
-            return len(published_ids)
+
+        conn.commit()
+
+        logger.info(
+            "Published %d events, %d failed",
+            len(published_ids),
+            len(failed_events),
+        )
+        return len(published_ids)

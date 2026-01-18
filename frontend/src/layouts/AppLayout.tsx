@@ -1,12 +1,8 @@
-import { Outlet } from "react-router-dom"
+import { Outlet } from 'react-router-dom'
 
-import { AppSidebar } from "../components/app-sidebar"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "../components/ui/sidebar"
-import { PasskeyEnrollmentPrompt } from "../features/auth/components"
+import { AppSidebar } from '../components/app-sidebar'
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '../components/ui/sidebar'
+import { PasskeyEnrollmentPrompt } from '../features/auth/components'
 
 export default function AppLayout() {
   return (

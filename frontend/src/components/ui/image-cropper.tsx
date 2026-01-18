@@ -1,14 +1,14 @@
-import { useCallback,useState } from "react"
-import type { Area, Point } from "react-easy-crop"
-import Cropper from "react-easy-crop"
+import { useCallback, useState } from 'react'
+import type { Area, Point } from 'react-easy-crop'
+import Cropper from 'react-easy-crop'
 
-import { cn } from "../../lib/utils"
-import { Button } from "./button"
+import { cn } from '../../lib/utils'
+import { Button } from './button'
 
 interface ImageCropperProps {
   image: string // Base64 or blob URL
   aspect?: number // Width/Height ratio (default 1 for square)
-  cropShape?: "rect" | "round"
+  cropShape?: 'rect' | 'round'
   onCropComplete: (croppedBlob: Blob) => void
   onCancel: () => void
 }
@@ -28,10 +28,10 @@ async function getCroppedImg(
     image.onload = resolve
   })
 
-  const canvas = document.createElement("canvas")
-  const ctx = canvas.getContext("2d")
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
   if (!ctx) {
-    throw new Error("Could not get canvas context")
+    throw new Error('Could not get canvas context')
   }
 
   // Set canvas size to desired output size
@@ -58,10 +58,10 @@ async function getCroppedImg(
         if (blob) {
           resolve(blob)
         } else {
-          reject(new Error("Failed to create blob"))
+          reject(new Error('Failed to create blob'))
         }
       },
-      "image/png",
+      'image/png',
       0.95
     )
   })
@@ -70,7 +70,7 @@ async function getCroppedImg(
 export function ImageCropper({
   image,
   aspect = 1,
-  cropShape = "round",
+  cropShape = 'round',
   onCropComplete,
   onCancel,
 }: ImageCropperProps) {
@@ -79,12 +79,9 @@ export function ImageCropper({
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
-  const handleCropComplete = useCallback(
-    (_croppedArea: Area, croppedAreaPixels: Area) => {
-      setCroppedAreaPixels(croppedAreaPixels)
-    },
-    []
-  )
+  const handleCropComplete = useCallback((_croppedArea: Area, croppedAreaPixels: Area) => {
+    setCroppedAreaPixels(croppedAreaPixels)
+  }, [])
 
   const handleSave = async () => {
     if (!croppedAreaPixels) return
@@ -94,7 +91,7 @@ export function ImageCropper({
       const croppedBlob = await getCroppedImg(image, croppedAreaPixels)
       onCropComplete(croppedBlob)
     } catch (error) {
-      console.error("Failed to crop image:", error)
+      console.error('Failed to crop image:', error)
     } finally {
       setIsProcessing(false)
     }
@@ -106,9 +103,7 @@ export function ImageCropper({
         {/* Header */}
         <div className="px-4 py-3 border-b border-border">
           <h3 className="text-lg font-semibold">Crop Image</h3>
-          <p className="text-sm text-muted-foreground">
-            Drag to reposition, scroll to zoom
-          </p>
+          <p className="text-sm text-muted-foreground">Drag to reposition, scroll to zoom</p>
         </div>
 
         {/* Cropper Area */}
@@ -136,16 +131,18 @@ export function ImageCropper({
               max={3}
               step={0.1}
               value={zoom}
-              onChange={(e) => { setZoom(Number(e.target.value)); }}
+              onChange={(e) => {
+                setZoom(Number(e.target.value))
+              }}
               className={cn(
-                "flex-1 h-2 rounded-full appearance-none cursor-pointer",
-                "bg-muted",
-                "[&::-webkit-slider-thumb]:appearance-none",
-                "[&::-webkit-slider-thumb]:w-4",
-                "[&::-webkit-slider-thumb]:h-4",
-                "[&::-webkit-slider-thumb]:rounded-full",
-                "[&::-webkit-slider-thumb]:bg-primary",
-                "[&::-webkit-slider-thumb]:cursor-pointer"
+                'flex-1 h-2 rounded-full appearance-none cursor-pointer',
+                'bg-muted',
+                '[&::-webkit-slider-thumb]:appearance-none',
+                '[&::-webkit-slider-thumb]:w-4',
+                '[&::-webkit-slider-thumb]:h-4',
+                '[&::-webkit-slider-thumb]:rounded-full',
+                '[&::-webkit-slider-thumb]:bg-primary',
+                '[&::-webkit-slider-thumb]:cursor-pointer'
               )}
             />
           </label>
@@ -156,11 +153,8 @@ export function ImageCropper({
           <Button variant="outline" onClick={onCancel} disabled={isProcessing}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSave}
-            disabled={isProcessing || !croppedAreaPixels}
-          >
-            {isProcessing ? "Processing..." : "Save"}
+          <Button onClick={handleSave} disabled={isProcessing || !croppedAreaPixels}>
+            {isProcessing ? 'Processing...' : 'Save'}
           </Button>
         </div>
       </div>

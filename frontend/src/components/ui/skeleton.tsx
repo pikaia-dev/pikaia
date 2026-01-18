@@ -1,10 +1,10 @@
-import { cn } from "@/lib/utils"
+import { cn } from '@/lib/utils'
 
-function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
+function Skeleton({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="skeleton"
-      className={cn("bg-accent animate-pulse rounded-md", className)}
+      className={cn('bg-accent animate-pulse rounded-md', className)}
       {...props}
     />
   )
@@ -15,7 +15,7 @@ function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
  */
 function CardSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn("rounded-lg border bg-card p-6", className)}>
+    <div className={cn('rounded-lg border bg-card p-6', className)}>
       <div className="space-y-3">
         <Skeleton className="h-5 w-1/3" />
         <Skeleton className="h-4 w-2/3" />
@@ -32,22 +32,16 @@ function CardSkeleton({ className }: { className?: string }) {
 /**
  * Table skeleton with header and rows.
  */
-function TableSkeleton({
-  rows = 5,
-  className,
-}: {
-  rows?: number
-  className?: string
-}) {
+function TableSkeleton({ rows = 5, className }: { rows?: number; className?: string }) {
   return (
-    <div className={cn("rounded-lg border bg-card", className)}>
+    <div className={cn('rounded-lg border bg-card', className)}>
       <div className="border-b p-4">
         <Skeleton className="h-5 w-1/4" />
       </div>
       <div className="p-4">
         <div className="space-y-4">
           {Array.from({ length: rows }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4">
+            <div key={`skeleton-row-${String(i)}`} className="flex items-center gap-4">
               <Skeleton className="h-10 w-10 rounded-full" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-4 w-1/3" />
@@ -97,10 +91,4 @@ function SettingsSkeleton() {
   )
 }
 
-export {
-  CardSkeleton,
-  DashboardSkeleton,
-  SettingsSkeleton,
-  Skeleton,
-  TableSkeleton,
-}
+export { CardSkeleton, DashboardSkeleton, SettingsSkeleton, Skeleton, TableSkeleton }

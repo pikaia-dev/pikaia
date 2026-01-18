@@ -1,11 +1,11 @@
-import { Building2, Upload, User, X } from "lucide-react"
-import { useCallback, useState } from "react"
-import { useDropzone } from "react-dropzone"
-import { toast } from "sonner"
+import { Building2, Upload, User, X } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { useDropzone } from 'react-dropzone'
+import { toast } from 'sonner'
 
-import { useImageUpload } from "../../hooks/useImageUpload"
-import { MEDIA_UPLOAD } from "../../lib/constants"
-import { cn } from "../../lib/utils"
+import { useImageUpload } from '../../hooks/useImageUpload'
+import { MEDIA_UPLOAD } from '../../lib/constants'
+import { cn } from '../../lib/utils'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,11 +15,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "./alert-dialog"
-import { ImageCropper } from "./image-cropper"
+} from './alert-dialog'
+import { ImageCropper } from './image-cropper'
 
 interface ImageUploaderProps {
-  type: "avatar" | "logo"
+  type: 'avatar' | 'logo'
   value?: string // Current image URL
   onChange: (url: string) => void
   onError?: (error: Error) => void
@@ -37,15 +37,13 @@ export function ImageUploader({
 }: ImageUploaderProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [showCropper, setShowCropper] = useState(false)
-  const [originalFilename, setOriginalFilename] = useState("")
+  const [originalFilename, setOriginalFilename] = useState('')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   const { upload, isUploading, progress } = useImageUpload(type, {
     onSuccess: (result) => {
       onChange(result.url)
-      toast.success(
-        `${type === "avatar" ? "Avatar" : "Logo"} updated successfully`
-      )
+      toast.success(`${type === 'avatar' ? 'Avatar' : 'Logo'} updated successfully`)
     },
     onError: (error) => {
       toast.error(error.message)
@@ -53,8 +51,8 @@ export function ImageUploader({
     },
   })
 
-  const isCircular = type === "avatar"
-  const label = type === "avatar" ? "profile picture" : "logo"
+  const isCircular = type === 'avatar'
+  const label = type === 'avatar' ? 'profile picture' : 'logo'
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -64,14 +62,12 @@ export function ImageUploader({
 
       // Validate file size
       if (file.size > MEDIA_UPLOAD.MAX_SIZE_BYTES) {
-        toast.error(
-          `File too large. Maximum size is ${String(MEDIA_UPLOAD.MAX_SIZE_MB)}MB`
-        )
+        toast.error(`File too large. Maximum size is ${String(MEDIA_UPLOAD.MAX_SIZE_MB)}MB`)
         return
       }
 
       // SVG files can't be cropped - upload directly
-      if (file.type === "image/svg+xml") {
+      if (file.type === 'image/svg+xml') {
         const filename = `${type}-${String(Date.now())}.svg`
         await upload(file, filename)
         return
@@ -104,7 +100,7 @@ export function ImageUploader({
     }
 
     // Upload cropped image
-    const ext = originalFilename.split(".").pop() || "png"
+    const ext = originalFilename.split('.').pop() || 'png'
     const filename = `${type}-${String(Date.now())}.${ext}`
     await upload(croppedBlob, filename)
   }
@@ -118,29 +114,25 @@ export function ImageUploader({
   }
 
   const handleRemoveConfirm = () => {
-    onChange("")
+    onChange('')
     setDeleteDialogOpen(false)
   }
 
-  const PlaceholderIcon = type === "avatar" ? User : Building2
+  const PlaceholderIcon = type === 'avatar' ? User : Building2
 
   return (
     <>
-      <div className={cn("flex items-center gap-4", className)}>
+      <div className={cn('flex items-center gap-4', className)}>
         {/* Preview */}
         <div className="relative">
           <div
             className={cn(
-              "flex items-center justify-center bg-muted border-2 border-dashed border-border overflow-hidden",
-              isCircular ? "rounded-full w-20 h-20" : "rounded-lg w-24 h-24"
+              'flex items-center justify-center bg-muted border-2 border-dashed border-border overflow-hidden',
+              isCircular ? 'rounded-full w-20 h-20' : 'rounded-lg w-24 h-24'
             )}
           >
             {value ? (
-              <img
-                src={value}
-                alt={type}
-                className="w-full h-full object-cover"
-              />
+              <img src={value} alt={type} className="w-full h-full object-cover" />
             ) : (
               <PlaceholderIcon className="w-8 h-8 text-muted-foreground" />
             )}
@@ -148,9 +140,7 @@ export function ImageUploader({
             {/* Upload progress overlay */}
             {isUploading && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                <div className="text-white text-xs font-medium">
-                  {progress}%
-                </div>
+                <div className="text-white text-xs font-medium">{progress}%</div>
               </div>
             )}
           </div>
@@ -159,7 +149,9 @@ export function ImageUploader({
           {value && !disabled && !isUploading && (
             <button
               type="button"
-              onClick={() => { setDeleteDialogOpen(true); }}
+              onClick={() => {
+                setDeleteDialogOpen(true)
+              }}
               className="absolute -top-1 -right-1 z-10 p-1 bg-muted-foreground/80 text-background rounded-full hover:bg-muted-foreground transition-colors shadow-sm cursor-pointer"
             >
               <X className="w-3 h-3" />
@@ -172,11 +164,11 @@ export function ImageUploader({
           <div
             {...getRootProps()}
             className={cn(
-              "border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors",
+              'border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors',
               isDragActive
-                ? "border-primary bg-primary/5"
-                : "border-border hover:border-primary/50",
-              (disabled || isUploading) && "opacity-50 cursor-not-allowed"
+                ? 'border-primary bg-primary/5'
+                : 'border-border hover:border-primary/50',
+              (disabled || isUploading) && 'opacity-50 cursor-not-allowed'
             )}
           >
             <input {...getInputProps()} />
@@ -184,11 +176,10 @@ export function ImageUploader({
               <Upload className="w-5 h-5 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
                 {isDragActive ? (
-                  "Drop the image here"
+                  'Drop the image here'
                 ) : (
                   <>
-                    Drag & drop or{" "}
-                    <span className="text-primary font-medium">browse</span>
+                    Drag & drop or <span className="text-primary font-medium">browse</span>
                   </>
                 )}
               </p>
@@ -205,7 +196,7 @@ export function ImageUploader({
         <ImageCropper
           image={selectedFile}
           aspect={1}
-          cropShape={isCircular ? "round" : "rect"}
+          cropShape={isCircular ? 'round' : 'rect'}
           onCropComplete={handleCropComplete}
           onCancel={handleCropCancel}
         />
@@ -217,15 +208,12 @@ export function ImageUploader({
           <AlertDialogHeader>
             <AlertDialogTitle>Remove {label}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove this {label}? This action cannot
-              be undone.
+              Are you sure you want to remove this {label}? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRemoveConfirm}>
-              Remove
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleRemoveConfirm}>Remove</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -5,12 +5,15 @@ Covers all auth endpoints with mocked Stytch client.
 """
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
 from ninja.errors import HttpError
 
-from apps.core.auth import AuthContext
+if TYPE_CHECKING:
+    from django.test import RequestFactory
+
 from apps.accounts.api import (
     authenticate_magic_link,
     create_organization,
@@ -41,6 +44,7 @@ from apps.accounts.schemas import (
     UpdateOrganizationRequest,
     UpdateProfileRequest,
 )
+from apps.core.auth import AuthContext
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
 
 # --- Mock Stytch Response Objects ---

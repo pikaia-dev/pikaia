@@ -15,10 +15,20 @@ from aws_cdk import (
     Duration,
     RemovalPolicy,
     Stack,
+)
+from aws_cdk import (
     aws_certificatemanager as acm,
+)
+from aws_cdk import (
     aws_cloudfront as cloudfront,
+)
+from aws_cdk import (
     aws_cloudfront_origins as origins,
+)
+from aws_cdk import (
     aws_elasticloadbalancingv2 as elbv2,
+)
+from aws_cdk import (
     aws_s3 as s3,
 )
 from constructs import Construct
@@ -87,9 +97,7 @@ class FrontendStack(Stack):
         certificate = None
         domain_names = None
         if certificate_arn and domain_name:
-            certificate = acm.Certificate.from_certificate_arn(
-                self, "Certificate", certificate_arn
-            )
+            certificate = acm.Certificate.from_certificate_arn(self, "Certificate", certificate_arn)
             domain_names = [domain_name]
 
         # CloudFront distribution

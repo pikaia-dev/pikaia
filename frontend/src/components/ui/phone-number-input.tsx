@@ -14,13 +14,13 @@ import {
   type CountryCode,
   getExampleNumber,
   parsePhoneNumberWithError,
-} from "libphonenumber-js"
-import examples from "libphonenumber-js/mobile/examples"
-import { Check, ChevronDown } from "lucide-react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+} from 'libphonenumber-js'
+import examples from 'libphonenumber-js/mobile/examples'
+import { Check, ChevronDown } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { COUNTRIES, getCountryByCode } from "../../lib/countries"
-import { cn } from "../../lib/utils"
+import { COUNTRIES, getCountryByCode } from '../../lib/countries'
+import { cn } from '../../lib/utils'
 import {
   Command,
   CommandEmpty,
@@ -28,8 +28,8 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "./command"
-import { Popover, PopoverContent, PopoverTrigger } from "./popover"
+} from './command'
+import { Popover, PopoverContent, PopoverTrigger } from './popover'
 
 interface PhoneNumberInputProps {
   /** Phone number in E.164 format (e.g., "+14155551234") */
@@ -47,8 +47,8 @@ interface PhoneNumberInputProps {
  */
 function getDefaultCountryCode(): string {
   // Try to get from browser's navigator.language (e.g., "en-US" -> "US")
-  if (typeof navigator !== "undefined" && navigator.language) {
-    const parts = navigator.language.split("-")
+  if (typeof navigator !== 'undefined' && navigator.language) {
+    const parts = navigator.language.split('-')
     if (parts.length >= 2) {
       const countryCode = parts[parts.length - 1].toUpperCase()
       if (getCountryByCode(countryCode)) {
@@ -56,7 +56,7 @@ function getDefaultCountryCode(): string {
       }
     }
   }
-  return "US" // Default fallback
+  return 'US' // Default fallback
 }
 
 /**
@@ -67,7 +67,7 @@ function parseE164(value: string): {
   nationalNumber: string
 } {
   if (!value) {
-    return { countryCode: getDefaultCountryCode(), nationalNumber: "" }
+    return { countryCode: getDefaultCountryCode(), nationalNumber: '' }
   }
 
   try {
@@ -90,7 +90,7 @@ function parseE164(value: string): {
 
   return {
     countryCode: getDefaultCountryCode(),
-    nationalNumber: value.replace(/^\+/, ""),
+    nationalNumber: value.replace(/^\+/, ''),
   }
 }
 
@@ -106,7 +106,7 @@ function getPlaceholder(countryCode: string): string {
   } catch {
     // Ignore errors
   }
-  return "123 456 7890"
+  return '123 456 7890'
 }
 
 export function PhoneNumberInput({
@@ -117,14 +117,12 @@ export function PhoneNumberInput({
 }: PhoneNumberInputProps) {
   const [open, setOpen] = useState(false)
 
-  // Parse the initial value
-  const { countryCode: initialCountry, nationalNumber: initialNational } =
-    useMemo(
-      () => parseE164(value),
-      // Only compute on mount
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      []
-    )
+  // Parse the initial value (only on mount - value changes are handled by the sync effect below)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Only compute on mount
+  const { countryCode: initialCountry, nationalNumber: initialNational } = useMemo(
+    () => parseE164(value),
+    []
+  )
 
   const [selectedCountry, setSelectedCountry] = useState<string>(initialCountry)
   const [inputValue, setInputValue] = useState<string>(initialNational)
@@ -138,16 +136,11 @@ export function PhoneNumberInput({
 
   const country = useMemo(
     () =>
-      getCountryByCode(selectedCountry) ??
-      COUNTRIES.find((c) => c.code === "US") ??
-      COUNTRIES[0],
+      getCountryByCode(selectedCountry) ?? COUNTRIES.find((c) => c.code === 'US') ?? COUNTRIES[0],
     [selectedCountry]
   )
 
-  const placeholder = useMemo(
-    () => getPlaceholder(selectedCountry),
-    [selectedCountry]
-  )
+  const placeholder = useMemo(() => getPlaceholder(selectedCountry), [selectedCountry])
 
   // Format input as user types
   const handleInputChange = useCallback(
@@ -155,7 +148,7 @@ export function PhoneNumberInput({
       const rawInput = e.target.value
 
       // Only allow digits
-      const digitsOnly = rawInput.replace(/\D/g, "")
+      const digitsOnly = rawInput.replace(/\D/g, '')
       setInputValue(digitsOnly)
 
       // Build E.164 number
@@ -163,7 +156,7 @@ export function PhoneNumberInput({
         const e164 = country.dialCode + digitsOnly
         onChange(e164)
       } else {
-        onChange("")
+        onChange('')
       }
     },
     [country.dialCode, onChange]
@@ -171,7 +164,7 @@ export function PhoneNumberInput({
 
   // Format for display using AsYouType
   const displayValue = useMemo(() => {
-    if (!inputValue) return ""
+    if (!inputValue) return ''
     try {
       const formatter = new AsYouType(selectedCountry as CountryCode)
       return formatter.input(inputValue)
@@ -198,7 +191,7 @@ export function PhoneNumberInput({
   )
 
   return (
-    <div className={cn("flex", className)}>
+    <div className={cn('flex', className)}>
       {/* Country Selector */}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild disabled={disabled}>
@@ -207,10 +200,10 @@ export function PhoneNumberInput({
             role="combobox"
             aria-expanded={open}
             className={cn(
-              "flex items-center gap-1 px-3 py-2 border border-border rounded-l-md bg-background text-sm",
-              "hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring",
-              "min-w-[100px] justify-between",
-              disabled && "opacity-50 cursor-not-allowed"
+              'flex items-center gap-1 px-3 py-2 border border-border rounded-l-md bg-background text-sm',
+              'hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring',
+              'min-w-[100px] justify-between',
+              disabled && 'opacity-50 cursor-not-allowed'
             )}
           >
             <span className="flex items-center gap-2">
@@ -230,18 +223,16 @@ export function PhoneNumberInput({
                   <CommandItem
                     key={c.code}
                     value={`${c.name} ${c.dialCode}`}
-                    onSelect={() => { handleCountryChange(c.code); }}
+                    onSelect={() => {
+                      handleCountryChange(c.code)
+                    }}
                   >
                     <span className="flex items-center gap-2 flex-1">
                       <span className="text-base">{c.flag}</span>
                       <span>{c.name}</span>
-                      <span className="text-muted-foreground ml-auto">
-                        {c.dialCode}
-                      </span>
+                      <span className="text-muted-foreground ml-auto">{c.dialCode}</span>
                     </span>
-                    {selectedCountry === c.code && (
-                      <Check className="h-4 w-4 ml-2" />
-                    )}
+                    {selectedCountry === c.code && <Check className="h-4 w-4 ml-2" />}
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -259,10 +250,10 @@ export function PhoneNumberInput({
         disabled={disabled}
         placeholder={placeholder}
         className={cn(
-          "flex-1 px-3 py-2 border border-l-0 border-border rounded-r-md bg-background text-sm",
-          "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0",
-          "placeholder:text-muted-foreground",
-          disabled && "opacity-50 cursor-not-allowed bg-muted"
+          'flex-1 px-3 py-2 border border-l-0 border-border rounded-r-md bg-background text-sm',
+          'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0',
+          'placeholder:text-muted-foreground',
+          disabled && 'opacity-50 cursor-not-allowed bg-muted'
         )}
       />
     </div>

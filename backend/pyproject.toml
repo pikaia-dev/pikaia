@@ -25,11 +25,16 @@ dependencies = [
     "structlog>=25.5",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
-    "pytest>=9.0",
-    "pytest-django>=4.11",
+    "django-stubs>=5.2.8",
     "factory-boy>=3.3",
+    "mypy>=1.19.1",
+    "psycopg2-binary>=2.9.11",
+    "pyright>=1.1.408",
+    "pytest>=9.0",
+    "pytest-cov>=7.0.0",
+    "pytest-django>=4.11",
     "ruff>=0.14",
 ]
 
@@ -43,15 +48,6 @@ known-first-party = ["apps", "config"]
 DJANGO_SETTINGS_MODULE = "config.settings.local"
 python_files = ["test_*.py"]
 addopts = "-v --tb=short"
-
-[dependency-groups]
-dev = [
-    "django-stubs>=5.2.8",
-    "mypy>=1.19.1",
-    "psycopg2-binary>=2.9.11",
-    "pyright>=1.1.408",
-    "pytest-cov>=7.0.0",
-]
 
 [tool.mypy]
 python_version = "3.12"

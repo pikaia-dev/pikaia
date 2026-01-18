@@ -14,10 +14,17 @@ from aws_cdk import (
     Duration,
     RemovalPolicy,
     Stack,
+)
+from aws_cdk import (
     aws_cloudfront as cloudfront,
+)
+from aws_cdk import (
     aws_cloudfront_origins as origins,
-    aws_iam as iam,
+)
+from aws_cdk import (
     aws_lambda as lambda_,
+)
+from aws_cdk import (
     aws_s3 as s3,
 )
 from constructs import Construct
@@ -204,9 +211,7 @@ class MediaStack(Stack):
             code=lambda_.Code.from_asset(
                 str(FUNCTIONS_DIR / "image-transform"),
                 bundling=BundlingOptions(
-                    image=DockerImage.from_registry(
-                        "public.ecr.aws/sam/build-nodejs20.x:latest"
-                    ),
+                    image=DockerImage.from_registry("public.ecr.aws/sam/build-nodejs20.x:latest"),
                     command=[
                         "bash",
                         "-c",

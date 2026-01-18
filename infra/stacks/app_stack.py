@@ -13,20 +13,38 @@ from aws_cdk import (
     Duration,
     RemovalPolicy,
     Stack,
+)
+from aws_cdk import (
     aws_certificatemanager as acm,
+)
+from aws_cdk import (
     aws_ec2 as ec2,
+)
+from aws_cdk import (
     aws_ecr as ecr,
+)
+from aws_cdk import (
     aws_ecs as ecs,
+)
+from aws_cdk import (
     aws_ecs_patterns as ecs_patterns,
+)
+from aws_cdk import (
     aws_elasticloadbalancingv2 as elbv2,
-    aws_iam as iam,
+)
+from aws_cdk import (
     aws_logs as logs,
+)
+from aws_cdk import (
     aws_rds as rds,
+)
+from aws_cdk import (
     aws_s3 as s3,
+)
+from aws_cdk import (
     aws_secretsmanager as secretsmanager,
 )
 from constructs import Construct
-
 
 
 class AppStack(Stack):
@@ -167,16 +185,20 @@ class AppStack(Stack):
             "ALLOWED_HOSTS": domain_name or "*",
         }
         if media_bucket:
-            container_env.update({
-                "USE_S3_STORAGE": "true",
-                "AWS_STORAGE_BUCKET_NAME": media_bucket.bucket_name,
-                "AWS_S3_REGION_NAME": self.region,
-            })
+            container_env.update(
+                {
+                    "USE_S3_STORAGE": "true",
+                    "AWS_STORAGE_BUCKET_NAME": media_bucket.bucket_name,
+                    "AWS_S3_REGION_NAME": self.region,
+                }
+            )
             if media_cdn_domain:
-                container_env.update({
-                    "AWS_S3_CUSTOM_DOMAIN": media_cdn_domain,
-                    "IMAGE_TRANSFORM_URL": f"https://{media_cdn_domain}",
-                })
+                container_env.update(
+                    {
+                        "AWS_S3_CUSTOM_DOMAIN": media_cdn_domain,
+                        "IMAGE_TRANSFORM_URL": f"https://{media_cdn_domain}",
+                    }
+                )
 
         # Container
         container = task_definition.add_container(
@@ -282,14 +304,11 @@ class AppStack(Stack):
             ),
         )
 
-        container.add_port_mappings(
-            ecs.PortMapping(container_port=8000, protocol=ecs.Protocol.TCP)
-        )
+        container.add_port_mappings(ecs.PortMapping(container_port=8000, protocol=ecs.Protocol.TCP))
 
         # Grant S3 access for media uploads if bucket is provided
         if media_bucket:
             media_bucket.grant_read_write(task_definition.task_role)
-
 
         # Security group for ECS
         ecs_security_group = ec2.SecurityGroup(
@@ -315,9 +334,7 @@ class AppStack(Stack):
 
         # ALB configuration
         if certificate_arn:
-            certificate = acm.Certificate.from_certificate_arn(
-                self, "Certificate", certificate_arn
-            )
+            certificate = acm.Certificate.from_certificate_arn(self, "Certificate", certificate_arn)
             listener_protocol = elbv2.ApplicationProtocol.HTTPS
         else:
             certificate = None

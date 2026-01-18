@@ -1,4 +1,4 @@
-import { useStytchB2BClient, useStytchMember } from "@stytch/react/b2b"
+import { useStytchB2BClient, useStytchMember } from '@stytch/react/b2b'
 import {
   Building2,
   ChevronsUpDown,
@@ -10,18 +10,18 @@ import {
   User,
   Users,
   Webhook,
-} from "lucide-react"
-import { NavLink, useNavigate } from "react-router-dom"
+} from 'lucide-react'
+import { NavLink, useNavigate } from 'react-router-dom'
 
-import { useCurrentUser } from "../features/auth/queries"
-import { STYTCH_ROLES } from "../lib/constants"
+import { useCurrentUser } from '../features/auth/queries'
+import { STYTCH_ROLES } from '../lib/constants'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "./ui/dropdown-menu"
+} from './ui/dropdown-menu'
 import {
   Sidebar,
   SidebarContent,
@@ -33,17 +33,17 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "./ui/sidebar"
+} from './ui/sidebar'
 
-const mainNavItems = [{ to: "/dashboard", label: "Dashboard", icon: Home }]
+const mainNavItems = [{ to: '/dashboard', label: 'Dashboard', icon: Home }]
 
 // Organization-level settings (admin-only)
 const organizationNavItems = [
-  { to: "/settings/organization", label: "General", icon: Building2 },
-  { to: "/settings/members", label: "Members", icon: Users },
-  { to: "/settings/billing", label: "Billing", icon: CreditCard },
-  { to: "/settings/security", label: "Security", icon: Shield },
-  { to: "/settings/integrations", label: "Integrations", icon: Webhook },
+  { to: '/settings/organization', label: 'General', icon: Building2 },
+  { to: '/settings/members', label: 'Members', icon: Users },
+  { to: '/settings/billing', label: 'Billing', icon: CreditCard },
+  { to: '/settings/security', label: 'Security', icon: Shield },
+  { to: '/settings/integrations', label: 'Integrations', icon: Webhook },
 ]
 
 export function AppSidebar() {
@@ -57,17 +57,15 @@ export function AppSidebar() {
 
   // Check admin from Stytch roles
   const roles = member?.roles || []
-  const isAdmin = roles.some(
-    (r: { role_id?: string }) => r.role_id === STYTCH_ROLES.ADMIN
-  )
+  const isAdmin = roles.some((r: { role_id?: string }) => r.role_id === STYTCH_ROLES.ADMIN)
 
   const handleLogout = async () => {
     try {
       await stytch.session.revoke()
       // eslint-disable-next-line @typescript-eslint/no-floating-promises -- navigate returns void
-      navigate("/login", { replace: true })
+      navigate('/login', { replace: true })
     } catch (err) {
-      console.error("Logout error:", err)
+      console.error('Logout error:', err)
     }
   }
 
@@ -94,9 +92,7 @@ export function AppSidebar() {
                     <NavLink
                       to={item.to}
                       className={({ isActive }) =>
-                        isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : ""
+                        isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''
                       }
                     >
                       <item.icon className="h-4 w-4" />
@@ -121,9 +117,7 @@ export function AppSidebar() {
                       <NavLink
                         to={item.to}
                         className={({ isActive }) =>
-                          isActive
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                            : ""
+                          isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''
                         }
                       >
                         <item.icon className="h-4 w-4" />
@@ -158,14 +152,12 @@ export function AppSidebar() {
                       {/* eslint-disable @typescript-eslint/no-unnecessary-condition -- member properties can be undefined */}
                       {member?.name?.[0]?.toUpperCase() ||
                         member?.email_address?.[0]?.toUpperCase() ||
-                        "?"}
+                        '?'}
                       {/* eslint-enable @typescript-eslint/no-unnecessary-condition */}
                     </div>
                   )}
                   <div className="flex flex-1 flex-col text-left text-sm min-w-0">
-                    <span className="font-medium truncate">
-                      {member?.name || "User"}
-                    </span>
+                    <span className="font-medium truncate">{member?.name || 'User'}</span>
                     <span className="text-xs text-sidebar-foreground/70 truncate">
                       {member?.email_address}
                     </span>
@@ -186,10 +178,7 @@ export function AppSidebar() {
                   </NavLink>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  className="cursor-pointer"
-                >
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                   <LogOut className="h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>
