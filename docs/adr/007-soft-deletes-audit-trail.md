@@ -1,7 +1,7 @@
 # ADR 007: Soft Deletes for Audit Trail and Compliance
 
 **Status:** Accepted
-**Date:** 2026
+**Date:** January 18, 2026
 
 ## Context
 

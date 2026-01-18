@@ -1,7 +1,7 @@
 # ADR 001: Stytch B2B for Authentication
 
 **Status:** Accepted
-**Date:** 2024
+**Date:** January 18, 2026
 
 ## Context
 

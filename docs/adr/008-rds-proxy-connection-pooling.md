@@ -1,7 +1,7 @@
 # ADR 008: RDS Proxy for Connection Pooling
 
 **Status:** Accepted
-**Date:** 2026
+**Date:** January 18, 2026
 
 ## Context
 

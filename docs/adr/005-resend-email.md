@@ -1,7 +1,7 @@
 # ADR 005: Resend for Transactional Email
 
 **Status:** Accepted
-**Date:** 2026
+**Date:** January 18, 2026
 
 ## Context
 

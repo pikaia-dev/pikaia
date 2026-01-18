@@ -1,7 +1,7 @@
 # ADR 002: Transactional Outbox for Event-Driven Architecture
 
 **Status:** Accepted
-**Date:** 2024
+**Date:** January 18, 2026
 
 ## Context
 
