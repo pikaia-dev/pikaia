@@ -397,6 +397,59 @@ class TestStripeWebhookIdempotency:
     @patch("apps.billing.webhooks.stripe.Webhook.construct_event")
     @patch("apps.billing.webhooks.settings")
     @patch("apps.billing.webhooks.get_stripe")
+    def test_handler_exception_rolls_back_idempotency_marker(
+        self,
+        mock_get_stripe: MagicMock,
+        mock_settings: MagicMock,
+        mock_construct: MagicMock,
+        mock_handler: MagicMock,
+        client: "Client",
+        webhook_url: str,
+    ) -> None:
+        """Should rollback ProcessedWebhook when handler fails, allowing retry."""
+        from apps.core.models import ProcessedWebhook
+
+        mock_settings.STRIPE_WEBHOOK_SECRET = "whsec_test"
+        event_id = "evt_rollback_test"
+        mock_construct.return_value = build_webhook_payload(
+            "customer.subscription.created",
+            {"id": "sub_123", "status": "active"},
+            event_id=event_id,
+        )
+
+        # First request - handler raises exception
+        mock_handler.side_effect = Exception("Database error")
+        response1 = client.post(
+            webhook_url,
+            data=json.dumps({"type": "customer.subscription.created"}),
+            content_type="application/json",
+            HTTP_STRIPE_SIGNATURE="valid_signature",
+        )
+        assert response1.status_code == 500
+
+        # Critical: ProcessedWebhook should NOT be persisted due to rollback
+        assert not ProcessedWebhook.objects.filter(source="stripe", event_id=event_id).exists()
+
+        # Retry request - handler succeeds this time
+        mock_handler.side_effect = None
+        mock_handler.reset_mock()
+        response2 = client.post(
+            webhook_url,
+            data=json.dumps({"type": "customer.subscription.created"}),
+            content_type="application/json",
+            HTTP_STRIPE_SIGNATURE="valid_signature",
+        )
+        assert response2.status_code == 200
+
+        # Handler should be called on retry
+        assert mock_handler.call_count == 1
+        # Now the marker should exist
+        assert ProcessedWebhook.objects.filter(source="stripe", event_id=event_id).exists()
+
+    @patch("apps.billing.webhooks.handle_subscription_created")
+    @patch("apps.billing.webhooks.stripe.Webhook.construct_event")
+    @patch("apps.billing.webhooks.settings")
+    @patch("apps.billing.webhooks.get_stripe")
     def test_duplicate_event_not_processed(
         self,
         mock_get_stripe: MagicMock,

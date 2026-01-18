@@ -665,6 +665,62 @@ class TestStytchWebhookIdempotency:
     @patch("apps.accounts.webhooks.handle_member_created")
     @patch("apps.accounts.webhooks.Webhook")
     @patch("apps.accounts.webhooks.settings")
+    def test_handler_exception_rolls_back_idempotency_marker(
+        self,
+        mock_settings: MagicMock,
+        mock_webhook_class: MagicMock,
+        mock_handler: MagicMock,
+        request_factory: "RequestFactory",
+    ) -> None:
+        """Should rollback ProcessedWebhook when handler fails, allowing retry."""
+        from apps.core.models import ProcessedWebhook
+
+        mock_settings.STYTCH_WEBHOOK_SECRET = "whsec_test"
+        mock_webhook = MagicMock()
+        event_id = "msg_rollback_test"
+        event_data = {
+            "event_type": "direct.member.create",
+            "action": "CREATE",
+            "object_type": "member",
+            "member": {"member_id": "member-123"},
+        }
+        mock_webhook.verify.return_value = event_data
+        mock_webhook_class.return_value = mock_webhook
+
+        # First request - handler raises exception
+        mock_handler.side_effect = Exception("Database error")
+        request1 = request_factory.post(
+            "/webhooks/stytch/",
+            data=json.dumps(event_data).encode(),
+            content_type="application/json",
+            HTTP_SVIX_ID=event_id,
+        )
+        response1 = stytch_webhook(request1)
+        assert response1.status_code == 500
+
+        # Critical: ProcessedWebhook should NOT be persisted due to rollback
+        assert not ProcessedWebhook.objects.filter(source="stytch", event_id=event_id).exists()
+
+        # Retry request - handler succeeds this time
+        mock_handler.side_effect = None
+        mock_handler.reset_mock()
+        request2 = request_factory.post(
+            "/webhooks/stytch/",
+            data=json.dumps(event_data).encode(),
+            content_type="application/json",
+            HTTP_SVIX_ID=event_id,
+        )
+        response2 = stytch_webhook(request2)
+        assert response2.status_code == 200
+
+        # Handler should be called on retry
+        assert mock_handler.call_count == 1
+        # Now the marker should exist
+        assert ProcessedWebhook.objects.filter(source="stytch", event_id=event_id).exists()
+
+    @patch("apps.accounts.webhooks.handle_member_created")
+    @patch("apps.accounts.webhooks.Webhook")
+    @patch("apps.accounts.webhooks.settings")
     def test_duplicate_event_not_processed(
         self,
         mock_settings: MagicMock,
