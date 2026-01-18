@@ -4,15 +4,16 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0008_add_role_and_status_indexes'),
-        ('organizations', '0005_add_soft_delete'),
+        ("accounts", "0008_add_role_and_status_indexes"),
+        ("organizations", "0005_add_soft_delete"),
     ]
 
     operations = [
         migrations.AddIndex(
-            model_name='member',
-            index=models.Index(fields=['organization', 'deleted_at'], name='accounts_me_organiz_e7fd8a_idx'),
+            model_name="member",
+            index=models.Index(
+                fields=["organization", "deleted_at"], name="accounts_me_organiz_e7fd8a_idx"
+            ),
         ),
     ]
