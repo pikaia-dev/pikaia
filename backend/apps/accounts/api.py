@@ -169,7 +169,9 @@ def create_organization(
         if "slug" in error_msg or "duplicate" in error_msg:
             logger.warning("Organization slug conflict: %s", e.details.error_message)
             raise HttpError(409, "Organization slug already in use. Try a different one.") from e
-        if "name" in error_msg and ("use" in error_msg or "exist" in error_msg or "taken" in error_msg):
+        if "name" in error_msg and (
+            "use" in error_msg or "exist" in error_msg or "taken" in error_msg
+        ):
             logger.warning("Organization name conflict: %s", e.details.error_message)
             raise HttpError(409, "Organization name already in use. Try a different one.") from e
         logger.warning("Failed to create organization: %s", e.details.error_message)
@@ -525,7 +527,9 @@ def send_phone_otp(request: HttpRequest, payload: SendPhoneOtpRequest) -> PhoneO
         )
     except StytchError as e:
         logger.warning("Failed to send phone OTP: %s", e.details.error_message)
-        raise HttpError(400, e.details.error_message or "Failed to send verification code") from None
+        raise HttpError(
+            400, e.details.error_message or "Failed to send verification code"
+        ) from None
 
 
 @router.post(
@@ -1000,20 +1004,24 @@ def bulk_invite_members_endpoint(
         normalized_email = item.email.strip().lower()
 
         if normalized_email == current_user_email:
-            skipped_results.append({
-                "email": item.email.strip(),
-                "success": False,
-                "error": "Cannot invite yourself",
-                "stytch_member_id": None,
-            })
+            skipped_results.append(
+                {
+                    "email": item.email.strip(),
+                    "success": False,
+                    "error": "Cannot invite yourself",
+                    "stytch_member_id": None,
+                }
+            )
             continue
 
-        members_data.append({
-            "email": item.email.strip(),  # Use stripped email
-            "name": item.name.strip() if item.name else "",
-            "phone": item.phone.strip() if item.phone else "",
-            "role": item.role,
-        })
+        members_data.append(
+            {
+                "email": item.email.strip(),  # Use stripped email
+                "name": item.name.strip() if item.name else "",
+                "phone": item.phone.strip() if item.phone else "",
+                "role": item.role,
+            }
+        )
 
     if not members_data:
         # All members were skipped (self-invites or existing members)

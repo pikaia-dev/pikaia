@@ -195,7 +195,7 @@ The following events are currently integrated into the codebase:
 # Consumer code handling multiple versions
 def handle_time_entry_created(event: dict):
     version = event["schema_version"]
-    
+
     if version == 1:
         # Original format
         project_id = event["data"]["project_id"]
@@ -352,27 +352,27 @@ A single action produces both:
 class AuditLog(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     workspace_id = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    
+
     # What happened
     action = models.CharField(max_length=100)  # e.g., "user.phone_number_changed"
     entity_type = models.CharField(max_length=50)
     entity_id = models.CharField(max_length=100)
-    
+
     # Who did it
     actor_id = models.CharField(max_length=100)
     actor_email = models.EmailField()
-    
+
     # Context
     correlation_id = models.UUIDField()
     ip_address = models.GenericIPAddressField(null=True)
     user_agent = models.TextField(blank=True)
-    
+
     # Changes
     diff = models.JSONField(default=dict)  # {"old": {...}, "new": {...}}
     metadata = models.JSONField(default=dict)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         indexes = [
             models.Index(fields=["workspace_id", "created_at"]),
@@ -452,30 +452,30 @@ class OutboxEvent(models.Model):
 
     # Primary key - BigAutoField for B-tree locality on write-heavy table
     id = models.BigAutoField(primary_key=True)
-    
+
     # Idempotency key - consumers use this to dedupe
     event_id = models.UUIDField(unique=True, default=uuid.uuid4, db_index=True)
-    
+
     # Event identity
     event_type = models.CharField(max_length=100, db_index=True)
     aggregate_type = models.CharField(max_length=50)
     aggregate_id = models.CharField(max_length=100)
     organization_id = models.CharField(max_length=100, db_index=True)
     schema_version = models.PositiveIntegerField(default=1)
-    
+
     # Full event payload (JSON)
     payload = models.JSONField()
-    
+
     # Publishing lifecycle
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
     published_at = models.DateTimeField(null=True, blank=True)
-    
+
     # Retry tracking
     attempts = models.PositiveIntegerField(default=0)
     next_attempt_at = models.DateTimeField(null=True, blank=True, db_index=True)
     last_error = models.TextField(blank=True)
-    
+
     class Meta:
         indexes = [
             models.Index(fields=["status", "next_attempt_at"]),  # Publisher query
@@ -494,7 +494,7 @@ def publish_pending_events():
         published_at__isnull=True,
         publish_attempts__lt=5,
     ).select_for_update(skip_locked=True)[:100]
-    
+
     for event in pending:
         try:
             eventbridge.put_events(Entries=[{
@@ -605,7 +605,7 @@ def handler(event, context):
     return {"statusCode": 200}
 ```
 
-> [!NOTE]  
+> [!NOTE]
 > The Lambda code is the same regardless of trigger source. Aurora triggers provide sub-second delivery; a CloudWatch schedule can serve as a fallback if needed.
 
 ---
@@ -709,11 +709,11 @@ def publish_event(event: dict):
     """Validate schema before publishing."""
     schema = load_schema(event["event_type"], event["schema_version"])
     jsonschema.validate(event, schema)
-    
+
     # Guard: workspace_id required for all public events
     if is_public_event(event["event_type"]):
         assert event.get("workspace_id"), "workspace_id required for public events"
-    
+
     OutboxEvent.objects.create(
         event_type=event["event_type"],
         payload=event,
@@ -746,20 +746,20 @@ CI check to prevent breaking schema changes:
 ```python
 def create_public_event(internal_event: dict) -> dict:
     """Transform internal event to public event with guards."""
-    
+
     # REQUIRED: workspace_id
     workspace_id = internal_event.get("workspace_id")
     if not workspace_id:
         raise ValueError("Cannot publish public event without workspace_id")
-    
+
     # Strip PII by default (explicit allowlist)
     allowed_fields = PUBLIC_EVENT_ALLOWLIST.get(internal_event["event_type"], set())
-    
+
     public_data = {
         k: v for k, v in internal_event["data"].items()
         if k in allowed_fields
     }
-    
+
     return {
         "event_type": f"public.{internal_event['event_type']}",
         "workspace_id": workspace_id,
@@ -792,13 +792,13 @@ class CorrelationIdMiddleware:
     def __call__(self, request):
         correlation_id = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
         request.correlation_id = correlation_id
-        
+
         # Set in logging context
         structlog.contextvars.bind_contextvars(correlation_id=correlation_id)
-        
+
         # Propagate to AWS X-Ray
         xray_recorder.put_annotation("correlation_id", correlation_id)
-        
+
         response = self.get_response(request)
         response["X-Correlation-ID"] = correlation_id
         return response

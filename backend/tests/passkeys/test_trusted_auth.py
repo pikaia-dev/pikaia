@@ -86,10 +86,10 @@ class TestTrustedAuthToken:
         )
 
         decoded = jwt.decode(token, options={"verify_signature": False})
-        
+
         # Should be issued now-ish (within 2 seconds)
         assert abs(decoded["iat"] - now) <= 2
-        
+
         # Should expire in exactly TRUSTED_AUTH_TOKEN_EXPIRY_SECONDS
         assert decoded["exp"] - decoded["iat"] == TRUSTED_AUTH_TOKEN_EXPIRY_SECONDS
 

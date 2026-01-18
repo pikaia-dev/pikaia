@@ -187,7 +187,7 @@ openssl rsa -pubout -in passkey-private.pem -out passkey-public.pem
 
 1. Go to [Stytch Dashboard → Trusted Auth Tokens](https://stytch.com/dashboard/trusted-auth-tokens)
 2. Create a new profile:
-   - **Name:** `Passkey Authentication`  
+   - **Name:** `Passkey Authentication`
    - **Audience:** `stytch`
    - **Issuer:** `passkey-auth`
 3. Under **Public Keys**, paste the contents of `passkey-public.pem`

@@ -93,11 +93,7 @@ class OTPVerification(models.Model):
     @property
     def is_valid(self) -> bool:
         """Check if OTP can still be used (not expired, not verified, attempts remaining)."""
-        return (
-            not self.is_expired
-            and not self.is_verified
-            and self.attempts < self.max_attempts
-        )
+        return not self.is_expired and not self.is_verified and self.attempts < self.max_attempts
 
     def increment_attempts(self) -> None:
         """Increment the attempt counter."""

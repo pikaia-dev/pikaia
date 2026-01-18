@@ -323,9 +323,7 @@ class TestAuthTest:
     def test_auth_test_returns_org_info(self, authenticated_request):
         org = OrganizationFactory(name="Test Company")
         member = MemberFactory(organization=org, role="admin")
-        request = authenticated_request(
-            member, method="get", path="/api/v1/hooks/auth/test"
-        )
+        request = authenticated_request(member, method="get", path="/api/v1/hooks/auth/test")
 
         result = verify_auth(request)
 

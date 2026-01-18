@@ -2,7 +2,6 @@
 Tests for webhook event catalog.
 """
 
-
 from apps.webhooks.events import (
     WEBHOOK_EVENTS,
     get_categories,

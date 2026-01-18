@@ -121,7 +121,9 @@ class Command(BaseCommand):
                 envelope = EventEnvelope(**event.payload)
                 envelopes.append(envelope)
             except Exception as e:
-                logger.error("event_payload_parse_failed", event_id=str(event.event_id), error=str(e))
+                logger.error(
+                    "event_payload_parse_failed", event_id=str(event.event_id), error=str(e)
+                )
                 event.mark_failed(f"Payload parse error: {e}", max_attempts)
                 continue
 

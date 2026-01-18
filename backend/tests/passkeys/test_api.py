@@ -117,9 +117,7 @@ class TestVerifyRegistration:
         assert "does not match" in str(exc_info.value)
 
     @patch("apps.passkeys.services.verify_registration_response")
-    def test_successful_registration(
-        self, mock_verify, request_factory: RequestFactory
-    ):
+    def test_successful_registration(self, mock_verify, request_factory: RequestFactory):
         """Should create passkey on successful verification."""
         from apps.passkeys.models import Passkey
 
