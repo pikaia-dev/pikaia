@@ -132,3 +132,16 @@ if not CORS_ALLOWED_ORIGINS:
     from apps.core.logging import get_logger
 
     get_logger(__name__).warning("cors_allowed_origins_empty")
+
+# Validate S3 storage configuration
+if settings.USE_S3_STORAGE:
+    _required_s3_settings = {
+        "AWS_STORAGE_BUCKET_NAME": settings.AWS_STORAGE_BUCKET_NAME,
+        "IMAGE_TRANSFORM_URL": settings.IMAGE_TRANSFORM_URL,
+    }
+    missing_s3 = [k for k, v in _required_s3_settings.items() if not v]
+    if missing_s3:
+        raise ValueError(
+            "Production configuration error!\n"
+            f"  - USE_S3_STORAGE is enabled but missing: {', '.join(missing_s3)}"
+        )
