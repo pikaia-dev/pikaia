@@ -38,7 +38,7 @@ const adminPortalStyles = {
   },
   inputs: {
     backgroundColor: "hsl(var(--background))",
-    borderColor: "hsl(var(--border))",
+    borderColor: "hsl(var(--input))",
     borderRadius: "calc(var(--radius) - 2px)",
     textColor: "hsl(var(--foreground))",
     placeholderColor: "hsl(var(--muted-foreground))",
