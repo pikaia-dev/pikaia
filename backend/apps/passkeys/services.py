@@ -38,6 +38,13 @@ AUTHENTICATION_CHALLENGE_PREFIX = "passkey:auth:"
 CHALLENGE_TTL_SECONDS = 300  # 5 minutes
 
 
+def _parse_transports(transports: list[str] | None) -> list[AuthenticatorTransport] | None:
+    """Convert transport strings to AuthenticatorTransport enums."""
+    if not transports:
+        return None
+    return [AuthenticatorTransport(t) for t in transports]
+
+
 @dataclass
 class RegistrationOptions:
     """Options returned to client for passkey registration."""
@@ -97,9 +104,7 @@ class PasskeyService:
         existing_credentials = [
             PublicKeyCredentialDescriptor(
                 id=passkey.credential_id,
-                transports=[AuthenticatorTransport(t) for t in passkey.transports]
-                if passkey.transports
-                else None,
+                transports=_parse_transports(passkey.transports),
             )
             for passkey in user.passkeys.all()
         ]
@@ -269,9 +274,7 @@ class PasskeyService:
                 allowed_credentials = [
                     PublicKeyCredentialDescriptor(
                         id=passkey.credential_id,
-                        transports=[AuthenticatorTransport(t) for t in passkey.transports]
-                        if passkey.transports
-                        else None,
+                        transports=_parse_transports(passkey.transports),
                     )
                     for passkey in user.passkeys.all()
                 ]
