@@ -186,7 +186,10 @@ class TestLambdaHandler:
 
     def test_handler_database_error(self, mock_env):
         """Test handler handles database connection errors."""
-        with patch("handler.psycopg2") as mock_psycopg2:
+        with (
+            patch("handler.psycopg2") as mock_psycopg2,
+            patch("handler.boto3"),  # Must mock boto3 as it's called before db connect
+        ):
             mock_psycopg2.connect.side_effect = Exception("Connection refused")
 
             result = lh.handler({}, None)
