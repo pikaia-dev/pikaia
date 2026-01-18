@@ -39,6 +39,19 @@ refactor(api): extract pagination logic
     - 1 approval required (human or designated AI reviewer)
     - Clean commit history (rebase interactive before merging if necessary)
 
+## Git Safety (AI Agents)
+
+**NEVER use these commands:**
+- `git reset` — Do not unstage or reset commits. If you staged wrong files, commit what's ready and fix in the next commit.
+- `git rebase -i` — Interactive rebase requires manual input.
+- `git push --force` — Never force push unless explicitly requested.
+- `git clean -fd` — Deletes untracked files irreversibly.
+
+**Instead:**
+- Stage specific files with `git add <file>` rather than `git add -A` if unsure.
+- Make small, focused commits. It's fine to have multiple commits.
+- If you made a mistake, make a new commit to fix it — don't try to rewrite history.
+
 ## Code Style
 
 See [rules.md](./RULES.md) for detailed coding standards.
