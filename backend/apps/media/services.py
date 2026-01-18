@@ -7,6 +7,7 @@ import uuid
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
+from typing import cast
 
 from django.conf import settings
 from django.core.files.storage import default_storage
@@ -60,11 +61,20 @@ class StorageService:
         self.use_s3 = getattr(settings, "USE_S3_STORAGE", False)
         if self.use_s3:
             import boto3
+            from botocore.config import Config
 
+            # Timeout configuration for S3 API calls
+            # Used for generating presigned URLs (quick operations)
+            config = Config(
+                connect_timeout=5,
+                read_timeout=30,
+                retries={"max_attempts": 2},
+            )
             # Use default credentials chain (works with Fargate task role, local credentials, etc.)
             self.s3_client = boto3.client(
                 "s3",
                 region_name=getattr(settings, "AWS_S3_REGION_NAME", "us-east-1"),
+                config=config,
             )
             self.bucket_name = settings.AWS_STORAGE_BUCKET_NAME
 
@@ -214,7 +224,7 @@ class StorageService:
         """Extract image dimensions from binary data."""
         try:
             with Image.open(BytesIO(image_data)) as img:
-                return img.size
+                return cast(tuple[int, int], img.size)
         except Exception:
             return (0, 0)
 

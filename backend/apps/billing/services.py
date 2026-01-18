@@ -6,6 +6,7 @@ External calls must NOT be inside database transactions.
 """
 
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 from apps.billing.models import Subscription
 from apps.billing.stripe_client import get_stripe
@@ -29,6 +30,7 @@ def get_or_create_stripe_customer(org: Organization) -> str:
     stripe = get_stripe()
 
     # Determine email for Stripe customer
+    email: str | None
     if org.use_billing_email and org.billing_email:
         email = org.billing_email
     else:
@@ -85,7 +87,7 @@ def get_or_create_stripe_customer(org: Organization) -> str:
             logger.warning("stripe_vat_id_add_failed", error=str(e), org_id=str(org.id))
 
     logger.info("stripe_customer_created", customer_id=customer.id, org_id=str(org.id))
-    return customer.id
+    return cast(str, customer.id)  # Stripe API always returns an ID
 
 
 def sync_billing_to_stripe(org: Organization) -> None:
@@ -100,6 +102,7 @@ def sync_billing_to_stripe(org: Organization) -> None:
     stripe = get_stripe()
 
     # Determine email
+    email: str | None
     if org.use_billing_email and org.billing_email:
         email = org.billing_email
     else:
@@ -176,7 +179,7 @@ def create_checkout_session(
     )
 
     logger.info("stripe_checkout_session_created", session_id=session.id, org_id=str(org.id))
-    return session.url
+    return cast(str, session.url)  # Checkout sessions always have a URL
 
 
 def create_subscription_intent(
@@ -238,7 +241,9 @@ def sync_subscription_from_stripe(subscription_id: str) -> bool:
     try:
         stripe_sub = stripe.Subscription.retrieve(subscription_id)
     except stripe.StripeError as e:
-        logger.error("stripe_subscription_retrieve_failed", subscription_id=subscription_id, error=str(e))
+        logger.error(
+            "stripe_subscription_retrieve_failed", subscription_id=subscription_id, error=str(e)
+        )
         raise
 
     # Use the existing handler to sync the subscription
@@ -320,7 +325,7 @@ def create_customer_portal_session(org: Organization, return_url: str) -> str:
         return_url=return_url,
     )
 
-    return session.url
+    return cast(str, session.url)  # Portal sessions always have a URL
 
 
 def handle_subscription_created(stripe_subscription: dict) -> None:
@@ -331,13 +336,20 @@ def handle_subscription_created(stripe_subscription: dict) -> None:
     """
     org_id = stripe_subscription.get("metadata", {}).get("organization_id")
     if not org_id:
-        logger.warning("stripe_subscription_missing_org_metadata", subscription_id=stripe_subscription.get("id"))
+        logger.warning(
+            "stripe_subscription_missing_org_metadata",
+            subscription_id=stripe_subscription.get("id"),
+        )
         return
 
     try:
         org = Organization.objects.get(id=int(org_id))
     except Organization.DoesNotExist:
-        logger.error("stripe_subscription_org_not_found", org_id=org_id, subscription_id=stripe_subscription.get("id"))
+        logger.error(
+            "stripe_subscription_org_not_found",
+            org_id=org_id,
+            subscription_id=stripe_subscription.get("id"),
+        )
         return
 
     # Parse dates - Stripe 2025 API may nest these differently
@@ -392,7 +404,9 @@ def handle_subscription_created(stripe_subscription: dict) -> None:
             organization_id=str(org.id),
         )
 
-    logger.info("stripe_subscription_synced", org_id=str(org.id), subscription_id=stripe_subscription["id"])
+    logger.info(
+        "stripe_subscription_synced", org_id=str(org.id), subscription_id=stripe_subscription["id"]
+    )
 
 
 def handle_subscription_updated(stripe_subscription: dict) -> None:

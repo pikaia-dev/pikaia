@@ -142,13 +142,13 @@ def publish_pending_events() -> int:
                 cur.execute(
                     """
                     UPDATE events_outboxevent
-                    SET 
+                    SET
                         attempts = attempts + 1,
                         last_error = %s,
                         next_attempt_at = NOW() + (INTERVAL '1 minute' * POWER(2, attempts)),
-                        status = CASE 
-                            WHEN attempts + 1 >= %s THEN 'failed' 
-                            ELSE 'pending' 
+                        status = CASE
+                            WHEN attempts + 1 >= %s THEN 'failed'
+                            ELSE 'pending'
                         END
                     WHERE id = %s
                     """,

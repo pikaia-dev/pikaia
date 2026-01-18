@@ -4,15 +4,18 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0006_make_google_tokens_nullable'),
+        ("accounts", "0006_make_google_tokens_nullable"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='user',
-            name='phone_verified_at',
-            field=models.DateTimeField(blank=True, help_text='Timestamp when phone was verified via OTP. NULL = unverified.', null=True),
+            model_name="user",
+            name="phone_verified_at",
+            field=models.DateTimeField(
+                blank=True,
+                help_text="Timestamp when phone was verified via OTP. NULL = unverified.",
+                null=True,
+            ),
         ),
     ]

@@ -140,6 +140,7 @@ class Member(models.Model):
     role = models.CharField(
         max_length=50,
         default="member",
+        db_index=True,
         help_text="Org-level role from Stytch RBAC",
     )
 

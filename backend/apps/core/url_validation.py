@@ -135,7 +135,8 @@ def validate_avatar_url(url: str, resolve_dns: bool = True) -> str:
             addr_info = socket.getaddrinfo(hostname, 443, proto=socket.IPPROTO_TCP)
             for _family, _type, _proto, _canonname, sockaddr in addr_info:
                 ip = sockaddr[0]
-                if is_private_ip(ip):
+                # sockaddr[0] is always str for AF_INET/AF_INET6, but typed as str|int
+                if isinstance(ip, str) and is_private_ip(ip):
                     raise SSRFError(f"URL resolves to private IP: {ip}")
         except socket.gaierror as e:
             raise SSRFError(f"DNS resolution failed: {e}") from e

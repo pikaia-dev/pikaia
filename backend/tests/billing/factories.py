@@ -25,7 +25,5 @@ class SubscriptionFactory(DjangoModelFactory):
     status = Subscription.Status.ACTIVE
     quantity = 1
     current_period_start = factory.LazyFunction(lambda: datetime.now(tz=UTC))
-    current_period_end = factory.LazyFunction(
-        lambda: datetime.now(tz=UTC) + timedelta(days=30)
-    )
+    current_period_end = factory.LazyFunction(lambda: datetime.now(tz=UTC) + timedelta(days=30))
     cancel_at_period_end = False

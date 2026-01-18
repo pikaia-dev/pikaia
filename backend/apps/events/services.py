@@ -3,8 +3,11 @@ Event services - publishing events via transactional outbox.
 """
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
+
+if TYPE_CHECKING:
+    from apps.accounts.models import User
 
 import structlog
 from django.db import models
@@ -35,7 +38,7 @@ def publish_event(
     event_type: str,
     aggregate: models.Model,
     data: dict[str, Any],
-    actor: "User | None" = None,  # noqa: F821 - User imported at runtime
+    actor: "User | None" = None,
     organization_id: str | None = None,
     schema_version: int = 1,
 ) -> OutboxEvent:
@@ -138,7 +141,7 @@ def publish_event(
 def create_audit_log(
     action: str,
     aggregate: models.Model,
-    actor: "User | None" = None,  # noqa: F821
+    actor: "User | None" = None,
     organization_id: str | None = None,
     diff: dict[str, Any] | None = None,
     metadata: dict[str, Any] | None = None,

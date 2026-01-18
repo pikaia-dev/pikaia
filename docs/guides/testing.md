@@ -141,22 +141,22 @@ from unittest.mock import MagicMock, patch
 
 @pytest.mark.django_db
 class TestCreateSubscriptionIntent:
-    
+
     @patch("apps.billing.services.get_stripe")
     def test_creates_subscription(self, mock_get_stripe):
         mock_stripe = MagicMock()
         mock_get_stripe.return_value = mock_stripe
-        
+
         # Configure mock response
         mock_subscription = MagicMock()
         mock_subscription.id = "sub_test_123"
         mock_subscription.latest_invoice.confirmation_secret.client_secret = "pi_secret"
         mock_stripe.Subscription.create.return_value = mock_subscription
-        
+
         # Test
         org = OrganizationFactory()
         client_secret, sub_id = create_subscription_intent(org, quantity=3)
-        
+
         assert client_secret == "pi_secret"
         mock_stripe.Subscription.create.assert_called_once()
 ```
@@ -170,10 +170,10 @@ from unittest.mock import patch
 def test_send_magic_link(mock_get_client):
     mock_client = MagicMock()
     mock_get_client.return_value = mock_client
-    
+
     # Test sends email
     result = send_magic_link(request, payload)
-    
+
     mock_client.magic_links.email.discovery.send.assert_called_once()
 ```
 
@@ -187,25 +187,25 @@ from ninja.errors import HttpError
 
 @pytest.mark.django_db
 class TestGetSubscription:
-    
+
     def test_returns_active_subscription(self, request_factory):
         sub = SubscriptionFactory(status=Subscription.Status.ACTIVE)
-        
+
         request = request_factory.get("/api/v1/billing/subscription")
         request.auth_user = UserFactory()
         request.auth_member = MemberFactory(organization=sub.organization)
         request.auth_organization = sub.organization
-        
+
         result = get_subscription(request)
-        
+
         assert result.status == "active"
-    
+
     def test_unauthenticated_returns_401(self, request_factory):
         request = request_factory.get("/api/v1/billing/subscription")
-        
+
         with pytest.raises(HttpError) as exc_info:
             get_subscription(request)
-        
+
         assert exc_info.value.status_code == 401
 ```
 
@@ -219,9 +219,9 @@ Services contain the core logic and are easy to test with mocked dependencies.
 def test_sync_subscription_from_stripe():
     with patch("apps.billing.services.get_stripe") as mock:
         mock.return_value.Subscription.retrieve.return_value = MagicMock(status="active")
-        
+
         result = sync_subscription_from_stripe("sub_123")
-        
+
         assert result is True
 ```
 
@@ -233,9 +233,9 @@ API tests verify request parsing, auth, and response format.
 def test_admin_can_create_checkout(mock_service, request_factory):
     request = _create_authenticated_request(role="admin")
     mock_service.return_value = "https://checkout.stripe.com"
-    
+
     result = create_checkout(request, payload)
-    
+
     assert "checkout_url" in result
 ```
 

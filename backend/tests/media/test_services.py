@@ -32,24 +32,28 @@ class TestStorageServiceInit:
 
     def test_initializes_with_s3(self) -> None:
         """Should initialize S3 client when USE_S3_STORAGE is True.
-        
+
         Uses default credentials chain (no explicit keys) which works with:
         - Fargate task IAM role
         - Local AWS credentials file/env vars
         - IAM instance profile
         """
-        with patch("boto3.client") as mock_boto_client, override_settings(
-            USE_S3_STORAGE=True,
-            AWS_STORAGE_BUCKET_NAME="test-bucket",
-            AWS_S3_REGION_NAME="us-west-2",
+        with (
+            patch("boto3.client") as mock_boto_client,
+            override_settings(
+                USE_S3_STORAGE=True,
+                AWS_STORAGE_BUCKET_NAME="test-bucket",
+                AWS_S3_REGION_NAME="us-west-2",
+            ),
         ):
             service = StorageService()
 
             assert service.use_s3 is True
-            mock_boto_client.assert_called_once_with(
-                "s3",
-                region_name="us-west-2",
-            )
+            mock_boto_client.assert_called_once()
+            call_args = mock_boto_client.call_args
+            assert call_args[0][0] == "s3"
+            assert call_args[1]["region_name"] == "us-west-2"
+            assert "config" in call_args[1]  # Timeout config added
 
 
 class TestGenerateKey:
@@ -148,9 +152,12 @@ class TestGenerateUploadUrl:
         mock_s3 = MagicMock()
         mock_s3.generate_presigned_url.return_value = "https://s3.aws.com/presigned"
 
-        with patch("boto3.client", return_value=mock_s3), override_settings(
-            USE_S3_STORAGE=True,
-            AWS_STORAGE_BUCKET_NAME="bucket",
+        with (
+            patch("boto3.client", return_value=mock_s3),
+            override_settings(
+                USE_S3_STORAGE=True,
+                AWS_STORAGE_BUCKET_NAME="bucket",
+            ),
         ):
             service = StorageService()
             result = service.generate_upload_url(
@@ -269,10 +276,13 @@ class TestGetImageUrl:
         """Should use custom domain for S3 URLs when configured."""
         mock_s3 = MagicMock()
 
-        with patch("boto3.client", return_value=mock_s3), override_settings(
-            USE_S3_STORAGE=True,
-            AWS_STORAGE_BUCKET_NAME="bucket",
-            AWS_S3_CUSTOM_DOMAIN="cdn.example.com",
+        with (
+            patch("boto3.client", return_value=mock_s3),
+            override_settings(
+                USE_S3_STORAGE=True,
+                AWS_STORAGE_BUCKET_NAME="bucket",
+                AWS_S3_CUSTOM_DOMAIN="cdn.example.com",
+            ),
         ):
             service = StorageService()
 
