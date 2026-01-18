@@ -387,13 +387,15 @@ path("admin/", admin.site.urls)
 
 ### Frontend Improvements
 
-| Item | Priority | Effort |
-|------|----------|--------|
-| Add bundle size monitoring | Medium | 2 hours |
-| Add aria-describedby for form errors | Medium | 2 hours |
-| Add React component tests | Medium | 8 hours |
-| Add E2E tests (Playwright) | Medium | 16 hours |
-| Add error boundary components | Low | 2 hours |
+| Item | Priority | Effort | Status |
+|------|----------|--------|--------|
+| Add bundle size monitoring | Medium | 2 hours | ❌ |
+| Add aria-describedby for form errors | Medium | 2 hours | ❌ |
+| Add E2E tests (Playwright) | Medium | 16 hours | ❌ |
+| Add error boundary components | Low | 2 hours | ❌ |
+| Add frontend CI workflow | High | 1 hour | ❌ |
+
+*Note: Frontend already has 277 unit tests covering auth, forms, CSV parsing, and utilities.*
 
 ---
 
@@ -401,15 +403,30 @@ path("admin/", admin.site.urls)
 
 ### Test Coverage Summary
 
-| Area | Files | Coverage | Assessment |
-|------|-------|----------|------------|
-| **Backend accounts** | 6 | Good | API, services, webhooks |
-| **Backend billing** | 4 | Partial | Needs more edge cases |
-| **Backend events** | 7 | Excellent | Comprehensive |
-| **Backend webhooks** | 6 | Good | Services, signing |
-| **Backend organizations** | 1 | Good | Models, billing fields, querysets |
-| **Backend SMS** | 2 | Excellent | Services, API, rate limiting, AWS mocking |
-| **Frontend** | 10 | **Minimal** | Schema validation only |
+**Backend: 37 files, 678 tests, 12,651 lines**
+
+| Area | Files | Tests | Assessment |
+|------|-------|-------|------------|
+| **accounts** | 6 | 173 | Excellent - API, services, webhooks, models |
+| **webhooks** | 6 | 126 | Excellent - Services, signing, REST hooks |
+| **core** | 4 | 78 | Good - Security, logging, middleware |
+| **billing** | 4 | 76 | Good - Services, webhooks, models |
+| **media** | 3 | 71 | Good - Services, SVG sanitizer, API |
+| **events** | 8 | 68 | Good - Services, models, cleanup |
+| **passkeys** | 3 | 42 | Good - Trusted auth, services, API |
+| **sms** | 2 | 27 | Good - Rate limiting, AWS mocking |
+| **organizations** | 1 | 17 | Basic - Models only |
+
+**Frontend: 10 files, 277 tests, 1,878 lines**
+
+| Area | Tests | Assessment |
+|------|-------|------------|
+| **CSV import** | 94 | Excellent - Comprehensive parsing |
+| **Auth hooks** | 48 | Excellent - useAuthCallback coverage |
+| **Org derivation** | 35 | Good - Domain/slug logic |
+| **Countries lib** | 25 | Good - Phone validation |
+| **Org API** | 18 | Good - API utilities |
+| **Schema validation** | 57 | Good - All forms covered |
 
 ### CI/CD Assessment
 
