@@ -1,18 +1,25 @@
 """
-Tests for StytchAuthMiddleware.
+Tests for core middleware.
 
-Tests JWT authentication, JIT sync, idempotency, and error paths.
+Tests:
+- CorrelationIdMiddleware: correlation ID, IP/user-agent capture
+- StytchAuthMiddleware: JWT authentication, JIT sync, idempotency, error paths
 """
 
 from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
 import pytest
+import structlog
 from django.http import HttpRequest, HttpResponse
 from stytch.core.response_base import StytchError, StytchErrorDetails
 
 from apps.accounts.models import Member, User
-from apps.core.middleware import StytchAuthMiddleware
+from apps.core.middleware import (
+    CorrelationIdMiddleware,
+    StytchAuthMiddleware,
+    get_client_ip,
+)
 from apps.organizations.models import Organization
 
 
@@ -51,6 +58,139 @@ class MockFullAuthResponse:
 
     member: MockStytchMember
     organization: MockStytchOrg
+
+
+class TestGetClientIp:
+    """Tests for get_client_ip helper function."""
+
+    def test_extracts_ip_from_remote_addr(self):
+        """Should extract IP from REMOTE_ADDR when no X-Forwarded-For."""
+        request = HttpRequest()
+        request.META = {"REMOTE_ADDR": "192.168.1.1"}
+
+        assert get_client_ip(request) == "192.168.1.1"
+
+    def test_extracts_first_ip_from_x_forwarded_for(self):
+        """Should extract first IP from X-Forwarded-For (original client)."""
+        request = HttpRequest()
+        request.META = {
+            "HTTP_X_FORWARDED_FOR": "203.0.113.1, 10.0.0.1, 10.0.0.2",
+            "REMOTE_ADDR": "127.0.0.1",
+        }
+
+        assert get_client_ip(request) == "203.0.113.1"
+
+    def test_handles_single_x_forwarded_for(self):
+        """Should handle single IP in X-Forwarded-For."""
+        request = HttpRequest()
+        request.META = {
+            "HTTP_X_FORWARDED_FOR": "203.0.113.1",
+            "REMOTE_ADDR": "127.0.0.1",
+        }
+
+        assert get_client_ip(request) == "203.0.113.1"
+
+    def test_strips_whitespace_from_x_forwarded_for(self):
+        """Should strip whitespace from IP addresses."""
+        request = HttpRequest()
+        request.META = {
+            "HTTP_X_FORWARDED_FOR": "  203.0.113.1  ,  10.0.0.1  ",
+            "REMOTE_ADDR": "127.0.0.1",
+        }
+
+        assert get_client_ip(request) == "203.0.113.1"
+
+    def test_returns_none_when_no_ip(self):
+        """Should return None when no IP available."""
+        request = HttpRequest()
+        request.META = {}
+
+        assert get_client_ip(request) is None
+
+
+class TestCorrelationIdMiddleware:
+    """Tests for CorrelationIdMiddleware IP and user-agent capture."""
+
+    def test_binds_ip_address_to_contextvars(self):
+        """Should bind IP address to structlog contextvars."""
+
+        def get_response(request):
+            # Check context inside request
+            ctx = structlog.contextvars.get_contextvars()
+            assert ctx.get("request.ip_address") == "203.0.113.1"
+            return HttpResponse()
+
+        middleware = CorrelationIdMiddleware(get_response)
+
+        request = HttpRequest()
+        request.path = "/api/v1/test"
+        request.method = "GET"
+        request.META = {
+            "HTTP_X_FORWARDED_FOR": "203.0.113.1",
+            "REMOTE_ADDR": "127.0.0.1",
+        }
+
+        middleware(request)
+
+    def test_binds_user_agent_to_contextvars(self):
+        """Should bind user-agent to structlog contextvars."""
+
+        def get_response(request):
+            ctx = structlog.contextvars.get_contextvars()
+            assert ctx.get("request.user_agent") == "Mozilla/5.0 Test"
+            return HttpResponse()
+
+        middleware = CorrelationIdMiddleware(get_response)
+
+        request = HttpRequest()
+        request.path = "/api/v1/test"
+        request.method = "GET"
+        request.META = {
+            "REMOTE_ADDR": "127.0.0.1",
+            "HTTP_USER_AGENT": "Mozilla/5.0 Test",
+        }
+
+        middleware(request)
+
+    def test_truncates_long_user_agent(self):
+        """Should truncate user-agent to MAX_USER_AGENT_LENGTH."""
+        long_user_agent = "A" * 1000
+
+        def get_response(request):
+            ctx = structlog.contextvars.get_contextvars()
+            user_agent = ctx.get("request.user_agent", "")
+            assert len(user_agent) == 512  # MAX_USER_AGENT_LENGTH
+            assert user_agent == "A" * 512
+            return HttpResponse()
+
+        middleware = CorrelationIdMiddleware(get_response)
+
+        request = HttpRequest()
+        request.path = "/api/v1/test"
+        request.method = "GET"
+        request.META = {
+            "REMOTE_ADDR": "127.0.0.1",
+            "HTTP_USER_AGENT": long_user_agent,
+        }
+
+        middleware(request)
+
+    def test_handles_missing_user_agent(self):
+        """Should handle missing user-agent gracefully."""
+
+        def get_response(request):
+            ctx = structlog.contextvars.get_contextvars()
+            assert ctx.get("request.user_agent") == ""
+            return HttpResponse()
+
+        middleware = CorrelationIdMiddleware(get_response)
+
+        request = HttpRequest()
+        request.path = "/api/v1/test"
+        request.method = "GET"
+        request.META = {"REMOTE_ADDR": "127.0.0.1"}
+
+        middleware(request)
 
 
 def make_request(path: str = "/api/v1/test", auth_header: str | None = None) -> HttpRequest:

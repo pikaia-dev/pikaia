@@ -21,6 +21,7 @@ The deployment creates:
 - **EventBridge** for event-driven architecture
 - **S3 + CloudFront** for media storage with image transformation
 - **S3 + CloudFront** for frontend SPA hosting
+- **CloudWatch** dashboards and alarms for observability
 
 ## Step 1: Configure AWS Profile
 
@@ -205,8 +206,22 @@ The repository includes GitHub Actions workflows for automatic deployment:
 | Var | `VITE_GOOGLE_PLACES_API_KEY` | Google Places API key (optional) |
 
 
+## Observability
+
+The `TangoObservability` stack deploys CloudWatch dashboards and alarms automatically. To enable email notifications for alarms:
+
+```bash
+AWS_PROFILE=your-profile npx cdk deploy TangoObservability --context alarm_email=ops@example.com
+```
+
+See [Observability Guide](../observability.md) for:
+- Structured logging configuration and field conventions
+- CloudWatch Logs Insights queries
+- Dashboard and alarm customization
+- Correlation between logs, events, and audit trails
+
 ## Next Steps
 
 - [ ] Configure custom domain with Route 53
-- [ ] Set up CloudWatch alarms for production monitoring
+- [ ] Subscribe to alarm SNS topic (PagerDuty, Slack, etc.)
 - [ ] Enable ECS Exec for container access

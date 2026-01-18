@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+import structlog
 from django.db import models
 
 from apps.core.logging import get_logger
@@ -86,6 +87,16 @@ def publish_event(
     else:
         actor_schema = ActorSchema(type="system", id="system")
 
+    # Get request context from structlog contextvars (set by middleware)
+    ctx = structlog.contextvars.get_contextvars()
+    request_context = {
+        "ip_address": ctx.get("request.ip_address"),
+        "user_agent": ctx.get("request.user_agent", ""),
+    }
+
+    # Merge request context with event data (explicit data takes precedence)
+    enriched_data = {**request_context, **data}
+
     # Build event envelope
     event_id = uuid4()
     envelope = EventEnvelope(
@@ -98,7 +109,7 @@ def publish_event(
         organization_id=organization_id,
         correlation_id=get_correlation_id(),
         actor=actor_schema,
-        data=data,
+        data=enriched_data,
     )
 
     # Validate payload size
