@@ -407,8 +407,8 @@ path("admin/", admin.site.urls)
 | **Backend billing** | 4 | Partial | Needs more edge cases |
 | **Backend events** | 7 | Excellent | Comprehensive |
 | **Backend webhooks** | 6 | Good | Services, signing |
-| **Backend organizations** | 1 | **Minimal** | Only models |
-| **Backend SMS** | 2 | **Sparse** | Needs AWS mocking |
+| **Backend organizations** | 1 | Good | Models, billing fields, querysets |
+| **Backend SMS** | 2 | Excellent | Services, API, rate limiting, AWS mocking |
 | **Frontend** | 10 | **Minimal** | Schema validation only |
 
 ### CI/CD Assessment
@@ -432,14 +432,13 @@ No test workflow exists for frontend. Recommend adding:
 
 ### Testing Improvements
 
-| Item | Priority | Effort |
-|------|----------|--------|
-| Add test workflow to CI | Critical | 2 hours |
-| Add frontend test workflow | High | 1 hour |
-| Add organizations app tests | Medium | 4 hours |
-| Add E2E test framework | Medium | 8 hours |
-| Add coverage thresholds | Medium | 1 hour |
-| Add security scanning (bandit) | Medium | 1 hour |
+| Item | Priority | Effort | Status |
+|------|----------|--------|--------|
+| Add test workflow to CI | Critical | 2 hours | ✅ Done |
+| Add frontend test workflow | High | 1 hour | ❌ |
+| Add E2E test framework | Medium | 8 hours | ❌ |
+| Add coverage thresholds | Medium | 1 hour | ❌ |
+| Add security scanning (bandit) | Medium | 1 hour | ❌ |
 
 ---
 
