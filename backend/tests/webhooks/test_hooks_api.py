@@ -128,6 +128,25 @@ class TestSubscribe:
         endpoint = WebhookEndpoint.objects.get(id=result.id)
         assert endpoint.source == WebhookEndpoint.Source.REST_HOOKS
 
+    def test_subscribe_with_wildcard_event(self, authenticated_request):
+        """Wildcard event types like member.* should work."""
+        member = MemberFactory(role="admin")
+        request = authenticated_request(member, method="post", path="/api/v1/hooks")
+
+        payload = RestHookSubscribeRequest(
+            target_url="https://hooks.zapier.com/hooks/catch/123/abc/",
+            event_type="member.*",
+        )
+
+        status, result = subscribe(request, payload)
+
+        assert status == 201
+        assert result.event_type == "member.*"
+
+        # Verify endpoint name falls back to event type for wildcards
+        endpoint = WebhookEndpoint.objects.get(id=result.id)
+        assert "member.*" in endpoint.name
+
     def test_subscribe_rejects_http_url(self):
         """HTTPS is required for webhook URLs."""
         with pytest.raises(ValueError, match="HTTPS"):
