@@ -258,7 +258,7 @@ def main():
         file_path = tool_input.get('file_path', '')
         result = check_path_access(file_path, config, is_write=False, is_delete=False)
 
-    # Output decision
+    # Output decision (explicit allow/deny/ask)
     if result:
         output = {
             'hookSpecificOutput': {
@@ -267,8 +267,15 @@ def main():
                 'permissionDecisionReason': result['reason']
             }
         }
-        print(json.dumps(output))
-
+    else:
+        # Explicit allow - prevents "hook error" display in Claude Code
+        output = {
+            'hookSpecificOutput': {
+                'hookEventName': 'PreToolUse',
+                'permissionDecision': 'allow'
+            }
+        }
+    print(json.dumps(output))
     sys.exit(0)
 
 
