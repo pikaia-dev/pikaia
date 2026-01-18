@@ -115,6 +115,7 @@ def list_endpoints(request: AuthenticatedHttpRequest) -> WebhookEndpointListResp
 
     Requires admin role.
     """
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
     service = WebhookService(request.auth_organization)
     endpoints = service.list_endpoints()
 
@@ -141,6 +142,7 @@ def create_endpoint(
 
     Requires admin role.
     """
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
     service = WebhookService(request.auth_organization)
     endpoint = service.create_endpoint(
         data=payload,
@@ -183,6 +185,7 @@ def get_endpoint(request: AuthenticatedHttpRequest, endpoint_id: str) -> Webhook
 
     Requires admin role.
     """
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
     service = WebhookService(request.auth_organization)
     endpoint = service.get_endpoint(endpoint_id)
 
@@ -212,6 +215,7 @@ def update_endpoint(
 
     Requires admin role.
     """
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
     service = WebhookService(request.auth_organization)
     endpoint = service.update_endpoint(endpoint_id, payload)
 
@@ -243,6 +247,7 @@ def delete_endpoint(request: AuthenticatedHttpRequest, endpoint_id: str) -> tupl
 
     Requires admin role.
     """
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
     service = WebhookService(request.auth_organization)
     deleted = service.delete_endpoint(endpoint_id)
 
@@ -283,6 +288,7 @@ def list_deliveries(
 
     Requires admin role.
     """
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
     service = WebhookService(request.auth_organization)
 
     # Verify endpoint exists and belongs to org
@@ -321,6 +327,7 @@ def send_test_webhook(
 
     Requires admin role.
     """
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
     service = WebhookService(request.auth_organization)
     endpoint = service.get_endpoint(endpoint_id)
 
