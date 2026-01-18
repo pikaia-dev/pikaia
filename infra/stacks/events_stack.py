@@ -113,9 +113,11 @@ def _create_python_lambda(
                 "command": [
                     "bash",
                     "-c",
-                    "pip install -r requirements.txt -t /asset-output && "
-                    "rsync -av --exclude='tests' --exclude='__pycache__' "
-                    "--exclude='*.pyc' --exclude='requirements.txt' . /asset-output/",
+                    (
+                        "pip install -r requirements.txt -t /asset-output && "
+                        "rsync -av --exclude='tests' --exclude='__pycache__' "
+                        "--exclude='*.pyc' --exclude='requirements.txt' . /asset-output/"
+                    ),
                 ],
             },
         ),
