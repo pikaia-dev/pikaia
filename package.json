@@ -16,37 +16,10 @@
     "test": "turbo run test",
     "clean": "turbo run clean",
     "check": "turbo run lint type-check",
-    "prepare": "husky"
+    "prepare": "uvx pre-commit install && uvx pre-commit install --hook-type commit-msg"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
-    "@commitlint/cli": "^20.3.1",
-    "@commitlint/config-conventional": "^20.3.1",
-    "husky": "^9.1.7",
-    "lint-staged": "^16.2.7",
     "turbo": "^2.7.5"
-  },
-  "lint-staged": {
-    "frontend/**/*.{js,jsx,ts,tsx,json,css,md}": [
-      "biome format --write",
-      "biome lint --write"
-    ],
-    "emails/**/*.{js,jsx,ts,tsx,json,css,md}": [
-      "biome format --write",
-      "biome lint --write"
-    ],
-    "infra/**/*.{js,ts,json}": [
-      "biome format --write",
-      "biome lint --write"
-    ],
-    "infra/**/*.py": [
-      "uv run ruff format",
-      "uv run ruff check --fix"
-    ],
-    "backend/**/*.py": [
-      "uv run --directory backend ruff format",
-      "uv run --directory backend ruff check --fix",
-      "uv run --directory backend mypy"
-    ]
   }
 }

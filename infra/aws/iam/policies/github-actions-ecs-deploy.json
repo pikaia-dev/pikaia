@@ -34,9 +34,7 @@
     {
       "Sid": "PassTaskRolesToECS",
       "Effect": "Allow",
-      "Action": [
-        "iam:PassRole"
-      ],
+      "Action": ["iam:PassRole"],
       "Resource": [
         "arn:aws:iam::603628786616:role/TangoApp-TangoBackendTaskExecutionRoleC72AFE65-saV0xcU7XsTx",
         "arn:aws:iam::603628786616:role/TangoApp-TangoBackendTaskTaskRole932EB48A-3ieDO3Q6b5fI"
@@ -61,12 +59,7 @@
     {
       "Sid": "S3FrontendDeploy",
       "Effect": "Allow",
-      "Action": [
-        "s3:PutObject",
-        "s3:GetObject",
-        "s3:DeleteObject",
-        "s3:ListBucket"
-      ],
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:ListBucket"],
       "Resource": [
         "arn:aws:s3:::tango-frontend-603628786616-us-east-1",
         "arn:aws:s3:::tango-frontend-603628786616-us-east-1/*"
@@ -85,20 +78,14 @@
     {
       "Sid": "CDKBootstrapSSM",
       "Effect": "Allow",
-      "Action": [
-        "ssm:GetParameter"
-      ],
+      "Action": ["ssm:GetParameter"],
       "Resource": "arn:aws:ssm:us-east-1:603628786616:parameter/cdk-bootstrap/*"
     },
     {
       "Sid": "STSAssumeRole",
       "Effect": "Allow",
-      "Action": [
-        "sts:AssumeRole"
-      ],
-      "Resource": [
-        "arn:aws:iam::603628786616:role/cdk-*"
-      ]
+      "Action": ["sts:AssumeRole"],
+      "Resource": ["arn:aws:iam::603628786616:role/cdk-*"]
     }
   ]
 }
