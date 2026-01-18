@@ -2,6 +2,7 @@
 Event services - publishing events via transactional outbox.
 """
 
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
@@ -19,19 +20,18 @@ from apps.events.schemas import MAX_PAYLOAD_SIZE_BYTES, ActorSchema, EventEnvelo
 logger = get_logger(__name__)
 
 
-# Context variable for correlation ID (set by middleware)
-_correlation_id: UUID | None = None
+# Thread-safe context variable for correlation ID (set by middleware)
+_correlation_id: ContextVar[UUID | None] = ContextVar("correlation_id", default=None)
 
 
 def set_correlation_id(correlation_id: UUID | None) -> None:
     """Set correlation ID for current request context."""
-    global _correlation_id
-    _correlation_id = correlation_id
+    _correlation_id.set(correlation_id)
 
 
 def get_correlation_id() -> UUID | None:
     """Get correlation ID for current request context."""
-    return _correlation_id
+    return _correlation_id.get()
 
 
 def publish_event(
