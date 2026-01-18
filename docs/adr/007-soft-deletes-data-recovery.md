@@ -1,26 +1,26 @@
-# ADR 007: Soft Deletes for Audit Trail and Compliance
+# ADR 007: Soft Deletes for Data Recovery and Referential Integrity
 
-**Status:** Accepted
 **Date:** January 18, 2026
 
 ## Context
-
-B2B SaaS applications face compliance requirements:
-- Data retention policies (GDPR, SOC 2)
-- Audit trails for enterprise customers
-- Ability to recover accidentally deleted data
-- Legal hold requirements
 
 We need to decide how to handle record deletion for:
 - Organizations (tenants)
 - Members (users within organizations)
 - Other business entities
 
+Key requirements:
+- Recover accidentally deleted data
+- Maintain foreign key references (e.g., `invoice.member` after member deletion)
+- Sync with Stytch's webhook-driven lifecycle
+- Support GDPR "right to deletion" when required
+
+**Note:** Audit trail requirements are handled separately by our event sourcing system (see ADR 002). The AuditLog captures *what happened* ("member.deleted at X by Y"). Soft deletes preserve *the entity data itself*.
+
 Options considered:
-1. **Hard deletes** - Simple, but data is gone forever
-2. **Soft deletes** - Mark as deleted, filter by default
-3. **Event sourcing** - Full history, major complexity
-4. **Archive tables** - Copy before delete, sync complexity
+1. **Hard deletes** - Simple, but data is gone forever, breaks FK references
+2. **Soft deletes** - Mark as deleted, filter by default, preserve data
+3. **Archive tables** - Copy before delete, sync complexity
 
 ## Decision
 
@@ -28,13 +28,41 @@ Use **soft deletes** with `deleted_at` timestamps for Organization and Member mo
 
 ## Rationale
 
-### Compliance Ready
+### Data Recovery
 
-Soft deletes enable:
-- **Audit trail**: Know what was deleted and when
-- **Data recovery**: Undo accidental deletions
-- **Legal holds**: Preserve data during investigations
-- **GDPR compliance**: Can perform actual deletion when required
+Soft deletes enable restoration of accidentally deleted records:
+- Admin deletes wrong member → restore by clearing `deleted_at`
+- No need to reconstruct from event history
+- Immediate recovery without data loss
+
+### Referential Integrity
+
+Foreign keys remain valid after soft delete:
+```python
+# Hard delete breaks this:
+invoice.member  # DoesNotExist error
+
+# Soft delete preserves it:
+invoice.member  # Returns the member
+invoice.member.deleted_at  # Shows when they were deleted
+```
+
+This is critical for:
+- Billing records referencing deleted members
+- Audit queries joining across tables
+- Historical reporting
+
+### Complements Event Sourcing
+
+Our architecture separates concerns:
+
+| System | Purpose | Data |
+|--------|---------|------|
+| **AuditLog** (events) | What happened | Event type, actor, timestamp |
+| **Soft deletes** | Entity preservation | Full entity state, recoverable |
+
+Events tell you "member X was deleted by admin Y at time Z."
+Soft deletes let you query "what was member X's email and role?"
 
 ### Stytch Webhook Alignment
 
@@ -80,7 +108,7 @@ invoice.member.deleted_at  # Shows when they were deleted
 
 ### Positive
 - **Recoverability** - Undo accidental deletions easily
-- **Audit compliance** - Full history of what existed
+- **FK integrity** - References to deleted entities remain valid
 - **Query safety** - Default manager protects business logic
 - **Webhook compatibility** - Matches Stytch's deletion events
 

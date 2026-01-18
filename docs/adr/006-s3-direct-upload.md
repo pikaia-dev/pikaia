@@ -1,6 +1,5 @@
 # ADR 006: S3 Direct Upload with Presigned URLs
 
-**Status:** Accepted
 **Date:** January 18, 2026
 
 ## Context
