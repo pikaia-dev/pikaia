@@ -94,8 +94,8 @@ def publish_event(
         "user_agent": ctx.get("request.user_agent", ""),
     }
 
-    # Merge request context with event data
-    enriched_data = {**data, **request_context}
+    # Merge request context with event data (explicit data takes precedence)
+    enriched_data = {**request_context, **data}
 
     # Build event envelope
     event_id = uuid4()

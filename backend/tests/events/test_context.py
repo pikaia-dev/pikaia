@@ -84,14 +84,15 @@ class TestAuditContext:
     def test_clears_context_on_exception(self):
         """Should clear context even if an exception occurs."""
         test_uuid = "550e8400-e29b-41d4-a716-446655440004"
-        with pytest.raises(RuntimeError), audit_context(correlation_id=test_uuid):
+        try:
+            with pytest.raises(RuntimeError), audit_context(correlation_id=test_uuid):
+                ctx = structlog.contextvars.get_contextvars()
+                assert ctx.get("correlation_id") == test_uuid
+                raise RuntimeError("Test exception")
+        finally:
+            # Context should still be cleared after exception
             ctx = structlog.contextvars.get_contextvars()
-            assert ctx.get("correlation_id") == test_uuid
-            raise RuntimeError("Test exception")
-
-        # Context should still be cleared
-        ctx = structlog.contextvars.get_contextvars()
-        assert "correlation_id" not in ctx
+            assert "correlation_id" not in ctx
 
     def test_handles_none_ip_address(self):
         """Should handle None ip_address gracefully."""
