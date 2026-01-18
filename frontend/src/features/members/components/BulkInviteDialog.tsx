@@ -39,8 +39,8 @@ import {
   type ColumnType,
   EMAIL_REGEX,
   extractCountryFromPhone,
-  parseCsvData,
   type ParsedRow,
+  parseCsvData,
   parseRowsWithMappings,
 } from '../utils/csv-import'
 

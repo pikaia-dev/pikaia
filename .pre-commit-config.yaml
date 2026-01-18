@@ -1,5 +1,5 @@
 # Pre-commit hooks for local development
-# Install: pre-commit install
+# Install: pre-commit install && pre-commit install --hook-type commit-msg
 # Run manually: pre-commit run --all-files
 
 repos:
@@ -12,6 +12,33 @@ repos:
         files: ^(backend|infra)/.*\.py$
       - id: ruff-format
         files: ^(backend|infra)/.*\.py$
+
+  # Biome - JS/TS/JSON linter and formatter
+  - repo: https://github.com/biomejs/pre-commit
+    rev: v2.0.0
+    hooks:
+      - id: biome-check
+        additional_dependencies: ["@biomejs/biome@2.3.11"]
+        files: ^(frontend|emails|infra)/.*\.(js|jsx|ts|tsx|json|css|md)$
+
+  # Mypy - Python type checker (runs via local uv for proper Django settings)
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: uv run --directory backend mypy .
+        language: system
+        types: [python]
+        files: ^backend/
+        exclude: migrations/
+        pass_filenames: false
+
+  # Conventional commits
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.0.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
 
   # Basic file hygiene
   - repo: https://github.com/pre-commit/pre-commit-hooks

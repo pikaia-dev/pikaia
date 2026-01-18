@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom'
 
 import { directLoginOptions, SESSION_DURATION_MINUTES } from '../constants'
 import { getErrorMessage } from '../utils'
-import { createOrganization, isConflictError, type CreateOrgResponse } from '../utils/org-api'
+import { type CreateOrgResponse, createOrganization, isConflictError } from '../utils/org-api'
 import {
   deriveOrgFromEmail,
   generateRetryOrgInfo,

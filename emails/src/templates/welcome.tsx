@@ -1,4 +1,4 @@
-import { Html, Head, Body, Container, Text, Hr } from '@react-email/components'
+import { Body, Container, Head, Hr, Html, Text } from '@react-email/components'
 
 interface WelcomeEmailProps {
   organizationName: string
