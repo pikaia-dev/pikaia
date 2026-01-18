@@ -4,19 +4,20 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0008_add_role_and_status_indexes'),
-        ('organizations', '0005_add_soft_delete'),
+        ("accounts", "0008_add_role_and_status_indexes"),
+        ("organizations", "0005_add_soft_delete"),
     ]
 
     operations = [
         migrations.AlterUniqueTogether(
-            name='member',
+            name="member",
             unique_together=set(),
         ),
         migrations.AddConstraint(
-            model_name='member',
-            constraint=models.UniqueConstraint(fields=('user', 'organization'), name='unique_member_per_org'),
+            model_name="member",
+            constraint=models.UniqueConstraint(
+                fields=("user", "organization"), name="unique_member_per_org"
+            ),
         ),
     ]
