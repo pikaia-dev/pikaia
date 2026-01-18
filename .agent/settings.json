@@ -15,7 +15,21 @@
       "Bash(git checkout*)",
       "Bash(git add*)",
       "Bash(git commit*)",
-      "Bash(git stash*)"
+      "Bash(git stash*)",
+      "Bash(git push*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/damage-control/pre-tool-use.py"
+          }
+        ]
+      }
     ]
   }
 }
