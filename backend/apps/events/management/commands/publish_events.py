@@ -14,8 +14,9 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.core.logging import get_logger
-from apps.events.backends import get_backend
-from apps.events.models import OutboxEvent
+from apps.events.backends import LocalBackend, get_backend
+from apps.events.management.commands.generate_audit_schema import AUDIT_EVENT_TYPES
+from apps.events.models import AuditLog, OutboxEvent
 from apps.events.schemas import EventEnvelope
 
 logger = get_logger(__name__)
@@ -132,18 +133,56 @@ class Command(BaseCommand):
 
         # Process results
         published_count = 0
+        is_local_backend = isinstance(backend, LocalBackend)
+
         for event, result in zip(events, results, strict=True):
             if result.get("status") == "success":
                 event.status = OutboxEvent.Status.PUBLISHED
                 event.published_at = timezone.now()
                 event.save(update_fields=["status", "published_at"])
                 published_count += 1
+
+                # Local dev fallback: create audit logs directly for LocalBackend
+                if is_local_backend and event.event_type in AUDIT_EVENT_TYPES:
+                    self._create_local_audit_log(event)
             else:
                 error = result.get("error", "Unknown error")
                 event.mark_failed(error, max_attempts)
                 logger.warning("event_publish_failed", event_id=str(event.event_id), error=error)
 
         return published_count
+
+    def _create_local_audit_log(self, event: OutboxEvent) -> None:
+        """
+        Create audit log entry for local development.
+
+        In production, the Lambda consumer creates audit logs from EventBridge events.
+        This fallback ensures local development still gets audit logs.
+        """
+        payload = event.payload
+        data = dict(payload.get("data", {}))
+        actor = payload.get("actor", {})
+
+        # Extract request context from data
+        ip_address = data.pop("ip_address", None)
+        user_agent = data.pop("user_agent", "")
+
+        # Use get_or_create for idempotency (event_id is unique)
+        AuditLog.objects.get_or_create(
+            event_id=event.event_id,
+            defaults={
+                "action": event.event_type,
+                "aggregate_type": event.aggregate_type,
+                "aggregate_id": event.aggregate_id,
+                "organization_id": event.organization_id,
+                "actor_id": actor.get("id") or "system",
+                "actor_email": actor.get("email") or "",
+                "correlation_id": payload.get("correlation_id"),
+                "ip_address": ip_address,
+                "user_agent": user_agent,
+                "diff": data,
+            },
+        )
 
     def _sleep_with_jitter(self, base_seconds: float) -> None:
         """Sleep with random jitter to avoid thundering herd."""

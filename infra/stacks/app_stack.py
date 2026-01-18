@@ -91,6 +91,22 @@ class AppStack(Stack):
         # Export database secret for other stacks
         self.database_secret = self.database.secret
 
+        # RDS Proxy for Lambda connections (connection pooling)
+        # This is required for Lambda functions to efficiently connect to Aurora
+        self.rds_proxy = rds.DatabaseProxy(
+            self,
+            "TangoRdsProxy",
+            proxy_target=rds.ProxyTarget.from_cluster(self.database),
+            secrets=[self.database.secret],
+            vpc=vpc,
+            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+            security_groups=[self.database_security_group],
+            require_tls=True,
+            idle_client_timeout=Duration.minutes(5),
+            max_connections_percent=90,
+            max_idle_connections_percent=10,
+        )
+
         # =================================================================
         # Application Secrets
         # =================================================================
@@ -393,4 +409,12 @@ class AppStack(Stack):
             value=self.ecr_repository.repository_uri,
             description="ECR repository URI for Docker images",
             export_name="TangoBackendEcrUri",
+        )
+
+        CfnOutput(
+            self,
+            "RdsProxyEndpoint",
+            value=self.rds_proxy.endpoint,
+            description="RDS Proxy endpoint for Lambda connections",
+            export_name="TangoRdsProxyEndpoint",
         )

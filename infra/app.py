@@ -124,6 +124,7 @@ events_stack = EventsStack(
     vpc=network.vpc,
     database_secret=app_stack.database_secret,
     database_security_group=network.database_security_group,
+    rds_proxy_endpoint=app_stack.rds_proxy.endpoint,
     event_bus_name="tango-events",
     env=env,
 )

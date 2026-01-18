@@ -51,6 +51,7 @@ cd functions/image-transform && npm install && cd ../..
 | **TangoApp** | Aurora PostgreSQL Serverless v2, ECS Fargate, ALB, Secrets |
 | **TangoMedia** | S3 bucket, CloudFront CDN, image transformation Lambda@Edge |
 | **TangoEvents** | EventBridge bus, publisher Lambda, SQS DLQ |
+| **TangoObservability** | CloudWatch dashboards, alarms, SNS notifications |
 
 
 

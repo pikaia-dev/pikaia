@@ -444,6 +444,9 @@ def update_profile(request: HttpRequest, payload: UpdateProfileRequest) -> UserI
     member = request.auth_member  # type: ignore[attr-defined]
     org = request.auth_organization  # type: ignore[attr-defined]
 
+    # Capture old name for event diff
+    old_name = user.name
+
     # Update local database (name only - phone requires OTP verification)
     user.name = payload.name
     user.save(update_fields=["name", "updated_at"])
@@ -459,6 +462,18 @@ def update_profile(request: HttpRequest, payload: UpdateProfileRequest) -> UserI
     except StytchError as e:
         logger.warning("Failed to sync name to Stytch: %s", e.details.error_message)
         # Don't fail the request - local update succeeded
+
+    # Emit user.profile_updated event
+    publish_event(
+        event_type="user.profile_updated",
+        aggregate=user,
+        data={
+            "old_name": old_name,
+            "new_name": payload.name,
+        },
+        actor=user,
+        organization_id=str(org.id),
+    )
 
     return UserInfo(
         id=user.id,
@@ -739,6 +754,17 @@ def update_organization(
     except StytchError as e:
         logger.warning("Failed to sync org to Stytch: %s", e.details.error_message)
         # Don't fail the request - local update succeeded
+
+    # Emit organization.updated event
+    publish_event(
+        event_type="organization.updated",
+        aggregate=org,
+        data={
+            "name": payload.name,
+            "slug": payload.slug,
+        },
+        actor=request.auth_user,  # type: ignore[attr-defined]
+    )
 
     return get_organization(request)
 
