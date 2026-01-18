@@ -3,12 +3,19 @@
   "watch": {
     "include": ["**"],
     "exclude": [
-      "README.md",
+      ".venv/**",
+      "cdk.out/**",
+      "**/__pycache__/**",
+      "**/*.pyc",
+      "**/*.pyo",
+      "**/tests/**",
+      "scripts/**",
       "cdk*.json",
-      "requirements*.txt",
-      "source.bat",
-      "**/__pycache__",
-      "**.pyc"
+      "pyproject.toml",
+      "uv.lock",
+      "package.json",
+      ".python-version",
+      "*.md"
     ]
   },
   "context": {
