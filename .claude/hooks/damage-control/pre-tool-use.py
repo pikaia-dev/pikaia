@@ -146,9 +146,46 @@ def check_path_access(file_path: str, config: dict, is_write: bool, is_delete: b
     return None
 
 
+def extract_paths_from_delete_command(command: str) -> list[str]:
+    """Extract file paths from rm/rmdir/unlink commands."""
+    paths = []
+    # Match rm, rmdir, unlink commands
+    delete_pattern = r'^(rm|rmdir|unlink)\s+'
+    if not re.match(delete_pattern, command.strip(), re.IGNORECASE):
+        return paths
+
+    # Remove the command and flags, extract paths
+    # Split by spaces but respect quotes
+    parts = []
+    current = []
+    in_quote = None
+    for char in command:
+        if char in ('"', "'") and not in_quote:
+            in_quote = char
+        elif char == in_quote:
+            in_quote = None
+        elif char == ' ' and not in_quote:
+            if current:
+                parts.append(''.join(current))
+                current = []
+            continue
+        current.append(char)
+    if current:
+        parts.append(''.join(current))
+
+    # Skip command name and flags (start with -)
+    for part in parts[1:]:
+        stripped = part.strip('"\'')
+        if stripped and not stripped.startswith('-'):
+            paths.append(stripped)
+
+    return paths
+
+
 def check_bash_command(command: str, config: dict) -> dict | None:
     """Check if a bash command should be blocked or require confirmation."""
 
+    # First check command patterns
     for entry in config.get('bashToolPatterns', []):
         if not isinstance(entry, dict):
             continue
@@ -165,6 +202,16 @@ def check_bash_command(command: str, config: dict) -> dict | None:
                 }
         except re.error:
             continue  # Skip invalid patterns
+
+    # Check if delete command targets protected paths
+    delete_paths = extract_paths_from_delete_command(command)
+    for file_path in delete_paths:
+        for pattern in config.get('noDeletePaths', []):
+            if path_matches(file_path, pattern):
+                return {
+                    'decision': 'deny',
+                    'reason': f"'{file_path}' cannot be deleted (matches '{pattern}')"
+                }
 
     return None
 
@@ -198,8 +245,8 @@ def main():
 
     elif tool_name in ('Edit', 'Write'):
         file_path = tool_input.get('file_path', '')
-        is_delete = False
-        result = check_path_access(file_path, config, is_write=True, is_delete=is_delete)
+        # Edit/Write don't delete files; deletions happen via Bash rm
+        result = check_path_access(file_path, config, is_write=True, is_delete=False)
 
     elif tool_name == 'Read':
         file_path = tool_input.get('file_path', '')
