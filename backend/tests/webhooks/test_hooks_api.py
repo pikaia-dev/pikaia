@@ -3,7 +3,6 @@ Tests for REST Hooks API (Zapier/Make integration).
 """
 
 import pytest
-from django.test import RequestFactory
 
 from apps.webhooks.hooks_api import (
     get_sample,
@@ -14,45 +13,17 @@ from apps.webhooks.hooks_api import (
 )
 from apps.webhooks.models import WebhookEndpoint
 from apps.webhooks.schemas import RestHookSubscribeRequest
-from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
+from tests.accounts.factories import MemberFactory, OrganizationFactory
 
 pytestmark = pytest.mark.django_db
-
-
-def _create_authenticated_request(
-    request_factory: RequestFactory,
-    method: str,
-    path: str,
-    org=None,
-    role: str = "admin",
-):
-    """Helper to create an authenticated request with member/org attached."""
-    if org is None:
-        org = OrganizationFactory()
-    user = UserFactory()
-    member = MemberFactory(user=user, organization=org, role=role)
-
-    if method == "get":
-        request = request_factory.get(path)
-    elif method == "delete":
-        request = request_factory.delete(path)
-    else:
-        request = request_factory.post(path)
-
-    request.auth_user = user
-    request.auth_member = member
-    request.auth_organization = org
-    return request
 
 
 class TestSubscribe:
     """Tests for POST /api/v1/hooks (subscribe)."""
 
-    def test_subscribe_creates_endpoint(self, request_factory: RequestFactory):
-        org = OrganizationFactory()
-        request = _create_authenticated_request(
-            request_factory, "post", "/api/v1/hooks", org=org
-        )
+    def test_subscribe_creates_endpoint(self, authenticated_request):
+        member = MemberFactory(role="admin")
+        request = authenticated_request(member, method="post", path="/api/v1/hooks")
 
         payload = RestHookSubscribeRequest(
             target_url="https://hooks.zapier.com/hooks/catch/123/abc/",
@@ -69,13 +40,11 @@ class TestSubscribe:
         # Verify endpoint was created in DB
         endpoint = WebhookEndpoint.objects.get(id=result.id)
         assert endpoint.source == WebhookEndpoint.Source.ZAPIER
-        assert endpoint.organization == org
+        assert endpoint.organization == member.organization
 
-    def test_subscribe_detects_make_source(self, request_factory: RequestFactory):
-        org = OrganizationFactory()
-        request = _create_authenticated_request(
-            request_factory, "post", "/api/v1/hooks", org=org
-        )
+    def test_subscribe_detects_make_source(self, authenticated_request):
+        member = MemberFactory(role="admin")
+        request = authenticated_request(member, method="post", path="/api/v1/hooks")
 
         payload = RestHookSubscribeRequest(
             target_url="https://hook.eu1.make.com/abc123",
@@ -88,11 +57,9 @@ class TestSubscribe:
         endpoint = WebhookEndpoint.objects.get(id=result.id)
         assert endpoint.source == WebhookEndpoint.Source.MAKE
 
-    def test_subscribe_detects_generic_rest_hooks(self, request_factory: RequestFactory):
-        org = OrganizationFactory()
-        request = _create_authenticated_request(
-            request_factory, "post", "/api/v1/hooks", org=org
-        )
+    def test_subscribe_detects_generic_rest_hooks(self, authenticated_request):
+        member = MemberFactory(role="admin")
+        request = authenticated_request(member, method="post", path="/api/v1/hooks")
 
         payload = RestHookSubscribeRequest(
             target_url="https://example.com/webhook",
@@ -105,7 +72,7 @@ class TestSubscribe:
         endpoint = WebhookEndpoint.objects.get(id=result.id)
         assert endpoint.source == WebhookEndpoint.Source.REST_HOOKS
 
-    def test_subscribe_rejects_http_url(self, request_factory: RequestFactory):
+    def test_subscribe_rejects_http_url(self):
         """HTTPS is required for webhook URLs."""
         with pytest.raises(ValueError, match="HTTPS"):
             RestHookSubscribeRequest(
@@ -113,7 +80,7 @@ class TestSubscribe:
                 event_type="member.created",
             )
 
-    def test_subscribe_rejects_invalid_event_type(self, request_factory: RequestFactory):
+    def test_subscribe_rejects_invalid_event_type(self):
         """Invalid event types should be rejected."""
         with pytest.raises(ValueError, match="Invalid event type"):
             RestHookSubscribeRequest(
@@ -125,32 +92,28 @@ class TestSubscribe:
 class TestUnsubscribe:
     """Tests for DELETE /api/v1/hooks/{id} (unsubscribe)."""
 
-    def test_unsubscribe_deletes_endpoint(self, request_factory: RequestFactory):
-        org = OrganizationFactory()
-        request = _create_authenticated_request(
-            request_factory, "delete", "/api/v1/hooks/test", org=org
-        )
+    def test_unsubscribe_deletes_endpoint(self, authenticated_request):
+        member = MemberFactory(role="admin")
 
         # Create a subscription first
         endpoint = WebhookEndpoint.objects.create(
-            organization=org,
+            organization=member.organization,
             name="Test Hook",
             url="https://hooks.zapier.com/test",
             events=["member.created"],
             source=WebhookEndpoint.Source.ZAPIER,
         )
 
+        request = authenticated_request(member, method="delete", path="/api/v1/hooks/x")
         status, result = unsubscribe(request, endpoint.id)
 
         assert status == 204
         assert result is None
         assert not WebhookEndpoint.objects.filter(id=endpoint.id).exists()
 
-    def test_unsubscribe_returns_404_for_unknown_id(self, request_factory: RequestFactory):
-        org = OrganizationFactory()
-        request = _create_authenticated_request(
-            request_factory, "delete", "/api/v1/hooks/test", org=org
-        )
+    def test_unsubscribe_returns_404_for_unknown_id(self, authenticated_request):
+        member = MemberFactory(role="admin")
+        request = authenticated_request(member, method="delete", path="/api/v1/hooks/x")
 
         from ninja.errors import HttpError
 
@@ -159,12 +122,11 @@ class TestUnsubscribe:
 
         assert exc_info.value.status_code == 404
 
-    def test_unsubscribe_cannot_delete_other_orgs_endpoint(
-        self, request_factory: RequestFactory
-    ):
+    def test_unsubscribe_cannot_delete_other_orgs_endpoint(self, authenticated_request):
         """Endpoints belong to organizations - can't delete others'."""
         org1 = OrganizationFactory()
         org2 = OrganizationFactory()
+        member2 = MemberFactory(organization=org2, role="admin")
 
         # Create endpoint for org1
         endpoint = WebhookEndpoint.objects.create(
@@ -176,9 +138,7 @@ class TestUnsubscribe:
         )
 
         # Try to delete from org2's context
-        request = _create_authenticated_request(
-            request_factory, "delete", "/api/v1/hooks/test", org=org2
-        )
+        request = authenticated_request(member2, method="delete", path="/api/v1/hooks/x")
 
         from ninja.errors import HttpError
 
@@ -193,38 +153,37 @@ class TestUnsubscribe:
 class TestListSubscriptions:
     """Tests for GET /api/v1/hooks (list)."""
 
-    def test_list_returns_rest_hook_subscriptions(self, request_factory: RequestFactory):
-        org = OrganizationFactory()
-        request = _create_authenticated_request(
-            request_factory, "get", "/api/v1/hooks", org=org
-        )
+    def test_list_returns_rest_hook_subscriptions(self, authenticated_request):
+        member = MemberFactory(role="admin")
 
         # Create mixed endpoints
         _manual = WebhookEndpoint.objects.create(
-            organization=org,
+            organization=member.organization,
             name="Manual Endpoint",
             url="https://example.com/webhook",
             events=["member.created"],
             source=WebhookEndpoint.Source.MANUAL,
         )
         zapier = WebhookEndpoint.objects.create(
-            organization=org,
+            organization=member.organization,
             name="Zapier Hook",
             url="https://hooks.zapier.com/test",
             events=["member.created"],
             source=WebhookEndpoint.Source.ZAPIER,
         )
 
+        request = authenticated_request(member, method="get", path="/api/v1/hooks")
         result = list_subscriptions(request)
 
         # Should only return REST Hook subscriptions, not manual
         assert len(result.subscriptions) == 1
         assert result.subscriptions[0].id == zapier.id
 
-    def test_list_does_not_include_other_orgs(self, request_factory: RequestFactory):
+    def test_list_does_not_include_other_orgs(self, authenticated_request):
         """Subscriptions are scoped to organization."""
         org1 = OrganizationFactory()
         org2 = OrganizationFactory()
+        member1 = MemberFactory(organization=org1, role="admin")
 
         # Create endpoints for each org
         _ep1 = WebhookEndpoint.objects.create(
@@ -242,10 +201,7 @@ class TestListSubscriptions:
             source=WebhookEndpoint.Source.ZAPIER,
         )
 
-        # Request from org1
-        request = _create_authenticated_request(
-            request_factory, "get", "/api/v1/hooks", org=org1
-        )
+        request = authenticated_request(member1, method="get", path="/api/v1/hooks")
         result = list_subscriptions(request)
 
         assert len(result.subscriptions) == 1
@@ -255,27 +211,27 @@ class TestListSubscriptions:
 class TestGetSample:
     """Tests for GET /api/v1/hooks/samples/{event_type}."""
 
-    def test_get_sample_returns_payload(self, request_factory: RequestFactory):
-        org = OrganizationFactory()
-        request = _create_authenticated_request(
-            request_factory, "get", "/api/v1/hooks/samples/member.created", org=org
+    def test_get_sample_returns_payload(self, authenticated_request):
+        member = MemberFactory(role="admin")
+        request = authenticated_request(
+            member, method="get", path="/api/v1/hooks/samples/member.created"
         )
 
         result = get_sample(request, "member.created")
 
         assert result.event_type == "member.created"
         assert result.description != ""
-        assert "type" in result.sample_payload
         assert result.sample_payload["type"] == "member.created"
         assert "data" in result.sample_payload
         assert "organization_id" in result.sample_payload
+        # Verify it uses WebhookPayload structure
+        assert "spec_version" in result.sample_payload
+        assert "timestamp" in result.sample_payload
 
-    def test_get_sample_returns_404_for_unknown_event(
-        self, request_factory: RequestFactory
-    ):
-        org = OrganizationFactory()
-        request = _create_authenticated_request(
-            request_factory, "get", "/api/v1/hooks/samples/unknown.event", org=org
+    def test_get_sample_returns_404_for_unknown_event(self, authenticated_request):
+        member = MemberFactory(role="admin")
+        request = authenticated_request(
+            member, method="get", path="/api/v1/hooks/samples/unknown.event"
         )
 
         from ninja.errors import HttpError
@@ -289,10 +245,11 @@ class TestGetSample:
 class TestAuthTest:
     """Tests for GET /api/v1/hooks/auth/test."""
 
-    def test_auth_test_returns_org_info(self, request_factory: RequestFactory):
+    def test_auth_test_returns_org_info(self, authenticated_request):
         org = OrganizationFactory(name="Test Company")
-        request = _create_authenticated_request(
-            request_factory, "get", "/api/v1/hooks/auth/test", org=org
+        member = MemberFactory(organization=org, role="admin")
+        request = authenticated_request(
+            member, method="get", path="/api/v1/hooks/auth/test"
         )
 
         result = verify_auth(request)
