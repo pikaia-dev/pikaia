@@ -80,7 +80,6 @@ Items that become important as the product scales or based on customer feedback.
 | Item | Effort | When |
 |------|--------|------|
 | API versioning guide | 1h | When v2 API is planned |
-| Testing guide | 2h | When onboarding new developers |
 | Security guide | 2h | For compliance documentation |
 
 ---
