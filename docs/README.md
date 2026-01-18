@@ -16,7 +16,15 @@ Technical documentation for the Tango Django SaaS Starter.
 
 ### Guides
 - [Local Development](./guides/local-development.md) — Setup and common commands
+- [Production Deployment](./guides/production-deployment.md) — AWS deployment with CDK
 - [Testing](./guides/testing.md) — Test strategy and running tests
+
+### Operations
+- [Observability](./observability.md) — Structured logging, events, and audit trails
+- [Webhooks](./webhooks.md) — Customer-facing webhook API
+
+### Planning
+- [Roadmap](./ROADMAP.md) — Future enhancements and improvements
 
 ## API Reference
 

@@ -9,6 +9,7 @@ import {
 } from "../../components/ui/card"
 
 // Style the Stytch Admin Portal to match the shadcn theme
+// Note: Stytch doesn't resolve CSS variables, so we use concrete color values
 const adminPortalStyles = {
   container: {
     backgroundColor: "transparent",
@@ -17,31 +18,31 @@ const adminPortalStyles = {
     width: "100%",
   },
   colors: {
-    primary: "hsl(var(--primary))",
-    secondary: "hsl(var(--secondary))",
-    success: "hsl(var(--success, 142 76% 36%))",
-    error: "hsl(var(--destructive))",
+    primary: "#171717",
+    secondary: "#fafafa",
+    success: "#22c55e",
+    error: "#ef4444",
   },
   buttons: {
     primary: {
-      backgroundColor: "hsl(var(--primary))",
-      borderColor: "hsl(var(--primary))",
-      borderRadius: "calc(var(--radius) - 2px)",
-      textColor: "hsl(var(--primary-foreground))",
+      backgroundColor: "#171717",
+      borderColor: "#171717",
+      borderRadius: "0.375rem",
+      textColor: "#fafafa",
     },
     secondary: {
-      backgroundColor: "hsl(var(--secondary))",
-      borderColor: "hsl(var(--border))",
-      borderRadius: "calc(var(--radius) - 2px)",
-      textColor: "hsl(var(--secondary-foreground))",
+      backgroundColor: "#fafafa",
+      borderColor: "#d4d4d4",
+      borderRadius: "0.375rem",
+      textColor: "#171717",
     },
   },
   inputs: {
-    backgroundColor: "hsl(var(--background))",
-    borderColor: "hsl(var(--border))",
-    borderRadius: "calc(var(--radius) - 2px)",
-    textColor: "hsl(var(--foreground))",
-    placeholderColor: "hsl(var(--muted-foreground))",
+    backgroundColor: "#ffffff",
+    borderColor: "#a3a3a3",
+    borderRadius: "0.375rem",
+    textColor: "#171717",
+    placeholderColor: "#737373",
   },
   fontFamily: "inherit",
 }

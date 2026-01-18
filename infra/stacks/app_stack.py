@@ -47,7 +47,6 @@ class AppStack(Stack):
         construct_id: str,
         *,
         vpc: ec2.IVpc,
-        database_security_group: ec2.ISecurityGroup,
         media_bucket: s3.IBucket | None = None,
         media_cdn_domain: str | None = None,
         certificate_arn: str | None = None,
@@ -64,8 +63,15 @@ class AppStack(Stack):
         # Database
         # =================================================================
 
-        # Security group from NetworkStack (avoids cyclic dependencies)
-        self.database_security_group = database_security_group
+        # Database security group - created here to avoid cyclic dependencies
+        # between stacks. Shared with EventsStack via parameter.
+        self.database_security_group = ec2.SecurityGroup(
+            self,
+            "DatabaseSG",
+            vpc=vpc,
+            description="Security group for Aurora PostgreSQL",
+            allow_all_outbound=False,
+        )
 
         # Aurora Serverless v2 cluster
         self.database = rds.DatabaseCluster(
@@ -90,6 +96,22 @@ class AppStack(Stack):
 
         # Export database secret for other stacks
         self.database_secret = self.database.secret
+
+        # RDS Proxy for Lambda connections (connection pooling)
+        # This is required for Lambda functions to efficiently connect to Aurora
+        self.rds_proxy = rds.DatabaseProxy(
+            self,
+            "TangoRdsProxy",
+            proxy_target=rds.ProxyTarget.from_cluster(self.database),
+            secrets=[self.database.secret],
+            vpc=vpc,
+            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+            security_groups=[self.database_security_group],
+            require_tls=True,
+            idle_client_timeout=Duration.minutes(5),
+            max_connections_percent=90,
+            max_idle_connections_percent=10,
+        )
 
         # =================================================================
         # Application Secrets
@@ -339,8 +361,9 @@ class AppStack(Stack):
             scale_out_cooldown=Duration.seconds(60),
         )
 
-        # Expose ALB for frontend stack
+        # Expose ALB and target group for frontend and observability stacks
         self.alb = self.fargate_service.load_balancer
+        self.target_group = self.fargate_service.target_group
 
         # Health check configuration
         self.fargate_service.target_group.configure_health_check(
@@ -392,4 +415,12 @@ class AppStack(Stack):
             value=self.ecr_repository.repository_uri,
             description="ECR repository URI for Docker images",
             export_name="TangoBackendEcrUri",
+        )
+
+        CfnOutput(
+            self,
+            "RdsProxyEndpoint",
+            value=self.rds_proxy.endpoint,
+            description="RDS Proxy endpoint for Lambda connections",
+            export_name="TangoRdsProxyEndpoint",
         )

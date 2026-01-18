@@ -882,3 +882,54 @@ class TestBulkInviteMembers:
         assert result["results"][0]["success"] is False
         assert "pending invitation" in result["results"][0]["error"]
         assert result["results"][0]["stytch_member_id"] == "stytch-invited"
+
+    @patch("apps.accounts.services.invite_member")
+    def test_deduplicates_emails_case_insensitive(self, mock_invite: MagicMock) -> None:
+        """Should dedupe emails (case-insensitive), processing only first occurrence."""
+        org = OrganizationFactory()
+        member = MemberFactory(organization=org, stytch_member_id="stytch-new")
+
+        mock_invite.return_value = (member, True)
+
+        members_data = [
+            {"email": "User@Example.com", "name": "First", "phone": "", "role": "member"},
+            {"email": "user@example.com", "name": "Duplicate", "phone": "", "role": "admin"},
+            {"email": "USER@EXAMPLE.COM", "name": "Another Dup", "phone": "", "role": "member"},
+        ]
+
+        result = bulk_invite_members(organization=org, members_data=members_data)
+
+        # Only first should be processed, others are duplicates
+        assert result["total"] == 3
+        assert result["succeeded"] == 1
+        assert result["failed"] == 2
+
+        # First occurrence succeeds
+        assert result["results"][0]["email"] == "user@example.com"
+        assert result["results"][0]["success"] is False
+        assert "Duplicate email" in result["results"][0]["error"]
+
+        assert result["results"][1]["email"] == "USER@EXAMPLE.COM"
+        assert result["results"][1]["success"] is False
+        assert "Duplicate email" in result["results"][1]["error"]
+
+        # Last one is the actual invite (after dedupes)
+        assert result["results"][2]["success"] is True
+
+        # invite_member should only be called once
+        mock_invite.assert_called_once()
+
+    def test_rejects_batch_exceeding_max_size(self) -> None:
+        """Should raise ValueError if batch exceeds MAX_BULK_INVITE_SIZE."""
+        from apps.accounts.services import MAX_BULK_INVITE_SIZE
+
+        org = OrganizationFactory()
+
+        # Create batch exceeding limit
+        members_data = [
+            {"email": f"user{i}@example.com", "name": f"User {i}", "phone": "", "role": "member"}
+            for i in range(MAX_BULK_INVITE_SIZE + 1)
+        ]
+
+        with pytest.raises(ValueError, match=f"limited to {MAX_BULK_INVITE_SIZE}"):
+            bulk_invite_members(organization=org, members_data=members_data)

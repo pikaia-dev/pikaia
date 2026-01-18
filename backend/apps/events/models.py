@@ -140,6 +140,15 @@ class AuditLog(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
+    # Link to source event for idempotency (prevents duplicates on retry)
+    event_id = models.UUIDField(
+        unique=True,
+        null=True,  # Nullable for existing rows / manual audit logs
+        blank=True,
+        db_index=True,
+        help_text="Source OutboxEvent ID for idempotency",
+    )
+
     # What happened
     action = models.CharField(
         max_length=100,

@@ -29,12 +29,6 @@ from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFac
 from .factories import SubscriptionFactory
 
 
-@pytest.fixture
-def request_factory() -> RequestFactory:
-    """Django request factory for unit testing views."""
-    return RequestFactory()
-
-
 def _create_authenticated_request(
     request_factory: RequestFactory,
     method: str,

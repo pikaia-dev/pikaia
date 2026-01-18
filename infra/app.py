@@ -8,6 +8,7 @@ Stacks:
 - TangoFrontend: S3 + CloudFront for React SPA with API routing
 - TangoMedia: S3 bucket, CloudFront CDN, image transformation Lambda
 - TangoEvents: EventBridge bus, publisher Lambda, DLQ
+- TangoObservability: CloudWatch dashboards and alarms
 
 Usage:
     # Synth (validate)
@@ -18,6 +19,9 @@ Usage:
 
     # Deploy with custom domain
     cdk deploy TangoApp --context domain_name=api.example.com --context certificate_arn=arn:aws:acm:...
+
+    # Deploy with alarm notifications
+    cdk deploy TangoObservability --context alarm_email=ops@example.com
 
     # Deploy all
     cdk deploy --all
@@ -30,6 +34,7 @@ from stacks.events_stack import EventsStack
 from stacks.frontend_stack import FrontendStack
 from stacks.media_stack import MediaStack
 from stacks.network_stack import NetworkStack
+from stacks.observability_stack import ObservabilityStack
 from stacks.validation import add_validation_aspects
 
 app = cdk.App()
@@ -79,7 +84,6 @@ app_stack = AppStack(
     app,
     "TangoApp",
     vpc=network.vpc,
-    database_security_group=network.database_security_group,
     media_bucket=media.bucket,
     media_cdn_domain=media.distribution.distribution_domain_name,
     domain_name=domain_name,
@@ -118,11 +122,32 @@ events_stack = EventsStack(
     "TangoEvents",
     vpc=network.vpc,
     database_secret=app_stack.database_secret,
-    database_security_group=network.database_security_group,
+    database_security_group=app_stack.database_security_group,
+    rds_proxy_endpoint=app_stack.rds_proxy.endpoint,
     event_bus_name="tango-events",
     env=env,
 )
 events_stack.add_dependency(app_stack)
+
+# =============================================================================
+# Observability: CloudWatch Dashboards + Alarms
+# =============================================================================
+
+# Optional: Email for alarm notifications
+alarm_email = app.node.try_get_context("alarm_email")
+
+observability = ObservabilityStack(
+    app,
+    "TangoObservability",
+    alb=app_stack.alb,
+    target_group=app_stack.target_group,
+    ecs_cluster=app_stack.cluster,
+    ecs_service=app_stack.fargate_service.service,
+    database=app_stack.database,
+    alarm_email=alarm_email,
+    env=env,
+)
+observability.add_dependency(app_stack)
 
 # =============================================================================
 # Validation: Pre-deployment checks

@@ -5,13 +5,13 @@ LocalBackend: Logs events to console (dev)
 EventBridgeBackend: Publishes to AWS EventBridge (production)
 """
 
-import logging
 from abc import ABC, abstractmethod
 from typing import Any
 
+from apps.core.logging import get_logger
 from apps.events.schemas import EventEnvelope
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class EventBackend(ABC):
@@ -41,20 +41,14 @@ class LocalBackend(EventBackend):
         results = []
 
         for event in events:
-            # Use same JSON serialization as EventBridge
-            event_json = event.model_dump_json(indent=2)
-
             logger.info(
-                "[LocalBackend] Event published:\n"
-                "  Type: %s\n"
-                "  Aggregate: %s/%s\n"
-                "  Organization: %s\n"
-                "  Payload:\n%s",
-                event.event_type,
-                event.aggregate_type,
-                event.aggregate_id,
-                event.organization_id,
-                event_json,
+                "domain_event_published",
+                event_type=event.event_type,
+                event_id=str(event.event_id),
+                aggregate_type=event.aggregate_type,
+                aggregate_id=event.aggregate_id,
+                organization_id=event.organization_id,
+                backend="local",
             )
 
             results.append({"event_id": str(event.event_id), "status": "success"})
@@ -122,7 +116,7 @@ class EventBridgeBackend(EventBackend):
         try:
             response = self.client.put_events(Entries=entries)
         except Exception as e:
-            logger.error("EventBridge PutEvents failed: %s", e)
+            logger.error("eventbridge_put_events_failed", error=str(e), batch_size=len(events))
             # Return all as failed
             return [
                 {"event_id": str(event.event_id), "status": "error", "error": str(e)}

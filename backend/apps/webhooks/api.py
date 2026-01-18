@@ -117,7 +117,7 @@ def list_endpoints(request: HttpRequest) -> WebhookEndpointListResponse:
 
     Requires admin role.
     """
-    service = WebhookService(request.organization)
+    service = WebhookService(request.auth_organization)
     endpoints = service.list_endpoints()
 
     return WebhookEndpointListResponse(
@@ -145,16 +145,16 @@ def create_endpoint(
 
     Requires admin role.
     """
-    service = WebhookService(request.organization)
+    service = WebhookService(request.auth_organization)
     endpoint = service.create_endpoint(
         data=payload,
-        created_by_id=request.user.id if hasattr(request, "user") else None,
+        created_by_id=request.auth_member.user_id if request.auth_member else None,
     )
 
     logger.info(
         "Created webhook endpoint %s for org %s",
         endpoint.id,
-        request.organization.id,
+        request.auth_organization.id,
     )
 
     return 201, WebhookEndpointWithSecretResponse(
@@ -187,7 +187,7 @@ def get_endpoint(request: HttpRequest, endpoint_id: str) -> WebhookEndpointRespo
 
     Requires admin role.
     """
-    service = WebhookService(request.organization)
+    service = WebhookService(request.auth_organization)
     endpoint = service.get_endpoint(endpoint_id)
 
     if not endpoint:
@@ -216,7 +216,7 @@ def update_endpoint(
 
     Requires admin role.
     """
-    service = WebhookService(request.organization)
+    service = WebhookService(request.auth_organization)
     endpoint = service.update_endpoint(endpoint_id, payload)
 
     if not endpoint:
@@ -225,7 +225,7 @@ def update_endpoint(
     logger.info(
         "Updated webhook endpoint %s for org %s",
         endpoint_id,
-        request.organization.id,
+        request.auth_organization.id,
     )
 
     return _endpoint_to_response(endpoint)
@@ -247,7 +247,7 @@ def delete_endpoint(request: HttpRequest, endpoint_id: str) -> tuple[int, None]:
 
     Requires admin role.
     """
-    service = WebhookService(request.organization)
+    service = WebhookService(request.auth_organization)
     deleted = service.delete_endpoint(endpoint_id)
 
     if not deleted:
@@ -256,7 +256,7 @@ def delete_endpoint(request: HttpRequest, endpoint_id: str) -> tuple[int, None]:
     logger.info(
         "Deleted webhook endpoint %s for org %s",
         endpoint_id,
-        request.organization.id,
+        request.auth_organization.id,
     )
 
     return 204, None
@@ -287,7 +287,7 @@ def list_deliveries(
 
     Requires admin role.
     """
-    service = WebhookService(request.organization)
+    service = WebhookService(request.auth_organization)
 
     # Verify endpoint exists and belongs to org
     endpoint = service.get_endpoint(endpoint_id)
@@ -327,7 +327,7 @@ def send_test_webhook(
 
     Requires admin role.
     """
-    service = WebhookService(request.organization)
+    service = WebhookService(request.auth_organization)
     endpoint = service.get_endpoint(endpoint_id)
 
     if not endpoint:

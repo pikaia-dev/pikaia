@@ -57,6 +57,7 @@ uv run pytest -v --tb=short
 
 ```
 backend/tests/
+├── conftest.py           # Shared fixtures (request_factory, api_client, etc.)
 ├── __init__.py
 ├── accounts/
 │   ├── factories.py      # User, Member, Organization factories
@@ -70,6 +71,31 @@ backend/tests/
 │   └── test_services.py  # Stripe integration tests
 └── core/
     └── test_middleware.py # Auth middleware tests
+```
+
+## Shared Fixtures
+
+Common fixtures are defined in `tests/conftest.py` and available to all tests:
+
+| Fixture | Description |
+|---------|-------------|
+| `request_factory` | Django `RequestFactory` for unit testing views |
+| `api_client` | Django test `Client` for full HTTP tests |
+| `authenticated_request` | Factory function for creating authenticated requests |
+| `admin_member` | Pre-created member with admin role |
+| `member` | Pre-created member with member role |
+
+### Using authenticated_request
+
+```python
+def test_authenticated_endpoint(authenticated_request):
+    from tests.accounts.factories import MemberFactory
+
+    member = MemberFactory(role="admin")
+    request = authenticated_request(member, method="post", path="/api/v1/something")
+
+    result = my_endpoint(request)
+    assert result.status_code == 200
 ```
 
 ## Factories
