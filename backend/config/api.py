@@ -12,6 +12,7 @@ from apps.media.api import router as media_router
 from apps.passkeys.api import router as passkeys_router
 from apps.sms.api import router as sms_router
 from apps.webhooks.api import router as webhooks_router
+from apps.webhooks.hooks_api import router as hooks_router
 
 api = NinjaAPI(
     title="B2B SaaS Starter API",
@@ -41,6 +42,10 @@ api = NinjaAPI(
             {
                 "name": "webhooks",
                 "description": "Customer webhook endpoint management",
+            },
+            {
+                "name": "hooks",
+                "description": "REST Hooks API for Zapier/Make integrations",
             },
             {
                 "name": "Phone Verification",
@@ -77,6 +82,7 @@ api.add_router("/media", media_router)
 api.add_router("/auth/passkeys", passkeys_router)
 api.add_router("/auth/phone", sms_router)
 api.add_router("/webhooks", webhooks_router)
+api.add_router("/hooks", hooks_router)
 
 
 @api.get("/health", tags=["health"], operation_id="healthCheck", summary="Health check")
