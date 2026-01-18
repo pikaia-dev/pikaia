@@ -49,10 +49,11 @@ class TestStorageServiceInit:
             service = StorageService()
 
             assert service.use_s3 is True
-            mock_boto_client.assert_called_once_with(
-                "s3",
-                region_name="us-west-2",
-            )
+            mock_boto_client.assert_called_once()
+            call_args = mock_boto_client.call_args
+            assert call_args[0][0] == "s3"
+            assert call_args[1]["region_name"] == "us-west-2"
+            assert "config" in call_args[1]  # Timeout config added
 
 
 class TestGenerateKey:
