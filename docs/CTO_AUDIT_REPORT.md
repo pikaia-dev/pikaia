@@ -415,7 +415,7 @@ path("admin/", admin.site.urls)
 | **events** | 8 | 68 | Good - Services, models, cleanup |
 | **passkeys** | 3 | 42 | Good - Trusted auth, services, API |
 | **sms** | 2 | 27 | Good - Rate limiting, AWS mocking |
-| **organizations** | 1 | 17 | Basic - Models only |
+| **organizations** | 1 | 17 | Good - Full model coverage (app is models-only) |
 
 **Frontend: 10 files, 277 tests, 1,878 lines**
 
