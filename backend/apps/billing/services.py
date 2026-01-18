@@ -6,6 +6,7 @@ External calls must NOT be inside database transactions.
 """
 
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 from apps.billing.models import Subscription
 from apps.billing.stripe_client import get_stripe
@@ -29,6 +30,7 @@ def get_or_create_stripe_customer(org: Organization) -> str:
     stripe = get_stripe()
 
     # Determine email for Stripe customer
+    email: str | None
     if org.use_billing_email and org.billing_email:
         email = org.billing_email
     else:
@@ -85,7 +87,7 @@ def get_or_create_stripe_customer(org: Organization) -> str:
             logger.warning("stripe_vat_id_add_failed", error=str(e), org_id=str(org.id))
 
     logger.info("stripe_customer_created", customer_id=customer.id, org_id=str(org.id))
-    return customer.id
+    return cast(str, customer.id)  # Stripe API always returns an ID
 
 
 def sync_billing_to_stripe(org: Organization) -> None:
@@ -100,6 +102,7 @@ def sync_billing_to_stripe(org: Organization) -> None:
     stripe = get_stripe()
 
     # Determine email
+    email: str | None
     if org.use_billing_email and org.billing_email:
         email = org.billing_email
     else:
@@ -176,7 +179,7 @@ def create_checkout_session(
     )
 
     logger.info("stripe_checkout_session_created", session_id=session.id, org_id=str(org.id))
-    return session.url
+    return cast(str, session.url)  # Checkout sessions always have a URL
 
 
 def create_subscription_intent(
@@ -322,7 +325,7 @@ def create_customer_portal_session(org: Organization, return_url: str) -> str:
         return_url=return_url,
     )
 
-    return session.url
+    return cast(str, session.url)  # Portal sessions always have a URL
 
 
 def handle_subscription_created(stripe_subscription: dict) -> None:

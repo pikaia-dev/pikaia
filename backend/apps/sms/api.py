@@ -5,12 +5,12 @@ API endpoints for SMS/OTP verification.
 import logging
 
 from django.conf import settings
-from django.http import HttpRequest
 from ninja import Router
 from ninja.errors import HttpError
 
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth
+from apps.core.types import AuthenticatedHttpRequest
 from apps.events.services import publish_event
 from apps.sms.aws_client import SMSError
 from apps.sms.schemas import (
@@ -43,7 +43,7 @@ bearer_auth = BearerAuth()
     summary="Send phone verification OTP",
 )
 def send_verification_otp(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     payload: SendOTPRequest,
 ) -> SendOTPResponse:
     """
@@ -52,10 +52,10 @@ def send_verification_otp(
     The OTP expires after the configured time (default: 30 minutes).
     Rate limited to 3 requests per phone number per hour.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+    if not hasattr(request, "auth_user") or request.auth_user is None:
         raise HttpError(401, "Not authenticated")
 
-    user = request.auth_user  # type: ignore[attr-defined]
+    user = request.auth_user
 
     try:
         send_phone_verification_otp(
@@ -83,7 +83,7 @@ def send_verification_otp(
     summary="Verify phone OTP and update profile",
 )
 def verify_phone_otp(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     payload: VerifyOTPRequest,
 ) -> VerifyOTPResponse:
     """
@@ -91,11 +91,11 @@ def verify_phone_otp(
 
     On success, updates the user's phone_number and sets phone_verified_at.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+    if not hasattr(request, "auth_user") or request.auth_user is None:
         raise HttpError(401, "Not authenticated")
 
-    user = request.auth_user  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    user = request.auth_user
+    org = request.auth_organization
 
     try:
         verify_phone_for_user(

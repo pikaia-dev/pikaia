@@ -25,7 +25,7 @@ See: https://docs.datadoghq.com/logs/log_configuration/attributes_naming_convent
 
 import logging
 import sys
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from structlog.types import EventDict, Processor
@@ -146,7 +146,7 @@ def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
         logger = get_logger(__name__)
         logger.info("event_name", key="value", another_key=123)
     """
-    return structlog.get_logger(name)
+    return cast(structlog.stdlib.BoundLogger, structlog.get_logger(name))
 
 
 def bind_contextvars(**kwargs: Any) -> None:

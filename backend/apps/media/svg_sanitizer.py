@@ -11,6 +11,7 @@ This module implements a strict whitelist-based approach.
 
 import re
 from io import BytesIO
+from typing import cast
 
 from defusedxml import ElementTree as DefusedET
 from lxml import etree
@@ -294,11 +295,14 @@ def sanitize_svg(svg_content: bytes) -> bytes:
     _sanitize_element(root)
 
     # Serialize back to bytes
-    return etree.tostring(
-        root,
-        encoding="utf-8",
-        xml_declaration=True,
-        pretty_print=True,
+    return cast(
+        bytes,
+        etree.tostring(
+            root,
+            encoding="utf-8",
+            xml_declaration=True,
+            pretty_print=True,
+        ),
     )
 
 
