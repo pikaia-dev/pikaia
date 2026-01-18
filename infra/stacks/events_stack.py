@@ -273,10 +273,8 @@ class EventsStack(Stack):
             dead_letter_queue=self.audit_dlq,
             retry_attempts=2,  # Retry twice before DLQ
             environment={
-                "DB_HOST": rds_proxy_endpoint,
-                "DB_PORT": "5432",
-                "DB_NAME": "tango",
-                "DB_SECRET_ARN": database_secret.secret_arn,
+                "DATABASE_SECRET_ARN": database_secret.secret_arn,
+                "RDS_PROXY_HOST": rds_proxy_endpoint,
             },
             description="Creates audit logs from domain events via EventBridge",
         )

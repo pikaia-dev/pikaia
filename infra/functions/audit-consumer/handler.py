@@ -27,12 +27,17 @@ SYSTEM_ACTOR_ID = "system"
 
 
 def get_db_credentials() -> dict[str, str]:
-    """Fetch DB credentials from Secrets Manager (cached for Lambda warm starts)."""
+    """
+    Fetch DB credentials from Secrets Manager (cached for Lambda warm starts).
+
+    RDS secrets contain: host, port, dbname, username, password, engine.
+    We use credentials but connect via RDS Proxy for connection pooling.
+    """
     import boto3
 
     if not hasattr(get_db_credentials, "_cache"):
         client = boto3.client("secretsmanager")
-        response = client.get_secret_value(SecretId=os.environ["DB_SECRET_ARN"])
+        response = client.get_secret_value(SecretId=os.environ["DATABASE_SECRET_ARN"])
         get_db_credentials._cache = json.loads(response["SecretString"])
     return get_db_credentials._cache
 
@@ -40,10 +45,11 @@ def get_db_credentials() -> dict[str, str]:
 def get_db_connection():
     """Get database connection via RDS Proxy with TLS."""
     creds = get_db_credentials()
+    # Connect via RDS Proxy (from env) using Aurora credentials (from secret)
     return psycopg2.connect(
-        host=os.environ["DB_HOST"],
-        port=os.environ.get("DB_PORT", "5432"),
-        dbname=os.environ["DB_NAME"],
+        host=os.environ.get("RDS_PROXY_HOST", creds["host"]),
+        port=creds.get("port", "5432"),
+        dbname=creds.get("dbname", "tango"),
         user=creds["username"],
         password=creds["password"],
         sslmode="require",
