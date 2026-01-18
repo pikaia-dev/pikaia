@@ -4,7 +4,7 @@ Tests for webhook API endpoints.
 Covers all webhook endpoints including authorization checks.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from django.test import RequestFactory
@@ -20,7 +20,7 @@ from apps.webhooks.api import (
     send_test_webhook,
     update_endpoint,
 )
-from apps.webhooks.models import WebhookDelivery, WebhookEndpoint
+from apps.webhooks.models import WebhookEndpoint
 from apps.webhooks.schemas import (
     WebhookEndpointCreate,
     WebhookEndpointUpdate,
@@ -29,12 +29,6 @@ from apps.webhooks.schemas import (
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
 
 from .factories import WebhookDeliveryFactory, WebhookEndpointFactory
-
-
-@pytest.fixture
-def request_factory() -> RequestFactory:
-    """Django request factory for unit testing views."""
-    return RequestFactory()
 
 
 def _create_authenticated_request(

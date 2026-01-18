@@ -9,18 +9,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import stripe
-from django.test import Client
-
-
-@pytest.fixture
-def client() -> Client:
-    """Django test client."""
-    return Client()
 
 
 @pytest.fixture
 def webhook_url() -> str:
-    """Webhook endpoint URL."""
+    """Webhook endpoint URL (module-specific)."""
     return "/webhooks/stripe/"
 
 

@@ -13,12 +13,6 @@ from apps.sms.schemas import SendOTPRequest, VerifyOTPRequest
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
 
 
-@pytest.fixture
-def request_factory() -> RequestFactory:
-    """Django request factory for unit testing views."""
-    return RequestFactory()
-
-
 @pytest.mark.django_db
 class TestSendVerificationOTPEndpoint:
     """Tests for POST /auth/phone/send endpoint."""
