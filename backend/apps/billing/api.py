@@ -6,7 +6,6 @@ Handles Stripe checkout, subscription management, and customer portal.
 
 from datetime import UTC, datetime
 
-from django.http import HttpRequest
 from ninja import Router
 from ninja.errors import HttpError
 
@@ -34,6 +33,7 @@ from apps.billing.stripe_client import get_stripe
 from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth, require_admin
+from apps.core.types import AuthenticatedHttpRequest
 
 logger = get_logger(__name__)
 
@@ -50,7 +50,7 @@ bearer_auth = BearerAuth()
 )
 @require_admin
 def create_checkout(
-    request: HttpRequest, payload: CheckoutSessionRequest
+    request: AuthenticatedHttpRequest, payload: CheckoutSessionRequest
 ) -> CheckoutSessionResponse:
     """
     Create a Stripe Checkout session for subscribing.
@@ -87,7 +87,7 @@ def create_checkout(
         )
     except Exception:
         logger.exception("checkout_session_creation_failed")
-        raise HttpError(500, "Failed to create checkout session")
+        raise HttpError(500, "Failed to create checkout session") from None
 
     return CheckoutSessionResponse(checkout_url=checkout_url)
 
@@ -100,7 +100,7 @@ def create_checkout(
     summary="Create Stripe Customer Portal session",
 )
 @require_admin
-def create_portal(request: HttpRequest, payload: PortalSessionRequest) -> PortalSessionResponse:
+def create_portal(request: AuthenticatedHttpRequest, payload: PortalSessionRequest) -> PortalSessionResponse:
     """
     Create a Stripe Customer Portal session.
 
@@ -118,7 +118,7 @@ def create_portal(request: HttpRequest, payload: PortalSessionRequest) -> Portal
         )
     except Exception:
         logger.exception("portal_session_creation_failed")
-        raise HttpError(500, "Failed to create portal session")
+        raise HttpError(500, "Failed to create portal session") from None
 
     return PortalSessionResponse(portal_url=portal_url)
 
@@ -130,7 +130,7 @@ def create_portal(request: HttpRequest, payload: PortalSessionRequest) -> Portal
     operation_id="getSubscription",
     summary="Get current subscription status",
 )
-def get_subscription(request: HttpRequest) -> SubscriptionResponse:
+def get_subscription(request: AuthenticatedHttpRequest) -> SubscriptionResponse:
     """
     Get current subscription status.
 
@@ -178,7 +178,7 @@ def get_subscription(request: HttpRequest) -> SubscriptionResponse:
 )
 @require_admin
 def create_subscription_intent_endpoint(
-    request: HttpRequest, payload: SubscriptionIntentRequest
+    request: AuthenticatedHttpRequest, payload: SubscriptionIntentRequest
 ) -> SubscriptionIntentResponse:
     """
     Create a subscription with an incomplete payment intent.
@@ -213,7 +213,7 @@ def create_subscription_intent_endpoint(
         )
     except Exception:
         logger.exception("subscription_intent_creation_failed")
-        raise HttpError(500, "Failed to create subscription intent")
+        raise HttpError(500, "Failed to create subscription intent") from None
 
     return SubscriptionIntentResponse(
         client_secret=client_secret,
@@ -235,7 +235,7 @@ def create_subscription_intent_endpoint(
 )
 @require_admin
 def confirm_subscription_endpoint(
-    request: HttpRequest, payload: ConfirmSubscriptionRequest
+    request: AuthenticatedHttpRequest, payload: ConfirmSubscriptionRequest
 ) -> ConfirmSubscriptionResponse:
     """
     Sync subscription status from Stripe after payment.
@@ -248,7 +248,7 @@ def confirm_subscription_endpoint(
         is_active = sync_subscription_from_stripe(payload.subscription_id)
     except Exception:
         logger.exception("subscription_confirmation_failed")
-        raise HttpError(500, "Failed to confirm subscription")
+        raise HttpError(500, "Failed to confirm subscription") from None
 
     return ConfirmSubscriptionResponse(is_active=is_active)
 
@@ -262,7 +262,7 @@ def confirm_subscription_endpoint(
 )
 @require_admin
 def list_invoices(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     limit: int = 12,
     starting_after: str | None = None,
 ) -> InvoiceListResponse:
@@ -332,4 +332,4 @@ def list_invoices(
 
     except Exception:
         logger.exception("invoice_list_failed")
-        raise HttpError(500, "Failed to retrieve invoices")
+        raise HttpError(500, "Failed to retrieve invoices") from None
