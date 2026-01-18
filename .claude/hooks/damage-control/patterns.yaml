@@ -12,7 +12,8 @@ bashToolPatterns:
     description: "Recursive/force delete on root or home"
     action: block
 
-  - pattern: 'rm\s+-[rfR]*\s+\.'
+  # Matches: rm -rf ., rm -r ./, rm -rf ./path (requires r/R flag, . must be path not filename)
+  - pattern: 'rm\s+-[fR]*[rR][fR]*\s+\.(\/\S*)?(\s|$)'
     description: "Recursive delete in current directory"
     action: ask
 
