@@ -18,6 +18,7 @@ from apps.billing.services import (
 )
 from apps.billing.stripe_client import get_stripe
 from apps.core.logging import get_logger
+from apps.core.webhooks import mark_webhook_processed
 from config.settings.base import settings
 
 logger = get_logger(__name__)
@@ -57,8 +58,15 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
         logger.warning("stripe_webhook_invalid_signature", error=str(e))
         return HttpResponse(status=400)
 
+    event_id = event["id"]
+
+    # Idempotency check - skip if already processed
+    if not mark_webhook_processed("stripe", event_id):
+        logger.info("stripe_webhook_duplicate", event_id=event_id, event_type=event["type"])
+        return HttpResponse(status=200)
+
     # Log event for debugging
-    logger.info("stripe_webhook_received", event_type=event["type"])
+    logger.info("stripe_webhook_received", event_id=event_id, event_type=event["type"])
 
     # Dispatch to handlers
     try:

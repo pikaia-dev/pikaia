@@ -487,6 +487,7 @@ class TestStytchWebhook:
             "/webhooks/stytch/",
             data=json.dumps(event_data).encode(),
             content_type="application/json",
+            HTTP_SVIX_ID="msg_member_create_123",
         )
 
         response = stytch_webhook(request)
@@ -521,6 +522,7 @@ class TestStytchWebhook:
             "/webhooks/stytch/",
             data=json.dumps(event_data).encode(),
             content_type="application/json",
+            HTTP_SVIX_ID="msg_member_update_123",
         )
 
         response = stytch_webhook(request)
@@ -555,6 +557,7 @@ class TestStytchWebhook:
             "/webhooks/stytch/",
             data=json.dumps(event_data).encode(),
             content_type="application/json",
+            HTTP_SVIX_ID="msg_member_delete_123",
         )
 
         response = stytch_webhook(request)
@@ -589,6 +592,7 @@ class TestStytchWebhook:
             "/webhooks/stytch/",
             data=json.dumps(event_data).encode(),
             content_type="application/json",
+            HTTP_SVIX_ID="msg_org_update_123",
         )
 
         response = stytch_webhook(request)
@@ -617,8 +621,133 @@ class TestStytchWebhook:
             "/webhooks/stytch/",
             data=json.dumps(event_data).encode(),
             content_type="application/json",
+            HTTP_SVIX_ID="msg_unhandled_123",
         )
 
         response = stytch_webhook(request)
 
         assert response.status_code == 200
+
+    @patch("apps.accounts.webhooks.Webhook")
+    @patch("apps.accounts.webhooks.settings")
+    def test_missing_svix_id_returns_400(
+        self,
+        mock_settings: MagicMock,
+        mock_webhook_class: MagicMock,
+        request_factory: RequestFactory,
+    ) -> None:
+        """Should return 400 when svix-id header is missing."""
+        mock_settings.STYTCH_WEBHOOK_SECRET = "whsec_test"
+        mock_webhook = MagicMock()
+        mock_webhook.verify.return_value = {
+            "event_type": "test",
+            "action": "TEST",
+            "object_type": "test",
+        }
+        mock_webhook_class.return_value = mock_webhook
+
+        request = request_factory.post(
+            "/webhooks/stytch/",
+            data=json.dumps({}).encode(),
+            content_type="application/json",
+            # No HTTP_SVIX_ID header
+        )
+
+        response = stytch_webhook(request)
+
+        assert response.status_code == 400
+
+
+@pytest.mark.django_db
+class TestStytchWebhookIdempotency:
+    """Tests for Stytch webhook idempotency."""
+
+    @patch("apps.accounts.webhooks.handle_member_created")
+    @patch("apps.accounts.webhooks.Webhook")
+    @patch("apps.accounts.webhooks.settings")
+    def test_duplicate_event_not_processed(
+        self,
+        mock_settings: MagicMock,
+        mock_webhook_class: MagicMock,
+        mock_handler: MagicMock,
+        request_factory: RequestFactory,
+    ) -> None:
+        """Should skip processing for duplicate event IDs."""
+        mock_settings.STYTCH_WEBHOOK_SECRET = "whsec_test"
+        mock_webhook = MagicMock()
+        event_data = {
+            "event_type": "direct.member.create",
+            "action": "CREATE",
+            "object_type": "member",
+            "member": {"member_id": "member-123"},
+        }
+        mock_webhook.verify.return_value = event_data
+        mock_webhook_class.return_value = mock_webhook
+
+        # First request - should process
+        request1 = request_factory.post(
+            "/webhooks/stytch/",
+            data=json.dumps(event_data).encode(),
+            content_type="application/json",
+            HTTP_SVIX_ID="msg_duplicate_test",
+        )
+        response1 = stytch_webhook(request1)
+        assert response1.status_code == 200
+        assert mock_handler.call_count == 1
+
+        # Second request with same svix-id - should skip
+        request2 = request_factory.post(
+            "/webhooks/stytch/",
+            data=json.dumps(event_data).encode(),
+            content_type="application/json",
+            HTTP_SVIX_ID="msg_duplicate_test",
+        )
+        response2 = stytch_webhook(request2)
+        assert response2.status_code == 200
+        # Handler should NOT be called again
+        assert mock_handler.call_count == 1
+
+    @patch("apps.accounts.webhooks.handle_member_created")
+    @patch("apps.accounts.webhooks.Webhook")
+    @patch("apps.accounts.webhooks.settings")
+    def test_different_events_processed_separately(
+        self,
+        mock_settings: MagicMock,
+        mock_webhook_class: MagicMock,
+        mock_handler: MagicMock,
+        request_factory: RequestFactory,
+    ) -> None:
+        """Should process events with different IDs."""
+        mock_settings.STYTCH_WEBHOOK_SECRET = "whsec_test"
+        mock_webhook = MagicMock()
+        event_data = {
+            "event_type": "direct.member.create",
+            "action": "CREATE",
+            "object_type": "member",
+            "member": {"member_id": "member-123"},
+        }
+        mock_webhook.verify.return_value = event_data
+        mock_webhook_class.return_value = mock_webhook
+
+        # First event
+        request1 = request_factory.post(
+            "/webhooks/stytch/",
+            data=json.dumps(event_data).encode(),
+            content_type="application/json",
+            HTTP_SVIX_ID="msg_first",
+        )
+        response1 = stytch_webhook(request1)
+        assert response1.status_code == 200
+
+        # Second event with different ID
+        request2 = request_factory.post(
+            "/webhooks/stytch/",
+            data=json.dumps(event_data).encode(),
+            content_type="application/json",
+            HTTP_SVIX_ID="msg_second",
+        )
+        response2 = stytch_webhook(request2)
+        assert response2.status_code == 200
+
+        # Both should be processed
+        assert mock_handler.call_count == 2
