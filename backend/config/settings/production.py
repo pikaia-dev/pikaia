@@ -9,15 +9,15 @@ Missing secrets will cause the application to crash immediately with a clear err
 rather than failing silently at runtime.
 """
 
-from .base import *  # noqa: F403
-from .base import parse_comma_list, settings
-
 # =============================================================================
 # Structured Logging Configuration
 # =============================================================================
 # Configure structlog for JSON output in production.
 # This enables easy querying in CloudWatch Logs Insights, Datadog, and Elastic.
 from apps.core.logging import configure_logging
+
+from .base import *  # noqa: F403
+from .base import parse_comma_list, settings
 
 configure_logging(json_format=True, log_level="INFO")
 
@@ -114,6 +114,12 @@ SECURE_HSTS_PRELOAD = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_CLOUDFRONT_FORWARDED_PROTO", "https")
+
+# Additional security headers (OWASP recommendations)
+SECURE_CONTENT_TYPE_NOSNIFF = True  # Prevent MIME-type sniffing
+X_FRAME_OPTIONS = "DENY"  # Clickjacking protection (explicit, don't rely on default)
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"  # Control referrer leakage
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"  # Isolate browsing context
 
 # Use the original host header from CloudFront, not the ALB's internal hostname
 # This ensures redirects go to b2b.demo.tango.agency, not the ALB DNS name
