@@ -19,6 +19,22 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+# Truncate user-agent to avoid bloating event payloads
+MAX_USER_AGENT_LENGTH = 512
+
+
+def get_client_ip(request: HttpRequest) -> str | None:
+    """
+    Extract client IP from X-Forwarded-For or REMOTE_ADDR.
+
+    Handles the case where X-Forwarded-For contains multiple IPs
+    (from proxy chain) by taking the first (original client).
+    """
+    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR")
+
 
 class CorrelationIdMiddleware:
     """
@@ -58,6 +74,10 @@ class CorrelationIdMiddleware:
         # Set in event services context
         set_correlation_id(correlation_id)
 
+        # Extract request context for audit logging
+        client_ip = get_client_ip(request)
+        user_agent = request.META.get("HTTP_USER_AGENT", "")[:MAX_USER_AGENT_LENGTH]
+
         # Clear any stale context and bind request metadata for structured logging
         clear_contextvars()
         bind_contextvars(
@@ -65,6 +85,8 @@ class CorrelationIdMiddleware:
             **{
                 "http.method": request.method,
                 "http.url_details.path": request.path,
+                "request.ip_address": client_ip,
+                "request.user_agent": user_agent,
             },
         )
 
