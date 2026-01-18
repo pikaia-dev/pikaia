@@ -253,16 +253,16 @@ class TestJWTAuthentication:
         request = make_request("/api/v1/test")
         middleware(request)
 
-        assert request.auth_user is None
-        assert request.auth_member is None
-        assert request.auth_organization is None
+        assert request.auth.user is None
+        assert request.auth.member is None
+        assert request.auth.organization is None
 
     def test_no_auth_header_sets_auth_failed_false(self, middleware: StytchAuthMiddleware) -> None:
         """Request without auth header should have auth_failed=False."""
         request = make_request("/api/v1/test")
         middleware(request)
 
-        assert request.auth_failed is False
+        assert request.auth.failed is False
 
     @patch("apps.accounts.stytch_client.get_stytch_client")
     def test_valid_jwt_with_existing_member(
@@ -304,9 +304,9 @@ class TestJWTAuthentication:
 
         # Fast path: should use local DB, NOT call sessions.authenticate
         mock_client.sessions.authenticate.assert_not_called()
-        assert request.auth_user.email == "test@example.com"
-        assert request.auth_member.stytch_member_id == "member-123"
-        assert request.auth_organization.stytch_org_id == "org-123"
+        assert request.auth.user.email == "test@example.com"
+        assert request.auth.member.stytch_member_id == "member-123"
+        assert request.auth.organization.stytch_org_id == "org-123"
 
     @patch("apps.core.middleware.bind_contextvars")
     @patch("apps.accounts.stytch_client.get_stytch_client")
@@ -377,9 +377,9 @@ class TestJWTAuthentication:
         request = make_request("/api/v1/test", "Bearer invalid-jwt")
         middleware(request)
 
-        assert request.auth_user is None
-        assert request.auth_member is None
-        assert request.auth_organization is None
+        assert request.auth.user is None
+        assert request.auth.member is None
+        assert request.auth.organization is None
 
     @patch("apps.accounts.stytch_client.get_stytch_client")
     def test_invalid_jwt_sets_auth_failed_true(
@@ -402,7 +402,7 @@ class TestJWTAuthentication:
         request = make_request("/api/v1/test", "Bearer invalid-jwt")
         middleware(request)
 
-        assert request.auth_failed is True
+        assert request.auth.failed is True
 
     @patch("apps.accounts.stytch_client.get_stytch_client")
     def test_unexpected_exception_sets_auth_failed_true(
@@ -419,8 +419,8 @@ class TestJWTAuthentication:
         request = make_request("/api/v1/test", "Bearer valid-jwt")
         middleware(request)
 
-        assert request.auth_user is None
-        assert request.auth_failed is True
+        assert request.auth.user is None
+        assert request.auth.failed is True
 
 
 @pytest.mark.django_db
@@ -472,12 +472,12 @@ class TestJITSync:
         mock_client.sessions.authenticate.assert_called_once()
 
         # Records should be created
-        assert request.auth_user is not None
-        assert request.auth_user.email == "new@example.com"
-        assert request.auth_member is not None
-        assert request.auth_member.stytch_member_id == "member-new-456"
-        assert request.auth_organization is not None
-        assert request.auth_organization.stytch_org_id == "org-new-789"
+        assert request.auth.user is not None
+        assert request.auth.user.email == "new@example.com"
+        assert request.auth.member is not None
+        assert request.auth.member.stytch_member_id == "member-new-456"
+        assert request.auth.organization is not None
+        assert request.auth.organization.stytch_org_id == "org-new-789"
 
         # Verify DB records
         assert Member.objects.filter(stytch_member_id="member-new-456").exists()
@@ -564,9 +564,9 @@ class TestJITSync:
         request = make_request("/api/v1/test", "Bearer jwt")
         middleware(request)
 
-        assert request.auth_user is None
-        assert request.auth_member is None
-        assert request.auth_organization is None
+        assert request.auth.user is None
+        assert request.auth.member is None
+        assert request.auth.organization is None
 
 
 @pytest.mark.django_db
@@ -608,6 +608,6 @@ class TestAdminRoleSync:
         request = make_request("/api/v1/test", "Bearer jwt")
         middleware(request)
 
-        assert request.auth_member is not None
-        assert request.auth_member.role == "admin"
-        assert request.auth_member.is_admin is True
+        assert request.auth.member is not None
+        assert request.auth.member.role == "admin"
+        assert request.auth.member.is_admin is True

@@ -84,8 +84,8 @@ def subscribe(
         201: Subscription created with ID for unsubscribe
         400: Invalid event type or URL
     """
-    assert request.auth_organization is not None  # Guaranteed by @require_admin
-    service = WebhookService(request.auth_organization)
+    assert request.auth.organization is not None  # Guaranteed by @require_admin
+    service = WebhookService(request.auth.organization)
     source = _detect_source(payload.target_url)
 
     # Create endpoint with auto-generated name based on source
@@ -103,7 +103,7 @@ def subscribe(
 
     endpoint = service.create_endpoint(
         data=endpoint_data,
-        created_by_id=request.auth_member.user_id if request.auth_member else None,
+        created_by_id=request.auth.member.user_id if request.auth.member else None,
         source=source,
     )
 
@@ -138,8 +138,8 @@ def list_subscriptions(request: AuthenticatedHttpRequest) -> RestHookListRespons
     Returns subscriptions created via REST Hooks (Zapier, Make, etc.),
     not manually created webhook endpoints.
     """
-    assert request.auth_organization is not None  # Guaranteed by @require_admin
-    service = WebhookService(request.auth_organization)
+    assert request.auth.organization is not None  # Guaranteed by @require_admin
+    service = WebhookService(request.auth.organization)
     endpoints = service.list_endpoints()
 
     subscriptions = [
@@ -179,8 +179,8 @@ def unsubscribe(
         204: Subscription deleted
         404: Subscription not found
     """
-    assert request.auth_organization is not None  # Guaranteed by @require_admin
-    service = WebhookService(request.auth_organization)
+    assert request.auth.organization is not None  # Guaranteed by @require_admin
+    service = WebhookService(request.auth.organization)
     deleted = service.delete_endpoint(subscription_id)
 
     if not deleted:
@@ -221,7 +221,7 @@ def get_sample(
         200: Sample payload
         404: Unknown event type
     """
-    assert request.auth_organization is not None  # Guaranteed by @require_admin
+    assert request.auth.organization is not None  # Guaranteed by @require_admin
     event = WEBHOOK_EVENTS.get(event_type)
     if not event:
         raise HttpError(404, f"Unknown event type: {event_type}")
@@ -232,7 +232,7 @@ def get_sample(
         spec_version="1.0",
         type=event.type,
         timestamp=datetime.now(UTC),
-        organization_id=str(request.auth_organization.id),
+        organization_id=str(request.auth.organization.id),
         data=event.payload_example,
     )
 
@@ -266,9 +266,9 @@ def verify_auth(request: AuthenticatedHttpRequest) -> AuthTestResponse:
     Returns:
         200: Authentication successful with organization info
     """
-    assert request.auth_organization is not None  # Guaranteed by @require_admin
+    assert request.auth.organization is not None  # Guaranteed by @require_admin
     return AuthTestResponse(
         ok=True,
-        organization_id=str(request.auth_organization.id),
-        organization_name=request.auth_organization.name,
+        organization_id=str(request.auth.organization.id),
+        organization_name=request.auth.organization.name,
     )
