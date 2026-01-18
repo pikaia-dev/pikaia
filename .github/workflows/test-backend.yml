@@ -5,10 +5,12 @@ on:
     branches: ["main"]
     paths:
       - 'backend/**'
+      - 'infra/functions/**'
       - '.github/workflows/test-backend.yml'
   pull_request:
     paths:
       - 'backend/**'
+      - 'infra/functions/**'
       - '.github/workflows/test-backend.yml'
 
 concurrency:
@@ -57,11 +59,17 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
 
-      - name: Lint (ruff check)
+      - name: Lint backend (ruff check)
         run: uv run ruff check apps/
 
-      - name: Format check (ruff format)
+      - name: Lint infra (ruff check)
+        run: uv run ruff check ../infra/functions/
+
+      - name: Format check backend (ruff format)
         run: uv run ruff format --check apps/
+
+      - name: Format check infra (ruff format)
+        run: uv run ruff format --check ../infra/functions/
 
       - name: Type check (mypy)
         run: uv run mypy apps/
