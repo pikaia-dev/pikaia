@@ -169,10 +169,14 @@ observability = ObservabilityStack(
     ecs_cluster=app_stack.cluster,
     ecs_service=app_stack.fargate_service.service,
     database=app_stack.database,
+    event_bus=events_stack.event_bus,
+    publisher_lambda=events_stack.publisher_lambda,
+    audit_lambda=events_stack.audit_lambda,
     alarm_email=alarm_email,
     env=env,
 )
 observability.add_dependency(app_stack)
+observability.add_dependency(events_stack)
 
 # =============================================================================
 # Validation: Pre-deployment checks
