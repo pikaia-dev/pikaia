@@ -257,6 +257,15 @@ class TestJWTAuthentication:
         assert request.auth_member is None
         assert request.auth_organization is None
 
+    def test_no_auth_header_sets_auth_failed_false(
+        self, middleware: StytchAuthMiddleware
+    ) -> None:
+        """Request without auth header should have auth_failed=False."""
+        request = make_request("/api/v1/test")
+        middleware(request)
+
+        assert request.auth_failed is False
+
     @patch("apps.accounts.stytch_client.get_stytch_client")
     def test_valid_jwt_with_existing_member(
         self,
@@ -373,6 +382,49 @@ class TestJWTAuthentication:
         assert request.auth_user is None
         assert request.auth_member is None
         assert request.auth_organization is None
+
+    @patch("apps.accounts.stytch_client.get_stytch_client")
+    def test_invalid_jwt_sets_auth_failed_true(
+        self,
+        mock_get_client: MagicMock,
+        middleware: StytchAuthMiddleware,
+    ) -> None:
+        """Invalid/expired JWT should set auth_failed=True."""
+        mock_client = MagicMock()
+        mock_client.sessions.authenticate_jwt.side_effect = StytchError(
+            StytchErrorDetails(
+                status_code=401,
+                request_id="test-request-id",
+                error_type="invalid_jwt",
+                error_message="JWT is invalid",
+            )
+        )
+        mock_get_client.return_value = mock_client
+
+        request = make_request("/api/v1/test", "Bearer invalid-jwt")
+        middleware(request)
+
+        assert request.auth_failed is True
+
+    @patch("apps.accounts.stytch_client.get_stytch_client")
+    def test_unexpected_exception_sets_auth_failed_true(
+        self,
+        mock_get_client: MagicMock,
+        middleware: StytchAuthMiddleware,
+    ) -> None:
+        """Unexpected exception during auth should set auth_failed=True."""
+        mock_client = MagicMock()
+        # Simulate network error or other unexpected exception
+        mock_client.sessions.authenticate_jwt.side_effect = ConnectionError(
+            "Network unreachable"
+        )
+        mock_get_client.return_value = mock_client
+
+        request = make_request("/api/v1/test", "Bearer valid-jwt")
+        middleware(request)
+
+        assert request.auth_user is None
+        assert request.auth_failed is True
 
 
 @pytest.mark.django_db
