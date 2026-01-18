@@ -9,8 +9,8 @@ Usage:
     add_validation_aspects(app)
 """
 
-import jsii
 import aws_cdk as cdk
+import jsii
 from aws_cdk import aws_ecs as ecs
 from aws_cdk import aws_rds as rds
 from aws_cdk import aws_s3 as s3
@@ -58,9 +58,7 @@ class SecurityAspect:
 
     def visit(self, node: IConstruct) -> None:
         if isinstance(node, s3.Bucket):
-            cdk.Annotations.of(node).add_info(
-                "Ensure S3 bucket has block_public_access configured"
-            )
+            cdk.Annotations.of(node).add_info("Ensure S3 bucket has block_public_access configured")
 
 
 def add_validation_aspects(

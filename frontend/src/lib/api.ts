@@ -8,7 +8,7 @@
  * - Is more secure and maintainable
  */
 
-import { config } from "./env"
+import { config } from './env'
 
 const API_URL = config.apiUrl
 
@@ -27,30 +27,29 @@ export type TokenProvider = () => string | null
  * This allows swapping token sourcing without touching client internals.
  */
 export function createApiClient(getToken: TokenProvider) {
-  async function request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
+  async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = getToken()
 
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     }
 
     if (token) {
-      headers["Authorization"] = `Bearer ${token}`
+      headers.Authorization = `Bearer ${token}`
     }
 
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...options,
       headers,
-      credentials: "include",
+      credentials: 'include',
     })
 
     if (!response.ok) {
-      const error = await response.json().catch((): ApiError => ({
-        detail: "An error occurred",
-      })) as ApiError
+      const error = (await response.json().catch(
+        (): ApiError => ({
+          detail: 'An error occurred',
+        })
+      )) as ApiError
       throw new Error(error.detail)
     }
 
@@ -59,30 +58,30 @@ export function createApiClient(getToken: TokenProvider) {
 
   return {
     get<T>(endpoint: string): Promise<T> {
-      return request<T>(endpoint, { method: "GET" })
+      return request<T>(endpoint, { method: 'GET' })
     },
 
     post<T>(endpoint: string, data?: unknown): Promise<T> {
       return request<T>(endpoint, {
-        method: "POST",
+        method: 'POST',
         body: data ? JSON.stringify(data) : undefined,
       })
     },
 
     put<T>(endpoint: string, data?: unknown): Promise<T> {
       return request<T>(endpoint, {
-        method: "PUT",
+        method: 'PUT',
         body: data ? JSON.stringify(data) : undefined,
       })
     },
 
     delete<T>(endpoint: string): Promise<T> {
-      return request<T>(endpoint, { method: "DELETE" })
+      return request<T>(endpoint, { method: 'DELETE' })
     },
 
     patch<T>(endpoint: string, data?: unknown): Promise<T> {
       return request<T>(endpoint, {
-        method: "PATCH",
+        method: 'PATCH',
         body: data ? JSON.stringify(data) : undefined,
       })
     },
@@ -91,15 +90,15 @@ export function createApiClient(getToken: TokenProvider) {
       const token = getToken()
       const headers: Record<string, string> = {}
       if (token) {
-        headers["Authorization"] = `Bearer ${token}`
+        headers.Authorization = `Bearer ${token}`
       }
       const response = await fetch(`${API_URL}${endpoint}`, {
-        method: "GET",
+        method: 'GET',
         headers,
-        credentials: "include",
+        credentials: 'include',
       })
       if (!response.ok) {
-        throw new Error("Failed to fetch blob")
+        throw new Error('Failed to fetch blob')
       }
       return response.blob()
     },
@@ -194,7 +193,7 @@ export interface MemberListResponse {
 export interface InviteMemberRequest {
   email: string
   name?: string
-  role?: "admin" | "member"
+  role?: 'admin' | 'member'
 }
 
 export interface InviteMemberResponse {
@@ -203,7 +202,7 @@ export interface InviteMemberResponse {
 }
 
 export interface UpdateMemberRoleRequest {
-  role: "admin" | "member"
+  role: 'admin' | 'member'
 }
 
 export interface MessageResponse {
@@ -212,13 +211,7 @@ export interface MessageResponse {
 
 // Billing/Subscription types
 export interface SubscriptionInfo {
-  status:
-  | "active"
-  | "past_due"
-  | "canceled"
-  | "incomplete"
-  | "trialing"
-  | "none"
+  status: 'active' | 'past_due' | 'canceled' | 'incomplete' | 'trialing' | 'none'
   quantity: number
   current_period_end: string | null
   cancel_at_period_end: boolean
@@ -264,7 +257,7 @@ export interface ConfirmSubscriptionResponse {
 export interface Invoice {
   id: string
   number: string | null
-  status: "draft" | "open" | "paid" | "uncollectible" | "void"
+  status: 'draft' | 'open' | 'paid' | 'uncollectible' | 'void'
   amount_due: number // cents
   amount_paid: number // cents
   currency: string
@@ -285,19 +278,19 @@ export interface UploadRequest {
   filename: string
   content_type: string
   size_bytes: number
-  image_type: "avatar" | "logo"
+  image_type: 'avatar' | 'logo'
 }
 
 export interface UploadResponse {
   upload_url: string
-  method: "PUT" | "POST"
+  method: 'PUT' | 'POST'
   key: string
   fields: Record<string, string>
 }
 
 export interface ConfirmUploadRequest {
   key: string
-  image_type: "avatar" | "logo"
+  image_type: 'avatar' | 'logo'
 }
 
 export interface ImageResponse {
@@ -319,7 +312,7 @@ export interface BulkInviteMemberItem {
   email: string
   name?: string
   phone?: string
-  role?: "admin" | "member"
+  role?: 'admin' | 'member'
 }
 
 export interface BulkInviteRequest {
@@ -382,7 +375,7 @@ export interface WebhookDelivery {
   id: string
   event_id: string
   event_type: string
-  status: "pending" | "success" | "failure"
+  status: 'pending' | 'success' | 'failure'
   error_type: string
   http_status: number | null
   duration_ms: number | null

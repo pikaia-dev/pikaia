@@ -20,14 +20,32 @@ from aws_cdk import (
     CfnOutput,
     Duration,
     Stack,
+)
+from aws_cdk import (
     aws_cloudwatch as cloudwatch,
+)
+from aws_cdk import (
     aws_cloudwatch_actions as cw_actions,
+)
+from aws_cdk import (
     aws_ecs as ecs,
+)
+from aws_cdk import (
     aws_elasticloadbalancingv2 as elbv2,
+)
+from aws_cdk import (
     aws_events as events,
+)
+from aws_cdk import (
     aws_lambda as lambda_,
+)
+from aws_cdk import (
     aws_rds as rds,
+)
+from aws_cdk import (
     aws_sns as sns,
+)
+from aws_cdk import (
     aws_sns_subscriptions as sns_subscriptions,
 )
 from constructs import Construct
@@ -73,9 +91,7 @@ class ObservabilityStack(Stack):
         )
 
         if alarm_email:
-            self.alarm_topic.add_subscription(
-                sns_subscriptions.EmailSubscription(alarm_email)
-            )
+            self.alarm_topic.add_subscription(sns_subscriptions.EmailSubscription(alarm_email))
 
         alarm_action = cw_actions.SnsAction(self.alarm_topic)
 
@@ -226,9 +242,7 @@ class ObservabilityStack(Stack):
                 publisher_lambda, "EventPublisher"
             )
         if audit_lambda:
-            lambda_metrics["audit"] = self._create_lambda_metrics(
-                audit_lambda, "AuditConsumer"
-            )
+            lambda_metrics["audit"] = self._create_lambda_metrics(audit_lambda, "AuditConsumer")
 
         # EventBridge metrics (optional)
         eventbridge_failed_invocations = None

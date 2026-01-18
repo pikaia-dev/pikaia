@@ -18,7 +18,7 @@ FIELDS = [
     "user_agent",
     "diff",
     "metadata",
-    "created_at"
+    "created_at",
 ]
 
 INSERT_SQL = """INSERT INTO events_auditlog (id, event_id, action, aggregate_type, aggregate_id, organization_id, actor_id, actor_email, correlation_id, ip_address, user_agent, diff, metadata, created_at)
@@ -36,5 +36,5 @@ AUDIT_EVENT_TYPES = [
     "organization.created",
     "organization.updated",
     "user.phone_changed",
-    "user.profile_updated"
+    "user.profile_updated",
 ]

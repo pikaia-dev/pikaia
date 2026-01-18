@@ -6,7 +6,7 @@
  */
 export const STYTCH_ROLES = {
   /** Admin role ID - grants full organization management permissions */
-  ADMIN: "stytch_admin",
+  ADMIN: 'stytch_admin',
 } as const
 
 /**
@@ -21,10 +21,10 @@ export const MEDIA_UPLOAD = {
   MAX_SIZE_MB: 10,
   /** Accepted MIME types mapped to file extensions */
   ACCEPTED_TYPES: {
-    "image/jpeg": [".jpg", ".jpeg", ".JPG", ".JPEG"],
-    "image/png": [".png", ".PNG"],
-    "image/webp": [".webp", ".WEBP"],
-    "image/svg+xml": [".svg", ".SVG"],
-    "image/avif": [".avif", ".AVIF"],
+    'image/jpeg': ['.jpg', '.jpeg', '.JPG', '.JPEG'],
+    'image/png': ['.png', '.PNG'],
+    'image/webp': ['.webp', '.WEBP'],
+    'image/svg+xml': ['.svg', '.SVG'],
+    'image/avif': ['.avif', '.AVIF'],
   },
 } as const

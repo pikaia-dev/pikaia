@@ -84,6 +84,10 @@ class EventBridgeBackend(EventBackend):
                 read_timeout=self.READ_TIMEOUT,
                 retries={"max_attempts": 2},
             )
+            # boto3 reads credentials and endpoint from environment:
+            # - AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY for credentials
+            # - AWS_ENDPOINT_URL for LocalStack or custom endpoints
+            # - For production: uses IAM role (Fargate task role, etc.)
             self._client = boto3.client("events", config=config)
         return self._client
 

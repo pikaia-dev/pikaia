@@ -1,10 +1,10 @@
 /// <reference types="@types/google.maps" />
 
-import { Keyboard, Search } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { Keyboard, Search } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { loadGooglePlacesScript, type ParsedAddress } from "@/lib/google-places"
-import { cn } from "@/lib/utils"
+import { loadGooglePlacesScript, type ParsedAddress } from '@/lib/google-places'
+import { cn } from '@/lib/utils'
 
 /** Minimum characters before triggering autocomplete */
 const MIN_QUERY_LENGTH = 3
@@ -39,18 +39,15 @@ export function AddressAutocomplete({
   value,
   onChange,
   onAddressSelect,
-  placeholder = "Start typing an address...",
+  placeholder = 'Start typing an address...',
   disabled = false,
   className,
   id,
 }: AddressAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const sessionTokenRef = useRef<
-    google.maps.places.AutocompleteSessionToken | undefined
-  >(undefined)
-  const autocompleteServiceRef =
-    useRef<google.maps.places.AutocompleteService | null>(null)
+  const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | undefined>(undefined)
+  const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null)
   const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null)
   const placesServiceElementRef = useRef<HTMLDivElement | null>(null)
 
@@ -65,12 +62,17 @@ export function AddressAutocomplete({
   const apiKey = import.meta.env.VITE_GOOGLE_PLACES_API_KEY
 
   // Load Google Places script
+  // biome-ignore lint/correctness/useExhaustiveDependencies: apiKey intentionally included for defensive re-loading
   useEffect(() => {
     if (!apiKey) return // No API key - component will show fallback
 
     loadGooglePlacesScript(apiKey)
-      .then(() => { setIsLoaded(true); })
-      .catch(() => { setLoadError(true); })
+      .then(() => {
+        setIsLoaded(true)
+      })
+      .catch(() => {
+        setLoadError(true)
+      })
   }, [apiKey])
 
   // Initialize services when loaded
@@ -79,23 +81,22 @@ export function AddressAutocomplete({
 
     const initServices = () => {
       try {
-        void google.maps.importLibrary("places").then(() => {
-          autocompleteServiceRef.current =
-            new google.maps.places.AutocompleteService()
-          // Create a container element for PlacesService (required by API)
-          const placesServiceElement = document.createElement("div")
-          placesServiceElementRef.current = placesServiceElement
-          placesServiceRef.current = new google.maps.places.PlacesService(
-            placesServiceElement
-          )
-          sessionTokenRef.current =
-            new google.maps.places.AutocompleteSessionToken()
-        }).catch((err: unknown) => {
-          console.error("Failed to initialize Places services:", err)
-          setLoadError(true)
-        })
+        void google.maps
+          .importLibrary('places')
+          .then(() => {
+            autocompleteServiceRef.current = new google.maps.places.AutocompleteService()
+            // Create a container element for PlacesService (required by API)
+            const placesServiceElement = document.createElement('div')
+            placesServiceElementRef.current = placesServiceElement
+            placesServiceRef.current = new google.maps.places.PlacesService(placesServiceElement)
+            sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken()
+          })
+          .catch((err: unknown) => {
+            console.error('Failed to initialize Places services:', err)
+            setLoadError(true)
+          })
       } catch (err) {
-        console.error("Failed to initialize Places services:", err)
+        console.error('Failed to initialize Places services:', err)
         setLoadError(true)
       }
     }
@@ -112,11 +113,7 @@ export function AddressAutocomplete({
 
   // Fetch suggestions when value changes
   const fetchSuggestions = useCallback((query: string) => {
-    if (
-      !query ||
-      query.length < MIN_QUERY_LENGTH ||
-      !autocompleteServiceRef.current
-    ) {
+    if (!query || query.length < MIN_QUERY_LENGTH || !autocompleteServiceRef.current) {
       setSuggestions([])
       return
     }
@@ -124,34 +121,28 @@ export function AddressAutocomplete({
     try {
       const request: google.maps.places.AutocompletionRequest = {
         input: query,
-        types: ["address"],
+        types: ['address'],
         sessionToken: sessionTokenRef.current,
       }
 
       // eslint-disable-next-line @typescript-eslint/no-floating-promises -- callback-based API
-      autocompleteServiceRef.current.getPlacePredictions(
-        request,
-        (predictions, status) => {
-          if (
-            status === google.maps.places.PlacesServiceStatus.OK &&
-            predictions
-          ) {
-            setSuggestions(
-              predictions.slice(0, MAX_SUGGESTIONS).map((p) => ({
-                placeId: p.place_id,
-                mainText: p.structured_formatting.main_text,
-                secondaryText: p.structured_formatting.secondary_text || "",
-                fullText: p.description,
-              }))
-            )
-            setIsOpen(true)
-          } else {
-            setSuggestions([])
-          }
+      autocompleteServiceRef.current.getPlacePredictions(request, (predictions, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+          setSuggestions(
+            predictions.slice(0, MAX_SUGGESTIONS).map((p) => ({
+              placeId: p.place_id,
+              mainText: p.structured_formatting.main_text,
+              secondaryText: p.structured_formatting.secondary_text || '',
+              fullText: p.description,
+            }))
+          )
+          setIsOpen(true)
+        } else {
+          setSuggestions([])
         }
-      )
+      })
     } catch (err) {
-      console.error("Failed to fetch address suggestions:", err)
+      console.error('Failed to fetch address suggestions:', err)
       setSuggestions([])
     }
   }, [])
@@ -164,7 +155,9 @@ export function AddressAutocomplete({
       fetchSuggestions(value)
     }, DEBOUNCE_DELAY_MS)
 
-    return () => { clearTimeout(timer); }
+    return () => {
+      clearTimeout(timer)
+    }
   }, [value, isLoaded, loadError, isFocused, fetchSuggestions])
 
   // Handle suggestion selection
@@ -178,7 +171,7 @@ export function AddressAutocomplete({
       // Fetch place details
       const request: google.maps.places.PlaceDetailsRequest = {
         placeId: suggestion.placeId,
-        fields: ["formatted_address", "address_components"],
+        fields: ['formatted_address', 'address_components'],
         sessionToken: sessionTokenRef.current,
       }
 
@@ -203,8 +196,7 @@ export function AddressAutocomplete({
         }
 
         // Create new session token for next search
-        sessionTokenRef.current =
-          new google.maps.places.AutocompleteSessionToken()
+        sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken()
       })
     },
     [onChange, onAddressSelect]
@@ -222,20 +214,20 @@ export function AddressAutocomplete({
     (e: React.KeyboardEvent) => {
       const totalItems = suggestions.length + 1 // +1 for "continue manually" option
 
-      if (e.key === "ArrowDown") {
+      if (e.key === 'ArrowDown') {
         e.preventDefault()
         setSelectedIndex((prev) => (prev + 1) % totalItems)
-      } else if (e.key === "ArrowUp") {
+      } else if (e.key === 'ArrowUp') {
         e.preventDefault()
         setSelectedIndex((prev) => (prev - 1 + totalItems) % totalItems)
-      } else if (e.key === "Enter" && isOpen) {
+      } else if (e.key === 'Enter' && isOpen) {
         e.preventDefault()
         if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
           handleSelect(suggestions[selectedIndex])
         } else if (selectedIndex === suggestions.length) {
           handleManualInput()
         }
-      } else if (e.key === "Escape") {
+      } else if (e.key === 'Escape') {
         setIsOpen(false)
         setSelectedIndex(-1)
       }
@@ -255,14 +247,16 @@ export function AddressAutocomplete({
         setIsOpen(false)
       }
     }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => { document.removeEventListener("mousedown", handleClickOutside); }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
   }, [])
 
   const inputClasses = cn(
-    "w-full px-3 py-2 border border-border rounded-md bg-background text-sm",
-    "focus:outline-none focus:ring-2 focus:ring-ring",
-    "disabled:opacity-50 disabled:cursor-not-allowed",
+    'w-full px-3 py-2 border border-border rounded-md bg-background text-sm',
+    'focus:outline-none focus:ring-2 focus:ring-ring',
+    'disabled:opacity-50 disabled:cursor-not-allowed',
     className
   )
 
@@ -275,60 +269,63 @@ export function AddressAutocomplete({
           id={id}
           type="text"
           value={value}
-          onChange={(e) => { onChange(e.target.value); }}
+          onChange={(e) => {
+            onChange(e.target.value)
+          }}
           onKeyDown={handleKeyDown}
           onFocus={() => {
             setIsFocused(true)
             if (suggestions.length > 0) setIsOpen(true)
           }}
-          onBlur={() => { setIsFocused(false); }}
-          placeholder={loadError || !apiKey ? "Enter address" : placeholder}
+          onBlur={() => {
+            setIsFocused(false)
+          }}
+          placeholder={loadError || !apiKey ? 'Enter address' : placeholder}
           disabled={disabled}
           autoComplete="off"
-          className={cn(inputClasses, "pl-10")}
+          className={cn(inputClasses, 'pl-10')}
         />
       </div>
 
       {/* Dropdown */}
-      {isOpen &&
-        (suggestions.length > 0 || value.length >= MIN_QUERY_LENGTH) && (
-          <div
-            ref={dropdownRef}
-            className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg overflow-hidden"
-          >
-            {suggestions.map((suggestion, index) => (
-              <button
-                key={suggestion.placeId}
-                type="button"
-                onClick={() => { handleSelect(suggestion) }}
-                className={cn(
-                  "w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors",
-                  "flex flex-col",
-                  selectedIndex === index && "bg-accent"
-                )}
-              >
-                <span className="font-medium">{suggestion.mainText}</span>
-                <span className="text-xs text-muted-foreground">
-                  {suggestion.secondaryText}
-                </span>
-              </button>
-            ))}
-
-            {/* "Continue manually" option */}
+      {isOpen && (suggestions.length > 0 || value.length >= MIN_QUERY_LENGTH) && (
+        <div
+          ref={dropdownRef}
+          className="absolute z-50 w-full mt-1 bg-background border border-border rounded-md shadow-lg overflow-hidden"
+        >
+          {suggestions.map((suggestion, index) => (
             <button
+              key={suggestion.placeId}
               type="button"
-              onClick={handleManualInput}
+              onClick={() => {
+                handleSelect(suggestion)
+              }}
               className={cn(
-                "w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors",
-                "flex items-center gap-2 border-t border-border text-muted-foreground",
-                selectedIndex === suggestions.length && "bg-accent"
+                'w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors',
+                'flex flex-col',
+                selectedIndex === index && 'bg-accent'
               )}
             >
-              <Keyboard className="h-4 w-4" />
-              <span>Continue with manual input</span>
+              <span className="font-medium">{suggestion.mainText}</span>
+              <span className="text-xs text-muted-foreground">{suggestion.secondaryText}</span>
             </button>
-          </div>
-        )}
+          ))}
+
+          {/* "Continue manually" option */}
+          <button
+            type="button"
+            onClick={handleManualInput}
+            className={cn(
+              'w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors',
+              'flex items-center gap-2 border-t border-border text-muted-foreground',
+              selectedIndex === suggestions.length && 'bg-accent'
+            )}
+          >
+            <Keyboard className="h-4 w-4" />
+            <span>Continue with manual input</span>
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -336,44 +333,38 @@ export function AddressAutocomplete({
 /**
  * Parse address from PlaceResult (legacy API format)
  */
-function parseAddressFromPlaceResult(
-  place: google.maps.places.PlaceResult
-): ParsedAddress {
+function parseAddressFromPlaceResult(place: google.maps.places.PlaceResult): ParsedAddress {
   const components = place.address_components || []
 
   const getComponent = (types: string[]): string => {
-    const component = components.find((c) =>
-      types.some((type) => c.types.includes(type))
-    )
-    return component?.long_name || ""
+    const component = components.find((c) => types.some((type) => c.types.includes(type)))
+    return component?.long_name || ''
   }
 
   const getComponentShort = (types: string[]): string => {
-    const component = components.find((c) =>
-      types.some((type) => c.types.includes(type))
-    )
-    return component?.short_name || ""
+    const component = components.find((c) => types.some((type) => c.types.includes(type)))
+    return component?.short_name || ''
   }
 
-  const streetNumber = getComponent(["street_number"])
-  const route = getComponent(["route"])
-  const streetAddress = [streetNumber, route].filter(Boolean).join(" ")
+  const streetNumber = getComponent(['street_number'])
+  const route = getComponent(['route'])
+  const streetAddress = [streetNumber, route].filter(Boolean).join(' ')
 
   // Priority: locality > administrative_area_level_2 > administrative_area_level_3 > sublocality
   const city =
-    getComponent(["locality"]) ||
-    getComponent(["administrative_area_level_2"]) ||
-    getComponent(["administrative_area_level_3"]) ||
-    getComponent(["sublocality"]) ||
-    ""
+    getComponent(['locality']) ||
+    getComponent(['administrative_area_level_2']) ||
+    getComponent(['administrative_area_level_3']) ||
+    getComponent(['sublocality']) ||
+    ''
 
   return {
-    formatted_address: place.formatted_address || "",
+    formatted_address: place.formatted_address || '',
     street_address: streetAddress,
     city,
-    state: getComponent(["administrative_area_level_1"]),
-    postal_code: getComponent(["postal_code"]),
-    country: getComponent(["country"]),
-    country_code: getComponentShort(["country"]).toLowerCase(),
+    state: getComponent(['administrative_area_level_1']),
+    postal_code: getComponent(['postal_code']),
+    country: getComponent(['country']),
+    country_code: getComponentShort(['country']).toLowerCase(),
   }
 }

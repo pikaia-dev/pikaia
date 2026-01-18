@@ -5,20 +5,15 @@
  * Used for in-app subscription checkout without redirect.
  */
 
-import {
-  Elements,
-  PaymentElement,
-  useElements,
-  useStripe,
-} from "@stripe/react-stripe-js"
-import type { StripeElementsOptions } from "@stripe/stripe-js"
-import { useEffect, useState } from "react"
-import { toast } from "sonner"
+import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
+import type { StripeElementsOptions } from '@stripe/stripe-js'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
-import { useApi } from "../hooks/useApi"
-import { getStripe } from "../lib/stripe"
-import { Button } from "./ui/button"
-import { LoadingSpinner } from "./ui/loading-spinner"
+import { useApi } from '../hooks/useApi'
+import { getStripe } from '../lib/stripe'
+import { Button } from './ui/button'
+import { LoadingSpinner } from './ui/loading-spinner'
 
 interface PaymentFormProps {
   quantity: number
@@ -58,11 +53,11 @@ function PaymentFormInner({
       confirmParams: {
         return_url: `${window.location.origin}/settings/billing?success=true`,
       },
-      redirect: "if_required",
+      redirect: 'if_required',
     })
 
     if (error) {
-      toast.error(error.message || "Payment failed")
+      toast.error(error.message || 'Payment failed')
       setProcessing(false)
       return
     }
@@ -74,24 +69,21 @@ function PaymentFormInner({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <PaymentElement
-        onReady={() => { setReady(true); }}
+        onReady={() => {
+          setReady(true)
+        }}
         options={{
-          layout: "tabs",
+          layout: 'tabs',
           wallets: {
             // Disable Link since we already collect customer info
-            applePay: "auto",
-            googlePay: "auto",
+            applePay: 'auto',
+            googlePay: 'auto',
           },
         }}
       />
 
       <div className="flex gap-3 justify-end pt-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={processing}
-        >
+        <Button type="button" variant="outline" onClick={onCancel} disabled={processing}>
           Cancel
         </Button>
         <Button type="submit" disabled={!stripe || !ready || processing}>
@@ -101,7 +93,7 @@ function PaymentFormInner({
               Processing...
             </>
           ) : (
-            "Subscribe"
+            'Subscribe'
           )}
         </Button>
       </div>
@@ -113,17 +105,14 @@ function PaymentFormInner({
  * Main PaymentForm component.
  * Initializes Stripe Elements with subscription intent.
  */
-export function PaymentForm({
-  quantity,
-  onSuccess,
-  onCancel,
-}: PaymentFormProps) {
+export function PaymentForm({ quantity, onSuccess, onCancel }: PaymentFormProps) {
   const { createSubscriptionIntent } = useApi()
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [subscriptionId, setSubscriptionId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: createSubscriptionIntent excluded to prevent infinite re-renders
   useEffect(() => {
     let cancelled = false
 
@@ -137,7 +126,7 @@ export function PaymentForm({
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          const message = err instanceof Error ? err.message : "Failed to initialize payment"
+          const message = err instanceof Error ? err.message : 'Failed to initialize payment'
           setError(message)
           setLoading(false)
         }
@@ -146,16 +135,13 @@ export function PaymentForm({
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quantity]) // Note: createSubscriptionIntent excluded to prevent infinite re-renders
+  }, [quantity])
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <LoadingSpinner size="sm" />
-        <span className="ml-2 text-muted-foreground">
-          Setting up payment...
-        </span>
+        <span className="ml-2 text-muted-foreground">Setting up payment...</span>
       </div>
     )
   }
@@ -178,21 +164,17 @@ export function PaymentForm({
   const options: StripeElementsOptions = {
     clientSecret,
     appearance: {
-      theme: "stripe",
+      theme: 'stripe',
       variables: {
-        colorPrimary: "#0f172a",
-        borderRadius: "8px",
+        colorPrimary: '#0f172a',
+        borderRadius: '8px',
       },
     },
   }
 
   return (
     <Elements stripe={getStripe()} options={options}>
-      <PaymentFormInner
-        subscriptionId={subscriptionId}
-        onSuccess={onSuccess}
-        onCancel={onCancel}
-      />
+      <PaymentFormInner subscriptionId={subscriptionId} onSuccess={onSuccess} onCancel={onCancel} />
     </Elements>
   )
 }

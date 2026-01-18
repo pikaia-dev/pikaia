@@ -23,13 +23,26 @@ from aws_cdk import (
     Duration,
     RemovalPolicy,
     Stack,
+)
+from aws_cdk import (
     aws_ec2 as ec2,
+)
+from aws_cdk import (
     aws_events as events,
+)
+from aws_cdk import (
     aws_events_targets as events_targets,
-    aws_iam as iam,
+)
+from aws_cdk import (
     aws_lambda as lambda_,
+)
+from aws_cdk import (
     aws_logs as logs,
+)
+from aws_cdk import (
     aws_secretsmanager as secretsmanager,
+)
+from aws_cdk import (
     aws_sqs as sqs,
 )
 from constructs import Construct
@@ -214,9 +227,7 @@ class EventsStack(Stack):
 
         # Add DATABASE_URL from secret (assumes secret has standard RDS format)
         # For Aurora Serverless, construct from secret fields
-        self.publisher_lambda.add_environment(
-            "DATABASE_SECRET_ARN", database_secret.secret_arn
-        )
+        self.publisher_lambda.add_environment("DATABASE_SECRET_ARN", database_secret.secret_arn)
 
         # CloudWatch scheduled rule for fallback polling
         # This ensures events are published even if Aurora triggers fail

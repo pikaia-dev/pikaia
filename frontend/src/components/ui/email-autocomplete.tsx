@@ -1,9 +1,9 @@
-import { Keyboard, Search, User } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { Keyboard, Search, User } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { useApi } from "@/hooks/useApi"
-import type { DirectoryUser } from "@/lib/api"
-import { cn } from "@/lib/utils"
+import { useApi } from '@/hooks/useApi'
+import type { DirectoryUser } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 /** Minimum characters before triggering autocomplete */
 const MIN_QUERY_LENGTH = 2
@@ -29,7 +29,7 @@ export function EmailAutocomplete({
   value,
   onChange,
   onSelect,
-  placeholder = "user@example.com",
+  placeholder = 'user@example.com',
   disabled = false,
   className,
   id,
@@ -78,7 +78,9 @@ export function EmailAutocomplete({
       void fetchSuggestions(value)
     }, DEBOUNCE_DELAY_MS)
 
-    return () => { clearTimeout(timer); }
+    return () => {
+      clearTimeout(timer)
+    }
   }, [value, isFocused, fetchSuggestions])
 
   // Fetch avatars for suggestions (in background)
@@ -126,20 +128,20 @@ export function EmailAutocomplete({
     (e: React.KeyboardEvent) => {
       const totalItems = suggestions.length + 1
 
-      if (e.key === "ArrowDown") {
+      if (e.key === 'ArrowDown') {
         e.preventDefault()
         setSelectedIndex((prev) => (prev + 1) % totalItems)
-      } else if (e.key === "ArrowUp") {
+      } else if (e.key === 'ArrowUp') {
         e.preventDefault()
         setSelectedIndex((prev) => (prev - 1 + totalItems) % totalItems)
-      } else if (e.key === "Enter" && isOpen) {
+      } else if (e.key === 'Enter' && isOpen) {
         e.preventDefault()
         if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
           handleSelect(suggestions[selectedIndex])
         } else if (selectedIndex === suggestions.length) {
           handleManualInput()
         }
-      } else if (e.key === "Escape") {
+      } else if (e.key === 'Escape') {
         setIsOpen(false)
         setSelectedIndex(-1)
       }
@@ -159,14 +161,16 @@ export function EmailAutocomplete({
         setIsOpen(false)
       }
     }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => { document.removeEventListener("mousedown", handleClickOutside); }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
   }, [])
 
   const inputClasses = cn(
-    "w-full px-3 py-2 border border-border rounded-md bg-background text-sm",
-    "focus:outline-none focus:ring-2 focus:ring-ring",
-    "disabled:opacity-50 disabled:cursor-not-allowed",
+    'w-full px-3 py-2 border border-border rounded-md bg-background text-sm',
+    'focus:outline-none focus:ring-2 focus:ring-ring',
+    'disabled:opacity-50 disabled:cursor-not-allowed',
     className
   )
 
@@ -179,7 +183,9 @@ export function EmailAutocomplete({
           id={id}
           type="email"
           value={value}
-          onChange={(e) => { onChange(e.target.value); }}
+          onChange={(e) => {
+            onChange(e.target.value)
+          }}
           onKeyDown={handleKeyDown}
           onFocus={() => {
             setIsFocused(true)
@@ -187,13 +193,15 @@ export function EmailAutocomplete({
           }}
           onBlur={() => {
             setIsFocused(false)
-            setTimeout(() => { setIsOpen(false); }, 150)
+            setTimeout(() => {
+              setIsOpen(false)
+            }, 150)
           }}
           placeholder={placeholder}
           disabled={disabled}
           autoComplete="off"
           required
-          className={cn(inputClasses, "pl-10")}
+          className={cn(inputClasses, 'pl-10')}
         />
       </div>
 
@@ -212,9 +220,9 @@ export function EmailAutocomplete({
                 handleSelect(user)
               }}
               className={cn(
-                "w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors",
-                "flex items-center gap-3",
-                selectedIndex === index && "bg-accent"
+                'w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors',
+                'flex items-center gap-3',
+                selectedIndex === index && 'bg-accent'
               )}
             >
               {avatarUrls[user.email] ? (
@@ -229,13 +237,9 @@ export function EmailAutocomplete({
                 </div>
               )}
               <div className="flex flex-col min-w-0">
-                <span className="font-medium truncate">
-                  {user.name || user.email}
-                </span>
+                <span className="font-medium truncate">{user.name || user.email}</span>
                 {user.name && (
-                  <span className="text-xs text-muted-foreground truncate">
-                    {user.email}
-                  </span>
+                  <span className="text-xs text-muted-foreground truncate">{user.email}</span>
                 )}
               </div>
             </button>
@@ -249,9 +253,9 @@ export function EmailAutocomplete({
               handleManualInput()
             }}
             className={cn(
-              "w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors",
-              "flex items-center gap-2 border-t border-border text-muted-foreground",
-              selectedIndex === suggestions.length && "bg-accent"
+              'w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors',
+              'flex items-center gap-2 border-t border-border text-muted-foreground',
+              selectedIndex === suggestions.length && 'bg-accent'
             )}
           >
             <Keyboard className="h-4 w-4" />

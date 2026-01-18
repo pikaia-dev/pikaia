@@ -1,25 +1,22 @@
-import { useStytchMemberSession } from "@stytch/react/b2b"
-import { Mail } from "lucide-react"
-import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
-import { toast } from "sonner"
+import { useStytchMemberSession } from '@stytch/react/b2b'
+import { Mail } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
-import { LoadingSpinner } from "../components/ui/loading-spinner"
+import { LoadingSpinner } from '../components/ui/loading-spinner'
 import {
   CheckEmailScreen,
   EmailLoginForm,
   GoogleOAuthButton,
   OrganizationSelector,
   PasskeyLoginButton,
-} from "../features/auth/components"
-import { useDiscoveryAuth } from "../features/auth/hooks"
-import {
-  hasPasskeyHint,
-  isWebAuthnSupported,
-} from "../features/auth/hooks/usePasskeyAuth"
+} from '../features/auth/components'
+import { useDiscoveryAuth } from '../features/auth/hooks'
+import { hasPasskeyHint, isWebAuthnSupported } from '../features/auth/hooks/usePasskeyAuth'
 
 // Passkey placeholder token before Stytch session attestation
-const PASSKEY_PLACEHOLDER_TOKEN = "passkey_authenticated"
+const PASSKEY_PLACEHOLDER_TOKEN = 'passkey_authenticated'
 
 // Props for the passkey-first login UI
 interface PasskeyFirstLoginProps {
@@ -55,19 +52,12 @@ function PasskeyFirstLogin({
     return (
       <>
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Welcome back
-          </h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            Sign in with your passkey
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
+          <p className="text-sm text-muted-foreground mt-2">Sign in with your passkey</p>
         </div>
 
         <div className="space-y-4">
-          <PasskeyLoginButton
-            onSuccess={onPasskeySuccess}
-            variant="primary"
-          />
+          <PasskeyLoginButton onSuccess={onPasskeySuccess} variant="primary" />
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -81,13 +71,12 @@ function PasskeyFirstLogin({
           </div>
 
           <div className="space-y-2">
-            <GoogleOAuthButton
-              onClick={startGoogleOAuth}
-              isLoading={isLoading}
-            />
+            <GoogleOAuthButton onClick={startGoogleOAuth} isLoading={isLoading} />
             <button
               type="button"
-              onClick={() => { setShowAlternatives(true); }}
+              onClick={() => {
+                setShowAlternatives(true)
+              }}
               className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
             >
               <Mail className="h-4 w-4" />
@@ -103,44 +92,30 @@ function PasskeyFirstLogin({
   return (
     <>
       <div className="text-center mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Welcome back
-        </h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
         <p className="text-sm text-muted-foreground mt-2">
           Sign in with Google or enter your email
         </p>
       </div>
 
       <div className="space-y-4">
-        <GoogleOAuthButton
-          onClick={startGoogleOAuth}
-          isLoading={isLoading}
-        />
+        <GoogleOAuthButton onClick={startGoogleOAuth} isLoading={isLoading} />
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
             <span className="w-full border-t" />
           </div>
           <div className="relative flex justify-center text-xs">
-            <span className="bg-background px-2 text-muted-foreground">
-              Or continue with
-            </span>
+            <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
           </div>
         </div>
 
-        <EmailLoginForm
-          onSubmit={sendMagicLink}
-          isLoading={isLoading}
-          error={error}
-        />
+        <EmailLoginForm onSubmit={sendMagicLink} isLoading={isLoading} error={error} />
 
         {/* Show passkey link for users who might have one */}
         {isWebAuthnSupported() && (
           <div className="text-center">
-            <PasskeyLoginButton
-              onSuccess={onPasskeySuccess}
-              variant="link"
-            />
+            <PasskeyLoginButton onSuccess={onPasskeySuccess} variant="link" />
           </div>
         )}
       </div>
@@ -151,19 +126,14 @@ function PasskeyFirstLogin({
 export default function Login() {
   const navigate = useNavigate()
   const { session, isInitialized } = useStytchMemberSession()
-  const {
-    state,
-    sendMagicLink,
-    startGoogleOAuth,
-    exchangeSession,
-    resetToEmail,
-  } = useDiscoveryAuth()
+  const { state, sendMagicLink, startGoogleOAuth, exchangeSession, resetToEmail } =
+    useDiscoveryAuth()
 
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isInitialized can be false
     if (isInitialized && session) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises -- navigate returns void
-      navigate("/dashboard", { replace: true })
+      navigate('/dashboard', { replace: true })
     }
   }, [session, isInitialized, navigate])
 
@@ -179,30 +149,33 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-sm p-8">
-        {state.step === "email" && (
+        {state.step === 'email' && (
           <PasskeyFirstLogin
             onPasskeySuccess={(result) => {
               // Passkey auth returns real Stytch session tokens via sessions.attest()
               if (result.session_token && result.session_token !== PASSKEY_PLACEHOLDER_TOKEN) {
                 // Set cookies that Stytch SDK will recognize
                 // Example cookie attributes: domain=your-domain.com; path=/; secure; max-age=2592000 (30 days)
-                const cookieOptions = "path=/; secure; max-age=2592000; SameSite=None"
+                const cookieOptions = 'path=/; secure; max-age=2592000; SameSite=None'
+                // biome-ignore lint/suspicious/noDocumentCookie: Stytch SDK requires these cookies
                 document.cookie = `stytch_session=${result.session_token}; ${cookieOptions}`
+                // biome-ignore lint/suspicious/noDocumentCookie: Stytch SDK requires these cookies
                 document.cookie = `stytch_session_jwt=${result.session_jwt}; ${cookieOptions}`
 
                 // Set flag so ProtectedRoute shows loading instead of redirecting to login
-                sessionStorage.setItem("stytch_just_logged_in", "true")
+                sessionStorage.setItem('stytch_just_logged_in', 'true')
 
                 // Use full page redirect so Stytch SDK reinitializes with new session
-                window.location.href = "/dashboard"
+                window.location.href = '/dashboard'
               } else {
                 // Log error details without exposing sensitive data
-                console.error("Passkey authentication failed", {
+                console.error('Passkey authentication failed', {
                   hasSessionToken: Boolean(result.session_token),
                   hasSessionJwt: Boolean(result.session_jwt),
-                  hasValidToken: result.session_token && result.session_token !== PASSKEY_PLACEHOLDER_TOKEN,
+                  hasValidToken:
+                    result.session_token && result.session_token !== PASSKEY_PLACEHOLDER_TOKEN,
                 })
-                toast.error("Authentication failed - no session received")
+                toast.error('Authentication failed - no session received')
               }
             }}
             startGoogleOAuth={startGoogleOAuth}
@@ -212,11 +185,11 @@ export default function Login() {
           />
         )}
 
-        {state.step === "check-email" && (
+        {state.step === 'check-email' && (
           <CheckEmailScreen email={state.email} onBack={resetToEmail} />
         )}
 
-        {state.step === "select-org" && (
+        {state.step === 'select-org' && (
           <OrganizationSelector
             organizations={state.discoveredOrganizations}
             onSelect={exchangeSession}

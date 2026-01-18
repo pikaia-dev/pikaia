@@ -64,13 +64,15 @@ class StorageService:
             from botocore.config import Config
 
             # Timeout configuration for S3 API calls
-            # Used for generating presigned URLs (quick operations)
             config = Config(
                 connect_timeout=5,
                 read_timeout=30,
                 retries={"max_attempts": 2},
             )
-            # Use default credentials chain (works with Fargate task role, local credentials, etc.)
+            # boto3 reads credentials and endpoint from environment:
+            # - AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY for credentials
+            # - AWS_ENDPOINT_URL for LocalStack or custom endpoints
+            # - For production: uses IAM role (Fargate task role, etc.)
             self.s3_client = boto3.client(
                 "s3",
                 region_name=getattr(settings, "AWS_S3_REGION_NAME", "us-east-1"),

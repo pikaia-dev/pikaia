@@ -1,69 +1,66 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 
-import { useApi } from "../../../hooks/useApi"
+import { useApi } from '../../../hooks/useApi'
 import type {
-    CheckoutSessionRequest,
-    ConfirmSubscriptionRequest,
-    InvoiceListResponse,
-    PortalSessionRequest,
-    SubscriptionInfo,
-} from "../../../lib/api"
-import { queryKeys } from "../../shared/query-keys"
+  CheckoutSessionRequest,
+  ConfirmSubscriptionRequest,
+  InvoiceListResponse,
+  PortalSessionRequest,
+  SubscriptionInfo,
+} from '../../../lib/api'
+import { queryKeys } from '../../shared/query-keys'
 
 /**
  * Query hook for fetching subscription info.
  */
 export function useSubscription() {
-    const { getSubscription } = useApi()
+  const { getSubscription } = useApi()
 
-    return useQuery<SubscriptionInfo>({
-        queryKey: queryKeys.billing.subscription(),
-        queryFn: getSubscription,
-    })
+  return useQuery<SubscriptionInfo>({
+    queryKey: queryKeys.billing.subscription(),
+    queryFn: getSubscription,
+  })
 }
 
 /**
  * Query hook for fetching invoices with pagination.
  */
-export function useInvoices(params?: {
-    limit?: number
-    starting_after?: string
-}) {
-    const { listInvoices } = useApi()
+export function useInvoices(params?: { limit?: number; starting_after?: string }) {
+  const { listInvoices } = useApi()
 
-    return useQuery<InvoiceListResponse>({
-        queryKey: queryKeys.billing.invoices(params),
-        queryFn: () => listInvoices(params),
-    })
+  return useQuery<InvoiceListResponse>({
+    queryKey: queryKeys.billing.invoices(params),
+    queryFn: () => listInvoices(params),
+  })
 }
 
 /**
  * Mutation hook for creating a checkout session.
  */
 export function useCreateCheckoutSession() {
-    const { createCheckoutSession } = useApi()
+  const { createCheckoutSession } = useApi()
 
-    return useMutation({
-        mutationFn: (data: CheckoutSessionRequest) => createCheckoutSession(data),
-        onError: (error: Error) => {
-            toast.error(error.message || "Failed to create checkout")
-        },
-    })
+  return useMutation({
+    mutationFn: (data: CheckoutSessionRequest) => createCheckoutSession(data),
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to create checkout')
+    },
+  })
 }
 
 /**
  * Mutation hook for creating a portal session.
  */
 export function useCreatePortalSession() {
-    const { createPortalSession } = useApi()
+  const { createPortalSession } = useApi()
 
-    return useMutation({
-        mutationFn: (data: PortalSessionRequest) => createPortalSession(data),
-        onError: (error: Error) => {
-            toast.error(error.message || "Failed to open billing portal")
-        },
-    })
+  return useMutation({
+    mutationFn: (data: PortalSessionRequest) => createPortalSession(data),
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to open billing portal')
+    },
+  })
 }
 
 /**
@@ -71,39 +68,38 @@ export function useCreatePortalSession() {
  * Syncs subscription status from Stripe (useful when webhooks may be delayed).
  */
 export function useConfirmSubscription() {
-    const { confirmSubscription } = useApi()
-    const queryClient = useQueryClient()
+  const { confirmSubscription } = useApi()
+  const queryClient = useQueryClient()
 
-    return useMutation({
-        mutationFn: (data: ConfirmSubscriptionRequest) =>
-            confirmSubscription(data),
-        onSuccess: () => {
-            void queryClient.invalidateQueries({
-                queryKey: queryKeys.billing.subscription(),
-            })
-            toast.success("Subscription activated!")
-        },
-        onError: () => {
-            // Sync failed but payment likely succeeded - still invalidate to let webhook catch up
-            void queryClient.invalidateQueries({
-                queryKey: queryKeys.billing.subscription(),
-            })
-            toast.error(
-                "Payment received, but we couldn't confirm your subscription yet. It should update shortly."
-            )
-        },
-    })
+  return useMutation({
+    mutationFn: (data: ConfirmSubscriptionRequest) => confirmSubscription(data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.billing.subscription(),
+      })
+      toast.success('Subscription activated!')
+    },
+    onError: () => {
+      // Sync failed but payment likely succeeded - still invalidate to let webhook catch up
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.billing.subscription(),
+      })
+      toast.error(
+        "Payment received, but we couldn't confirm your subscription yet. It should update shortly."
+      )
+    },
+  })
 }
 
 /**
  * Hook to refresh subscription data after upgrade.
  */
 export function useRefreshSubscription() {
-    const queryClient = useQueryClient()
+  const queryClient = useQueryClient()
 
-    return () => {
-        void queryClient.invalidateQueries({
-            queryKey: queryKeys.billing.subscription(),
-        })
-    }
+  return () => {
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.billing.subscription(),
+    })
+  }
 }
