@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
 import pytest
-from django.test import Client, RequestFactory
 from ninja.errors import HttpError
 
 from apps.accounts.api import (
@@ -42,19 +41,6 @@ from apps.accounts.schemas import (
     UpdateProfileRequest,
 )
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
-
-
-@pytest.fixture
-def api_client() -> Client:
-    """Django test client for API requests."""
-    return Client()
-
-
-@pytest.fixture
-def request_factory() -> RequestFactory:
-    """Django request factory for unit testing views."""
-    return RequestFactory()
-
 
 # --- Mock Stytch Response Objects ---
 
