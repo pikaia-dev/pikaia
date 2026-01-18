@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-globs: "frontend/**/*"
+globs: "frontend/**/*.{ts,tsx},emails/**/*.{ts,tsx}"
 ---
 
 # Frontend Rules
