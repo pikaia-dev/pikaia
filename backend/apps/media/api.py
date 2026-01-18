@@ -173,8 +173,7 @@ def direct_upload(
     In production, files are uploaded directly to S3 using presigned URLs.
     This endpoint is only used in local development.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:
-        raise HttpError(401, "Not authenticated")
+    get_auth_context(request)  # Validates authentication
 
     if not key:
         raise HttpError(400, "Missing storage key")
