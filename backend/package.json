@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "uv run python manage.py runserver",
     "build": "echo 'Python backend - no build step'",
-    "lint": "uv run ruff check apps tests",
-    "format": "uv run ruff format apps tests && uv run ruff check --fix apps tests",
+    "lint": "uv run ruff check .",
+    "format": "uv run ruff format . && uv run ruff check --fix .",
     "type-check": "echo 'Type checking via ruff'",
     "test": "uv run pytest",
     "clean": "rm -rf __pycache__ .pytest_cache .ruff_cache .turbo apps/**/__pycache__ tests/**/__pycache__"
