@@ -109,6 +109,24 @@ class TestListEndpoints:
 
         assert len(result.endpoints) == 2
 
+    def test_list_does_not_expose_secret(self, request_factory: RequestFactory) -> None:
+        """List endpoint should never expose the signing secret."""
+        org = OrganizationFactory()
+        endpoint = WebhookEndpointFactory(organization=org)
+
+        request = _create_authenticated_request(
+            request_factory, "get", "/api/v1/webhooks/endpoints", org=org, role="admin"
+        )
+
+        result = list_endpoints(request)
+
+        # Verify secret is not in response
+        assert len(result.endpoints) == 1
+        response_dict = result.endpoints[0].model_dump()
+        assert "secret" not in response_dict
+        # Double-check the actual secret value isn't anywhere
+        assert endpoint.secret not in str(response_dict)
+
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
         org = OrganizationFactory()
@@ -227,6 +245,27 @@ class TestGetEndpoint:
 
         assert result.id == endpoint.id
         assert result.name == "My Endpoint"
+
+    def test_get_does_not_expose_secret(self, request_factory: RequestFactory) -> None:
+        """Get endpoint should never expose the signing secret."""
+        org = OrganizationFactory()
+        endpoint = WebhookEndpointFactory(organization=org)
+
+        request = _create_authenticated_request(
+            request_factory,
+            "get",
+            f"/api/v1/webhooks/endpoints/{endpoint.id}",
+            org=org,
+            role="admin",
+        )
+
+        result = get_endpoint(request, endpoint.id)
+
+        # Verify secret is not in response
+        response_dict = result.model_dump()
+        assert "secret" not in response_dict
+        # Double-check the actual secret value isn't anywhere
+        assert endpoint.secret not in str(response_dict)
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
