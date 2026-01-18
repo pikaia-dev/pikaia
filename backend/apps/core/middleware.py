@@ -146,11 +146,11 @@ class StytchAuthMiddleware:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
-        # Initialize auth context
-        request.auth_user: User | None = None  # type: ignore[attr-defined]
-        request.auth_member: Member | None = None  # type: ignore[attr-defined]
-        request.auth_organization: Organization | None = None  # type: ignore[attr-defined]
-        request.auth_failed: bool = False  # type: ignore[attr-defined]
+        # Initialize auth context (attrs added dynamically to HttpRequest)
+        request.auth_user: User | None = None  # type: ignore[misc, attr-defined]
+        request.auth_member: Member | None = None  # type: ignore[misc, attr-defined]
+        request.auth_organization: Organization | None = None  # type: ignore[misc, attr-defined]
+        request.auth_failed: bool = False  # type: ignore[misc, attr-defined]
 
         # Skip auth for public paths
         if self._is_public_path(request.path):

@@ -64,7 +64,7 @@ from apps.accounts.stytch_client import get_stytch_client
 from apps.billing.services import sync_billing_to_stripe
 from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth, require_admin
+from apps.core.security import BearerAuth, get_auth_context, require_admin
 from apps.core.types import AuthenticatedHttpRequest
 from apps.events.services import publish_event
 
@@ -126,11 +126,12 @@ def authenticate_magic_link(
         raise HttpError(400, "Invalid or expired token.") from e
 
     # Build list of discovered organizations
+    # Stytch SDK types organization as Optional but it's always present in discovered_organizations
     discovered_orgs = [
         DiscoveredOrganization(
-            organization_id=org.organization.organization_id,
-            organization_name=org.organization.organization_name,
-            organization_slug=org.organization.organization_slug,
+            organization_id=org.organization.organization_id,  # type: ignore[union-attr]
+            organization_name=org.organization.organization_name,  # type: ignore[union-attr]
+            organization_slug=org.organization.organization_slug,  # type: ignore[union-attr]
         )
         for org in response.discovered_organizations
     ]
@@ -197,11 +198,12 @@ def create_organization(
         actor=user,
     )
 
+    # Stytch SDK types organization as Optional but it's always present after successful creation
     return SessionResponse(
         session_token=response.session_token,
         session_jwt=response.session_jwt,
         member_id=response.member.member_id,
-        organization_id=response.organization.organization_id,
+        organization_id=response.organization.organization_id,  # type: ignore[union-attr]
     )
 
 
@@ -391,13 +393,7 @@ def get_current_user(request: AuthenticatedHttpRequest) -> MeResponse:
 
     Requires valid session JWT in Authorization header.
     """
-    # These are set by the auth middleware
-    if not hasattr(request, "auth_user") or request.auth_user is None:
-        raise HttpError(401, "Not authenticated")
-
-    user = request.auth_user
-    member = request.auth_member
-    org = request.auth_organization
+    user, member, org = get_auth_context(request)
 
     return MeResponse(
         user=UserInfo(
@@ -440,12 +436,7 @@ def update_profile(request: AuthenticatedHttpRequest, payload: UpdateProfileRequ
     Updates local database and syncs to Stytch.
     Phone number changes require OTP verification via /phone/verify-otp.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:
-        raise HttpError(401, "Not authenticated")
-
-    user = request.auth_user
-    member = request.auth_member
-    org = request.auth_organization
+    user, member, org = get_auth_context(request)
 
     # Capture old name for event diff
     old_name = user.name
@@ -506,11 +497,7 @@ def send_phone_otp(
     The OTP is used to verify phone ownership before updating the user's profile.
     Uses Stytch's SMS OTP service.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:
-        raise HttpError(401, "Not authenticated")
-
-    member = request.auth_member
-    org = request.auth_organization
+    _, member, org = get_auth_context(request)
 
     # Extract session JWT from auth header
     auth_header = request.headers.get("Authorization", "")
@@ -548,12 +535,7 @@ def verify_phone_otp(request: AuthenticatedHttpRequest, payload: VerifyPhoneOtpR
 
     On success, updates the user's phone number in both local database and Stytch.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:
-        raise HttpError(401, "Not authenticated")
-
-    user = request.auth_user
-    member = request.auth_member
-    org = request.auth_organization
+    user, member, org = get_auth_context(request)
 
     # Extract session JWT from auth header (required by Stytch B2B OTP)
     auth_header = request.headers.get("Authorization", "")
@@ -649,12 +631,7 @@ def start_email_update(
     Sends a verification to the new email address. User must verify the new
     email to complete the change. The update is finalized via Stytch.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:
-        raise HttpError(401, "Not authenticated")
-
-    user = request.auth_user
-    member = request.auth_member
-    org = request.auth_organization
+    user, member, org = get_auth_context(request)
 
     # Check if new email is the same as current
     if payload.new_email.lower() == user.email.lower():
@@ -758,7 +735,8 @@ def update_organization(
         }
         if payload.slug is not None:
             stytch_update_kwargs["organization_slug"] = payload.slug
-        client.organizations.update(**stytch_update_kwargs)
+        # Stytch SDK has complex overloaded types; we only use simple string params
+        client.organizations.update(**stytch_update_kwargs)  # type: ignore[arg-type]
     except StytchError as e:
         logger.warning("Failed to sync org to Stytch: %s", e.details.error_message)
         # Don't fail the request - local update succeeded
@@ -1038,10 +1016,10 @@ def bulk_invite_members_endpoint(
         return BulkInviteResponse(
             results=[
                 BulkInviteResultItem(
-                    email=r["email"],
-                    success=r["success"],
-                    error=r["error"],
-                    stytch_member_id=r["stytch_member_id"],
+                    email=str(r["email"]),
+                    success=bool(r["success"]),
+                    error=str(r["error"]) if r["error"] else None,
+                    stytch_member_id=str(r["stytch_member_id"]) if r["stytch_member_id"] else None,
                 )
                 for r in skipped_results
             ],
@@ -1072,10 +1050,10 @@ def bulk_invite_members_endpoint(
     return BulkInviteResponse(
         results=[
             BulkInviteResultItem(
-                email=r["email"],
-                success=r["success"],
-                error=r["error"],
-                stytch_member_id=r["stytch_member_id"],
+                email=str(r["email"]),
+                success=bool(r["success"]),
+                error=str(r["error"]) if r["error"] else None,
+                stytch_member_id=str(r["stytch_member_id"]) if r["stytch_member_id"] else None,
             )
             for r in all_results
         ],
@@ -1226,14 +1204,10 @@ def search_directory(request: AuthenticatedHttpRequest, q: str = "") -> list[Dir
     Only works if the user has signed in with Google OAuth and granted
     the Directory API scope. Returns empty list if not available.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:
-        raise HttpError(401, "Not authenticated")
+    user, member, _ = get_auth_context(request)
 
     if not q or len(q) < 2:
         return []
-
-    user = request.auth_user
-    member = request.auth_member
 
     # Import here to avoid circular imports
     from apps.accounts.google_directory import search_directory_users
@@ -1271,8 +1245,7 @@ def get_directory_avatar(request: AuthenticatedHttpRequest, url: str = ""):
 
     from apps.core.url_validation import SSRFError, validate_avatar_url
 
-    if not hasattr(request, "auth_user") or request.auth_user is None:
-        raise HttpError(401, "Not authenticated")
+    user, _, _ = get_auth_context(request)
 
     # Validate URL against SSRF attacks
     try:
@@ -1285,9 +1258,7 @@ def get_directory_avatar(request: AuthenticatedHttpRequest, url: str = ""):
     from apps.accounts.google_directory import get_google_access_token
     from apps.accounts.models import Member
 
-    user = request.auth_user
-
-    # Get member to find Stytch IDs
+    # Get member to find Stytch IDs (query all memberships, not just current)
     member = (
         Member.objects.filter(user=user, deleted_at__isnull=True)
         .select_related("organization")

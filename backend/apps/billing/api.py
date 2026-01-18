@@ -57,6 +57,7 @@ def create_checkout(
 
     Admin only. Returns URL to redirect user to Stripe Checkout.
     """
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
     org = request.auth_organization
 
     # Check if already subscribed
@@ -100,12 +101,15 @@ def create_checkout(
     summary="Create Stripe Customer Portal session",
 )
 @require_admin
-def create_portal(request: AuthenticatedHttpRequest, payload: PortalSessionRequest) -> PortalSessionResponse:
+def create_portal(
+    request: AuthenticatedHttpRequest, payload: PortalSessionRequest
+) -> PortalSessionResponse:
     """
     Create a Stripe Customer Portal session.
 
     Admin only. Returns URL to redirect user to manage their subscription.
     """
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
     org = request.auth_organization
 
     if not org.stripe_customer_id:
@@ -186,6 +190,7 @@ def create_subscription_intent_endpoint(
     Admin only. Returns client_secret for PaymentElement.
     Use this for embedded Stripe Elements payment flow.
     """
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
     org = request.auth_organization
 
     # Check if already subscribed

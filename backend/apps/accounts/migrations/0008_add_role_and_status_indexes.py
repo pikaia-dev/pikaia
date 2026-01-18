@@ -4,15 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0007_user_phone_verified_at'),
+        ("accounts", "0007_user_phone_verified_at"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='member',
-            name='role',
-            field=models.CharField(db_index=True, default='member', help_text='Org-level role from Stytch RBAC', max_length=50),
+            model_name="member",
+            name="role",
+            field=models.CharField(
+                db_index=True,
+                default="member",
+                help_text="Org-level role from Stytch RBAC",
+                max_length=50,
+            ),
         ),
     ]
