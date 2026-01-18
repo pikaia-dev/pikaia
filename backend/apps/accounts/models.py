@@ -19,7 +19,7 @@ class UserManager(BaseUserManager):
             raise ValueError("Email is required")
 
         email = self.normalize_email(email)
-        user = self.model(email=email, **extra_fields)
+        user: User = self.model(email=email, **extra_fields)  # type: ignore[assignment]
         # No password - Stytch handles authentication
         user.set_unusable_password()
         user.save(using=self._db)

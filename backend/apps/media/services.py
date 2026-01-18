@@ -69,20 +69,15 @@ class StorageService:
                 read_timeout=30,
                 retries={"max_attempts": 2},
             )
-            # Build S3 client config
-            # - For LocalStack: uses endpoint_url and explicit credentials
-            # - For AWS: uses default credentials chain (Fargate task role, etc.)
-            client_kwargs: dict[str, str | Config | None] = {
-                "region_name": getattr(settings, "AWS_S3_REGION_NAME", "us-east-1"),
-                "config": config,
-                "endpoint_url": getattr(settings, "AWS_S3_ENDPOINT_URL", None),
-                "aws_access_key_id": getattr(settings, "AWS_ACCESS_KEY_ID", None),
-                "aws_secret_access_key": getattr(settings, "AWS_SECRET_ACCESS_KEY", None),
-            }
-            # Remove None values to let boto3 use defaults
-            client_kwargs = {k: v for k, v in client_kwargs.items() if v is not None}
-
-            self.s3_client = boto3.client("s3", **client_kwargs)  # type: ignore[arg-type]
+            # boto3 reads credentials and endpoint from environment:
+            # - AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY for credentials
+            # - AWS_ENDPOINT_URL for LocalStack or custom endpoints
+            # - For production: uses IAM role (Fargate task role, etc.)
+            self.s3_client = boto3.client(
+                "s3",
+                region_name=getattr(settings, "AWS_S3_REGION_NAME", "us-east-1"),
+                config=config,
+            )
             self.bucket_name = settings.AWS_STORAGE_BUCKET_NAME
 
     def generate_key(self, image_type: str, owner_id: str, filename: str) -> str:
