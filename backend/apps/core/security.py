@@ -4,7 +4,11 @@ Core security - authentication and authorization for API.
 
 from collections.abc import Callable
 from functools import wraps
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from apps.accounts.models import Member, User
+    from apps.organizations.models import Organization
 
 from django.http import HttpRequest
 from ninja.errors import HttpError
@@ -66,3 +70,36 @@ def require_admin[F: Callable[..., Any]](func: F) -> F:
         return func(request, *args, **kwargs)
 
     return wrapper  # type: ignore[return-value]
+
+
+def get_auth_context(
+    request: HttpRequest,
+) -> tuple["User", "Member", "Organization"]:
+    """
+    Get authenticated user, member, and organization from request.
+
+    Use this helper to get properly type-narrowed auth context in endpoints.
+    The middleware sets all three together, so if one exists, all do.
+
+    Args:
+        request: The HTTP request (with auth attrs from middleware)
+
+    Returns:
+        Tuple of (user, member, organization)
+
+    Raises:
+        HttpError 401: If not authenticated
+    """
+
+    if not hasattr(request, "auth_user") or request.auth_user is None:
+        raise HttpError(401, "Not authenticated")
+
+    # Middleware sets all three together (attrs added dynamically)
+    assert request.auth_member is not None  # type: ignore[attr-defined]
+    assert request.auth_organization is not None  # type: ignore[attr-defined]
+
+    return (
+        request.auth_user,
+        request.auth_member,  # type: ignore[attr-defined]
+        request.auth_organization,  # type: ignore[attr-defined]
+    )

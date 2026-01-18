@@ -8,7 +8,7 @@ from ninja.files import UploadedFile
 
 from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth
+from apps.core.security import BearerAuth, get_auth_context
 from apps.core.types import AuthenticatedHttpRequest
 from apps.media.models import UploadedImage
 from apps.media.schemas import (
@@ -33,7 +33,9 @@ bearer_auth = BearerAuth()
     operation_id="requestImageUpload",
     summary="Request an image upload URL",
 )
-def request_upload(request: AuthenticatedHttpRequest, payload: UploadRequestSchema) -> UploadResponseSchema:
+def request_upload(
+    request: AuthenticatedHttpRequest, payload: UploadRequestSchema
+) -> UploadResponseSchema:
     """
     Request a presigned URL for uploading an image.
 
@@ -41,11 +43,7 @@ def request_upload(request: AuthenticatedHttpRequest, payload: UploadRequestSche
     1. Upload the file to the returned URL using the specified method
     2. Call /confirm endpoint after successful upload
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:
-        raise HttpError(401, "Not authenticated")
-
-    user = request.auth_user
-    org = request.auth_organization
+    user, _, org = get_auth_context(request)
 
     storage = get_storage_service()
 
@@ -89,17 +87,15 @@ def request_upload(request: AuthenticatedHttpRequest, payload: UploadRequestSche
     operation_id="confirmImageUpload",
     summary="Confirm an image upload",
 )
-def confirm_upload(request: AuthenticatedHttpRequest, payload: ConfirmUploadSchema) -> ImageResponseSchema:
+def confirm_upload(
+    request: AuthenticatedHttpRequest, payload: ConfirmUploadSchema
+) -> ImageResponseSchema:
     """
     Confirm that an image was successfully uploaded.
 
     Verifies the file exists in storage and saves metadata to the database.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:
-        raise HttpError(401, "Not authenticated")
-
-    user = request.auth_user
-    org = request.auth_organization
+    user, _, org = get_auth_context(request)
 
     storage = get_storage_service()
 
@@ -223,12 +219,7 @@ def delete_image(request: AuthenticatedHttpRequest, image_id: str) -> dict:
     Users can only delete their own avatars.
     Admins can delete organization logos.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:
-        raise HttpError(401, "Not authenticated")
-
-    user = request.auth_user
-    member = request.auth_member
-    org = request.auth_organization
+    user, member, org = get_auth_context(request)
 
     try:
         image = UploadedImage.objects.get(id=image_id)

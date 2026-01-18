@@ -14,7 +14,6 @@ Endpoints:
 """
 
 import logging
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from urllib.parse import urlparse
 
@@ -33,20 +32,10 @@ from .schemas import (
     RestHookListResponse,
     RestHookSubscribeRequest,
     RestHookSubscribeResponse,
+    WebhookEndpointCreate,
     WebhookPayload,
 )
 from .services import WebhookService
-
-
-@dataclass
-class RestHookEndpointData:
-    """Data for creating a REST Hook endpoint."""
-
-    name: str
-    description: str
-    url: str
-    events: list[str]
-
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +94,7 @@ def subscribe(
     event_description = event_def.description if event_def else payload.event_type
     name = f"{source.label} - {event_description}"
 
-    endpoint_data = RestHookEndpointData(
+    endpoint_data = WebhookEndpointCreate(
         name=name[:100],  # Truncate to max length
         description=f"Auto-created by {source.label}",
         url=payload.target_url,
