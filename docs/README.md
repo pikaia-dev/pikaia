@@ -23,6 +23,9 @@ Technical documentation for the Tango Django SaaS Starter.
 - [Observability](./observability.md) — Structured logging, events, and audit trails
 - [Webhooks](./webhooks.md) — Customer-facing webhook API
 
+### Planning
+- [Roadmap](./ROADMAP.md) — Future enhancements and improvements
+
 ## API Reference
 
 API documentation is auto-generated from OpenAPI spec at `/api/v1/docs`.
