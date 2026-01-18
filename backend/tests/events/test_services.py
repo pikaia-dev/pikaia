@@ -248,26 +248,36 @@ class TestPublishEventRequestContext:
         # Original data should still be present
         assert event.payload["data"]["name"] == "New Org"
 
-    def test_publish_event_does_not_overwrite_explicit_ip(self):
-        """Test that explicit data is not overwritten by context."""
+    def test_explicit_data_takes_precedence_over_context(self):
+        """Test that explicit data takes precedence over auto-enriched context."""
         import structlog
 
         org = OrganizationFactory()
 
-        # Bind context with one IP
-        structlog.contextvars.bind_contextvars(**{"request.ip_address": "10.0.0.1"})
+        # Bind context with middleware IP
+        structlog.contextvars.bind_contextvars(
+            **{
+                "request.ip_address": "10.0.0.1",
+                "request.user_agent": "ContextAgent/1.0",
+            }
+        )
 
         try:
-            # But event data has a different field we want to preserve
+            # Caller explicitly provides ip_address - should take precedence
             event = publish_event(
                 event_type="organization.updated",
                 aggregate=org,
-                data={"name": "Test", "custom_field": "preserved"},
+                data={
+                    "name": "Test",
+                    "ip_address": "192.168.1.100",  # Explicit IP should win
+                },
             )
 
-            # Context IP should be added
-            assert event.payload["data"]["ip_address"] == "10.0.0.1"
-            # Custom field should be preserved
-            assert event.payload["data"]["custom_field"] == "preserved"
+            # Explicit IP should take precedence over context
+            assert event.payload["data"]["ip_address"] == "192.168.1.100"
+            # Context user_agent should still be added (no conflict)
+            assert event.payload["data"]["user_agent"] == "ContextAgent/1.0"
+            # Other data should be preserved
+            assert event.payload["data"]["name"] == "Test"
         finally:
-            structlog.contextvars.unbind_contextvars("request.ip_address")
+            structlog.contextvars.unbind_contextvars("request.ip_address", "request.user_agent")
