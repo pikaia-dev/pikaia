@@ -79,10 +79,10 @@ def expand_path(path: str) -> str:
 
 
 def path_matches(file_path: str, pattern: str) -> bool:
-    """Check if a file path matches a pattern."""
-    # Handle negation
+    """Check if a file path matches a pattern (excluding negation prefix)."""
+    # Strip negation prefix for matching - caller handles negation logic
     if pattern.startswith('!'):
-        return False  # Negation patterns are handled separately
+        pattern = pattern[1:]
 
     expanded_pattern = expand_path(pattern)
     expanded_file = expand_path(file_path)
@@ -133,11 +133,17 @@ def check_path_access(file_path: str, config: dict, is_write: bool, is_delete: b
                     'reason': f"'{file_path}' cannot be deleted (matches '{pattern}')"
                 }
 
-    # Check ask-access paths
-    for pattern in config.get('askAccessPaths', []):
-        if pattern.startswith('!'):
-            continue  # Skip negation patterns in main check
-        if path_matches(file_path, pattern):
+    # Check ask-access paths (with negation support)
+    ask_patterns = config.get('askAccessPaths', [])
+
+    # First check if file is excluded by any negation pattern
+    for pattern in ask_patterns:
+        if pattern.startswith('!') and path_matches(file_path, pattern):
+            return None  # Explicitly excluded
+
+    # Then check if file matches any inclusion pattern
+    for pattern in ask_patterns:
+        if not pattern.startswith('!') and path_matches(file_path, pattern):
             return {
                 'decision': 'ask',
                 'reason': f"Access to '{file_path}' requires confirmation (matches '{pattern}')"
