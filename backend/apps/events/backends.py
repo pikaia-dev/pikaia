@@ -67,12 +67,9 @@ class EventBridgeBackend(EventBackend):
     CONNECT_TIMEOUT = 5  # seconds to establish connection
     READ_TIMEOUT = 30  # seconds to wait for response
 
-    def __init__(
-        self, event_bus_name: str, source: str = "app.events", endpoint_url: str | None = None
-    ):
+    def __init__(self, event_bus_name: str, source: str = "app.events"):
         self.event_bus_name = event_bus_name
         self.source = source
-        self.endpoint_url = endpoint_url
         self._client = None
 
     @property
@@ -87,15 +84,11 @@ class EventBridgeBackend(EventBackend):
                 read_timeout=self.READ_TIMEOUT,
                 retries={"max_attempts": 2},
             )
-            # Build client kwargs - supports LocalStack via endpoint_url
-            client_kwargs: dict[str, str | Config | None] = {
-                "config": config,
-                "endpoint_url": self.endpoint_url,
-            }
-            # Remove None values to let boto3 use defaults
-            client_kwargs = {k: v for k, v in client_kwargs.items() if v is not None}
-
-            self._client = boto3.client("events", **client_kwargs)  # type: ignore[arg-type]
+            # boto3 reads credentials and endpoint from environment:
+            # - AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY for credentials
+            # - AWS_ENDPOINT_URL for LocalStack or custom endpoints
+            # - For production: uses IAM role (Fargate task role, etc.)
+            self._client = boto3.client("events", config=config)
         return self._client
 
     def publish(self, events: list[EventEnvelope]) -> list[dict[str, Any]]:
@@ -172,7 +165,6 @@ def get_backend() -> EventBackend:
         event_bus_name = getattr(settings, "EVENT_BUS_NAME", "")
         if not event_bus_name:
             raise ValueError("EVENT_BUS_NAME setting required for eventbridge backend")
-        endpoint_url = getattr(settings, "AWS_EVENTS_ENDPOINT_URL", None)
-        return EventBridgeBackend(event_bus_name=event_bus_name, endpoint_url=endpoint_url)
+        return EventBridgeBackend(event_bus_name=event_bus_name)
 
     return LocalBackend()
