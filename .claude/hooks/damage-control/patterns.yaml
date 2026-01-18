@@ -123,7 +123,8 @@ bashToolPatterns:
     description: "SQL TRUNCATE statement"
     action: block
 
-  - pattern: 'DELETE\s+FROM\s+\w+\s*(;|$)'
+  # Catches DELETE FROM table without WHERE (including comments, newlines)
+  - pattern: 'DELETE\s+FROM\s+\w+\s*(?=\s*;|\s*$|\s*--)'
     description: "DELETE without WHERE clause"
     action: block
 
