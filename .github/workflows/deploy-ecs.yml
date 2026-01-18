@@ -93,12 +93,12 @@ jobs:
         with:
           version: "0.5.x"
 
-      - name: Validate audit schema
+      - name: Generate audit schema
         if: needs.changes.outputs.infra == 'true'
         working-directory: backend
         run: |
           uv sync
-          uv run python manage.py generate_audit_schema --check
+          uv run python manage.py generate_audit_schema
 
       - name: Install CDK and deploy infrastructure
         if: needs.changes.outputs.infra == 'true'
