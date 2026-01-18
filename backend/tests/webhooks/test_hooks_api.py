@@ -18,6 +18,62 @@ from tests.accounts.factories import MemberFactory, OrganizationFactory
 pytestmark = pytest.mark.django_db
 
 
+class TestAuthorization:
+    """Tests for admin-only authorization on REST Hooks endpoints."""
+
+    def test_non_admin_cannot_subscribe(self, authenticated_request):
+        """Only admins can create subscriptions."""
+        member = MemberFactory(role="member")  # Not admin
+        request = authenticated_request(member, method="post", path="/api/v1/hooks")
+
+        payload = RestHookSubscribeRequest(
+            target_url="https://hooks.zapier.com/hooks/catch/123/abc/",
+            event_type="member.created",
+        )
+
+        from ninja.errors import HttpError
+
+        with pytest.raises(HttpError) as exc_info:
+            subscribe(request, payload)
+
+        assert exc_info.value.status_code == 403
+
+    def test_non_admin_cannot_list_subscriptions(self, authenticated_request):
+        """Only admins can list subscriptions."""
+        member = MemberFactory(role="member")
+        request = authenticated_request(member, method="get", path="/api/v1/hooks")
+
+        from ninja.errors import HttpError
+
+        with pytest.raises(HttpError) as exc_info:
+            list_subscriptions(request)
+
+        assert exc_info.value.status_code == 403
+
+    def test_non_admin_cannot_unsubscribe(self, authenticated_request):
+        """Only admins can delete subscriptions."""
+        member = MemberFactory(role="member")
+
+        endpoint = WebhookEndpoint.objects.create(
+            organization=member.organization,
+            name="Test Hook",
+            url="https://hooks.zapier.com/test",
+            events=["member.created"],
+            source=WebhookEndpoint.Source.ZAPIER,
+        )
+
+        request = authenticated_request(member, method="delete", path="/api/v1/hooks/x")
+
+        from ninja.errors import HttpError
+
+        with pytest.raises(HttpError) as exc_info:
+            unsubscribe(request, endpoint.id)
+
+        assert exc_info.value.status_code == 403
+        # Endpoint should still exist
+        assert WebhookEndpoint.objects.filter(id=endpoint.id).exists()
+
+
 class TestSubscribe:
     """Tests for POST /api/v1/hooks (subscribe)."""
 
