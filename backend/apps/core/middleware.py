@@ -121,6 +121,10 @@ class StytchAuthMiddleware:
     for authenticated requests. Allows unauthenticated requests to pass through
     (authorization enforced at endpoint level).
 
+    Also sets request.auth_failed to distinguish between:
+    - No auth attempted (auth_failed=False, auth_user=None)
+    - Auth attempted but failed (auth_failed=True, auth_user=None)
+
     After successful authentication, binds user/org context to structured logging:
     - usr.id: User identifier
     - usr.email: User email
@@ -146,6 +150,7 @@ class StytchAuthMiddleware:
         request.auth_user: User | None = None  # type: ignore[attr-defined]
         request.auth_member: Member | None = None  # type: ignore[attr-defined]
         request.auth_organization: Organization | None = None  # type: ignore[attr-defined]
+        request.auth_failed: bool = False  # type: ignore[attr-defined]
 
         # Skip auth for public paths
         if self._is_public_path(request.path):
@@ -241,10 +246,14 @@ class StytchAuthMiddleware:
             )
 
         except StytchError as e:
-            # Invalid/expired JWT - request continues unauthenticated
+            # Invalid/expired JWT - mark as failed so endpoints can distinguish
+            # "no auth attempted" from "auth attempted but failed"
+            request.auth_failed = True  # type: ignore[attr-defined]
             logger.debug("jwt_auth_failed", error_message=e.details.error_message)
         except Exception:
             # Catch any other exception (network errors, timeouts, etc.)
+            # Also mark as failed - potential security issue
+            request.auth_failed = True  # type: ignore[attr-defined]
             logger.exception("jwt_auth_unexpected_error")
 
 

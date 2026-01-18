@@ -2,7 +2,6 @@
 Tests for structured logging configuration.
 """
 
-import pytest
 import structlog
 
 from apps.core.logging import (

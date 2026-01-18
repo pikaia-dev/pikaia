@@ -16,15 +16,6 @@ from apps.accounts.schemas import MobileProvisionRequest
 from apps.accounts.services import provision_mobile_user
 from apps.organizations.models import Organization
 
-from .factories import MemberFactory, OrganizationFactory, UserFactory
-
-
-@pytest.fixture
-def request_factory() -> RequestFactory:
-    """Django request factory for unit testing views."""
-    return RequestFactory()
-
-
 # --- Mock Stytch Response Objects ---
 
 
