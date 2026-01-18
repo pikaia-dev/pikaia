@@ -22,6 +22,7 @@ Maintenance:
 """
 
 import json
+import sys
 from pathlib import Path
 
 from django.core.management.base import BaseCommand
@@ -104,13 +105,13 @@ AUDIT_EVENT_TYPES = {json.dumps(sorted(AUDIT_EVENT_TYPES), indent=4)}
             if not output_path.exists():
                 self.stderr.write(self.style.ERROR(f"Schema file missing: {output_path}"))
                 self.stderr.write("Run: uv run python manage.py generate_audit_schema")
-                exit(1)
+                sys.exit(1)
 
             existing = output_path.read_text()
             if existing != output_content:
                 self.stderr.write(self.style.ERROR("Schema out of date!"))
                 self.stderr.write("Run: uv run python manage.py generate_audit_schema")
-                exit(1)
+                sys.exit(1)
 
             self.stdout.write(self.style.SUCCESS("Schema is up-to-date"))
         else:

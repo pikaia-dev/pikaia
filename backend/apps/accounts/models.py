@@ -4,6 +4,7 @@ Accounts models - user and membership management.
 
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
+from django.utils import timezone
 
 
 class UserManager(BaseUserManager):
@@ -165,6 +166,7 @@ class Member(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "organization"],
+                condition=models.Q(deleted_at__isnull=True),
                 name="unique_member_per_org",
             ),
         ]
@@ -187,7 +189,5 @@ class Member(models.Model):
 
     def soft_delete(self) -> None:
         """Soft delete this member by setting deleted_at timestamp."""
-        from django.utils import timezone
-
         self.deleted_at = timezone.now()
         self.save(update_fields=["deleted_at", "updated_at"])
