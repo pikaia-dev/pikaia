@@ -34,6 +34,7 @@ jobs:
     outputs:
       infra: ${{ steps.filter.outputs.infra }}
       backend: ${{ steps.filter.outputs.backend }}
+      events: ${{ steps.filter.outputs.events }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -45,6 +46,8 @@ jobs:
             backend:
               - 'backend/**'
               - 'emails/**'
+            events:
+              - 'backend/apps/events/**'
 
   deploy:
     needs: changes
@@ -94,7 +97,7 @@ jobs:
           version: "0.5.x"
 
       - name: Generate audit schema
-        if: needs.changes.outputs.infra == 'true'
+        if: needs.changes.outputs.infra == 'true' || needs.changes.outputs.events == 'true'
         working-directory: backend
         run: |
           uv sync
