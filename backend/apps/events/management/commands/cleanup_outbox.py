@@ -9,6 +9,8 @@ Best practice: Published events can be deleted after a short retention period
 longer (default 30 days) for debugging.
 """
 
+from datetime import datetime, timedelta
+
 from django.core.management.base import BaseCommand
 from django.db.models import QuerySet
 from django.utils import timezone
@@ -54,8 +56,8 @@ class Command(BaseCommand):
         dry_run = options["dry_run"]
 
         now = timezone.now()
-        published_cutoff = now - timezone.timedelta(days=published_retention_days)
-        failed_cutoff = now - timezone.timedelta(days=failed_retention_days)
+        published_cutoff = now - timedelta(days=published_retention_days)
+        failed_cutoff = now - timedelta(days=failed_retention_days)
 
         logger.info(
             "outbox_cleanup_started",
@@ -108,7 +110,7 @@ class Command(BaseCommand):
     def _cleanup_events(
         self,
         status: str,
-        cutoff: timezone.datetime,
+        cutoff: datetime,
         batch_size: int,
         dry_run: bool,
     ) -> int:

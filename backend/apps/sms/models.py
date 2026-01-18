@@ -2,6 +2,8 @@
 OTP verification models.
 """
 
+from datetime import timedelta
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -77,10 +79,10 @@ class OTPVerification(models.Model):
     def __str__(self) -> str:
         return f"OTP for {self.phone_number[-4:]} ({self.purpose})"
 
-    def save(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
+    def save(self, *args, **kwargs) -> None:
         """Set expiration time on creation."""
         if not self.expires_at:
-            self.expires_at = timezone.now() + timezone.timedelta(
+            self.expires_at = timezone.now() + timedelta(
                 minutes=settings.AWS_SMS_OTP_EXPIRY_MINUTES
             )
         super().save(*args, **kwargs)
