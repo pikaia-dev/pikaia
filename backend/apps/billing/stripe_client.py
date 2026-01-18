@@ -4,6 +4,8 @@ Stripe client configuration.
 Provides a configured Stripe client for billing operations.
 """
 
+from types import ModuleType
+
 import stripe
 
 from config.settings.base import settings
@@ -18,7 +20,7 @@ def configure_stripe() -> None:
     stripe.api_version = STRIPE_API_VERSION
 
 
-def get_stripe() -> stripe:
+def get_stripe() -> ModuleType:
     """
     Get configured Stripe module.
 
