@@ -12,7 +12,7 @@ from ninja import Router
 from ninja.errors import HttpError
 
 from apps.accounts.stytch_client import get_stytch_client
-from apps.core.security import BearerAuth
+from apps.core.security import BearerAuth, get_auth_context
 from apps.passkeys.models import Passkey
 from apps.passkeys.schemas import (
     PasskeyAuthenticationOptionsRequest,
@@ -46,8 +46,7 @@ bearer_auth = BearerAuth()
 )
 def get_registration_options(request: HttpRequest) -> PasskeyRegistrationOptionsResponse:
     """Generate registration options for the authenticated user."""
-    user = request.auth.user  # type: ignore[attr-defined]
-    member = request.auth.member  # type: ignore[attr-defined]
+    user, member, _ = get_auth_context(request)
 
     service = get_passkey_service()
     result = service.generate_registration_options(user=user, member=member)
@@ -70,7 +69,7 @@ def verify_registration(
     payload: PasskeyRegistrationVerifyRequest,
 ) -> PasskeyRegistrationVerifyResponse:
     """Verify registration response and create passkey."""
-    user = request.auth.user  # type: ignore[attr-defined]
+    user, _, _ = get_auth_context(request)
 
     service = get_passkey_service()
 
@@ -187,7 +186,7 @@ def verify_authentication(
 )
 def list_passkeys(request: HttpRequest) -> PasskeyListResponse:
     """List all passkeys for the authenticated user."""
-    user = request.auth.user  # type: ignore[attr-defined]
+    user, _, _ = get_auth_context(request)
 
     passkeys = Passkey.objects.filter(user=user).order_by("-created_at")
 
@@ -215,7 +214,7 @@ def list_passkeys(request: HttpRequest) -> PasskeyListResponse:
 )
 def delete_passkey(request: HttpRequest, passkey_id: int) -> PasskeyDeleteResponse:
     """Delete a passkey owned by the authenticated user."""
-    user = request.auth.user  # type: ignore[attr-defined]
+    user, _, _ = get_auth_context(request)
 
     try:
         passkey = Passkey.objects.get(id=passkey_id, user=user)

@@ -40,7 +40,7 @@ class TestGetRegistrationOptions:
         user = member.user
 
         request = request_factory.post("/api/v1/passkeys/register/options")
-        request.auth = AuthContext(user=user, member=member)
+        request.auth = AuthContext(user=user, member=member, organization=member.organization)
 
         response = get_registration_options(request)
 
@@ -57,7 +57,7 @@ class TestGetRegistrationOptions:
         PasskeyFactory(user=user, credential_id=b"existing_cred")
 
         request = request_factory.post("/api/v1/passkeys/register/options")
-        request.auth = AuthContext(user=user, member=member)
+        request.auth = AuthContext(user=user, member=member, organization=member.organization)
 
         response = get_registration_options(request)
 
@@ -71,10 +71,11 @@ class TestVerifyRegistration:
 
     def test_rejects_invalid_challenge(self, request_factory: RequestFactory):
         """Should reject expired or invalid challenge."""
-        user = UserFactory()
+        member = MemberFactory()
+        user = member.user
 
         request = request_factory.post("/api/v1/passkeys/register/verify")
-        request.auth = AuthContext(user=user)
+        request.auth = AuthContext(user=user, member=member, organization=member.organization)
 
         payload = PasskeyRegistrationVerifyRequest(
             challenge_id="invalid_challenge",
@@ -91,16 +92,16 @@ class TestVerifyRegistration:
     def test_rejects_wrong_user_challenge(self, request_factory: RequestFactory):
         """Should reject challenge created for different user."""
         member = MemberFactory()
-        other_user = UserFactory()
+        other_member = MemberFactory()
 
         # Create challenge for member.user
         request1 = request_factory.post("/api/v1/passkeys/register/options")
-        request1.auth = AuthContext(user=member.user, member=member)
+        request1.auth = AuthContext(user=member.user, member=member, organization=member.organization)
         options_response = get_registration_options(request1)
 
-        # Try to use it with other_user
+        # Try to use it with other_member's user
         request2 = request_factory.post("/api/v1/passkeys/register/verify")
-        request2.auth = AuthContext(user=other_user)
+        request2.auth = AuthContext(user=other_member.user, member=other_member, organization=other_member.organization)
 
         payload = PasskeyRegistrationVerifyRequest(
             challenge_id=options_response.challenge_id,
@@ -124,7 +125,7 @@ class TestVerifyRegistration:
 
         # Generate options
         request1 = request_factory.post("/api/v1/passkeys/register/options")
-        request1.auth = AuthContext(user=user, member=member)
+        request1.auth = AuthContext(user=user, member=member, organization=member.organization)
         options_response = get_registration_options(request1)
 
         # Mock webauthn verification
@@ -138,7 +139,7 @@ class TestVerifyRegistration:
 
         # Verify registration
         request2 = request_factory.post("/api/v1/passkeys/register/verify")
-        request2.auth = AuthContext(user=user)
+        request2.auth = AuthContext(user=user, member=member, organization=member.organization)
 
         payload = PasskeyRegistrationVerifyRequest(
             challenge_id=options_response.challenge_id,
@@ -276,16 +277,17 @@ class TestListPasskeys:
 
     def test_returns_user_passkeys(self, request_factory: RequestFactory):
         """Should return all passkeys for authenticated user."""
-        user = UserFactory()
+        member = MemberFactory()
+        user = member.user
         PasskeyFactory(user=user, name="Passkey 1")
         PasskeyFactory(user=user, name="Passkey 2")
 
         # Create passkey for different user (should not be returned)
-        other_user = UserFactory()
-        PasskeyFactory(user=other_user, name="Other User Passkey")
+        other_member = MemberFactory()
+        PasskeyFactory(user=other_member.user, name="Other User Passkey")
 
         request = request_factory.get("/api/v1/passkeys/")
-        request.auth = AuthContext(user=user)
+        request.auth = AuthContext(user=user, member=member, organization=member.organization)
 
         response = list_passkeys(request)
 
@@ -297,10 +299,10 @@ class TestListPasskeys:
 
     def test_returns_empty_list_when_no_passkeys(self, request_factory: RequestFactory):
         """Should return empty list when user has no passkeys."""
-        user = UserFactory()
+        member = MemberFactory()
 
         request = request_factory.get("/api/v1/passkeys/")
-        request.auth = AuthContext(user=user)
+        request.auth = AuthContext(user=member.user, member=member, organization=member.organization)
 
         response = list_passkeys(request)
 
@@ -308,11 +310,11 @@ class TestListPasskeys:
 
     def test_passkey_fields(self, request_factory: RequestFactory):
         """Should return all expected passkey fields."""
-        user = UserFactory()
-        passkey = PasskeyFactory(user=user, backup_eligible=True, backup_state=False)
+        member = MemberFactory()
+        passkey = PasskeyFactory(user=member.user, backup_eligible=True, backup_state=False)
 
         request = request_factory.get("/api/v1/passkeys/")
-        request.auth = AuthContext(user=user)
+        request.auth = AuthContext(user=member.user, member=member, organization=member.organization)
 
         response = list_passkeys(request)
 
@@ -333,12 +335,12 @@ class TestDeletePasskey:
         """Should delete passkey owned by authenticated user."""
         from apps.passkeys.models import Passkey
 
-        user = UserFactory()
-        passkey = PasskeyFactory(user=user, name="To Delete")
+        member = MemberFactory()
+        passkey = PasskeyFactory(user=member.user, name="To Delete")
         passkey_id = passkey.id
 
         request = request_factory.delete(f"/api/v1/passkeys/{passkey_id}")
-        request.auth = AuthContext(user=user)
+        request.auth = AuthContext(user=member.user, member=member, organization=member.organization)
 
         response = delete_passkey(request, passkey_id)
 
@@ -349,12 +351,12 @@ class TestDeletePasskey:
 
     def test_rejects_deleting_other_user_passkey(self, request_factory: RequestFactory):
         """Should reject deleting passkey owned by different user."""
-        user = UserFactory()
-        other_user = UserFactory()
-        passkey = PasskeyFactory(user=other_user, name="Other's Passkey")
+        member = MemberFactory()
+        other_member = MemberFactory()
+        passkey = PasskeyFactory(user=other_member.user, name="Other's Passkey")
 
         request = request_factory.delete(f"/api/v1/passkeys/{passkey.id}")
-        request.auth = AuthContext(user=user)
+        request.auth = AuthContext(user=member.user, member=member, organization=member.organization)
 
         with pytest.raises(HttpError) as exc_info:
             delete_passkey(request, passkey.id)
@@ -364,10 +366,10 @@ class TestDeletePasskey:
 
     def test_rejects_nonexistent_passkey(self, request_factory: RequestFactory):
         """Should return 404 for non-existent passkey."""
-        user = UserFactory()
+        member = MemberFactory()
 
         request = request_factory.delete("/api/v1/passkeys/99999")
-        request.auth = AuthContext(user=user)
+        request.auth = AuthContext(user=member.user, member=member, organization=member.organization)
 
         with pytest.raises(HttpError) as exc_info:
             delete_passkey(request, 99999)
