@@ -1743,21 +1743,17 @@ dependencies = [
     { name = "webauthn" },
 ]
 
-[package.optional-dependencies]
-dev = [
-    { name = "factory-boy" },
-    { name = "pytest" },
-    { name = "pytest-django" },
-    { name = "ruff" },
-]
-
 [package.dev-dependencies]
 dev = [
     { name = "django-stubs" },
+    { name = "factory-boy" },
     { name = "mypy" },
     { name = "psycopg2-binary" },
     { name = "pyright" },
+    { name = "pytest" },
     { name = "pytest-cov" },
+    { name = "pytest-django" },
+    { name = "ruff" },
 ]
 
 [package.metadata]
@@ -1769,31 +1765,30 @@ requires-dist = [
     { name = "django-ninja", specifier = ">=1.5" },
     { name = "django-storages", extras = ["s3"], specifier = ">=1.14" },
     { name = "email-validator", specifier = ">=2.2" },
-    { name = "factory-boy", marker = "extra == 'dev'", specifier = ">=3.3" },
     { name = "gunicorn", specifier = ">=23.0" },
     { name = "lxml", specifier = ">=5.0" },
     { name = "pillow", specifier = ">=11.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3" },
     { name = "pydantic", specifier = ">=2.12" },
     { name = "pydantic-settings", specifier = ">=2.6" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0" },
-    { name = "pytest-django", marker = "extra == 'dev'", specifier = ">=4.11" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14" },
     { name = "stripe", specifier = ">=11.0" },
     { name = "structlog", specifier = ">=25.5" },
     { name = "stytch", specifier = ">=14.0" },
     { name = "svix", specifier = ">=1.84.1" },
     { name = "webauthn", specifier = ">=2.0.0,<3.0.0" },
 ]
-provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "django-stubs", specifier = ">=5.2.8" },
+    { name = "factory-boy", specifier = ">=3.3" },
     { name = "mypy", specifier = ">=1.19.1" },
     { name = "psycopg2-binary", specifier = ">=2.9.11" },
     { name = "pyright", specifier = ">=1.1.408" },
+    { name = "pytest", specifier = ">=9.0" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
+    { name = "pytest-django", specifier = ">=4.11" },
+    { name = "ruff", specifier = ">=0.14" },
 ]
 
 [[package]]

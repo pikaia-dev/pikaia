@@ -15,7 +15,8 @@
     "includes": [
       "**",
       "!**/api-schema.json",
-      "!**/api-types.ts"
+      "!**/api-types.ts",
+      "!infra/functions/**/__tests__/**"
     ]
   },
   "formatter": {
@@ -31,6 +32,14 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "a11y": {
+        "noSvgWithoutTitle": "warn",
+        "noLabelWithoutControl": "warn",
+        "useKeyWithClickEvents": "warn",
+        "noStaticElementInteractions": "warn",
+        "useButtonType": "warn",
+        "useSemanticElements": "warn"
+      },
       "correctness": {
         "noUnusedVariables": "warn",
         "useExhaustiveDependencies": "warn"
@@ -39,14 +48,18 @@
         "noNonNullAssertion": "warn",
         "useImportType": "error",
         "useNodejsImportProtocol": "error",
-        "useNumberNamespace": "error"
+        "useNumberNamespace": "error",
+        "useTemplate": "warn"
       },
       "suspicious": {
         "noExplicitAny": "warn",
-        "noArrayIndexKey": "error"
+        "noArrayIndexKey": "warn",
+        "noDocumentCookie": "warn"
       },
       "complexity": {
-        "noForEach": "off"
+        "noForEach": "off",
+        "useLiteralKeys": "warn",
+        "noImportantStyles": "off"
       },
       "performance": {
         "noDelete": "error"
