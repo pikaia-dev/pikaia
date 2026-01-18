@@ -95,9 +95,7 @@ class TestMemberModel:
         # Check that the model has the expected index
         # This test verifies the index is defined in the model Meta
         indexes = Member._meta.indexes
-        index_fields_list = [
-            tuple(index.fields) for index in indexes
-        ]
+        index_fields_list = [tuple(index.fields) for index in indexes]
 
         # Verify the composite index exists
         assert ("organization", "deleted_at") in index_fields_list
