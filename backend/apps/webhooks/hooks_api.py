@@ -54,7 +54,7 @@ router = Router(tags=["hooks"])
 bearer_auth = BearerAuth()
 
 
-def _detect_source(target_url: str) -> str:
+def _detect_source(target_url: str) -> WebhookEndpoint.Source:
     """Detect the source based on the target URL domain."""
     parsed = urlparse(target_url)
     domain = parsed.netloc.lower()
@@ -95,6 +95,7 @@ def subscribe(
         201: Subscription created with ID for unsubscribe
         400: Invalid event type or URL
     """
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
     service = WebhookService(request.auth_organization)
     source = _detect_source(payload.target_url)
 
@@ -148,6 +149,7 @@ def list_subscriptions(request: AuthenticatedHttpRequest) -> RestHookListRespons
     Returns subscriptions created via REST Hooks (Zapier, Make, etc.),
     not manually created webhook endpoints.
     """
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
     service = WebhookService(request.auth_organization)
     endpoints = service.list_endpoints()
 
@@ -188,6 +190,7 @@ def unsubscribe(
         204: Subscription deleted
         404: Subscription not found
     """
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
     service = WebhookService(request.auth_organization)
     deleted = service.delete_endpoint(subscription_id)
 
@@ -229,6 +232,7 @@ def get_sample(
         200: Sample payload
         404: Unknown event type
     """
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
     event = WEBHOOK_EVENTS.get(event_type)
     if not event:
         raise HttpError(404, f"Unknown event type: {event_type}")
@@ -273,6 +277,7 @@ def verify_auth(request: AuthenticatedHttpRequest) -> AuthTestResponse:
     Returns:
         200: Authentication successful with organization info
     """
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
     return AuthTestResponse(
         ok=True,
         organization_id=str(request.auth_organization.id),

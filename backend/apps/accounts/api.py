@@ -65,6 +65,7 @@ from apps.billing.services import sync_billing_to_stripe
 from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth, require_admin
+from apps.core.types import AuthenticatedHttpRequest
 from apps.events.services import publish_event
 
 logger = get_logger(__name__)
@@ -384,19 +385,19 @@ def logout(request: HttpRequest) -> MessageResponse:
     operation_id="getCurrentUser",
     summary="Get current user info",
 )
-def get_current_user(request: HttpRequest) -> MeResponse:
+def get_current_user(request: AuthenticatedHttpRequest) -> MeResponse:
     """
     Get current authenticated user, member, and organization info.
 
     Requires valid session JWT in Authorization header.
     """
     # These are set by the auth middleware
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+    if not hasattr(request, "auth_user") or request.auth_user is None:
         raise HttpError(401, "Not authenticated")
 
-    user = request.auth_user  # type: ignore[attr-defined]
-    member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    user = request.auth_user
+    member = request.auth_member
+    org = request.auth_organization
 
     return MeResponse(
         user=UserInfo(
@@ -432,19 +433,19 @@ def get_current_user(request: HttpRequest) -> MeResponse:
     operation_id="updateProfile",
     summary="Update user profile",
 )
-def update_profile(request: HttpRequest, payload: UpdateProfileRequest) -> UserInfo:
+def update_profile(request: AuthenticatedHttpRequest, payload: UpdateProfileRequest) -> UserInfo:
     """
     Update current user's profile (name only).
 
     Updates local database and syncs to Stytch.
     Phone number changes require OTP verification via /phone/verify-otp.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+    if not hasattr(request, "auth_user") or request.auth_user is None:
         raise HttpError(401, "Not authenticated")
 
-    user = request.auth_user  # type: ignore[attr-defined]
-    member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    user = request.auth_user
+    member = request.auth_member
+    org = request.auth_organization
 
     # Capture old name for event diff
     old_name = user.name
@@ -496,18 +497,20 @@ def update_profile(request: HttpRequest, payload: UpdateProfileRequest) -> UserI
     operation_id="sendPhoneOtp",
     summary="Send OTP to phone for verification",
 )
-def send_phone_otp(request: HttpRequest, payload: SendPhoneOtpRequest) -> PhoneOtpResponse:
+def send_phone_otp(
+    request: AuthenticatedHttpRequest, payload: SendPhoneOtpRequest
+) -> PhoneOtpResponse:
     """
     Send a one-time password (OTP) to the specified phone number.
 
     The OTP is used to verify phone ownership before updating the user's profile.
     Uses Stytch's SMS OTP service.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+    if not hasattr(request, "auth_user") or request.auth_user is None:
         raise HttpError(401, "Not authenticated")
 
-    member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    member = request.auth_member
+    org = request.auth_organization
 
     # Extract session JWT from auth header
     auth_header = request.headers.get("Authorization", "")
@@ -539,18 +542,18 @@ def send_phone_otp(request: HttpRequest, payload: SendPhoneOtpRequest) -> PhoneO
     operation_id="verifyPhoneOtp",
     summary="Verify phone OTP and update profile",
 )
-def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> UserInfo:
+def verify_phone_otp(request: AuthenticatedHttpRequest, payload: VerifyPhoneOtpRequest) -> UserInfo:
     """
     Verify the OTP sent to the phone number.
 
     On success, updates the user's phone number in both local database and Stytch.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+    if not hasattr(request, "auth_user") or request.auth_user is None:
         raise HttpError(401, "Not authenticated")
 
-    user = request.auth_user  # type: ignore[attr-defined]
-    member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    user = request.auth_user
+    member = request.auth_member
+    org = request.auth_organization
 
     # Extract session JWT from auth header (required by Stytch B2B OTP)
     auth_header = request.headers.get("Authorization", "")
@@ -638,7 +641,7 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
     summary="Start email address update flow",
 )
 def start_email_update(
-    request: HttpRequest, payload: StartEmailUpdateRequest
+    request: AuthenticatedHttpRequest, payload: StartEmailUpdateRequest
 ) -> EmailUpdateResponse:
     """
     Initiate email address change.
@@ -646,12 +649,12 @@ def start_email_update(
     Sends a verification to the new email address. User must verify the new
     email to complete the change. The update is finalized via Stytch.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+    if not hasattr(request, "auth_user") or request.auth_user is None:
         raise HttpError(401, "Not authenticated")
 
-    user = request.auth_user  # type: ignore[attr-defined]
-    member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    user = request.auth_user
+    member = request.auth_member
+    org = request.auth_organization
 
     # Check if new email is the same as current
     if payload.new_email.lower() == user.email.lower():
@@ -685,16 +688,16 @@ def start_email_update(
     operation_id="getOrganization",
     summary="Get current organization details",
 )
-def get_organization(request: HttpRequest) -> OrganizationDetailResponse:
+def get_organization(request: AuthenticatedHttpRequest) -> OrganizationDetailResponse:
     """
     Get current organization details including billing info.
 
     All authenticated members can view.
     """
-    if not hasattr(request, "auth_organization") or request.auth_organization is None:  # type: ignore[attr-defined]
+    if not hasattr(request, "auth_organization") or request.auth_organization is None:
         raise HttpError(401, "Not authenticated")
 
-    org = request.auth_organization  # type: ignore[attr-defined]
+    org = request.auth_organization
 
     return OrganizationDetailResponse(
         id=org.id,
@@ -728,14 +731,15 @@ def get_organization(request: HttpRequest) -> OrganizationDetailResponse:
 )
 @require_admin
 def update_organization(
-    request: HttpRequest, payload: UpdateOrganizationRequest
+    request: AuthenticatedHttpRequest, payload: UpdateOrganizationRequest
 ) -> OrganizationDetailResponse:
     """
     Update organization settings (name).
 
     Admin only. Updates local database and syncs to Stytch.
     """
-    org = request.auth_organization  # type: ignore[attr-defined]
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
+    org = request.auth_organization
 
     # Update local database
     update_fields = ["name", "updated_at"]
@@ -767,7 +771,7 @@ def update_organization(
             "name": payload.name,
             "slug": payload.slug,
         },
-        actor=request.auth_user,  # type: ignore[attr-defined]
+        actor=request.auth_user,
     )
 
     return get_organization(request)
@@ -782,14 +786,15 @@ def update_organization(
 )
 @require_admin
 def update_billing(
-    request: HttpRequest, payload: UpdateBillingRequest
+    request: AuthenticatedHttpRequest, payload: UpdateBillingRequest
 ) -> OrganizationDetailResponse:
     """
     Update organization billing info (address, VAT, etc.).
 
     Admin only. This is our system's data - synced out to Stripe.
     """
-    org = request.auth_organization  # type: ignore[attr-defined]
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
+    org = request.auth_organization
 
     # Update billing fields
     org.use_billing_email = payload.use_billing_email
@@ -826,7 +831,7 @@ def update_billing(
             "vat_id": org.vat_id,
             "country": org.billing_country,
         },
-        actor=request.auth_user,  # type: ignore[attr-defined]
+        actor=request.auth_user,
     )
 
     return get_organization(request)
@@ -844,7 +849,7 @@ def update_billing(
 )
 @require_admin
 def list_members(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     offset: int = 0,
     limit: int | None = None,
 ) -> MemberListResponse:
@@ -857,7 +862,8 @@ def list_members(
         offset: Number of records to skip (default 0)
         limit: Maximum records to return (default None = all)
     """
-    org = request.auth_organization  # type: ignore[attr-defined]
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
+    org = request.auth_organization
     all_members = list_organization_members(org)
     total = len(all_members)
 
@@ -915,20 +921,22 @@ def list_members(
 )
 @require_admin
 def invite_member_endpoint(
-    request: HttpRequest, payload: InviteMemberRequest
+    request: AuthenticatedHttpRequest, payload: InviteMemberRequest
 ) -> InviteMemberResponse:
     """
     Invite a new member to the organization.
 
     Admin only. Stytch sends the invite email with Magic Link.
     """
-    member = request.auth_member  # type: ignore[attr-defined]
+    assert request.auth_member is not None  # Guaranteed by @require_admin
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
+    member = request.auth_member
 
     # Prevent inviting yourself
     if payload.email.lower() == member.user.email.lower():
         raise HttpError(400, "Cannot invite yourself - you're already a member")
 
-    org = request.auth_organization  # type: ignore[attr-defined]
+    org = request.auth_organization
 
     try:
         new_member, invite_sent = invite_member(
@@ -981,7 +989,7 @@ def invite_member_endpoint(
 )
 @require_admin
 def bulk_invite_members_endpoint(
-    request: HttpRequest, payload: BulkInviteRequest
+    request: AuthenticatedHttpRequest, payload: BulkInviteRequest
 ) -> BulkInviteResponse:
     """
     Invite multiple members to the organization at once.
@@ -991,8 +999,10 @@ def bulk_invite_members_endpoint(
 
     Returns detailed results for each member attempted.
     """
-    member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    assert request.auth_member is not None  # Guaranteed by @require_admin
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
+    member = request.auth_member
+    org = request.auth_organization
 
     current_user_email = member.user.email.lower()
 
@@ -1090,15 +1100,17 @@ def bulk_invite_members_endpoint(
 )
 @require_admin
 def update_member_role_endpoint(
-    request: HttpRequest, member_id: int, payload: UpdateMemberRoleRequest
+    request: AuthenticatedHttpRequest, member_id: int, payload: UpdateMemberRoleRequest
 ) -> MessageResponse:
     """
     Update a member's role (admin or member).
 
     Admin only. Cannot change your own role.
     """
-    current_member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    assert request.auth_member is not None  # Guaranteed by @require_admin
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
+    current_member = request.auth_member
+    org = request.auth_organization
 
     # Find the target member
     try:
@@ -1150,15 +1162,17 @@ def update_member_role_endpoint(
     summary="Remove member from organization",
 )
 @require_admin
-def delete_member_endpoint(request: HttpRequest, member_id: int) -> MessageResponse:
+def delete_member_endpoint(request: AuthenticatedHttpRequest, member_id: int) -> MessageResponse:
     """
     Remove a member from the organization.
 
     Admin only. Cannot remove yourself. Soft deletes locally
     and removes from Stytch.
     """
-    current_member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    assert request.auth_member is not None  # Guaranteed by @require_admin
+    assert request.auth_organization is not None  # Guaranteed by @require_admin
+    current_member = request.auth_member
+    org = request.auth_organization
 
     # Find the target member
     try:
@@ -1204,7 +1218,7 @@ def delete_member_endpoint(request: HttpRequest, member_id: int) -> MessageRespo
     operation_id="searchDirectory",
     summary="Search Google Workspace directory for users",
 )
-def search_directory(request: HttpRequest, q: str = "") -> list[DirectoryUserSchema]:
+def search_directory(request: AuthenticatedHttpRequest, q: str = "") -> list[DirectoryUserSchema]:
     """
     Search Google Workspace directory for coworkers.
 
@@ -1212,14 +1226,14 @@ def search_directory(request: HttpRequest, q: str = "") -> list[DirectoryUserSch
     Only works if the user has signed in with Google OAuth and granted
     the Directory API scope. Returns empty list if not available.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+    if not hasattr(request, "auth_user") or request.auth_user is None:
         raise HttpError(401, "Not authenticated")
 
     if not q or len(q) < 2:
         return []
 
-    user = request.auth_user  # type: ignore[attr-defined]
-    member = request.auth_member  # type: ignore[attr-defined]
+    user = request.auth_user
+    member = request.auth_member
 
     # Import here to avoid circular imports
     from apps.accounts.google_directory import search_directory_users
@@ -1243,7 +1257,7 @@ def search_directory(request: HttpRequest, q: str = "") -> list[DirectoryUserSch
     operation_id="getDirectoryAvatar",
     summary="Proxy Google Workspace avatar image",
 )
-def get_directory_avatar(request: HttpRequest, url: str = ""):
+def get_directory_avatar(request: AuthenticatedHttpRequest, url: str = ""):
     """
     Proxy a Google Workspace avatar image.
 
@@ -1257,7 +1271,7 @@ def get_directory_avatar(request: HttpRequest, url: str = ""):
 
     from apps.core.url_validation import SSRFError, validate_avatar_url
 
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
+    if not hasattr(request, "auth_user") or request.auth_user is None:
         raise HttpError(401, "Not authenticated")
 
     # Validate URL against SSRF attacks
@@ -1271,7 +1285,7 @@ def get_directory_avatar(request: HttpRequest, url: str = ""):
     from apps.accounts.google_directory import get_google_access_token
     from apps.accounts.models import Member
 
-    user = request.auth_user  # type: ignore[attr-defined]
+    user = request.auth_user
 
     # Get member to find Stytch IDs
     member = (
