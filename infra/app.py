@@ -14,17 +14,20 @@ Usage:
     # Synth (validate)
     cdk synth --all
 
-    # Deploy foundation
+    # Deploy foundation (development - HTTP allowed)
     cdk deploy TangoNetwork TangoApp TangoFrontend
+
+    # Deploy for production (HTTPS required)
+    cdk deploy --all \\
+        --context require_https=true \\
+        --context certificate_arn=arn:aws:acm:... \\
+        --context cors_origins='["https://app.example.com"]'
 
     # Deploy with custom domain
     cdk deploy TangoApp --context domain_name=api.example.com --context certificate_arn=arn:aws:acm:...
 
     # Deploy with alarm notifications
     cdk deploy TangoObservability --context alarm_email=ops@example.com
-
-    # Deploy all
-    cdk deploy --all
 """
 
 import aws_cdk as cdk
@@ -57,11 +60,20 @@ network = NetworkStack(app, "TangoNetwork", env=env)
 # =============================================================================
 
 # Configuration via cdk.json or --context flag:
-#   cors_origins: CORS allowed origins (default: ["*"])
+#   cors_origins: CORS allowed origins (default: ["*"] for dev, required for production)
 #   enable_versioning: Enable S3 versioning for data recovery (default: false)
+#   require_https: Enforce HTTPS/certificate for production (default: false)
 # Example: cdk deploy TangoMedia --context cors_origins='["https://app.example.com"]'
 cors_origins = app.node.try_get_context("cors_origins") or ["*"]
 enable_versioning = app.node.try_get_context("enable_versioning") or False
+require_https = app.node.try_get_context("require_https") or False
+
+# Validate CORS configuration for production
+if require_https and cors_origins == ["*"]:
+    raise ValueError(
+        "cors_origins must be explicitly set when require_https=true. "
+        "Pass --context cors_origins='[\"https://app.example.com\"]'"
+    )
 
 media = MediaStack(
     app,
@@ -79,6 +91,19 @@ media = MediaStack(
 # Context parameters for production deployment
 domain_name = app.node.try_get_context("domain_name")
 certificate_arn = app.node.try_get_context("certificate_arn")
+
+# Validate HTTPS configuration
+if domain_name and not certificate_arn:
+    raise ValueError(
+        "certificate_arn is required when domain_name is provided. "
+        "Create a certificate in ACM and pass --context certificate_arn=arn:aws:acm:..."
+    )
+
+if require_https and not certificate_arn:
+    raise ValueError(
+        "certificate_arn is required when require_https=true. "
+        "For production deployments, always use HTTPS."
+    )
 
 app_stack = AppStack(
     app,
