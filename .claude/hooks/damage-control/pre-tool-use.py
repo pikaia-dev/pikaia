@@ -6,6 +6,7 @@ Blocks or requires confirmation for dangerous operations.
 Reads patterns from patterns.yaml in the same directory.
 """
 
+import fnmatch
 import json
 import os
 import re
@@ -89,7 +90,6 @@ def path_matches(file_path: str, pattern: str) -> bool:
 
     # Glob-style matching
     if '*' in pattern:
-        import fnmatch
         return fnmatch.fnmatch(expanded_file, expanded_pattern) or \
                fnmatch.fnmatch(os.path.basename(expanded_file), pattern)
 
