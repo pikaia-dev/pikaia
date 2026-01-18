@@ -98,8 +98,10 @@ def subscribe(
     source = _detect_source(payload.target_url)
 
     # Create endpoint with auto-generated name based on source
+    # Note: get_event_type returns None for wildcards like "member.*"
     event_def = get_event_type(payload.event_type)
-    name = f"{source.label} - {event_def.description if event_def else payload.event_type}"
+    event_description = event_def.description if event_def else payload.event_type
+    name = f"{source.label} - {event_description}"
 
     endpoint_data = RestHookEndpointData(
         name=name[:100],  # Truncate to max length
