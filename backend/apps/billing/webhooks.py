@@ -69,9 +69,7 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
         with transaction.atomic():
             # Idempotency check - skip if already processed
             if not mark_webhook_processed("stripe", event_id):
-                logger.info(
-                    "stripe_webhook_duplicate", event_id=event_id, event_type=event["type"]
-                )
+                logger.info("stripe_webhook_duplicate", event_id=event_id, event_type=event["type"])
                 return HttpResponse(status=200)
 
             # Dispatch to handlers
