@@ -78,11 +78,13 @@ bashToolPatterns:
     action: block
 
   # --- Cloud platform operations (Firebase only) ---
-  - pattern: 'firebase\s+.*delete'
+  # Match actual delete commands, not config values containing 'delete'
+  - pattern: 'firebase\s+\S*:?delete\b'
     description: "Firebase delete operation"
     action: ask
 
-  - pattern: 'firebase\s+.*--force'
+  # --force is dangerous with deploy/delete operations
+  - pattern: 'firebase\s+(deploy|firestore:delete|functions:delete|database:remove|hosting:disable)\b.*--force'
     description: "Firebase force operation"
     action: ask
 
