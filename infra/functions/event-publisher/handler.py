@@ -82,26 +82,50 @@ def publish_pending_events() -> int:
                 logger.info("No pending events to publish")
                 return 0
 
-            logger.info("Publishing %d events", len(events))
+            # Pre-parse payloads to handle JSON errors before batching
+            valid_events = []
+            failed_events: list[tuple[Any, str]] = []
+
+            for event in events:
+                payload = event["payload"]
+                if isinstance(payload, str):
+                    try:
+                        payload = json.loads(payload)
+                    except json.JSONDecodeError as e:
+                        error_msg = f"Invalid JSON payload: {e}"
+                        failed_events.append((event["id"], error_msg))
+                        logger.warning(
+                            "Failed to parse JSON for event %s: %s",
+                            event["id"],
+                            error_msg,
+                        )
+                        continue
+                event["decoded_payload"] = payload
+                valid_events.append(event)
+
+            if not valid_events:
+                logger.info("No valid events to publish after JSON parsing")
+                # Still need to mark JSON failures
+                if failed_events:
+                    _mark_failed_events(cur, failed_events)
+                    conn.commit()
+                return 0
+
+            logger.info("Publishing %d events", len(valid_events))
 
             # Publish to EventBridge (max 10 per PutEvents call)
             published_ids = []
-            failed_events = []
 
-            for batch_start in range(0, len(events), 10):
-                batch = events[batch_start : batch_start + 10]
+            for batch_start in range(0, len(valid_events), 10):
+                batch = valid_events[batch_start : batch_start + 10]
                 entries = []
 
                 for event in batch:
-                    payload = event["payload"]
-                    if isinstance(payload, str):
-                        payload = json.loads(payload)
-
                     entries.append(
                         {
                             "Source": "app.outbox",
                             "DetailType": event["event_type"],
-                            "Detail": json.dumps(payload),
+                            "Detail": json.dumps(event["decoded_payload"]),
                             "EventBusName": EVENT_BUS_NAME,
                         }
                     )
@@ -139,22 +163,7 @@ def publish_pending_events() -> int:
                 )
 
             # Mark failed events for retry (with exponential backoff)
-            for event_id, error in failed_events:
-                cur.execute(
-                    """
-                    UPDATE events_outboxevent
-                    SET
-                        attempts = attempts + 1,
-                        last_error = %s,
-                        next_attempt_at = NOW() + (INTERVAL '1 minute' * POWER(2, attempts)),
-                        status = CASE
-                            WHEN attempts + 1 >= %s THEN 'failed'
-                            ELSE 'pending'
-                        END
-                    WHERE id = %s
-                    """,
-                    (error, MAX_ATTEMPTS, event_id),
-                )
+            _mark_failed_events(cur, failed_events)
 
             conn.commit()
 
@@ -164,3 +173,23 @@ def publish_pending_events() -> int:
                 len(failed_events),
             )
             return len(published_ids)
+
+
+def _mark_failed_events(cur: Any, failed_events: list[tuple[Any, str]]) -> None:
+    """Mark failed events for retry with exponential backoff."""
+    for event_id, error in failed_events:
+        cur.execute(
+            """
+            UPDATE events_outboxevent
+            SET
+                attempts = attempts + 1,
+                last_error = %s,
+                next_attempt_at = NOW() + (INTERVAL '1 minute' * POWER(2, attempts)),
+                status = CASE
+                    WHEN attempts + 1 >= %s THEN 'failed'
+                    ELSE 'pending'
+                END
+            WHERE id = %s
+            """,
+            (error, MAX_ATTEMPTS, event_id),
+        )
