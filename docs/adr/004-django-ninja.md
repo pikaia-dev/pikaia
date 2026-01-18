@@ -1,6 +1,5 @@
 # ADR 004: Django Ninja for REST API
 
-**Status:** Accepted
 **Date:** January 18, 2026
 
 ## Context

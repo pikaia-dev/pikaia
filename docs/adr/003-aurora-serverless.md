@@ -1,6 +1,5 @@
 # ADR 003: Aurora Serverless v2 for Database
 
-**Status:** Accepted
 **Date:** January 18, 2026
 
 ## Context
