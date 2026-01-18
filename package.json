@@ -35,11 +35,11 @@
       "biome format --write",
       "biome lint --write"
     ],
-    "infra/functions/**/*.{js,ts,json}": [
+    "infra/**/*.{js,ts,json}": [
       "biome format --write",
       "biome lint --write"
     ],
-    "infra/functions/**/*.py": [
+    "infra/**/*.py": [
       "uv run ruff format",
       "uv run ruff check --fix"
     ],

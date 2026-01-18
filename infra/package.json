@@ -1,0 +1,18 @@
+{
+  "name": "infra",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'No dev server for infra'",
+    "build": "echo 'CDK synth handled separately'",
+    "lint": "pnpm run lint:py && pnpm run lint:js",
+    "lint:py": "uv run ruff check .",
+    "lint:js": "biome lint functions",
+    "format": "pnpm run format:py && pnpm run format:js",
+    "format:py": "uv run ruff format . && uv run ruff check --fix .",
+    "format:js": "biome format --write functions",
+    "type-check": "echo 'Type checking via ruff'",
+    "test": "uv run pytest",
+    "clean": "rm -rf .ruff_cache .pytest_cache .turbo cdk.out stacks/**/__pycache__ functions/**/__pycache__"
+  }
+}
