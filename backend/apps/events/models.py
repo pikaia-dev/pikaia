@@ -3,6 +3,7 @@ Events models - transactional outbox for guaranteed event delivery.
 """
 
 import uuid
+from datetime import timedelta
 
 from django.db import models
 from django.utils import timezone
@@ -125,7 +126,7 @@ class OutboxEvent(models.Model):
         else:
             # Exponential backoff: 1s, 2s, 4s, 8s... up to 5 minutes
             delay_seconds = min(2**self.attempts, 300)
-            self.next_attempt_at = timezone.now() + timezone.timedelta(seconds=delay_seconds)
+            self.next_attempt_at = timezone.now() + timedelta(seconds=delay_seconds)
 
         self.save(update_fields=["attempts", "last_error", "status", "next_attempt_at"])
 
