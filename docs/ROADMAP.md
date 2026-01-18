@@ -6,24 +6,42 @@ Future enhancements and improvements planned for Tango.
 
 ### API Rate Limiting
 
-**Priority:** High
+**Priority:** Medium (implement before significant user traffic)
 **Status:** Not started
 
-Implement general API rate limiting to protect against abuse and DoS attacks.
+Protect security-sensitive endpoints from abuse. General API rate limiting can wait until usage patterns are known.
 
 **Current state:**
-- Only SMS OTP endpoints have rate limiting (`OTPRateLimitError`)
-- No protection on other API endpoints
+- SMS OTP endpoints have rate limiting (`OTPRateLimitError`)
+- Magic link and other auth endpoints unprotected
 
-**Recommended approach:**
-- Use [django-ratelimit](https://django-ratelimit.readthedocs.io/) or implement custom middleware
-- Apply sensible defaults per endpoint category:
-  - Authentication endpoints: 5 requests/minute per IP
-  - Write operations: 30 requests/minute per user
-  - Read operations: 100 requests/minute per user
-- Return `429 Too Many Requests` with `Retry-After` header
-- Consider Redis backend for distributed rate limiting in production
+**Phase 1 — Pre-launch (security-sensitive endpoints):**
+
+| Endpoint | Limit | Reason |
+|----------|-------|--------|
+| Magic link send | 5/min per email | Prevents email bombing |
+| OTP send | Already implemented | — |
+| Password reset | 3/hour per email | Prevents harassment |
+| Failed auth | 10/hour per IP+email | Prevents credential stuffing |
+
+Implementation: Simple DB cache counter (already using Django DB cache for passkey challenges).
+
+**Phase 2 — Post-launch (infrastructure-level):**
+
+- Add AWS WAF to ALB with rate-based rule (100 req/5min per IP)
+- Blocks bots/scrapers before hitting application
+- ~15 lines in CDK, ~$5/month
+
+**Phase 3 — When needed (general API):**
+
+- Measure P95/P99 usage patterns from real users
+- Set limits at 10x normal usage
+- Only if abuse actually occurs
+
+**Not recommended:**
+- Arbitrary limits on regular CRUD operations (hurts legitimate users)
+- Rate limiting reads (users pull-to-refresh frequently)
 
 **Reference:**
-- [OWASP Rate Limiting Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Rate_Limiting_Cheat_Sheet.html)
+- [AWS WAF Rate-based Rules](https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-type-rate-based.html)
 - [Django Ninja Throttling](https://django-ninja.dev/guides/throttling/)

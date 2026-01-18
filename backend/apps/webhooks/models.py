@@ -42,6 +42,13 @@ class WebhookEndpoint(models.Model):
         MAKE = "make", "Make"
         REST_HOOKS = "rest_hooks", "REST Hooks (generic)"
 
+    # Sources that are considered REST Hook subscriptions (not manual)
+    REST_HOOK_SOURCES: ClassVar[list[str]] = [
+        Source.ZAPIER,
+        Source.MAKE,
+        Source.REST_HOOKS,
+    ]
+
     id = models.CharField(
         primary_key=True,
         max_length=32,

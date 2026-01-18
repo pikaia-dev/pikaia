@@ -14,6 +14,8 @@ Endpoints:
 """
 
 import logging
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 from django.http import HttpRequest
@@ -31,8 +33,19 @@ from .schemas import (
     RestHookListResponse,
     RestHookSubscribeRequest,
     RestHookSubscribeResponse,
+    WebhookPayload,
 )
 from .services import WebhookService
+
+
+@dataclass
+class RestHookEndpointData:
+    """Data for creating a REST Hook endpoint."""
+
+    name: str
+    description: str
+    url: str
+    events: list[str]
 
 logger = logging.getLogger(__name__)
 
@@ -87,17 +100,15 @@ def subscribe(
     event_def = get_event_type(payload.event_type)
     name = f"{source.label} - {event_def.description if event_def else payload.event_type}"
 
+    endpoint_data = RestHookEndpointData(
+        name=name[:100],  # Truncate to max length
+        description=f"Auto-created by {source.label}",
+        url=payload.target_url,
+        events=[payload.event_type],
+    )
+
     endpoint = service.create_endpoint(
-        data=type(
-            "EndpointData",
-            (),
-            {
-                "name": name[:100],  # Truncate to max length
-                "description": f"Auto-created by {source.label}",
-                "url": payload.target_url,
-                "events": [payload.event_type],
-            },
-        )(),
+        data=endpoint_data,
         created_by_id=request.auth_member.user_id if request.auth_member else None,
         source=source,
     )
@@ -135,13 +146,6 @@ def list_subscriptions(request: HttpRequest) -> RestHookListResponse:
     service = WebhookService(request.auth_organization)
     endpoints = service.list_endpoints()
 
-    # Filter to only REST Hook subscriptions
-    rest_hook_sources = [
-        WebhookEndpoint.Source.ZAPIER,
-        WebhookEndpoint.Source.MAKE,
-        WebhookEndpoint.Source.REST_HOOKS,
-    ]
-
     subscriptions = [
         RestHookSubscribeResponse(
             id=ep.id,
@@ -151,7 +155,7 @@ def list_subscriptions(request: HttpRequest) -> RestHookListResponse:
             created_at=ep.created_at,
         )
         for ep in endpoints
-        if ep.source in rest_hook_sources
+        if ep.source in WebhookEndpoint.REST_HOOK_SOURCES
     ]
 
     return RestHookListResponse(subscriptions=subscriptions)
@@ -222,20 +226,20 @@ def get_sample(
     if not event:
         raise HttpError(404, f"Unknown event type: {event_type}")
 
-    # Build a full sample payload as it would be delivered
-    sample_payload = {
-        "id": "evt_sample123",
-        "spec_version": "1.0",
-        "type": event.type,
-        "timestamp": "2026-01-18T12:00:00Z",
-        "organization_id": str(request.auth_organization.id),
-        "data": event.payload_example,
-    }
+    # Build a full sample payload using the same schema as actual deliveries
+    sample = WebhookPayload(
+        id="evt_sample123",
+        spec_version="1.0",
+        type=event.type,
+        timestamp=datetime.now(UTC),
+        organization_id=str(request.auth_organization.id),
+        data=event.payload_example,
+    )
 
     return EventSampleResponse(
         event_type=event.type,
         description=event.description,
-        sample_payload=sample_payload,
+        sample_payload=sample.model_dump(),
     )
 
 
