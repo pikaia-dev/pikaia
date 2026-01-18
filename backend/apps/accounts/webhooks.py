@@ -8,6 +8,7 @@ Stytch uses Svix for webhook delivery and signature verification.
 import json
 from datetime import UTC, datetime
 
+from django.db import transaction
 from django.http import HttpRequest, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -16,6 +17,7 @@ from svix.webhooks import Webhook, WebhookVerificationError
 from apps.accounts.models import Member
 from apps.accounts.services import get_or_create_member_from_stytch, get_or_create_user_from_stytch
 from apps.core.logging import get_logger
+from apps.core.webhooks import mark_webhook_processed
 from apps.events.services import publish_event
 from apps.organizations.models import Organization
 from config.settings.base import settings
@@ -330,41 +332,59 @@ def stytch_webhook(request: HttpRequest) -> HttpResponse:
         logger.warning("stytch_webhook_invalid_json", error=str(e))
         return HttpResponse(status=400)
 
+    # Get Svix message ID for idempotency
+    event_id = request.headers.get("svix-id", "")
+    if not event_id:
+        logger.warning("stytch_webhook_missing_svix_id")
+        return HttpResponse(status=400)
+
     # Parse event type: source.object_type.action
     event_type = event.get("event_type", "")
     action = event.get("action", "")
     object_type = event.get("object_type", "")
 
     logger.info(
-        "stytch_webhook_received", event_type=event_type, action=action, object_type=object_type
+        "stytch_webhook_received",
+        event_id=event_id,
+        event_type=event_type,
+        action=action,
+        object_type=object_type,
     )
 
-    # Dispatch to handlers based on object_type and action
+    # Use transaction to ensure idempotency marker is rolled back if handler fails
     try:
-        if object_type == "member":
-            if action == "CREATE":
-                handle_member_created(event)
-            elif action == "UPDATE":
-                handle_member_updated(event)
-            elif action == "DELETE":
-                handle_member_deleted(event)
-            else:
-                logger.debug("stytch_webhook_unhandled_member_action", action=action)
+        with transaction.atomic():
+            # Idempotency check - skip if already processed
+            if not mark_webhook_processed("stytch", event_id):
+                logger.info("stytch_webhook_duplicate", event_id=event_id)
+                return HttpResponse(status=200)
 
-        elif object_type == "organization":
-            if action == "UPDATE":
-                handle_organization_updated(event)
-            elif action == "DELETE":
-                handle_organization_deleted(event)
-            else:
-                logger.debug("stytch_webhook_unhandled_org_action", action=action)
+            # Dispatch to handlers based on object_type and action
+            if object_type == "member":
+                if action == "CREATE":
+                    handle_member_created(event)
+                elif action == "UPDATE":
+                    handle_member_updated(event)
+                elif action == "DELETE":
+                    handle_member_deleted(event)
+                else:
+                    logger.debug("stytch_webhook_unhandled_member_action", action=action)
 
-        else:
-            logger.debug("stytch_webhook_unhandled_object_type", object_type=object_type)
+            elif object_type == "organization":
+                if action == "UPDATE":
+                    handle_organization_updated(event)
+                elif action == "DELETE":
+                    handle_organization_deleted(event)
+                else:
+                    logger.debug("stytch_webhook_unhandled_org_action", action=action)
+
+            else:
+                logger.debug("stytch_webhook_unhandled_object_type", object_type=object_type)
 
     except Exception:
         logger.exception("stytch_webhook_handler_error")
         # Return 500 so Svix will retry with exponential backoff
+        # Transaction rollback ensures idempotency marker is not committed
         return HttpResponse(status=500)
 
     return HttpResponse(status=200)
