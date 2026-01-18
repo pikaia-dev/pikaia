@@ -84,36 +84,36 @@ def publish_pending_events() -> int:
             logger.info("No pending events to publish")
             return 0
 
-            # Pre-parse payloads to handle JSON errors before batching
-            valid_events = []
-            failed_events: list[tuple[Any, str]] = []
+        # Pre-parse payloads to handle JSON errors before batching
+        valid_events = []
+        failed_events: list[tuple[Any, str]] = []
 
-            for event in events:
-                payload = event["payload"]
-                if isinstance(payload, str):
-                    try:
-                        payload = json.loads(payload)
-                    except json.JSONDecodeError as e:
-                        error_msg = f"Invalid JSON payload: {e}"
-                        failed_events.append((event["id"], error_msg))
-                        logger.warning(
-                            "Failed to parse JSON for event %s: %s",
-                            event["id"],
-                            error_msg,
-                        )
-                        continue
-                event["decoded_payload"] = payload
-                valid_events.append(event)
+        for event in events:
+            payload = event["payload"]
+            if isinstance(payload, str):
+                try:
+                    payload = json.loads(payload)
+                except json.JSONDecodeError as e:
+                    error_msg = f"Invalid JSON payload: {e}"
+                    failed_events.append((event["id"], error_msg))
+                    logger.warning(
+                        "Failed to parse JSON for event %s: %s",
+                        event["id"],
+                        error_msg,
+                    )
+                    continue
+            event["decoded_payload"] = payload
+            valid_events.append(event)
 
-            if not valid_events:
-                logger.info("No valid events to publish after JSON parsing")
-                # Still need to mark JSON failures
-                if failed_events:
-                    _mark_failed_events(cur, failed_events)
-                    conn.commit()
-                return 0
+        if not valid_events:
+            logger.info("No valid events to publish after JSON parsing")
+            # Still need to mark JSON failures
+            if failed_events:
+                _mark_failed_events(cur, failed_events)
+                conn.commit()
+            return 0
 
-            logger.info("Publishing %d events", len(valid_events))
+        logger.info("Publishing %d events", len(valid_events))
 
         # Publish to EventBridge (max 10 per PutEvents call)
         published_ids = []
