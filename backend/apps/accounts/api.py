@@ -1076,25 +1076,26 @@ def bulk_invite_members_endpoint(
 )
 @require_admin
 def update_member_role_endpoint(
-    request: AuthenticatedHttpRequest, member_id: int, payload: UpdateMemberRoleRequest
+    request: AuthenticatedHttpRequest, member_id: str, payload: UpdateMemberRoleRequest
 ) -> MessageResponse:
     """
     Update a member's role (admin or member).
 
     Admin only. Cannot change your own role.
+    Member ID is the Stytch member ID (e.g., "member-xxx").
     """
     _, current_member, org = get_auth_context(request)
 
-    # Find the target member
+    # Find the target member by stytch_member_id
     try:
         target_member = Member.objects.select_related("organization").get(
-            id=member_id, organization=org
+            stytch_member_id=member_id, organization=org
         )
     except Member.DoesNotExist:
         raise HttpError(404, "Member not found") from None
 
     # Prevent changing own role
-    if target_member.id == current_member.id:
+    if target_member.stytch_member_id == current_member.stytch_member_id:
         raise HttpError(400, "Cannot change your own role")
 
     # Capture old role before update
@@ -1135,25 +1136,26 @@ def update_member_role_endpoint(
     summary="Remove member from organization",
 )
 @require_admin
-def delete_member_endpoint(request: AuthenticatedHttpRequest, member_id: int) -> MessageResponse:
+def delete_member_endpoint(request: AuthenticatedHttpRequest, member_id: str) -> MessageResponse:
     """
     Remove a member from the organization.
 
     Admin only. Cannot remove yourself. Soft deletes locally
     and removes from Stytch.
+    Member ID is the Stytch member ID (e.g., "member-xxx").
     """
     _, current_member, org = get_auth_context(request)
 
-    # Find the target member
+    # Find the target member by stytch_member_id
     try:
         target_member = Member.objects.select_related("organization", "user").get(
-            id=member_id, organization=org
+            stytch_member_id=member_id, organization=org
         )
     except Member.DoesNotExist:
         raise HttpError(404, "Member not found") from None
 
     # Prevent removing yourself
-    if target_member.id == current_member.id:
+    if target_member.stytch_member_id == current_member.stytch_member_id:
         raise HttpError(400, "Cannot remove yourself")
 
     email = target_member.user.email

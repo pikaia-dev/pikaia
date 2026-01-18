@@ -1271,13 +1271,15 @@ class TestUpdateMemberRole:
 
         mock_client = MagicMock()
 
-        request = request_factory.patch(f"/api/v1/auth/organization/members/{target_member.id}")
+        request = request_factory.patch(
+            f"/api/v1/auth/organization/members/{target_member.stytch_member_id}"
+        )
         request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
 
         payload = UpdateMemberRoleRequest(role="admin")
 
         with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
-            result = update_member_role_endpoint(request, target_member.id, payload)
+            result = update_member_role_endpoint(request, target_member.stytch_member_id, payload)
 
         assert "admin" in result.message
         target_member.refresh_from_db()
@@ -1289,13 +1291,15 @@ class TestUpdateMemberRole:
         user = UserFactory()
         member = MemberFactory(user=user, organization=org, role="admin")
 
-        request = request_factory.patch(f"/api/v1/auth/organization/members/{member.id}")
+        request = request_factory.patch(
+            f"/api/v1/auth/organization/members/{member.stytch_member_id}"
+        )
         request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = UpdateMemberRoleRequest(role="member")
 
         with pytest.raises(HttpError) as exc_info:
-            update_member_role_endpoint(request, member.id, payload)
+            update_member_role_endpoint(request, member.stytch_member_id, payload)
 
         assert exc_info.value.status_code == 400
         assert "own role" in str(exc_info.value.message).lower()
@@ -1307,13 +1311,15 @@ class TestUpdateMemberRole:
         member = MemberFactory(user=user, organization=org, role="member")
         target_member = MemberFactory(organization=org, role="member")
 
-        request = request_factory.patch(f"/api/v1/auth/organization/members/{target_member.id}")
+        request = request_factory.patch(
+            f"/api/v1/auth/organization/members/{target_member.stytch_member_id}"
+        )
         request.auth = AuthContext(user=user, member=member, organization=org)
 
         payload = UpdateMemberRoleRequest(role="admin")
 
         with pytest.raises(HttpError) as exc_info:
-            update_member_role_endpoint(request, target_member.id, payload)
+            update_member_role_endpoint(request, target_member.stytch_member_id, payload)
 
         assert exc_info.value.status_code == 403
 
@@ -1332,11 +1338,13 @@ class TestDeleteMember:
 
         mock_client = MagicMock()
 
-        request = request_factory.delete(f"/api/v1/auth/organization/members/{target_member.id}")
+        request = request_factory.delete(
+            f"/api/v1/auth/organization/members/{target_member.stytch_member_id}"
+        )
         request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
 
         with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
-            result = delete_member_endpoint(request, target_member.id)
+            result = delete_member_endpoint(request, target_member.stytch_member_id)
 
         assert "target@example.com" in result.message
         target_member.refresh_from_db()
@@ -1348,11 +1356,13 @@ class TestDeleteMember:
         user = UserFactory()
         member = MemberFactory(user=user, organization=org, role="admin")
 
-        request = request_factory.delete(f"/api/v1/auth/organization/members/{member.id}")
+        request = request_factory.delete(
+            f"/api/v1/auth/organization/members/{member.stytch_member_id}"
+        )
         request.auth = AuthContext(user=user, member=member, organization=org)
 
         with pytest.raises(HttpError) as exc_info:
-            delete_member_endpoint(request, member.id)
+            delete_member_endpoint(request, member.stytch_member_id)
 
         assert exc_info.value.status_code == 400
         assert "yourself" in str(exc_info.value.message).lower()
@@ -1364,11 +1374,13 @@ class TestDeleteMember:
         member = MemberFactory(user=user, organization=org, role="member")
         target_member = MemberFactory(organization=org, role="member")
 
-        request = request_factory.delete(f"/api/v1/auth/organization/members/{target_member.id}")
+        request = request_factory.delete(
+            f"/api/v1/auth/organization/members/{target_member.stytch_member_id}"
+        )
         request.auth = AuthContext(user=user, member=member, organization=org)
 
         with pytest.raises(HttpError) as exc_info:
-            delete_member_endpoint(request, target_member.id)
+            delete_member_endpoint(request, target_member.stytch_member_id)
 
         assert exc_info.value.status_code == 403
 
