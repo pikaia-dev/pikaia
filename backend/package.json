@@ -4,11 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "uv run python manage.py runserver",
-    "build": "echo 'Python backend - no build step'",
+    "build": "echo 'No build step for Django backend'",
     "lint": "uv run ruff check .",
     "format": "uv run ruff format . && uv run ruff check --fix .",
-    "type-check": "echo 'Type checking via ruff'",
+    "type-check": "uv run mypy .",
     "test": "uv run pytest",
-    "clean": "rm -rf __pycache__ .pytest_cache .ruff_cache .turbo apps/**/__pycache__ tests/**/__pycache__"
+    "clean": "rm -rf .ruff_cache .pytest_cache .mypy_cache .turbo **/__pycache__"
   }
 }
