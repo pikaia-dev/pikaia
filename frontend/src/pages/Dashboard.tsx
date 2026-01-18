@@ -1,14 +1,8 @@
-import { useStytchMemberSession } from "@stytch/react/b2b"
+import { useStytchMemberSession } from '@stytch/react/b2b'
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../components/ui/card"
-import { LoadingSpinner } from "../components/ui/loading-spinner"
-import { useCurrentUser } from "../features/auth/queries"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { LoadingSpinner } from '../components/ui/loading-spinner'
+import { useCurrentUser } from '../features/auth/queries'
 
 export default function Dashboard() {
   const { session } = useStytchMemberSession()
@@ -48,9 +42,7 @@ export default function Dashboard() {
           <CardContent className="space-y-2">
             <div>
               <span className="text-xs text-muted-foreground">Name</span>
-              <p className="text-sm font-medium">
-                {userData?.user.name || "Not set"}
-              </p>
+              <p className="text-sm font-medium">{userData?.user.name || 'Not set'}</p>
             </div>
             <div>
               <span className="text-xs text-muted-foreground">Email</span>
@@ -67,15 +59,11 @@ export default function Dashboard() {
           <CardContent className="space-y-2">
             <div>
               <span className="text-xs text-muted-foreground">Role</span>
-              <p className="text-sm font-medium capitalize">
-                {userData?.member.role}
-              </p>
+              <p className="text-sm font-medium capitalize">{userData?.member.role}</p>
             </div>
             <div>
               <span className="text-xs text-muted-foreground">Admin</span>
-              <p className="text-sm font-medium">
-                {userData?.member.is_admin ? "Yes" : "No"}
-              </p>
+              <p className="text-sm font-medium">{userData?.member.is_admin ? 'Yes' : 'No'}</p>
             </div>
           </CardContent>
         </Card>
@@ -88,15 +76,11 @@ export default function Dashboard() {
           <CardContent className="space-y-2">
             <div>
               <span className="text-xs text-muted-foreground">Name</span>
-              <p className="text-sm font-medium">
-                {userData?.organization.name}
-              </p>
+              <p className="text-sm font-medium">{userData?.organization.name}</p>
             </div>
             <div>
               <span className="text-xs text-muted-foreground">Slug</span>
-              <p className="text-sm font-medium">
-                {userData?.organization.slug}
-              </p>
+              <p className="text-sm font-medium">{userData?.organization.slug}</p>
             </div>
           </CardContent>
         </Card>

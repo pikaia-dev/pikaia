@@ -1,26 +1,17 @@
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useEffect, useState } from "react"
-import { useForm } from "react-hook-form"
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
 
-import { Button } from "../../components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card"
-import { ImageUploader } from "../../components/ui/image-uploader"
-import { LoadingSpinner } from "../../components/ui/loading-spinner"
+import { Button } from '../../components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
+import { ImageUploader } from '../../components/ui/image-uploader'
+import { LoadingSpinner } from '../../components/ui/loading-spinner'
 import {
   normalizeSlug,
   type OrganizationFormData,
   organizationSchema,
-} from "../../features/organization/forms/schema"
-import {
-  useOrganization,
-  useUpdateOrganization,
-} from "../../features/organization/queries"
+} from '../../features/organization/forms/schema'
+import { useOrganization, useUpdateOrganization } from '../../features/organization/queries'
 
 export default function OrganizationSettings() {
   const { data: organization, isLoading, error } = useOrganization()
@@ -28,7 +19,7 @@ export default function OrganizationSettings() {
   const [editedLogoUrl, setEditedLogoUrl] = useState<string | null>(null)
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
 
-  const logoUrl = editedLogoUrl ?? organization?.logo_url ?? ""
+  const logoUrl = editedLogoUrl ?? organization?.logo_url ?? ''
 
   const {
     register,
@@ -40,12 +31,12 @@ export default function OrganizationSettings() {
   } = useForm<OrganizationFormData>({
     resolver: zodResolver(organizationSchema),
     defaultValues: {
-      name: "",
-      slug: "",
+      name: '',
+      slug: '',
     },
   })
 
-  const name = watch("name")
+  const name = watch('name')
 
   // Sync form with server data when it loads
   useEffect(() => {
@@ -58,16 +49,16 @@ export default function OrganizationSettings() {
   }, [organization, reset])
 
   const handleNameChange = (newName: string) => {
-    setValue("name", newName, { shouldValidate: true })
+    setValue('name', newName, { shouldValidate: true })
     // Auto-update slug if user hasn't manually edited it
     if (!slugManuallyEdited) {
-      setValue("slug", normalizeSlug(newName), { shouldValidate: true })
+      setValue('slug', normalizeSlug(newName), { shouldValidate: true })
     }
   }
 
   const handleSlugChange = (newSlug: string) => {
     const normalized = normalizeSlug(newSlug)
-    setValue("slug", normalized, { shouldValidate: true })
+    setValue('slug', normalized, { shouldValidate: true })
     // Mark as manually edited if different from auto-derived
     if (normalized !== normalizeSlug(name)) {
       setSlugManuallyEdited(true)
@@ -102,9 +93,7 @@ export default function OrganizationSettings() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">Organization</h1>
-        <p className="text-muted-foreground">
-          Manage your organization settings
-        </p>
+        <p className="text-muted-foreground">Manage your organization settings</p>
       </div>
 
       <div className="space-y-6 max-w-lg">
@@ -112,16 +101,10 @@ export default function OrganizationSettings() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Organization Logo</CardTitle>
-            <CardDescription>
-              Upload a logo for your organization
-            </CardDescription>
+            <CardDescription>Upload a logo for your organization</CardDescription>
           </CardHeader>
           <CardContent>
-            <ImageUploader
-              type="logo"
-              value={logoUrl}
-              onChange={setEditedLogoUrl}
-            />
+            <ImageUploader type="logo" value={logoUrl} onChange={setEditedLogoUrl} />
           </CardContent>
         </Card>
 
@@ -129,21 +112,16 @@ export default function OrganizationSettings() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Organization Details</CardTitle>
-            <CardDescription>
-              Update your organization information
-            </CardDescription>
+            <CardDescription>Update your organization information</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
-                <label
-                  htmlFor="name"
-                  className="block text-sm font-medium mb-1"
-                >
+                <label htmlFor="name" className="block text-sm font-medium mb-1">
                   Organization name
                 </label>
                 <input
-                  {...register("name")}
+                  {...register('name')}
                   id="name"
                   type="text"
                   onChange={(e) => {
@@ -153,21 +131,16 @@ export default function OrganizationSettings() {
                   placeholder="Your organization name"
                 />
                 {errors.name && (
-                  <p className="text-xs text-destructive mt-1">
-                    {errors.name.message}
-                  </p>
+                  <p className="text-xs text-destructive mt-1">{errors.name.message}</p>
                 )}
               </div>
 
               <div>
-                <label
-                  htmlFor="slug"
-                  className="block text-sm font-medium mb-1"
-                >
+                <label htmlFor="slug" className="block text-sm font-medium mb-1">
                   Slug
                 </label>
                 <input
-                  {...register("slug")}
+                  {...register('slug')}
                   id="slug"
                   type="text"
                   onChange={(e) => {
@@ -177,9 +150,7 @@ export default function OrganizationSettings() {
                   placeholder="your-organization"
                 />
                 {errors.slug ? (
-                  <p className="text-xs text-destructive mt-1">
-                    {errors.slug.message}
-                  </p>
+                  <p className="text-xs text-destructive mt-1">{errors.slug.message}</p>
                 ) : (
                   <p className="text-xs text-muted-foreground mt-1">
                     URL-friendly identifier (lowercase, hyphens, 2-128 chars)
@@ -188,7 +159,7 @@ export default function OrganizationSettings() {
               </div>
 
               <Button type="submit" disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? "Saving..." : "Save changes"}
+                {updateMutation.isPending ? 'Saving...' : 'Save changes'}
               </Button>
             </form>
           </CardContent>

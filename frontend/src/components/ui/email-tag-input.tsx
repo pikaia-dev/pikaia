@@ -1,7 +1,7 @@
-import { X } from "lucide-react"
-import { type KeyboardEvent,useCallback, useRef, useState } from "react"
+import { X } from 'lucide-react'
+import { type KeyboardEvent, useCallback, useRef, useState } from 'react'
 
-import { cn } from "@/lib/utils"
+import { cn } from '@/lib/utils'
 
 /** Regex for basic email validation */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -31,14 +31,14 @@ interface EmailTagInputProps {
 export function EmailTagInput({
   value,
   onChange,
-  placeholder = "Enter email addresses...",
+  placeholder = 'Enter email addresses...',
   disabled = false,
   className,
   id,
   maxEmails = 100,
 }: EmailTagInputProps) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const [inputValue, setInputValue] = useState("")
+  const [inputValue, setInputValue] = useState('')
 
   const isValidEmail = useCallback((email: string) => {
     return EMAIL_REGEX.test(email.trim())
@@ -64,7 +64,7 @@ export function EmailTagInput({
         onChange([...value, ...toAdd])
       }
 
-      setInputValue("")
+      setInputValue('')
     },
     [value, onChange, maxEmails]
   )
@@ -80,12 +80,12 @@ export function EmailTagInput({
     (e: KeyboardEvent<HTMLInputElement>) => {
       const trimmed = inputValue.trim()
 
-      if (e.key === "Enter" || e.key === "Tab" || e.key === ",") {
+      if (e.key === 'Enter' || e.key === 'Tab' || e.key === ',') {
         if (trimmed) {
           e.preventDefault()
           addEmails(trimmed)
         }
-      } else if (e.key === "Backspace" && !inputValue && value.length > 0) {
+      } else if (e.key === 'Backspace' && !inputValue && value.length > 0) {
         // Delete last email when backspace on empty input
         removeEmail(value.length - 1)
       }
@@ -96,7 +96,7 @@ export function EmailTagInput({
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
       e.preventDefault()
-      const pastedText = e.clipboardData.getData("text")
+      const pastedText = e.clipboardData.getData('text')
       addEmails(pastedText)
     },
     [addEmails]
@@ -114,13 +114,20 @@ export function EmailTagInput({
   }, [])
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: Click delegates to input focus
     <div
       onClick={handleContainerClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          handleContainerClick()
+        }
+      }}
       className={cn(
-        "flex flex-wrap items-start content-start gap-1.5 p-2 min-h-[80px] max-h-[200px] overflow-y-auto",
-        "border border-input rounded-md bg-background",
-        "focus-within:outline-none focus-within:ring-1 focus-within:ring-ring focus-within:ring-offset-0",
-        disabled && "opacity-50 cursor-not-allowed",
+        'flex flex-wrap items-start content-start gap-1.5 p-2 min-h-[80px] max-h-[200px] overflow-y-auto',
+        'border border-input rounded-md bg-background',
+        'focus-within:outline-none focus-within:ring-1 focus-within:ring-ring focus-within:ring-offset-0',
+        disabled && 'opacity-50 cursor-not-allowed',
         className
       )}
     >
@@ -131,11 +138,11 @@ export function EmailTagInput({
           <span
             key={`${email}-${String(index)}`}
             className={cn(
-              "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-sm max-w-full",
-              "transition-colors shrink-0",
+              'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-sm max-w-full',
+              'transition-colors shrink-0',
               isValid
-                ? "bg-primary/10 text-primary border border-primary/20"
-                : "bg-destructive/10 text-destructive border border-destructive/30"
+                ? 'bg-primary/10 text-primary border border-primary/20'
+                : 'bg-destructive/10 text-destructive border border-destructive/30'
             )}
           >
             <span className="truncate">{email}</span>
@@ -147,8 +154,8 @@ export function EmailTagInput({
                   removeEmail(index)
                 }}
                 className={cn(
-                  "rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/10 shrink-0",
-                  "focus:outline-none focus:ring-1 focus:ring-ring"
+                  'rounded-full p-0.5 hover:bg-black/10 dark:hover:bg-white/10 shrink-0',
+                  'focus:outline-none focus:ring-1 focus:ring-ring'
                 )}
                 tabIndex={-1}
               >
@@ -166,16 +173,18 @@ export function EmailTagInput({
           id={id}
           type="text"
           value={inputValue}
-          onChange={(e) => { setInputValue(e.target.value); }}
+          onChange={(e) => {
+            setInputValue(e.target.value)
+          }}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           onBlur={handleBlur}
-          placeholder={value.length === 0 ? placeholder : ""}
+          placeholder={value.length === 0 ? placeholder : ''}
           disabled={disabled}
           autoComplete="off"
           className={cn(
-            "flex-1 min-w-[120px] h-6 outline-none bg-transparent text-sm",
-            "placeholder:text-muted-foreground"
+            'flex-1 min-w-[120px] h-6 outline-none bg-transparent text-sm',
+            'placeholder:text-muted-foreground'
           )}
         />
       )}
