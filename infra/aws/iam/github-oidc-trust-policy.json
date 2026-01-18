@@ -13,10 +13,7 @@
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
         },
         "StringLike": {
-          "token.actions.githubusercontent.com:sub": [
-            "repo:TangoAgency/tango-django-ninja-stytch-saas-starter:ref:refs/heads/main",
-            "repo:TangoAgency/tango-django-ninja-stytch-saas-starter:environment:demo"
-          ]
+          "token.actions.githubusercontent.com:sub": "repo:TangoAgency/tango-django-ninja-stytch-saas-starter:*"
         }
       }
     }
