@@ -4,11 +4,16 @@ Core security - authentication and authorization for API.
 
 from collections.abc import Callable
 from functools import wraps
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from apps.accounts.models import Member, User
+    from apps.organizations.models import Organization
 
 from django.http import HttpRequest
-from ninja.errors import HttpError
 from ninja.security import HttpBearer
+
+from apps.core.auth import AuthContext
 
 
 class BearerAuth(HttpBearer):
@@ -16,7 +21,7 @@ class BearerAuth(HttpBearer):
     Bearer token authentication for API endpoints.
 
     Validates that StytchAuthMiddleware has successfully authenticated the user.
-    The middleware runs first and populates request.auth_user if JWT is valid.
+    The middleware runs first and populates request.auth if JWT is valid.
     This class provides defense-in-depth by verifying authentication succeeded.
     """
 
@@ -27,7 +32,8 @@ class BearerAuth(HttpBearer):
         Returns token if user is authenticated, None otherwise (triggers 401).
         """
         # Check that middleware validated the JWT and set auth context
-        if not hasattr(request, "auth_user") or request.auth_user is None:
+        auth: AuthContext | None = getattr(request, "auth", None)
+        if auth is None or auth.user is None:
             return None
 
         return token
@@ -53,16 +59,39 @@ def require_admin[F: Callable[..., Any]](func: F) -> F:
 
     @wraps(func)
     def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> Any:
-        # Check authentication - middleware sets auth_user, auth_member, and
-        # auth_organization together, so checking any one of them is sufficient.
-        # We check auth_member since we need it for the admin role check anyway.
-        if not hasattr(request, "auth_member") or request.auth_member is None:
+        # Delegate to AuthContext - raises 401/403 as appropriate
+        from ninja.errors import HttpError
+
+        auth: AuthContext | None = getattr(request, "auth", None)
+        if auth is None:
             raise HttpError(401, "Not authenticated")
-
-        # Check admin role (safe to access - we verified auth_member is not None above)
-        if not request.auth_member.is_admin:
-            raise HttpError(403, "Admin access required")
-
+        auth.require_admin()
         return func(request, *args, **kwargs)
 
     return wrapper  # type: ignore[return-value]
+
+
+def get_auth_context(
+    request: HttpRequest,
+) -> tuple["User", "Member", "Organization"]:
+    """
+    Get authenticated user, member, and organization from request.
+
+    Use this helper to get properly type-narrowed auth context in endpoints.
+    The middleware sets all three together, so if one exists, all do.
+
+    Args:
+        request: The HTTP request (with auth from middleware)
+
+    Returns:
+        Tuple of (user, member, organization)
+
+    Raises:
+        HttpError 401: If not authenticated
+    """
+    from ninja.errors import HttpError
+
+    auth: AuthContext | None = getattr(request, "auth", None)
+    if auth is None:
+        raise HttpError(401, "Not authenticated")
+    return auth.require_auth()

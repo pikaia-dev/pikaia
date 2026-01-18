@@ -6,12 +6,12 @@ Allows organization admins to manage webhook endpoints and view delivery logs.
 
 import logging
 
-from django.http import HttpRequest
 from ninja import Router
 from ninja.errors import HttpError
 
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth, require_admin
+from apps.core.security import BearerAuth, get_auth_context, require_admin
+from apps.core.types import AuthenticatedHttpRequest
 
 from .schemas import (
     WebhookDeliveryListResponse,
@@ -85,7 +85,7 @@ def _delivery_to_response(delivery) -> WebhookDeliveryResponse:
     operation_id="listWebhookEvents",
     summary="List available webhook events",
 )
-def list_events(request: HttpRequest) -> WebhookEventListResponse:
+def list_events(request: AuthenticatedHttpRequest) -> WebhookEventListResponse:
     """
     Get the catalog of all available webhook event types.
 
@@ -93,9 +93,7 @@ def list_events(request: HttpRequest) -> WebhookEventListResponse:
     This endpoint is the single source of truth for what events can be subscribed to.
     """
     events = get_available_events()
-    return WebhookEventListResponse(
-        events=[WebhookEventTypeResponse(**e) for e in events]
-    )
+    return WebhookEventListResponse(events=[WebhookEventTypeResponse(**e) for e in events])
 
 
 # =============================================================================
@@ -111,18 +109,17 @@ def list_events(request: HttpRequest) -> WebhookEventListResponse:
     summary="List webhook endpoints",
 )
 @require_admin
-def list_endpoints(request: HttpRequest) -> WebhookEndpointListResponse:
+def list_endpoints(request: AuthenticatedHttpRequest) -> WebhookEndpointListResponse:
     """
     List all webhook endpoints for the organization.
 
     Requires admin role.
     """
-    service = WebhookService(request.auth_organization)
+    _, _, org = get_auth_context(request)
+    service = WebhookService(org)
     endpoints = service.list_endpoints()
 
-    return WebhookEndpointListResponse(
-        endpoints=[_endpoint_to_response(ep) for ep in endpoints]
-    )
+    return WebhookEndpointListResponse(endpoints=[_endpoint_to_response(ep) for ep in endpoints])
 
 
 @router.post(
@@ -134,7 +131,7 @@ def list_endpoints(request: HttpRequest) -> WebhookEndpointListResponse:
 )
 @require_admin
 def create_endpoint(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     payload: WebhookEndpointCreate,
 ) -> tuple[int, WebhookEndpointWithSecretResponse]:
     """
@@ -145,16 +142,17 @@ def create_endpoint(
 
     Requires admin role.
     """
-    service = WebhookService(request.auth_organization)
+    _, member, org = get_auth_context(request)
+    service = WebhookService(org)
     endpoint = service.create_endpoint(
         data=payload,
-        created_by_id=request.auth_member.user_id if request.auth_member else None,
+        created_by_id=member.user_id,
     )
 
     logger.info(
         "Created webhook endpoint %s for org %s",
         endpoint.id,
-        request.auth_organization.id,
+        org.id,
     )
 
     return 201, WebhookEndpointWithSecretResponse(
@@ -181,13 +179,14 @@ def create_endpoint(
     summary="Get webhook endpoint",
 )
 @require_admin
-def get_endpoint(request: HttpRequest, endpoint_id: str) -> WebhookEndpointResponse:
+def get_endpoint(request: AuthenticatedHttpRequest, endpoint_id: str) -> WebhookEndpointResponse:
     """
     Get a specific webhook endpoint.
 
     Requires admin role.
     """
-    service = WebhookService(request.auth_organization)
+    _, _, org = get_auth_context(request)
+    service = WebhookService(org)
     endpoint = service.get_endpoint(endpoint_id)
 
     if not endpoint:
@@ -205,7 +204,7 @@ def get_endpoint(request: HttpRequest, endpoint_id: str) -> WebhookEndpointRespo
 )
 @require_admin
 def update_endpoint(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     endpoint_id: str,
     payload: WebhookEndpointUpdate,
 ) -> WebhookEndpointResponse:
@@ -216,7 +215,8 @@ def update_endpoint(
 
     Requires admin role.
     """
-    service = WebhookService(request.auth_organization)
+    _, _, org = get_auth_context(request)
+    service = WebhookService(org)
     endpoint = service.update_endpoint(endpoint_id, payload)
 
     if not endpoint:
@@ -225,7 +225,7 @@ def update_endpoint(
     logger.info(
         "Updated webhook endpoint %s for org %s",
         endpoint_id,
-        request.auth_organization.id,
+        org.id,
     )
 
     return _endpoint_to_response(endpoint)
@@ -239,7 +239,7 @@ def update_endpoint(
     summary="Delete webhook endpoint",
 )
 @require_admin
-def delete_endpoint(request: HttpRequest, endpoint_id: str) -> tuple[int, None]:
+def delete_endpoint(request: AuthenticatedHttpRequest, endpoint_id: str) -> tuple[int, None]:
     """
     Delete a webhook endpoint.
 
@@ -247,7 +247,8 @@ def delete_endpoint(request: HttpRequest, endpoint_id: str) -> tuple[int, None]:
 
     Requires admin role.
     """
-    service = WebhookService(request.auth_organization)
+    _, _, org = get_auth_context(request)
+    service = WebhookService(org)
     deleted = service.delete_endpoint(endpoint_id)
 
     if not deleted:
@@ -256,7 +257,7 @@ def delete_endpoint(request: HttpRequest, endpoint_id: str) -> tuple[int, None]:
     logger.info(
         "Deleted webhook endpoint %s for org %s",
         endpoint_id,
-        request.auth_organization.id,
+        org.id,
     )
 
     return 204, None
@@ -276,7 +277,7 @@ def delete_endpoint(request: HttpRequest, endpoint_id: str) -> tuple[int, None]:
 )
 @require_admin
 def list_deliveries(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     endpoint_id: str,
     limit: int = 50,
 ) -> WebhookDeliveryListResponse:
@@ -287,7 +288,8 @@ def list_deliveries(
 
     Requires admin role.
     """
-    service = WebhookService(request.auth_organization)
+    _, _, org = get_auth_context(request)
+    service = WebhookService(org)
 
     # Verify endpoint exists and belongs to org
     endpoint = service.get_endpoint(endpoint_id)
@@ -296,9 +298,7 @@ def list_deliveries(
 
     deliveries = service.list_deliveries(endpoint_id, limit=min(limit, 100))
 
-    return WebhookDeliveryListResponse(
-        deliveries=[_delivery_to_response(d) for d in deliveries]
-    )
+    return WebhookDeliveryListResponse(deliveries=[_delivery_to_response(d) for d in deliveries])
 
 
 # =============================================================================
@@ -315,7 +315,7 @@ def list_deliveries(
 )
 @require_admin
 def send_test_webhook(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     endpoint_id: str,
     payload: WebhookTestRequest,
 ) -> WebhookTestResponse:
@@ -327,7 +327,8 @@ def send_test_webhook(
 
     Requires admin role.
     """
-    service = WebhookService(request.auth_organization)
+    _, _, org = get_auth_context(request)
+    service = WebhookService(org)
     endpoint = service.get_endpoint(endpoint_id)
 
     if not endpoint:

@@ -100,9 +100,7 @@ def send_phone_verification_otp(
 
     if recent_otps >= 3:
         logger.warning("OTP rate limit exceeded for phone %s", phone_number[-4:])
-        raise OTPRateLimitError(
-            "Too many verification attempts. Please try again later."
-        )
+        raise OTPRateLimitError("Too many verification attempts. Please try again later.")
 
     # Invalidate any existing unused OTPs for this phone/purpose
     OTPVerification.objects.filter(
@@ -188,9 +186,7 @@ def verify_otp(
     # Check attempts
     if otp.attempts >= otp.max_attempts:
         logger.warning("Max OTP attempts exceeded for phone %s", phone_number[-4:])
-        raise OTPMaxAttemptsError(
-            "Too many incorrect attempts. Please request a new code."
-        )
+        raise OTPMaxAttemptsError("Too many incorrect attempts. Please request a new code.")
 
     # Verify code (constant-time comparison to prevent timing attacks)
     if not secrets.compare_digest(otp.code, code):
@@ -201,9 +197,7 @@ def verify_otp(
             phone_number[-4:],
             remaining,
         )
-        raise OTPInvalidError(
-            f"Invalid verification code. {remaining} attempts remaining."
-        )
+        raise OTPInvalidError(f"Invalid verification code. {remaining} attempts remaining.")
 
     # Success - mark as verified
     otp.mark_verified()

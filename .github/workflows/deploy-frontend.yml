@@ -68,11 +68,11 @@ jobs:
             --cache-control "max-age=31536000,immutable" \
             --exclude "index.html" \
             --exclude "*.json"
-          
+
           # index.html and JSON files with short cache
           aws s3 cp frontend/dist/index.html "s3://${FRONTEND_BUCKET}/index.html" \
             --cache-control "max-age=0,no-cache,no-store,must-revalidate"
-          
+
           # Copy any JSON files (like manifest) with short cache
           find frontend/dist -name "*.json" -exec aws s3 cp {} "s3://${FRONTEND_BUCKET}/{}" \
             --cache-control "max-age=0,no-cache" \;

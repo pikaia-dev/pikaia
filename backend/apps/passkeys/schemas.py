@@ -18,7 +18,9 @@ class PasskeyRegistrationOptionsResponse(BaseModel):
     """Response with registration options for WebAuthn."""
 
     challenge_id: str = Field(description="Challenge ID to include in verification request")
-    options: dict = Field(description="WebAuthn registration options for navigator.credentials.create()")
+    options: dict = Field(
+        description="WebAuthn registration options for navigator.credentials.create()"
+    )
 
 
 class PasskeyRegistrationVerifyRequest(BaseModel):
@@ -57,7 +59,9 @@ class PasskeyAuthenticationOptionsResponse(BaseModel):
     """Response with authentication options for WebAuthn."""
 
     challenge_id: str = Field(description="Challenge ID to include in verification request")
-    options: dict = Field(description="WebAuthn authentication options for navigator.credentials.get()")
+    options: dict = Field(
+        description="WebAuthn authentication options for navigator.credentials.get()"
+    )
 
 
 class PasskeyAuthenticationVerifyRequest(BaseModel):

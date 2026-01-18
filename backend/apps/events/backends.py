@@ -63,6 +63,10 @@ class EventBridgeBackend(EventBackend):
     Publishes events in batches (up to 10 per PutEvents call).
     """
 
+    # Timeout configuration for EventBridge API calls
+    CONNECT_TIMEOUT = 5  # seconds to establish connection
+    READ_TIMEOUT = 30  # seconds to wait for response
+
     def __init__(
         self, event_bus_name: str, source: str = "app.events", endpoint_url: str | None = None
     ):
@@ -73,12 +77,19 @@ class EventBridgeBackend(EventBackend):
 
     @property
     def client(self):
-        """Lazy-load boto3 client."""
+        """Lazy-load boto3 client with timeout configuration."""
         if self._client is None:
             import boto3
+            from botocore.config import Config
 
-            # Build client config - supports LocalStack via endpoint_url
-            client_kwargs: dict[str, str | None] = {
+            config = Config(
+                connect_timeout=self.CONNECT_TIMEOUT,
+                read_timeout=self.READ_TIMEOUT,
+                retries={"max_attempts": 2},
+            )
+            # Build client kwargs - supports LocalStack via endpoint_url
+            client_kwargs: dict[str, str | Config | None] = {
+                "config": config,
                 "endpoint_url": self.endpoint_url,
             }
             # Remove None values to let boto3 use defaults

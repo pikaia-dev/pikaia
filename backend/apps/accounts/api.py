@@ -64,13 +64,29 @@ from apps.accounts.stytch_client import get_stytch_client
 from apps.billing.services import sync_billing_to_stripe
 from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth, require_admin
+from apps.core.security import BearerAuth, get_auth_context, require_admin
+from apps.core.types import AuthenticatedHttpRequest
 from apps.events.services import publish_event
 
 logger = get_logger(__name__)
 
 router = Router(tags=["auth"])
 bearer_auth = BearerAuth()
+
+
+def _extract_bearer_token(request: HttpRequest) -> str | None:
+    """Extract JWT from Authorization: Bearer header."""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header.replace("Bearer ", "")
+    return None
+
+
+def _get_stytch_error_message(error: StytchError) -> str:
+    """Extract error message from StytchError, lowercase for comparison."""
+    if error.details and error.details.error_message:
+        return error.details.error_message.lower()
+    return ""
 
 
 @router.post(
@@ -125,11 +141,12 @@ def authenticate_magic_link(
         raise HttpError(400, "Invalid or expired token.") from e
 
     # Build list of discovered organizations
+    # Stytch SDK types organization as Optional but it's always present in discovered_organizations
     discovered_orgs = [
         DiscoveredOrganization(
-            organization_id=org.organization.organization_id,
-            organization_name=org.organization.organization_name,
-            organization_slug=org.organization.organization_slug,
+            organization_id=org.organization.organization_id,  # type: ignore[union-attr]
+            organization_name=org.organization.organization_name,  # type: ignore[union-attr]
+            organization_slug=org.organization.organization_slug,  # type: ignore[union-attr]
         )
         for org in response.discovered_organizations
     ]
@@ -165,11 +182,13 @@ def create_organization(
             organization_slug=payload.organization_slug,
         )
     except StytchError as e:
-        error_msg = e.details.error_message.lower() if e.details.error_message else ""
+        error_msg = _get_stytch_error_message(e)
         if "slug" in error_msg or "duplicate" in error_msg:
             logger.warning("Organization slug conflict: %s", e.details.error_message)
             raise HttpError(409, "Organization slug already in use. Try a different one.") from e
-        if "name" in error_msg and ("use" in error_msg or "exist" in error_msg or "taken" in error_msg):
+        if "name" in error_msg and (
+            "use" in error_msg or "exist" in error_msg or "taken" in error_msg
+        ):
             logger.warning("Organization name conflict: %s", e.details.error_message)
             raise HttpError(409, "Organization name already in use. Try a different one.") from e
         logger.warning("Failed to create organization: %s", e.details.error_message)
@@ -194,11 +213,12 @@ def create_organization(
         actor=user,
     )
 
+    # Stytch SDK types organization as Optional but it's always present after successful creation
     return SessionResponse(
         session_token=response.session_token,
         session_jwt=response.session_jwt,
         member_id=response.member.member_id,
-        organization_id=response.organization.organization_id,
+        organization_id=response.organization.organization_id,  # type: ignore[union-attr]
     )
 
 
@@ -298,7 +318,7 @@ def provision_mobile_user_endpoint(
     except ValueError as e:
         raise HttpError(400, str(e)) from None
     except StytchError as e:
-        error_msg = e.details.error_message.lower() if e.details.error_message else ""
+        error_msg = _get_stytch_error_message(e)
         if "slug" in error_msg or "duplicate" in error_msg:
             logger.warning("Organization slug conflict: %s", e.details.error_message)
             raise HttpError(409, "Organization slug already in use. Try a different one.") from None
@@ -382,19 +402,13 @@ def logout(request: HttpRequest) -> MessageResponse:
     operation_id="getCurrentUser",
     summary="Get current user info",
 )
-def get_current_user(request: HttpRequest) -> MeResponse:
+def get_current_user(request: AuthenticatedHttpRequest) -> MeResponse:
     """
     Get current authenticated user, member, and organization info.
 
     Requires valid session JWT in Authorization header.
     """
-    # These are set by the auth middleware
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
-        raise HttpError(401, "Not authenticated")
-
-    user = request.auth_user  # type: ignore[attr-defined]
-    member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    user, member, org = get_auth_context(request)
 
     return MeResponse(
         user=UserInfo(
@@ -430,19 +444,14 @@ def get_current_user(request: HttpRequest) -> MeResponse:
     operation_id="updateProfile",
     summary="Update user profile",
 )
-def update_profile(request: HttpRequest, payload: UpdateProfileRequest) -> UserInfo:
+def update_profile(request: AuthenticatedHttpRequest, payload: UpdateProfileRequest) -> UserInfo:
     """
     Update current user's profile (name only).
 
     Updates local database and syncs to Stytch.
     Phone number changes require OTP verification via /phone/verify-otp.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
-        raise HttpError(401, "Not authenticated")
-
-    user = request.auth_user  # type: ignore[attr-defined]
-    member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    user, member, org = get_auth_context(request)
 
     # Capture old name for event diff
     old_name = user.name
@@ -494,22 +503,18 @@ def update_profile(request: HttpRequest, payload: UpdateProfileRequest) -> UserI
     operation_id="sendPhoneOtp",
     summary="Send OTP to phone for verification",
 )
-def send_phone_otp(request: HttpRequest, payload: SendPhoneOtpRequest) -> PhoneOtpResponse:
+def send_phone_otp(
+    request: AuthenticatedHttpRequest, payload: SendPhoneOtpRequest
+) -> PhoneOtpResponse:
     """
     Send a one-time password (OTP) to the specified phone number.
 
     The OTP is used to verify phone ownership before updating the user's profile.
     Uses Stytch's SMS OTP service.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
-        raise HttpError(401, "Not authenticated")
+    _, member, org = get_auth_context(request)
 
-    member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
-
-    # Extract session JWT from auth header
-    auth_header = request.headers.get("Authorization", "")
-    session_jwt = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
+    session_jwt = _extract_bearer_token(request)
 
     try:
         client = get_stytch_client()
@@ -525,7 +530,9 @@ def send_phone_otp(request: HttpRequest, payload: SendPhoneOtpRequest) -> PhoneO
         )
     except StytchError as e:
         logger.warning("Failed to send phone OTP: %s", e.details.error_message)
-        raise HttpError(400, e.details.error_message or "Failed to send verification code") from None
+        raise HttpError(
+            400, e.details.error_message or "Failed to send verification code"
+        ) from None
 
 
 @router.post(
@@ -535,22 +542,15 @@ def send_phone_otp(request: HttpRequest, payload: SendPhoneOtpRequest) -> PhoneO
     operation_id="verifyPhoneOtp",
     summary="Verify phone OTP and update profile",
 )
-def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> UserInfo:
+def verify_phone_otp(request: AuthenticatedHttpRequest, payload: VerifyPhoneOtpRequest) -> UserInfo:
     """
     Verify the OTP sent to the phone number.
 
     On success, updates the user's phone number in both local database and Stytch.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
-        raise HttpError(401, "Not authenticated")
+    user, member, org = get_auth_context(request)
 
-    user = request.auth_user  # type: ignore[attr-defined]
-    member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
-
-    # Extract session JWT from auth header (required by Stytch B2B OTP)
-    auth_header = request.headers.get("Authorization", "")
-    session_jwt = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
+    session_jwt = _extract_bearer_token(request)
 
     try:
         client = get_stytch_client()
@@ -634,7 +634,7 @@ def verify_phone_otp(request: HttpRequest, payload: VerifyPhoneOtpRequest) -> Us
     summary="Start email address update flow",
 )
 def start_email_update(
-    request: HttpRequest, payload: StartEmailUpdateRequest
+    request: AuthenticatedHttpRequest, payload: StartEmailUpdateRequest
 ) -> EmailUpdateResponse:
     """
     Initiate email address change.
@@ -642,12 +642,7 @@ def start_email_update(
     Sends a verification to the new email address. User must verify the new
     email to complete the change. The update is finalized via Stytch.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
-        raise HttpError(401, "Not authenticated")
-
-    user = request.auth_user  # type: ignore[attr-defined]
-    member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    user, member, org = get_auth_context(request)
 
     # Check if new email is the same as current
     if payload.new_email.lower() == user.email.lower():
@@ -681,16 +676,13 @@ def start_email_update(
     operation_id="getOrganization",
     summary="Get current organization details",
 )
-def get_organization(request: HttpRequest) -> OrganizationDetailResponse:
+def get_organization(request: AuthenticatedHttpRequest) -> OrganizationDetailResponse:
     """
     Get current organization details including billing info.
 
     All authenticated members can view.
     """
-    if not hasattr(request, "auth_organization") or request.auth_organization is None:  # type: ignore[attr-defined]
-        raise HttpError(401, "Not authenticated")
-
-    org = request.auth_organization  # type: ignore[attr-defined]
+    _, _, org = get_auth_context(request)
 
     return OrganizationDetailResponse(
         id=org.id,
@@ -724,14 +716,14 @@ def get_organization(request: HttpRequest) -> OrganizationDetailResponse:
 )
 @require_admin
 def update_organization(
-    request: HttpRequest, payload: UpdateOrganizationRequest
+    request: AuthenticatedHttpRequest, payload: UpdateOrganizationRequest
 ) -> OrganizationDetailResponse:
     """
     Update organization settings (name).
 
     Admin only. Updates local database and syncs to Stytch.
     """
-    org = request.auth_organization  # type: ignore[attr-defined]
+    _, _, org = get_auth_context(request)
 
     # Update local database
     update_fields = ["name", "updated_at"]
@@ -750,7 +742,8 @@ def update_organization(
         }
         if payload.slug is not None:
             stytch_update_kwargs["organization_slug"] = payload.slug
-        client.organizations.update(**stytch_update_kwargs)
+        # Stytch SDK has complex overloaded types; we only use simple string params
+        client.organizations.update(**stytch_update_kwargs)  # type: ignore[arg-type]
     except StytchError as e:
         logger.warning("Failed to sync org to Stytch: %s", e.details.error_message)
         # Don't fail the request - local update succeeded
@@ -763,7 +756,7 @@ def update_organization(
             "name": payload.name,
             "slug": payload.slug,
         },
-        actor=request.auth_user,  # type: ignore[attr-defined]
+        actor=request.auth.user,
     )
 
     return get_organization(request)
@@ -778,14 +771,14 @@ def update_organization(
 )
 @require_admin
 def update_billing(
-    request: HttpRequest, payload: UpdateBillingRequest
+    request: AuthenticatedHttpRequest, payload: UpdateBillingRequest
 ) -> OrganizationDetailResponse:
     """
     Update organization billing info (address, VAT, etc.).
 
     Admin only. This is our system's data - synced out to Stripe.
     """
-    org = request.auth_organization  # type: ignore[attr-defined]
+    _, _, org = get_auth_context(request)
 
     # Update billing fields
     org.use_billing_email = payload.use_billing_email
@@ -822,7 +815,7 @@ def update_billing(
             "vat_id": org.vat_id,
             "country": org.billing_country,
         },
-        actor=request.auth_user,  # type: ignore[attr-defined]
+        actor=request.auth.user,
     )
 
     return get_organization(request)
@@ -840,7 +833,7 @@ def update_billing(
 )
 @require_admin
 def list_members(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     offset: int = 0,
     limit: int | None = None,
 ) -> MemberListResponse:
@@ -853,7 +846,7 @@ def list_members(
         offset: Number of records to skip (default 0)
         limit: Maximum records to return (default None = all)
     """
-    org = request.auth_organization  # type: ignore[attr-defined]
+    _, _, org = get_auth_context(request)
     all_members = list_organization_members(org)
     total = len(all_members)
 
@@ -911,20 +904,18 @@ def list_members(
 )
 @require_admin
 def invite_member_endpoint(
-    request: HttpRequest, payload: InviteMemberRequest
+    request: AuthenticatedHttpRequest, payload: InviteMemberRequest
 ) -> InviteMemberResponse:
     """
     Invite a new member to the organization.
 
     Admin only. Stytch sends the invite email with Magic Link.
     """
-    member = request.auth_member  # type: ignore[attr-defined]
+    _, member, org = get_auth_context(request)
 
     # Prevent inviting yourself
     if payload.email.lower() == member.user.email.lower():
         raise HttpError(400, "Cannot invite yourself - you're already a member")
-
-    org = request.auth_organization  # type: ignore[attr-defined]
 
     try:
         new_member, invite_sent = invite_member(
@@ -977,7 +968,7 @@ def invite_member_endpoint(
 )
 @require_admin
 def bulk_invite_members_endpoint(
-    request: HttpRequest, payload: BulkInviteRequest
+    request: AuthenticatedHttpRequest, payload: BulkInviteRequest
 ) -> BulkInviteResponse:
     """
     Invite multiple members to the organization at once.
@@ -987,8 +978,7 @@ def bulk_invite_members_endpoint(
 
     Returns detailed results for each member attempted.
     """
-    member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    _, member, org = get_auth_context(request)
 
     current_user_email = member.user.email.lower()
 
@@ -1000,30 +990,34 @@ def bulk_invite_members_endpoint(
         normalized_email = item.email.strip().lower()
 
         if normalized_email == current_user_email:
-            skipped_results.append({
-                "email": item.email.strip(),
-                "success": False,
-                "error": "Cannot invite yourself",
-                "stytch_member_id": None,
-            })
+            skipped_results.append(
+                {
+                    "email": item.email.strip(),
+                    "success": False,
+                    "error": "Cannot invite yourself",
+                    "stytch_member_id": None,
+                }
+            )
             continue
 
-        members_data.append({
-            "email": item.email.strip(),  # Use stripped email
-            "name": item.name.strip() if item.name else "",
-            "phone": item.phone.strip() if item.phone else "",
-            "role": item.role,
-        })
+        members_data.append(
+            {
+                "email": item.email.strip(),  # Use stripped email
+                "name": item.name.strip() if item.name else "",
+                "phone": item.phone.strip() if item.phone else "",
+                "role": item.role,
+            }
+        )
 
     if not members_data:
         # All members were skipped (self-invites or existing members)
         return BulkInviteResponse(
             results=[
                 BulkInviteResultItem(
-                    email=r["email"],
-                    success=r["success"],
-                    error=r["error"],
-                    stytch_member_id=r["stytch_member_id"],
+                    email=str(r["email"]),
+                    success=bool(r["success"]),
+                    error=str(r["error"]) if r["error"] else None,
+                    stytch_member_id=str(r["stytch_member_id"]) if r["stytch_member_id"] else None,
                 )
                 for r in skipped_results
             ],
@@ -1054,10 +1048,10 @@ def bulk_invite_members_endpoint(
     return BulkInviteResponse(
         results=[
             BulkInviteResultItem(
-                email=r["email"],
-                success=r["success"],
-                error=r["error"],
-                stytch_member_id=r["stytch_member_id"],
+                email=str(r["email"]),
+                success=bool(r["success"]),
+                error=str(r["error"]) if r["error"] else None,
+                stytch_member_id=str(r["stytch_member_id"]) if r["stytch_member_id"] else None,
             )
             for r in all_results
         ],
@@ -1082,15 +1076,14 @@ def bulk_invite_members_endpoint(
 )
 @require_admin
 def update_member_role_endpoint(
-    request: HttpRequest, member_id: int, payload: UpdateMemberRoleRequest
+    request: AuthenticatedHttpRequest, member_id: int, payload: UpdateMemberRoleRequest
 ) -> MessageResponse:
     """
     Update a member's role (admin or member).
 
     Admin only. Cannot change your own role.
     """
-    current_member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    _, current_member, org = get_auth_context(request)
 
     # Find the target member
     try:
@@ -1142,15 +1135,14 @@ def update_member_role_endpoint(
     summary="Remove member from organization",
 )
 @require_admin
-def delete_member_endpoint(request: HttpRequest, member_id: int) -> MessageResponse:
+def delete_member_endpoint(request: AuthenticatedHttpRequest, member_id: int) -> MessageResponse:
     """
     Remove a member from the organization.
 
     Admin only. Cannot remove yourself. Soft deletes locally
     and removes from Stytch.
     """
-    current_member = request.auth_member  # type: ignore[attr-defined]
-    org = request.auth_organization  # type: ignore[attr-defined]
+    _, current_member, org = get_auth_context(request)
 
     # Find the target member
     try:
@@ -1196,7 +1188,7 @@ def delete_member_endpoint(request: HttpRequest, member_id: int) -> MessageRespo
     operation_id="searchDirectory",
     summary="Search Google Workspace directory for users",
 )
-def search_directory(request: HttpRequest, q: str = "") -> list[DirectoryUserSchema]:
+def search_directory(request: AuthenticatedHttpRequest, q: str = "") -> list[DirectoryUserSchema]:
     """
     Search Google Workspace directory for coworkers.
 
@@ -1204,14 +1196,10 @@ def search_directory(request: HttpRequest, q: str = "") -> list[DirectoryUserSch
     Only works if the user has signed in with Google OAuth and granted
     the Directory API scope. Returns empty list if not available.
     """
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
-        raise HttpError(401, "Not authenticated")
+    user, member, _ = get_auth_context(request)
 
     if not q or len(q) < 2:
         return []
-
-    user = request.auth_user  # type: ignore[attr-defined]
-    member = request.auth_member  # type: ignore[attr-defined]
 
     # Import here to avoid circular imports
     from apps.accounts.google_directory import search_directory_users
@@ -1235,7 +1223,7 @@ def search_directory(request: HttpRequest, q: str = "") -> list[DirectoryUserSch
     operation_id="getDirectoryAvatar",
     summary="Proxy Google Workspace avatar image",
 )
-def get_directory_avatar(request: HttpRequest, url: str = ""):
+def get_directory_avatar(request: AuthenticatedHttpRequest, url: str = ""):
     """
     Proxy a Google Workspace avatar image.
 
@@ -1249,8 +1237,7 @@ def get_directory_avatar(request: HttpRequest, url: str = ""):
 
     from apps.core.url_validation import SSRFError, validate_avatar_url
 
-    if not hasattr(request, "auth_user") or request.auth_user is None:  # type: ignore[attr-defined]
-        raise HttpError(401, "Not authenticated")
+    user, _, _ = get_auth_context(request)
 
     # Validate URL against SSRF attacks
     try:
@@ -1263,9 +1250,7 @@ def get_directory_avatar(request: HttpRequest, url: str = ""):
     from apps.accounts.google_directory import get_google_access_token
     from apps.accounts.models import Member
 
-    user = request.auth_user  # type: ignore[attr-defined]
-
-    # Get member to find Stytch IDs
+    # Get member to find Stytch IDs (query all memberships, not just current)
     member = (
         Member.objects.filter(user=user, deleted_at__isnull=True)
         .select_related("organization")

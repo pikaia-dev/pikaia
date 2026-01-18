@@ -9,10 +9,16 @@ from functools import lru_cache
 from typing import Any
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+# Timeout configuration for AWS API calls
+# Boto3 default is 60s which can be too long for web requests
+AWS_CONNECT_TIMEOUT = 5  # seconds to establish connection
+AWS_READ_TIMEOUT = 30  # seconds to wait for response
 
 
 class SMSError(Exception):
@@ -30,9 +36,15 @@ def get_sms_client() -> Any:
     Credentials are loaded from environment (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
     or IAM role when running on AWS.
     """
+    config = Config(
+        connect_timeout=AWS_CONNECT_TIMEOUT,
+        read_timeout=AWS_READ_TIMEOUT,
+        retries={"max_attempts": 2},
+    )
     return boto3.client(
         "pinpoint-sms-voice-v2",
         region_name=settings.AWS_SMS_REGION,
+        config=config,
     )
 
 
@@ -86,7 +98,9 @@ def send_sms(phone_number: str, message: str) -> dict[str, Any]:
         raise SMSError(f"SMS service error: {str(e)}") from e
 
 
-def send_otp_message(phone_number: str, otp_code: str, app_name: str = "Snowball") -> dict[str, Any]:
+def send_otp_message(
+    phone_number: str, otp_code: str, app_name: str = "Snowball"
+) -> dict[str, Any]:
     """
     Send an OTP verification message.
 

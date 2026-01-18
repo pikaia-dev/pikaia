@@ -218,7 +218,7 @@ def get_changes_since(workspace_id: str, cursor: str, limit: int = 100):
     Fetch changes since cursor with snapshot consistency.
     """
     cursor_ts, cursor_id = parse_cursor(cursor)
-    
+
     # Use server-assigned updated_at, not client timestamp
     # Composite index: (workspace, updated_at, id) ensures monotonic ordering
     changes = (
@@ -231,7 +231,7 @@ def get_changes_since(workspace_id: str, cursor: str, limit: int = 100):
         .order_by("updated_at", "id")
         [:limit]
     )
-    
+
     return changes
 ```
 
@@ -268,22 +268,22 @@ class SyncOperation(models.Model):
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     idempotency_key = models.CharField(max_length=100, unique=True)
-    
+
     workspace = models.ForeignKey(Organization, on_delete=models.CASCADE)
     actor = models.ForeignKey(Member, on_delete=models.CASCADE)
-    
+
     entity_type = models.CharField(max_length=50)
     entity_id = models.CharField(max_length=100)
     intent = models.CharField(max_length=20)  # create, update, delete
-    
+
     payload = models.JSONField()
     client_timestamp = models.DateTimeField()
     server_timestamp = models.DateTimeField(auto_now_add=True)
-    
+
     status = models.CharField(max_length=20)  # applied, rejected, duplicate
     error_code = models.CharField(max_length=50, blank=True)
     error_message = models.TextField(blank=True)
-    
+
     class Meta:
         indexes = [
             models.Index(fields=["workspace", "server_timestamp"]),
@@ -305,19 +305,19 @@ class SyncableModel(models.Model):
         primary_key=True,
         default=generate_prefixed_uuid  # e.g., "te_01HN..."
     )
-    
+
     workspace = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     deleted_at = models.DateTimeField(null=True, blank=True)  # Soft delete
-    
+
     class Meta:
         abstract = True
         indexes = [
             models.Index(fields=["workspace", "updated_at"]),
         ]
-    
+
     @property
     def is_deleted(self):
         return self.deleted_at is not None
@@ -360,18 +360,18 @@ def normalize_to_utc(dt: datetime) -> datetime:
 
 def apply_operation(op: SyncOperation, entity: SyncableModel):
     """Apply operation using LWW based on server timestamp."""
-    
+
     # Normalize timestamps to UTC for safe comparison
     entity_ts = normalize_to_utc(entity.updated_at)
     op_ts = normalize_to_utc(op.server_timestamp)
-    
+
     if entity_ts > op_ts:
         # Server already has newer data
         return "skipped"
-    
+
     for field, value in op.payload.items():
         setattr(entity, field, value)
-    
+
     entity.updated_at = op.server_timestamp
     entity.save()
     return "applied"
@@ -385,7 +385,7 @@ For text-heavy entities like notes:
 def merge_fields(existing: dict, incoming: dict, base: dict) -> dict:
     """
     Three-way merge at field level.
-    
+
     - If only one side changed, take that change
     - If both changed to same value, no conflict
     - If both changed to different values, incoming wins (LWW fallback)
@@ -395,7 +395,7 @@ def merge_fields(existing: dict, incoming: dict, base: dict) -> dict:
         existing_val = existing.get(field)
         incoming_val = incoming.get(field)
         base_val = base.get(field)
-        
+
         if existing_val == incoming_val:
             result[field] = existing_val
         elif existing_val == base_val:
@@ -407,7 +407,7 @@ def merge_fields(existing: dict, incoming: dict, base: dict) -> dict:
         else:
             # Both changed → LWW fallback
             result[field] = incoming_val
-    
+
     return result
 ```
 
@@ -470,25 +470,25 @@ function generateId(entityType: string): string {
 class SyncScheduler {
   private pendingQueue: Operation[] = [];
   private lastCursor: string | null = null;
-  
+
   async sync() {
     // 1. Push pending operations
     if (this.pendingQueue.length > 0) {
       const results = await api.push(this.pendingQueue);
       this.handlePushResults(results);
     }
-    
+
     // 2. Pull server changes
     const { changes, cursor, hasMore } = await api.pull(this.lastCursor);
     this.applyServerChanges(changes);
     this.lastCursor = cursor;
-    
+
     // 3. Continue if more data
     if (hasMore) {
       await this.sync();
     }
   }
-  
+
   private handlePushResults(results: OperationResult[]) {
     for (const result of results) {
       if (result.status === 'applied' || result.status === 'duplicate') {
@@ -533,11 +533,11 @@ CREATE INDEX idx_ops_status ON sync_operations(status, next_retry_at);
 ```typescript
 class PersistentOperationQueue {
   private db: SQLiteDatabase;
-  
+
   async enqueue(operation: Operation): Promise<void> {
     // Persist BEFORE returning to caller
     await this.db.run(`
-      INSERT INTO sync_operations 
+      INSERT INTO sync_operations
       (idempotency_key, entity_type, entity_id, intent, payload, created_at)
       VALUES (?, ?, ?, ?, ?, ?)
     `, [
@@ -549,17 +549,17 @@ class PersistentOperationQueue {
       new Date().toISOString(),
     ]);
   }
-  
+
   async getPending(): Promise<Operation[]> {
     return this.db.query(`
-      SELECT * FROM sync_operations 
-      WHERE status = 'pending' 
+      SELECT * FROM sync_operations
+      WHERE status = 'pending'
          OR (status = 'failed' AND next_retry_at <= datetime('now'))
       ORDER BY created_at
       LIMIT 100
     `);
   }
-  
+
   async markSynced(idempotencyKey: string): Promise<void> {
     await this.db.run(`
       DELETE FROM sync_operations WHERE idempotency_key = ?
@@ -575,7 +575,7 @@ class SyncRetryPolicy {
   private readonly MAX_ATTEMPTS = 10;
   private readonly BASE_DELAY_MS = 1000;
   private readonly MAX_DELAY_MS = 300000; // 5 minutes
-  
+
   calculateNextRetry(attempts: number): Date {
     // Exponential backoff with jitter
     const delay = Math.min(
@@ -583,15 +583,15 @@ class SyncRetryPolicy {
       this.MAX_DELAY_MS
     );
     const jitter = delay * 0.2 * Math.random();
-    
+
     return new Date(Date.now() + delay + jitter);
   }
-  
+
   shouldRetry(operation: Operation, error: SyncError): boolean {
     if (operation.attempts >= this.MAX_ATTEMPTS) {
       return false; // Move to failed permanently
     }
-    
+
     // Retry on network/server errors, not validation errors
     return error.isRetryable();
   }
@@ -603,17 +603,17 @@ class SyncError {
     public readonly message: string,
     public readonly statusCode?: number
   ) {}
-  
+
   isRetryable(): boolean {
     // Network errors
     if (!this.statusCode) return true;
-    
+
     // Server errors (5xx) are retryable
     if (this.statusCode >= 500) return true;
-    
+
     // Rate limiting
     if (this.statusCode === 429) return true;
-    
+
     // Client errors (4xx except 429) are NOT retryable
     return false;
   }
@@ -640,7 +640,7 @@ async function handlePushResults(results: PushResult[]): Promise<void> {
         // Success - remove from queue
         await queue.markSynced(result.idempotency_key);
         break;
-        
+
       case 'rejected':
         if (isRetryableError(result.error_code)) {
           // Transient error - schedule retry
@@ -658,7 +658,7 @@ async function handlePushResults(results: PushResult[]): Promise<void> {
 function isRetryableError(code: string | undefined): boolean {
   const permanentErrors = [
     'PROJECT_ARCHIVED',
-    'ENTITY_NOT_FOUND', 
+    'ENTITY_NOT_FOUND',
     'PERMISSION_DENIED',
     'VALIDATION_ERROR',
   ];
@@ -674,27 +674,27 @@ import NetInfo from '@react-native-community/netinfo';
 class NetworkAwareSyncScheduler {
   private isOnline = true;
   private syncInProgress = false;
-  
+
   constructor() {
     // Listen for connectivity changes
     NetInfo.addEventListener(state => {
       const wasOffline = !this.isOnline;
       this.isOnline = state.isConnected && state.isInternetReachable;
-      
+
       // Trigger sync when coming back online
       if (wasOffline && this.isOnline) {
         this.scheduleSync(0); // Immediate sync
       }
     });
   }
-  
+
   async scheduleSync(delayMs: number = 30000): Promise<void> {
     if (!this.isOnline || this.syncInProgress) return;
-    
+
     await delay(delayMs);
-    
+
     if (!this.isOnline) return; // Re-check after delay
-    
+
     this.syncInProgress = true;
     try {
       await this.sync();
@@ -702,12 +702,12 @@ class NetworkAwareSyncScheduler {
       this.syncInProgress = false;
     }
   }
-  
+
   private async sync(): Promise<void> {
     try {
       await this.pushPendingOperations();
       await this.pullServerChanges();
-      
+
       // Schedule next sync
       this.scheduleSync(30000);
     } catch (error) {
@@ -727,15 +727,15 @@ class NetworkAwareSyncScheduler {
 ```typescript
 class SyncCursorManager {
   private readonly CURSOR_KEY = 'sync_cursor';
-  
+
   async getCursor(): Promise<string | null> {
     return AsyncStorage.getItem(this.CURSOR_KEY);
   }
-  
+
   async setCursor(cursor: string): Promise<void> {
     await AsyncStorage.setItem(this.CURSOR_KEY, cursor);
   }
-  
+
   async resetCursor(): Promise<void> {
     // Full re-sync from beginning
     await AsyncStorage.removeItem(this.CURSOR_KEY);
@@ -744,20 +744,20 @@ class SyncCursorManager {
 
 async function pullWithRecovery(): Promise<void> {
   const cursor = await cursorManager.getCursor();
-  
+
   try {
     const { changes, cursor: newCursor, hasMore } = await api.pull(cursor);
-    
+
     // Apply changes in transaction
     await db.transaction(async () => {
       for (const change of changes) {
         await applyChange(change);
       }
     });
-    
+
     // Only update cursor after successful apply
     await cursorManager.setCursor(newCursor);
-    
+
   } catch (error) {
     if (error instanceof CursorInvalidError) {
       // Server says cursor is stale/invalid - full re-sync
@@ -825,10 +825,10 @@ class Meta:
     indexes = [
         # Pull query: changes since cursor
         models.Index(fields=["workspace", "updated_at"]),
-        
+
         # Idempotency check
         models.Index(fields=["idempotency_key"]),
-        
+
         # Soft delete cleanup
         models.Index(fields=["deleted_at"]),
     ]
@@ -876,7 +876,7 @@ Clients should batch operations in push requests:
 class SyncScheduler {
   private readonly BATCH_SIZE = 50;
   private readonly BATCH_DELAY_MS = 100;
-  
+
   async pushWithBatching(operations: Operation[]) {
     // Batch operations to reduce round-trips
     for (let i = 0; i < operations.length; i += this.BATCH_SIZE) {
@@ -925,10 +925,10 @@ def notify_client_to_sync(event, context):
     Send silent push notification to trigger client sync.
     """
     workspace_id = event["detail"]["workspace_id"]
-    
+
     # Get device tokens for workspace members
     tokens = get_device_tokens_for_workspace(workspace_id)
-    
+
     for token in tokens:
         sns.publish(
             TargetArn=token.sns_endpoint_arn,

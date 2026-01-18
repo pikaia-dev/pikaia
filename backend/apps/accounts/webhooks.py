@@ -208,13 +208,23 @@ def handle_organization_updated(data: dict) -> None:
 
     new_name = org_data.get("organization_name")
     if new_name and org.name != new_name:
-        logger.info("stytch_webhook_org_name_updated", stytch_org_id=stytch_org_id, old_name=org.name, new_name=new_name)
+        logger.info(
+            "stytch_webhook_org_name_updated",
+            stytch_org_id=stytch_org_id,
+            old_name=org.name,
+            new_name=new_name,
+        )
         org.name = new_name
         updated = True
 
     new_slug = org_data.get("organization_slug")
     if new_slug and org.slug != new_slug:
-        logger.info("stytch_webhook_org_slug_updated", stytch_org_id=stytch_org_id, old_slug=org.slug, new_slug=new_slug)
+        logger.info(
+            "stytch_webhook_org_slug_updated",
+            stytch_org_id=stytch_org_id,
+            old_slug=org.slug,
+            new_slug=new_slug,
+        )
         org.slug = new_slug
         updated = True
 

@@ -4,15 +4,20 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('events', '0001_initial'),
+        ("events", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='auditlog',
-            name='event_id',
-            field=models.UUIDField(blank=True, db_index=True, help_text='Source OutboxEvent ID for idempotency', null=True, unique=True),
+            model_name="auditlog",
+            name="event_id",
+            field=models.UUIDField(
+                blank=True,
+                db_index=True,
+                help_text="Source OutboxEvent ID for idempotency",
+                null=True,
+                unique=True,
+            ),
         ),
     ]

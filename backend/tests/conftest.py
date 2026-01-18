@@ -25,6 +25,8 @@ Example usage:
 import pytest
 from django.test import Client, RequestFactory
 
+from apps.core.auth import AuthContext
+
 
 @pytest.fixture
 def request_factory() -> RequestFactory:
@@ -36,10 +38,9 @@ def request_factory() -> RequestFactory:
 
     Example:
         def test_endpoint(request_factory):
+            from apps.core.auth import AuthContext
             request = request_factory.get("/api/v1/endpoint")
-            request.auth_user = UserFactory()
-            request.auth_member = MemberFactory()
-            request.auth_organization = member.organization
+            request.auth = AuthContext(user=user, member=member, organization=org)
             result = my_endpoint(request)
     """
     return RequestFactory()
@@ -96,12 +97,54 @@ def authenticated_request(request_factory):
             kwargs["content_type"] = content_type
 
         request = method_func(path, **kwargs)
-        request.auth_user = member.user
-        request.auth_member = member
-        request.auth_organization = member.organization
+        request.auth = AuthContext(
+            user=member.user,
+            member=member,
+            organization=member.organization,
+        )
         return request
 
     return _make_request
+
+
+def create_authenticated_request(
+    request_factory: RequestFactory,
+    method: str,
+    path: str,
+    org=None,
+    role: str = "admin",
+):
+    """
+    Helper to create an authenticated request with member/org attached.
+
+    Creates organization, user, and member if not provided.
+    Sets request.auth with AuthContext and legacy attributes (user, organization).
+
+    Args:
+        request_factory: Django RequestFactory instance
+        method: HTTP method (get, post, delete, patch, put)
+        path: Request path
+        org: Optional Organization instance (created if None)
+        role: Member role (default: "admin")
+
+    Returns:
+        Request object with auth attributes set
+    """
+    from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
+
+    if org is None:
+        org = OrganizationFactory()
+    user = UserFactory()
+    member = MemberFactory(user=user, organization=org, role=role)
+
+    method_func = getattr(request_factory, method.lower())
+    request = method_func(path)
+
+    request.auth = AuthContext(user=user, member=member, organization=org)
+    # Legacy attributes for backward compatibility
+    request.organization = org
+    request.user = user
+    return request
 
 
 @pytest.fixture
