@@ -149,8 +149,8 @@ askAccessPaths:
   - '.claude/'
   - '~/.ssh/'
   - '.env'
+  # .env.* includes .env.example, .env.local, etc.
   - '.env.*'
-  - '!.env.example'  # .env.example also requires ask
   - 'cdk.context.json'
 
 # Paths that are read-only (no writes)
