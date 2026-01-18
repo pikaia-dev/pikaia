@@ -71,7 +71,8 @@ bashToolPatterns:
     description: "Direct disk write"
     action: block
 
-  - pattern: '>\s*/dev/sd[a-z]'
+  # Covers: SATA/SCSI (sda), NVMe (nvme0n1), VirtIO (vda), Xen (xvda), eMMC (mmcblk0)
+  - pattern: '>\s*/dev/(sd[a-z]|nvme[0-9]+n[0-9]+|vd[a-z]|xvd[a-z]|mmcblk[0-9]+)'
     description: "Redirect to block device"
     action: block
 
