@@ -2,7 +2,6 @@ packages:
   - frontend
   - emails
   - infra
-  - infra/functions/*
   - backend
 
 onlyBuiltDependencies:
