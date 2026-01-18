@@ -23,7 +23,7 @@ from ninja import Router
 from ninja.errors import HttpError
 
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth
+from apps.core.security import BearerAuth, require_admin
 
 from .events import WEBHOOK_EVENTS, get_event_type
 from .models import WebhookEndpoint
@@ -78,6 +78,7 @@ def _detect_source(target_url: str) -> str:
     operation_id="subscribeHook",
     summary="Subscribe to webhook events",
 )
+@require_admin
 def subscribe(
     request: HttpRequest,
     payload: RestHookSubscribeRequest,
@@ -136,6 +137,7 @@ def subscribe(
     operation_id="listHooks",
     summary="List webhook subscriptions",
 )
+@require_admin
 def list_subscriptions(request: HttpRequest) -> RestHookListResponse:
     """
     List all REST Hook subscriptions for the organization.
@@ -168,6 +170,7 @@ def list_subscriptions(request: HttpRequest) -> RestHookListResponse:
     operation_id="unsubscribeHook",
     summary="Unsubscribe from webhook events",
 )
+@require_admin
 def unsubscribe(
     request: HttpRequest,
     subscription_id: str,
@@ -208,6 +211,7 @@ def unsubscribe(
     operation_id="getEventSample",
     summary="Get sample payload for event type",
 )
+@require_admin
 def get_sample(
     request: HttpRequest,
     event_type: str,
@@ -255,6 +259,7 @@ def get_sample(
     operation_id="testAuth",
     summary="Test authentication",
 )
+@require_admin
 def verify_auth(request: HttpRequest) -> AuthTestResponse:
     """
     Test that authentication is working.
