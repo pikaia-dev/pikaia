@@ -81,8 +81,14 @@ jobs:
         run: uv run mypy apps/
         continue-on-error: true  # TODO: Remove after fixing type errors
 
-      - name: Run tests
+      - name: Run backend tests
         run: uv run pytest --tb=short
+
+      - name: Run infra Lambda tests
+        working-directory: infra
+        run: |
+          uv sync --extra dev
+          uv run pytest functions/ --tb=short
 
       - name: Audit dependencies
         run: uv export --no-hashes | uvx pip-audit -r /dev/stdin
