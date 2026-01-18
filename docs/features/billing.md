@@ -22,11 +22,11 @@ sequenceDiagram
     Backend->>Stripe: Create incomplete subscription
     Stripe-->>Backend: client_secret + subscription_id
     Backend-->>Frontend: Payment form data
-    
+
     Frontend->>User: Show payment form
     User->>Frontend: Enter card details
     Frontend->>Stripe: Confirm payment
-    
+
     alt Payment Successful
         Stripe-->>Frontend: Success
         Frontend->>Backend: Confirm subscription
@@ -52,7 +52,7 @@ stateDiagram-v2
     PastDue --> Canceled: Max retries
     Active --> Canceled: User cancels
     Canceled --> [*]
-    
+
     note right of Active: Usable subscription
     note right of PastDue: Grace period
 ```

@@ -4,6 +4,7 @@ Webhook models for customer-facing webhook delivery.
 
 import secrets
 import uuid
+from datetime import timedelta
 from typing import ClassVar
 
 from django.contrib.postgres.fields import ArrayField
@@ -375,7 +376,7 @@ class WebhookDelivery(models.Model):
             self.attempt_number += 1
             delay_index = min(self.attempt_number - 1, len(self.RETRY_DELAYS_SECONDS) - 1)
             delay_seconds = self.RETRY_DELAYS_SECONDS[delay_index]
-            self.next_retry_at = timezone.now() + timezone.timedelta(seconds=delay_seconds)
+            self.next_retry_at = timezone.now() + timedelta(seconds=delay_seconds)
             self.status = self.Status.PENDING
         else:
             self.status = self.Status.FAILURE

@@ -14,16 +14,15 @@ Endpoints:
 """
 
 import logging
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from urllib.parse import urlparse
 
-from django.http import HttpRequest
 from ninja import Router
 from ninja.errors import HttpError
 
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth, require_admin
+from apps.core.security import BearerAuth, get_auth_context, require_admin
+from apps.core.types import AuthenticatedHttpRequest
 
 from .events import WEBHOOK_EVENTS, get_event_type
 from .models import WebhookEndpoint
@@ -33,19 +32,10 @@ from .schemas import (
     RestHookListResponse,
     RestHookSubscribeRequest,
     RestHookSubscribeResponse,
+    WebhookEndpointCreate,
     WebhookPayload,
 )
 from .services import WebhookService
-
-
-@dataclass
-class RestHookEndpointData:
-    """Data for creating a REST Hook endpoint."""
-
-    name: str
-    description: str
-    url: str
-    events: list[str]
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +43,7 @@ router = Router(tags=["hooks"])
 bearer_auth = BearerAuth()
 
 
-def _detect_source(target_url: str) -> str:
+def _detect_source(target_url: str) -> WebhookEndpoint.Source:
     """Detect the source based on the target URL domain."""
     parsed = urlparse(target_url)
     domain = parsed.netloc.lower()
@@ -80,7 +70,7 @@ def _detect_source(target_url: str) -> str:
 )
 @require_admin
 def subscribe(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     payload: RestHookSubscribeRequest,
 ) -> tuple[int, RestHookSubscribeResponse]:
     """
@@ -94,7 +84,8 @@ def subscribe(
         201: Subscription created with ID for unsubscribe
         400: Invalid event type or URL
     """
-    service = WebhookService(request.auth_organization)
+    _, member, org = get_auth_context(request)
+    service = WebhookService(org)
     source = _detect_source(payload.target_url)
 
     # Create endpoint with auto-generated name based on source
@@ -103,7 +94,7 @@ def subscribe(
     event_description = event_def.description if event_def else payload.event_type
     name = f"{source.label} - {event_description}"
 
-    endpoint_data = RestHookEndpointData(
+    endpoint_data = WebhookEndpointCreate(
         name=name[:100],  # Truncate to max length
         description=f"Auto-created by {source.label}",
         url=payload.target_url,
@@ -112,7 +103,7 @@ def subscribe(
 
     endpoint = service.create_endpoint(
         data=endpoint_data,
-        created_by_id=request.auth_member.user_id if request.auth_member else None,
+        created_by_id=member.user_id,
         source=source,
     )
 
@@ -140,14 +131,15 @@ def subscribe(
     summary="List webhook subscriptions",
 )
 @require_admin
-def list_subscriptions(request: HttpRequest) -> RestHookListResponse:
+def list_subscriptions(request: AuthenticatedHttpRequest) -> RestHookListResponse:
     """
     List all REST Hook subscriptions for the organization.
 
     Returns subscriptions created via REST Hooks (Zapier, Make, etc.),
     not manually created webhook endpoints.
     """
-    service = WebhookService(request.auth_organization)
+    _, _, org = get_auth_context(request)
+    service = WebhookService(org)
     endpoints = service.list_endpoints()
 
     subscriptions = [
@@ -174,7 +166,7 @@ def list_subscriptions(request: HttpRequest) -> RestHookListResponse:
 )
 @require_admin
 def unsubscribe(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     subscription_id: str,
 ) -> tuple[int, None]:
     """
@@ -187,7 +179,8 @@ def unsubscribe(
         204: Subscription deleted
         404: Subscription not found
     """
-    service = WebhookService(request.auth_organization)
+    _, _, org = get_auth_context(request)
+    service = WebhookService(org)
     deleted = service.delete_endpoint(subscription_id)
 
     if not deleted:
@@ -215,7 +208,7 @@ def unsubscribe(
 )
 @require_admin
 def get_sample(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     event_type: str,
 ) -> EventSampleResponse:
     """
@@ -228,6 +221,7 @@ def get_sample(
         200: Sample payload
         404: Unknown event type
     """
+    _, _, org = get_auth_context(request)
     event = WEBHOOK_EVENTS.get(event_type)
     if not event:
         raise HttpError(404, f"Unknown event type: {event_type}")
@@ -238,7 +232,7 @@ def get_sample(
         spec_version="1.0",
         type=event.type,
         timestamp=datetime.now(UTC),
-        organization_id=str(request.auth_organization.id),
+        organization_id=str(org.id),
         data=event.payload_example,
     )
 
@@ -262,7 +256,7 @@ def get_sample(
     summary="Test authentication",
 )
 @require_admin
-def verify_auth(request: HttpRequest) -> AuthTestResponse:
+def verify_auth(request: AuthenticatedHttpRequest) -> AuthTestResponse:
     """
     Test that authentication is working.
 
@@ -272,8 +266,9 @@ def verify_auth(request: HttpRequest) -> AuthTestResponse:
     Returns:
         200: Authentication successful with organization info
     """
+    _, _, org = get_auth_context(request)
     return AuthTestResponse(
         ok=True,
-        organization_id=str(request.auth_organization.id),
-        organization_name=request.auth_organization.name,
+        organization_id=str(org.id),
+        organization_name=org.name,
     )

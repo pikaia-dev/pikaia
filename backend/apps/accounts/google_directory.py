@@ -6,8 +6,12 @@ Stytch automatically refreshes tokens when calling their API.
 """
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import httpx
+
+if TYPE_CHECKING:
+    from apps.accounts.models import Member, User
 from stytch.core.response_base import StytchError
 
 from apps.accounts.stytch_client import get_stytch_client
@@ -51,17 +55,18 @@ def get_google_access_token(organization_id: str, member_id: str) -> str | None:
         return response.access_token
     except StytchError as e:
         # No Google OAuth tokens for this member
+        error_message = e.details.error_message if e.details else str(e)
         logger.debug(
             "google_oauth_token_not_found",
             member_id=member_id,
-            error=e.details.error_message if e.details else str(e),
+            error=error_message,
         )
         return None
 
 
 def search_directory_users(
-    user: "User",  # noqa: F821 - forward reference
-    member: "Member",  # noqa: F821 - forward reference
+    user: "User",
+    member: "Member",
     query: str,
     limit: int = 10,
 ) -> list[DirectoryUser]:

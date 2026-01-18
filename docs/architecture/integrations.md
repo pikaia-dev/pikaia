@@ -92,22 +92,22 @@ def handle_integration_event(event: dict, context):
     for record in event["Records"]:
         message = json.loads(record["body"])
         event_data = json.loads(message["detail"])
-        
+
         workspace_id = event_data["workspace_id"]
         event_type = event_data["event_type"]
-        
+
         # Find matching subscriptions
         subscriptions = IntegrationSubscription.objects.filter(
             workspace_id=workspace_id,
             event_types__contains=[event_type],
             is_active=True,
         )
-        
+
         for sub in subscriptions:
             # Apply subscription-specific filters
             if not sub.matches_filters(event_data):
                 continue
-            
+
             # Deliver webhook
             deliver_webhook.delay(
                 subscription_id=sub.id,
@@ -219,7 +219,7 @@ def verify_webhook(payload: str, signature: str, secret: str, timestamp: int) ->
     now = int(time.time())
     if abs(now - timestamp) > 300:
         return False  # Replay attack prevention
-    
+
     expected = sign_webhook(payload, secret, timestamp)
     return hmac.compare_digest(signature, expected)
 ```
@@ -255,24 +255,24 @@ class IntegrationEndpoint(models.Model):
     """
     id = models.CharField(max_length=50, primary_key=True)  # "ep_01HN..."
     workspace = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    
+
     name = models.CharField(max_length=100)  # "Slack Notifications"
     url = models.URLField()
-    
+
     # Security
     signing_secret = models.CharField(max_length=64)
     signing_secret_rotated = models.CharField(max_length=64, blank=True)  # During rotation
-    
+
     # Status
     is_active = models.BooleanField(default=True)
     disabled_at = models.DateTimeField(null=True)
     disabled_reason = models.CharField(max_length=100, blank=True)
-    
+
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True)
-    
+
     class Meta:
         indexes = [
             models.Index(fields=["workspace", "is_active"]),
@@ -288,23 +288,23 @@ class IntegrationSubscription(models.Model):
     """
     id = models.CharField(max_length=50, primary_key=True)  # "sub_01HN..."
     endpoint = models.ForeignKey(IntegrationEndpoint, on_delete=models.CASCADE)
-    
+
     # Event matching
     event_types = models.JSONField()  # ["public.time_entry.created", "public.time_entry.approved"]
-    
+
     # Optional filters (applied in router)
     filters = models.JSONField(default=dict)  # {"project_id": "prj_01HN..."}
-    
+
     is_active = models.BooleanField(default=True)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         indexes = [
             models.Index(fields=["endpoint", "is_active"]),
         ]
-    
+
     def matches_filters(self, event_data: dict) -> bool:
         """Check if event matches subscription filters."""
         for key, value in self.filters.items():
@@ -322,25 +322,25 @@ class IntegrationDelivery(models.Model):
     """
     id = models.CharField(max_length=50, primary_key=True)  # "del_01HN..."
     subscription = models.ForeignKey(IntegrationSubscription, on_delete=models.CASCADE)
-    
+
     # Event reference
     event_id = models.UUIDField()
     event_type = models.CharField(max_length=100)
-    
+
     # Delivery status
     status = models.CharField(max_length=20)  # pending, success, failed, dlq
     attempts = models.PositiveIntegerField(default=0)
-    
+
     # Response details
     response_status = models.PositiveIntegerField(null=True)
     response_body = models.TextField(blank=True)  # First 1KB for debugging
     response_time_ms = models.PositiveIntegerField(null=True)
-    
+
     # Timing
     created_at = models.DateTimeField(auto_now_add=True)
     delivered_at = models.DateTimeField(null=True)
     next_retry_at = models.DateTimeField(null=True)
-    
+
     class Meta:
         indexes = [
             models.Index(fields=["subscription", "created_at"]),
@@ -391,14 +391,14 @@ Already implemented in `apps/billing/`:
 def stripe_webhook(request):
     payload = request.body
     sig_header = request.headers.get("Stripe-Signature")
-    
+
     try:
         event = stripe.Webhook.construct_event(
             payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
         )
     except stripe.error.SignatureVerificationError:
         return HttpResponse(status=400)
-    
+
     # Handle event
     handle_stripe_event(event)
     return HttpResponse(status=200)
@@ -485,10 +485,10 @@ class TenantRateLimiter:
     Token bucket rate limiter per workspace.
     Uses DynamoDB for distributed state.
     """
-    
+
     def __init__(self, table_name: str = "rate-limits"):
         self.table = boto3.resource("dynamodb").Table(table_name)
-    
+
     def check_and_consume(self, workspace_id: str, tokens: int = 1) -> bool:
         """
         Check rate limit and consume tokens.
@@ -496,7 +496,7 @@ class TenantRateLimiter:
         """
         now = int(time.time())
         bucket_key = f"webhook:{workspace_id}:{now // 60}"  # Per-minute bucket
-        
+
         try:
             response = self.table.update_item(
                 Key={"pk": bucket_key},
@@ -522,7 +522,7 @@ MAX_IN_FLIGHT_PER_ENDPOINT = 10
 
 async def deliver_with_concurrency_limit(endpoint_id: str, event: dict):
     semaphore = get_endpoint_semaphore(endpoint_id, MAX_IN_FLIGHT_PER_ENDPOINT)
-    
+
     async with semaphore:
         await deliver_webhook(endpoint_id, event)
 ```
@@ -550,27 +550,27 @@ class EndpointCircuitBreaker:
     """
     FAILURE_THRESHOLD = 5  # consecutive failures
     COOLDOWN_SECONDS = 300  # 5 minutes
-    
+
     def record_failure(self, endpoint: IntegrationEndpoint):
         endpoint.consecutive_failures += 1
-        
+
         if endpoint.consecutive_failures >= self.FAILURE_THRESHOLD:
             endpoint.is_active = False
             endpoint.disabled_at = timezone.now()
             endpoint.disabled_reason = "circuit_breaker: consecutive failures"
             logger.warning(f"Circuit opened for endpoint {endpoint.id}")
-        
+
         endpoint.save()
-    
+
     def record_success(self, endpoint: IntegrationEndpoint):
         endpoint.consecutive_failures = 0
         endpoint.save()
-    
+
     def maybe_retry(self, endpoint: IntegrationEndpoint) -> bool:
         """Check if disabled endpoint should be retried (half-open)."""
         if not endpoint.disabled_at:
             return True
-        
+
         cooldown_expired = timezone.now() > endpoint.disabled_at + timedelta(
             seconds=self.COOLDOWN_SECONDS
         )
@@ -621,17 +621,17 @@ def create_signing_secret(endpoint_id: str) -> str:
 def rotate_signing_secret(event, context):
     """Rotate signing secrets with dual-secret verification window."""
     endpoint_id = event["endpoint_id"]
-    
+
     # 1. Generate new secret
     new_secret = secrets.token_urlsafe(32)
-    
+
     # 2. Update Secrets Manager with staged secret
     secrets_client.put_secret_value(
         SecretId=f"webhook/{endpoint_id}/signing-secret",
         SecretString=new_secret,
         VersionStages=["AWSPENDING"],
     )
-    
+
     # 3. During transition period, accept signatures from both secrets
     # (Already supported via signing_secret_rotated field)
 ```
@@ -650,31 +650,31 @@ def replay_from_dlq(event, context):
     """
     filters = event.get("filters", {})
     rate_limit = event.get("rate_limit", 10)  # per second
-    
+
     dlq = sqs.Queue(DELIVERY_DLQ_URL)
     replayed = 0
-    
+
     for message in dlq.receive_messages(MaxNumberOfMessages=10):
         delivery = json.loads(message.body)
-        
+
         # Apply filters
         if filters.get("workspace_id") and delivery["workspace_id"] != filters["workspace_id"]:
             continue
         if filters.get("event_type") and delivery["event_type"] != filters["event_type"]:
             continue
-        
+
         # Re-queue for delivery
         deliver_webhook.delay(
             subscription_id=delivery["subscription_id"],
             event_data=delivery["event_data"],
         )
-        
+
         message.delete()
         replayed += 1
-        
+
         # Rate limiting
         time.sleep(1 / rate_limit)
-    
+
     return {"replayed": replayed}
 ```
 
@@ -708,7 +708,7 @@ def emit_delivery_metrics(delivery: IntegrationDelivery, duration_ms: int):
         {"Name": "WorkspaceId", "Value": delivery.subscription.endpoint.workspace_id},
         {"Name": "Status", "Value": "success" if delivery.status == "success" else "failure"},
     ]
-    
+
     cloudwatch.put_metric_data(
         Namespace="Integrations",
         MetricData=[

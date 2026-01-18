@@ -44,6 +44,7 @@ class Subscription(models.Model):
         max_length=50,
         choices=Status.choices,
         default=Status.INCOMPLETE,
+        db_index=True,
         help_text="Subscription status from Stripe",
     )
     quantity = models.PositiveIntegerField(

@@ -5,7 +5,7 @@ globs: "*.ts,*.tsx"
 
 # Frontend Rules
 
-Coding standards for TypeScript/React frontend. 
+Coding standards for TypeScript/React frontend.
 
 ## Typing & Linting
 
@@ -71,7 +71,7 @@ Coding standards for TypeScript/React frontend.
 
 Each feature in `features/` follows this structure:
 - `queries/` — TanStack Query hooks (useQuery wrappers)
-- `mutations/` — TanStack mutation hooks (useMutation wrappers)  
+- `mutations/` — TanStack mutation hooks (useMutation wrappers)
 - `components/` — Feature-specific UI components
 - `forms/` — React Hook Form components with Zod schemas
 - `types.ts` — Feature-specific TypeScript types

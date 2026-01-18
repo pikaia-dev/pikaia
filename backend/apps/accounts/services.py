@@ -276,7 +276,7 @@ def invite_member(
         stytch.organizations.members.update(
             organization_id=organization.stytch_org_id,
             member_id=stytch_member_id,
-            name=name if name else None,
+            name=name or None,
             roles=roles,
         )
     else:
@@ -293,7 +293,7 @@ def invite_member(
             stytch.organizations.members.update(
                 organization_id=organization.stytch_org_id,
                 member_id=stytch_member_id,
-                name=name if name else None,
+                name=name or None,
                 roles=roles,
             )
 
@@ -487,12 +487,14 @@ def bulk_invite_members(
         email_lower = member_item.get("email", "").lower()
         if email_lower in seen_emails:
             # Skip duplicate, report as failed
-            results.append({
-                "email": member_item.get("email", ""),
-                "success": False,
-                "error": "Duplicate email in request",
-                "stytch_member_id": None,
-            })
+            results.append(
+                {
+                    "email": member_item.get("email", ""),
+                    "success": False,
+                    "error": "Duplicate email in request",
+                    "stytch_member_id": None,
+                }
+            )
             failed += 1
             continue
         seen_emails.add(email_lower)
@@ -639,10 +641,14 @@ def provision_mobile_user(
         raise ValueError("Cannot specify both organization_id and organization_name/slug")
 
     if not creating_org and not joining_org:
-        raise ValueError("Must specify either organization_id or organization_name and organization_slug")
+        raise ValueError(
+            "Must specify either organization_id or organization_name and organization_slug"
+        )
 
     if creating_org and (not organization_name or not organization_slug):
-        raise ValueError("Both organization_name and organization_slug are required to create an organization")
+        raise ValueError(
+            "Both organization_name and organization_slug are required to create an organization"
+        )
 
     stytch = get_stytch_client()
     stytch_org_id: str
@@ -663,7 +669,7 @@ def provision_mobile_user(
         member_response = stytch.organizations.members.create(
             organization_id=stytch_org_id,
             email_address=email,
-            name=name if name else None,
+            name=name or None,
         )
         stytch_member_id = member_response.member.member_id
         stytch_member = member_response.member
@@ -723,7 +729,7 @@ def provision_mobile_user(
             member_response = stytch.organizations.members.create(
                 organization_id=stytch_org_id,
                 email_address=email,
-                name=name if name else None,
+                name=name or None,
             )
             stytch_member_id = member_response.member.member_id
             stytch_member = member_response.member

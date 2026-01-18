@@ -32,4 +32,3 @@ class NetworkStack(Stack):
                 ),
             ],
         )
-

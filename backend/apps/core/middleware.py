@@ -4,18 +4,15 @@ Core middleware.
 
 import time
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import cast
 from uuid import UUID, uuid4
 
 from django.http import HttpRequest, HttpResponse
 from stytch.core.response_base import StytchError
 
+from apps.core.auth import AuthContext
 from apps.core.logging import bind_contextvars, clear_contextvars, get_logger
 from apps.events.services import set_correlation_id
-
-if TYPE_CHECKING:
-    from apps.accounts.models import Member, User
-    from apps.organizations.models import Organization
 
 logger = get_logger(__name__)
 
@@ -33,7 +30,7 @@ def get_client_ip(request: HttpRequest) -> str | None:
     x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
     if x_forwarded_for:
         return x_forwarded_for.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR")
+    return cast(str | None, request.META.get("REMOTE_ADDR"))
 
 
 class CorrelationIdMiddleware:
@@ -117,13 +114,13 @@ class StytchAuthMiddleware:
     """
     Validates Stytch session JWT from Authorization header.
 
-    Sets request.auth_user, request.auth_member, and request.auth_organization
-    for authenticated requests. Allows unauthenticated requests to pass through
-    (authorization enforced at endpoint level).
+    Sets request.auth with user, member, and organization for authenticated
+    requests. Allows unauthenticated requests to pass through (authorization
+    enforced at endpoint level).
 
-    Also sets request.auth_failed to distinguish between:
-    - No auth attempted (auth_failed=False, auth_user=None)
-    - Auth attempted but failed (auth_failed=True, auth_user=None)
+    The auth.failed flag distinguishes between:
+    - No auth attempted (failed=False, user=None)
+    - Auth attempted but failed (failed=True, user=None)
 
     After successful authentication, binds user/org context to structured logging:
     - usr.id: User identifier
@@ -147,10 +144,7 @@ class StytchAuthMiddleware:
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         # Initialize auth context
-        request.auth_user: User | None = None  # type: ignore[attr-defined]
-        request.auth_member: Member | None = None  # type: ignore[attr-defined]
-        request.auth_organization: Organization | None = None  # type: ignore[attr-defined]
-        request.auth_failed: bool = False  # type: ignore[attr-defined]
+        request.auth = AuthContext()  # type: ignore[attr-defined]
 
         # Skip auth for public paths
         if self._is_public_path(request.path):
@@ -177,7 +171,7 @@ class StytchAuthMiddleware:
 
     def _authenticate_jwt(self, request: HttpRequest, session_jwt: str) -> None:
         """
-        Validate JWT and populate request with user/member/org.
+        Validate JWT and populate request.auth with user/member/org.
 
         Uses a two-tier strategy for performance:
         1. Local JWT verification (fast, no API call)
@@ -196,6 +190,7 @@ class StytchAuthMiddleware:
         from apps.accounts.stytch_client import get_stytch_client
 
         client = get_stytch_client()
+        auth: AuthContext = request.auth  # type: ignore[attr-defined]
 
         try:
             # Step 1: Local JWT verification (no API call)
@@ -217,9 +212,9 @@ class StytchAuthMiddleware:
 
             if member:
                 # Fast path: member exists locally, use cached data
-                request.auth_user = member.user  # type: ignore[attr-defined]
-                request.auth_member = member  # type: ignore[attr-defined]
-                request.auth_organization = member.organization  # type: ignore[attr-defined]
+                auth.user = member.user
+                auth.member = member
+                auth.organization = member.organization
             else:
                 # Slow path: first-time login, sync from Stytch
                 # Call the full API to get current data
@@ -232,28 +227,28 @@ class StytchAuthMiddleware:
                     stytch_member=full_response.member,
                     stytch_organization=full_response.organization,
                 )
-                request.auth_user = user  # type: ignore[attr-defined]
-                request.auth_member = member  # type: ignore[attr-defined]
-                request.auth_organization = org  # type: ignore[attr-defined]
+                auth.user = user
+                auth.member = member
+                auth.organization = org
 
             # Bind user/org context to structured logging (Datadog-compatible field names)
             bind_contextvars(
                 **{
                     "usr.id": str(member.user.id),
                     "usr.email": member.user.email,
-                    "organization.id": member.organization.stytch_org_id if member.organization else None,
+                    "organization.id": member.organization.stytch_org_id
+                    if member.organization
+                    else None,
                 }
             )
 
         except StytchError as e:
             # Invalid/expired JWT - mark as failed so endpoints can distinguish
             # "no auth attempted" from "auth attempted but failed"
-            request.auth_failed = True  # type: ignore[attr-defined]
+            auth.failed = True
             logger.debug("jwt_auth_failed", error_message=e.details.error_message)
         except Exception:
             # Catch any other exception (network errors, timeouts, etc.)
             # Also mark as failed - potential security issue
-            request.auth_failed = True  # type: ignore[attr-defined]
+            auth.failed = True
             logger.exception("jwt_auth_unexpected_error")
-
-
