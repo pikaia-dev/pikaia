@@ -94,13 +94,15 @@ def _create_python_lambda(
         handler=handler,
         code=lambda_.Code.from_asset(
             str(code_path),
-            exclude=["tests", "__pycache__", "*.pyc"],
+            # Note: exclude has no effect when bundling is used, handled in command
             bundling={
                 "image": PYTHON_RUNTIME.bundling_image,
                 "command": [
                     "bash",
                     "-c",
-                    "pip install -r requirements.txt -t /asset-output && cp -r . /asset-output/",
+                    "pip install -r requirements.txt -t /asset-output && "
+                    "rsync -av --exclude='tests' --exclude='__pycache__' "
+                    "--exclude='*.pyc' --exclude='requirements.txt' . /asset-output/",
                 ],
             },
         ),
