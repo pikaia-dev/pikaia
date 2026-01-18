@@ -63,6 +63,10 @@ class EventBridgeBackend(EventBackend):
     Publishes events in batches (up to 10 per PutEvents call).
     """
 
+    # Timeout configuration for EventBridge API calls
+    CONNECT_TIMEOUT = 5  # seconds to establish connection
+    READ_TIMEOUT = 30  # seconds to wait for response
+
     def __init__(self, event_bus_name: str, source: str = "app.events"):
         self.event_bus_name = event_bus_name
         self.source = source
@@ -70,11 +74,17 @@ class EventBridgeBackend(EventBackend):
 
     @property
     def client(self):
-        """Lazy-load boto3 client."""
+        """Lazy-load boto3 client with timeout configuration."""
         if self._client is None:
             import boto3
+            from botocore.config import Config
 
-            self._client = boto3.client("events")
+            config = Config(
+                connect_timeout=self.CONNECT_TIMEOUT,
+                read_timeout=self.READ_TIMEOUT,
+                retries={"max_attempts": 2},
+            )
+            self._client = boto3.client("events", config=config)
         return self._client
 
     def publish(self, events: list[EventEnvelope]) -> list[dict[str, Any]]:
