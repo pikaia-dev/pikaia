@@ -167,23 +167,3 @@ class Organization(Model):
 | Failed auth | 10/hour per IP+email | Prevents credential stuffing |
 
 **Implementation:** Simple DB cache counter (already using Django DB cache for passkey challenges).
-
----
-
-## Completed
-
-Items from the original CTO audit that have been addressed:
-
-- ✅ WSGI/ASGI defaults to production settings
-- ✅ HTTPS enforcement via CDK context validation
-- ✅ CORS origin validation for production
-- ✅ Lambda and EventBridge alarms
-- ✅ 8 Architecture Decision Records
-- ✅ Thread-safe correlation ID (ContextVar)
-- ✅ Webhook idempotency with transaction rollback
-- ✅ Bandit security scanning in CI
-- ✅ Pre-commit hooks configured
-- ✅ Local setup guide (README.md)
-- ✅ Event types catalog (webhooks.md)
-- ✅ Member list pagination (database-level)
-- ✅ IDOR fix (opaque member identifiers)
