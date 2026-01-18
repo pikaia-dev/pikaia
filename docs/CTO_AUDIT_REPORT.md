@@ -30,6 +30,10 @@ This template is a **production-quality B2B SaaS foundation** with enterprise-gr
 - ✅ CORS origin validation for production
 - ✅ Lambda and EventBridge alarms added
 - ✅ 8 Architecture Decision Records documented
+- ✅ Thread-safe correlation ID (ContextVar)
+- ✅ Webhook idempotency with transaction rollback
+- ✅ Bandit security scanning in CI
+- ✅ Pre-commit hooks configured
 
 ### Recommended Priority Actions
 1. Add WAF to ALB and CloudFront (High)
@@ -436,6 +440,7 @@ The `test-backend.yml` workflow runs on PRs and pushes to main:
 - ✅ PostgreSQL service for integration tests
 - ✅ `ruff check` (linting)
 - ✅ `ruff format --check` (formatting)
+- ✅ `bandit` (security scanning)
 - ✅ `mypy` (type checking - currently `continue-on-error`)
 - ✅ `pytest` (tests)
 - ✅ `pip-audit` (dependency security scanning)
@@ -455,7 +460,7 @@ No test workflow exists for frontend. Recommend adding:
 | Add frontend test workflow | High | 1 hour | ❌ |
 | Add E2E test framework | Medium | 8 hours | ❌ |
 | Add coverage thresholds | Medium | 1 hour | ❌ |
-| Add security scanning (bandit) | Medium | 1 hour | ❌ |
+| Add security scanning (bandit) | Medium | 1 hour | ✅ Done |
 
 ---
 
@@ -478,7 +483,7 @@ No test workflow exists for frontend. Recommend adding:
 1. ~~**Architecture Decision Records (ADRs)**~~ ✅ Added 8 ADRs in `docs/adr/`
 2. **Runbooks** - Deployment, rollback, incident response
 3. **API changelog** - Breaking changes between versions
-4. **Environment setup guide** - Step-by-step local setup
+4. ~~**Environment setup guide**~~ ✅ In `README.md` Setup section
 5. **Testing guide** - How to write tests, mocking patterns
 6. **Security guide** - Authentication flows, RBAC model
 
@@ -488,8 +493,8 @@ No test workflow exists for frontend. Recommend adding:
 |------|----------|--------|--------|
 | Add ADR folder with key decisions | Medium | 4 hours | ✅ Done (8 ADRs) |
 | Add deployment runbook | High | 2 hours | ❌ |
-| Add local setup guide | High | 2 hours | ❌ |
-| Document event types catalog | Medium | 2 hours | ❌ |
+| Add local setup guide | High | 2 hours | ✅ Done (README.md) |
+| Document event types catalog | Medium | 2 hours | ✅ Done (webhooks.md) |
 | Add API versioning guide | Medium | 1 hour | ❌ |
 
 ---
