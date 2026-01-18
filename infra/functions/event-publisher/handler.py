@@ -13,6 +13,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
+from typing import Any
 
 import boto3
 import psycopg2
@@ -28,7 +29,7 @@ BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "100"))
 MAX_ATTEMPTS = int(os.environ.get("MAX_ATTEMPTS", "10"))
 
 
-def handler(event: dict, context) -> dict:
+def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """
     Lambda entry point for event publishing.
 
