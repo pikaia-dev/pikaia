@@ -5,11 +5,15 @@ Provides operational visibility into:
 - API performance (latency, error rates, request volume)
 - ECS service health (CPU, memory, task count)
 - Database health (connections, CPU, storage)
+- Lambda health (errors, duration, throttling)
+- EventBridge delivery (failed invocations)
 
 Alarms notify via SNS topic for:
 - High error rates
 - Elevated latency
 - Unhealthy infrastructure
+- Lambda failures
+- Event delivery failures
 """
 
 from aws_cdk import (
@@ -20,6 +24,8 @@ from aws_cdk import (
     aws_cloudwatch_actions as cw_actions,
     aws_ecs as ecs,
     aws_elasticloadbalancingv2 as elbv2,
+    aws_events as events,
+    aws_lambda as lambda_,
     aws_rds as rds,
     aws_sns as sns,
     aws_sns_subscriptions as sns_subscriptions,
@@ -47,6 +53,9 @@ class ObservabilityStack(Stack):
         ecs_cluster: ecs.ICluster,
         ecs_service: ecs.FargateService,
         database: rds.DatabaseCluster,
+        event_bus: events.IEventBus | None = None,
+        publisher_lambda: lambda_.IFunction | None = None,
+        audit_lambda: lambda_.IFunction | None = None,
         alarm_email: str | None = None,
         **kwargs,
     ) -> None:
@@ -210,6 +219,30 @@ class ObservabilityStack(Stack):
             period=Duration.minutes(1),
         )
 
+        # Lambda metrics (optional - only if event stack is deployed)
+        lambda_metrics: dict[str, dict[str, cloudwatch.Metric]] = {}
+        if publisher_lambda:
+            lambda_metrics["publisher"] = self._create_lambda_metrics(
+                publisher_lambda, "EventPublisher"
+            )
+        if audit_lambda:
+            lambda_metrics["audit"] = self._create_lambda_metrics(
+                audit_lambda, "AuditConsumer"
+            )
+
+        # EventBridge metrics (optional)
+        eventbridge_failed_invocations = None
+        if event_bus:
+            eventbridge_failed_invocations = cloudwatch.Metric(
+                namespace="AWS/Events",
+                metric_name="FailedInvocations",
+                dimensions_map={
+                    "EventBusName": event_bus.event_bus_name,
+                },
+                statistic="Sum",
+                period=Duration.minutes(5),
+            )
+
         # =================================================================
         # Alarms
         # =================================================================
@@ -328,6 +361,73 @@ class ObservabilityStack(Stack):
         db_connections_alarm.add_alarm_action(alarm_action)
         db_connections_alarm.add_ok_action(alarm_action)
 
+        # Lambda alarms (optional)
+        lambda_alarms: list[cloudwatch.Alarm] = []
+
+        if publisher_lambda and "publisher" in lambda_metrics:
+            publisher_error_alarm = cloudwatch.Alarm(
+                self,
+                "PublisherLambdaErrorAlarm",
+                alarm_name="tango-event-publisher-errors",
+                alarm_description="Event publisher Lambda has errors",
+                metric=lambda_metrics["publisher"]["errors"],
+                threshold=1,
+                evaluation_periods=1,
+                comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+                treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+            )
+            publisher_error_alarm.add_alarm_action(alarm_action)
+            publisher_error_alarm.add_ok_action(alarm_action)
+            lambda_alarms.append(publisher_error_alarm)
+
+            publisher_throttle_alarm = cloudwatch.Alarm(
+                self,
+                "PublisherLambdaThrottleAlarm",
+                alarm_name="tango-event-publisher-throttles",
+                alarm_description="Event publisher Lambda is being throttled",
+                metric=lambda_metrics["publisher"]["throttles"],
+                threshold=1,
+                evaluation_periods=1,
+                comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+                treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+            )
+            publisher_throttle_alarm.add_alarm_action(alarm_action)
+            publisher_throttle_alarm.add_ok_action(alarm_action)
+            lambda_alarms.append(publisher_throttle_alarm)
+
+        if audit_lambda and "audit" in lambda_metrics:
+            audit_error_alarm = cloudwatch.Alarm(
+                self,
+                "AuditLambdaErrorAlarm",
+                alarm_name="tango-audit-consumer-errors",
+                alarm_description="Audit consumer Lambda has errors",
+                metric=lambda_metrics["audit"]["errors"],
+                threshold=1,
+                evaluation_periods=1,
+                comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+                treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+            )
+            audit_error_alarm.add_alarm_action(alarm_action)
+            audit_error_alarm.add_ok_action(alarm_action)
+            lambda_alarms.append(audit_error_alarm)
+
+        # EventBridge delivery failures alarm
+        eventbridge_alarm = None
+        if eventbridge_failed_invocations:
+            eventbridge_alarm = cloudwatch.Alarm(
+                self,
+                "EventBridgeFailedInvocationsAlarm",
+                alarm_name="tango-eventbridge-failed-invocations",
+                alarm_description="EventBridge rule invocations are failing",
+                metric=eventbridge_failed_invocations,
+                threshold=1,
+                evaluation_periods=1,
+                comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+                treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+            )
+            eventbridge_alarm.add_alarm_action(alarm_action)
+            eventbridge_alarm.add_ok_action(alarm_action)
+
         # =================================================================
         # Dashboard
         # =================================================================
@@ -437,19 +537,69 @@ class ObservabilityStack(Stack):
             ),
         )
 
-        # Row 4: Alarm Status
+        # Row 4: Lambda & Events (if configured)
+        if lambda_metrics or eventbridge_failed_invocations:
+            lambda_widgets = []
+
+            if "publisher" in lambda_metrics:
+                lambda_widgets.append(
+                    cloudwatch.GraphWidget(
+                        title="Event Publisher Lambda",
+                        left=[
+                            lambda_metrics["publisher"]["invocations"],
+                            lambda_metrics["publisher"]["errors"],
+                        ],
+                        right=[lambda_metrics["publisher"]["duration"]],
+                        width=8,
+                        height=6,
+                    )
+                )
+
+            if "audit" in lambda_metrics:
+                lambda_widgets.append(
+                    cloudwatch.GraphWidget(
+                        title="Audit Consumer Lambda",
+                        left=[
+                            lambda_metrics["audit"]["invocations"],
+                            lambda_metrics["audit"]["errors"],
+                        ],
+                        right=[lambda_metrics["audit"]["duration"]],
+                        width=8,
+                        height=6,
+                    )
+                )
+
+            if eventbridge_failed_invocations:
+                lambda_widgets.append(
+                    cloudwatch.GraphWidget(
+                        title="EventBridge Delivery",
+                        left=[eventbridge_failed_invocations],
+                        width=8,
+                        height=6,
+                    )
+                )
+
+            if lambda_widgets:
+                dashboard.add_widgets(*lambda_widgets)
+
+        # Row 5: Alarm Status
+        all_alarms = [
+            error_rate_alarm,
+            latency_alarm,
+            unhealthy_alarm,
+            ecs_cpu_alarm,
+            ecs_memory_alarm,
+            db_cpu_alarm,
+            db_connections_alarm,
+        ]
+        all_alarms.extend(lambda_alarms)
+        if eventbridge_alarm:
+            all_alarms.append(eventbridge_alarm)
+
         dashboard.add_widgets(
             cloudwatch.AlarmStatusWidget(
                 title="Alarm Status",
-                alarms=[
-                    error_rate_alarm,
-                    latency_alarm,
-                    unhealthy_alarm,
-                    ecs_cpu_alarm,
-                    ecs_memory_alarm,
-                    db_cpu_alarm,
-                    db_connections_alarm,
-                ],
+                alarms=all_alarms,
                 width=24,
                 height=4,
             ),
@@ -473,3 +623,38 @@ class ObservabilityStack(Stack):
             description="SNS Topic ARN for alarm notifications",
             export_name="TangoAlarmTopicArn",
         )
+
+    def _create_lambda_metrics(
+        self, fn: lambda_.IFunction, name_prefix: str
+    ) -> dict[str, cloudwatch.Metric]:
+        """Create standard metrics for a Lambda function."""
+        return {
+            "errors": cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Errors",
+                dimensions_map={"FunctionName": fn.function_name},
+                statistic="Sum",
+                period=Duration.minutes(5),
+            ),
+            "duration": cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Duration",
+                dimensions_map={"FunctionName": fn.function_name},
+                statistic="p99",
+                period=Duration.minutes(5),
+            ),
+            "throttles": cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Throttles",
+                dimensions_map={"FunctionName": fn.function_name},
+                statistic="Sum",
+                period=Duration.minutes(5),
+            ),
+            "invocations": cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Invocations",
+                dimensions_map={"FunctionName": fn.function_name},
+                statistic="Sum",
+                period=Duration.minutes(5),
+            ),
+        }
