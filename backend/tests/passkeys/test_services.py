@@ -365,9 +365,9 @@ class TestPasskeyServiceAuthentication:
         """Should filter by organization when specified."""
         # Create user with two memberships
         user = UserFactory()
-        member1 = MemberFactory(user=user)
+        _member1 = MemberFactory(user=user)
         member2 = MemberFactory(user=user)
-        passkey = PasskeyFactory(user=user, credential_id=b"multi_org_cred")
+        _passkey = PasskeyFactory(user=user, credential_id=b"multi_org_cred")
 
         # Generate options
         options = passkey_service.generate_authentication_options()
@@ -400,7 +400,7 @@ class TestPasskeyServiceAuthentication:
     ):
         """Should reject if user not member of specified organization."""
         member = MemberFactory()
-        passkey = PasskeyFactory(user=member.user, credential_id=b"wrong_org_cred")
+        _passkey = PasskeyFactory(user=member.user, credential_id=b"wrong_org_cred")
 
         options = passkey_service.generate_authentication_options()
 
@@ -429,7 +429,7 @@ class TestPasskeyServiceAuthentication:
         """Should reject if user has no organization memberships."""
         # Create user without any membership
         user = UserFactory()
-        passkey = PasskeyFactory(user=user, credential_id=b"no_membership_cred")
+        _passkey = PasskeyFactory(user=user, credential_id=b"no_membership_cred")
 
         options = passkey_service.generate_authentication_options()
 
