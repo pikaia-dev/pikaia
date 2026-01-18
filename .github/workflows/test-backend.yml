@@ -71,6 +71,12 @@ jobs:
       - name: Format check infra (ruff format)
         run: uv run ruff format --check ../infra/functions/
 
+      - name: Security scan backend (bandit)
+        run: uvx bandit -c pyproject.toml -r apps/
+
+      - name: Security scan infra (bandit)
+        run: uvx bandit -c pyproject.toml -r ../infra/functions/
+
       - name: Type check (mypy)
         run: uv run mypy apps/
         continue-on-error: true  # TODO: Remove after fixing type errors

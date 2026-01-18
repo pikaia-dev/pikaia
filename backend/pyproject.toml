@@ -60,3 +60,10 @@ exclude = ["migrations"]
 
 [tool.django-stubs]
 django_settings_module = "config.settings.local"
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]
+skips = [
+    "B101",  # assert used in tests
+    "B311",  # random.random() - fine for non-security uses like jitter
+]
