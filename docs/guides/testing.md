@@ -21,6 +21,25 @@ pnpm test         # Watch mode
 pnpm test run     # Single run
 ```
 
+### Frontend Test Structure
+
+```
+frontend/tests/
+├── setup.ts              # Test setup
+├── features/
+│   └── {feature}/
+│       ├── forms/        # Schema validation tests
+│       ├── hooks/        # Hook tests
+│       └── utils/        # Utility tests
+└── lib/                  # Shared utility tests
+```
+
+Tests mirror the `src/` directory structure. Run a specific test:
+
+```bash
+pnpm test tests/features/auth/hooks/use-auth-callback.test.ts
+```
+
 ### Specific App
 
 ```bash
