@@ -59,7 +59,7 @@ _REQUIRED_SECRETS = {
 
 # Secrets that have obviously insecure defaults
 _INSECURE_DEFAULTS = {
-    "SECRET_KEY": "django-insecure-change-me-in-production",
+    "SECRET_KEY": "django-insecure-change-me-in-production",  # nosec B105
 }
 
 

@@ -201,7 +201,7 @@ def _get_database_config() -> dict:
             "ENGINE": "django.db.backends.postgresql",
             "NAME": settings.DB_NAME or "app",
             "USER": "postgres",
-            "PASSWORD": "postgres",
+            "PASSWORD": "postgres",  # nosec B105
             "HOST": "localhost",
             "PORT": "5432",
         }
