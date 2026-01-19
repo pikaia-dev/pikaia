@@ -33,7 +33,7 @@ class TestHandleMemberCreated:
         """Should create member and user from webhook data."""
         from apps.accounts.models import Member, User
 
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         data = {
             "member": {
@@ -61,7 +61,7 @@ class TestHandleMemberCreated:
         """Should set admin role when stytch_admin role present."""
         from apps.accounts.models import Member
 
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         data = {
             "member": {
@@ -80,7 +80,7 @@ class TestHandleMemberCreated:
 
     def test_skips_existing_member(self) -> None:
         """Should not create duplicate if member already exists."""
-        member = MemberFactory()
+        member = MemberFactory.create()
 
         data = {
             "member": {
@@ -128,8 +128,8 @@ class TestHandleMemberCreated:
         """Should link to existing user if email matches."""
         from apps.accounts.models import Member
 
-        org = OrganizationFactory()
-        existing_user = UserFactory(email="existing@example.com", name="Existing Name")
+        org = OrganizationFactory.create()
+        existing_user = UserFactory.create(email="existing@example.com", name="Existing Name")
 
         data = {
             "member": {
@@ -153,7 +153,7 @@ class TestHandleMemberUpdated:
 
     def test_updates_member_role_to_admin(self) -> None:
         """Should update member role when Stytch role changes."""
-        member = MemberFactory(role="member")
+        member = MemberFactory.create(role="member")
 
         data = {
             "member": {
@@ -169,7 +169,7 @@ class TestHandleMemberUpdated:
 
     def test_updates_member_role_to_member(self) -> None:
         """Should downgrade role when admin role removed."""
-        member = MemberFactory(role="admin")
+        member = MemberFactory.create(role="admin")
 
         data = {
             "member": {
@@ -185,7 +185,7 @@ class TestHandleMemberUpdated:
 
     def test_soft_deletes_when_status_deleted(self) -> None:
         """Should soft delete member when status is 'deleted'."""
-        member = MemberFactory()
+        member = MemberFactory.create()
         assert member.deleted_at is None
 
         data = {
@@ -227,7 +227,7 @@ class TestHandleMemberDeleted:
 
     def test_soft_deletes_member(self) -> None:
         """Should soft delete the member."""
-        member = MemberFactory()
+        member = MemberFactory.create()
         assert member.deleted_at is None
 
         data = {"id": member.stytch_member_id}
@@ -239,7 +239,7 @@ class TestHandleMemberDeleted:
 
     def test_uses_member_object_id(self) -> None:
         """Should support member.member_id format."""
-        member = MemberFactory()
+        member = MemberFactory.create()
 
         data = {"member": {"member_id": member.stytch_member_id}}
 
@@ -250,7 +250,7 @@ class TestHandleMemberDeleted:
 
     def test_ignores_already_deleted(self) -> None:
         """Should not error if member already deleted."""
-        member = MemberFactory()
+        member = MemberFactory.create()
         member.soft_delete()
         original_deleted_at = member.deleted_at
 
@@ -275,7 +275,7 @@ class TestHandleOrganizationUpdated:
 
     def test_updates_organization_name(self) -> None:
         """Should update org name when changed in Stytch."""
-        org = OrganizationFactory(name="Old Name")
+        org = OrganizationFactory.create(name="Old Name")
 
         data = {
             "organization": {
@@ -292,7 +292,7 @@ class TestHandleOrganizationUpdated:
 
     def test_updates_organization_slug(self) -> None:
         """Should update org slug when changed in Stytch."""
-        org = OrganizationFactory(slug="old-slug")
+        org = OrganizationFactory.create(slug="old-slug")
 
         data = {
             "organization": {
@@ -309,7 +309,7 @@ class TestHandleOrganizationUpdated:
 
     def test_updates_logo_url(self) -> None:
         """Should update logo URL when changed."""
-        org = OrganizationFactory(logo_url="")
+        org = OrganizationFactory.create(logo_url="")
 
         data = {
             "organization": {
@@ -346,7 +346,7 @@ class TestHandleOrganizationDeleted:
         """Should soft delete the organization."""
         from apps.organizations.models import Organization
 
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
         assert org.deleted_at is None
 
         data = {"id": org.stytch_org_id}
@@ -362,9 +362,9 @@ class TestHandleOrganizationDeleted:
         from apps.accounts.models import Member
         from apps.organizations.models import Organization
 
-        org = OrganizationFactory()
-        member1 = MemberFactory(organization=org)
-        member2 = MemberFactory(organization=org)
+        org = OrganizationFactory.create()
+        member1 = MemberFactory.create(organization=org)
+        member2 = MemberFactory.create(organization=org)
 
         data = {"id": org.stytch_org_id}
 
@@ -384,7 +384,7 @@ class TestHandleOrganizationDeleted:
         """Should support organization.organization_id format."""
         from apps.organizations.models import Organization
 
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         data = {"organization": {"organization_id": org.stytch_org_id}}
 
@@ -397,7 +397,7 @@ class TestHandleOrganizationDeleted:
         """Should not error if org already deleted."""
         from apps.organizations.models import Organization
 
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
         org.soft_delete()
         original_deleted_at = org.deleted_at
 

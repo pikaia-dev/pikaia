@@ -28,12 +28,12 @@ class TestWebhookService:
 
     def test_list_endpoints(self) -> None:
         """Should list all endpoints for organization."""
-        org = OrganizationFactory()
-        other_org = OrganizationFactory()
+        org = OrganizationFactory.create()
+        other_org = OrganizationFactory.create()
 
-        ep1 = WebhookEndpointFactory(organization=org)
-        ep2 = WebhookEndpointFactory(organization=org)
-        _other_ep = WebhookEndpointFactory(organization=other_org)
+        ep1 = WebhookEndpointFactory.create(organization=org)
+        ep2 = WebhookEndpointFactory.create(organization=org)
+        _other_ep = WebhookEndpointFactory.create(organization=other_org)
 
         service = WebhookService(org)
         endpoints = service.list_endpoints()
@@ -43,8 +43,8 @@ class TestWebhookService:
 
     def test_get_endpoint(self) -> None:
         """Should get endpoint by ID."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org)
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org)
 
         service = WebhookService(org)
         result = service.get_endpoint(endpoint.id)
@@ -54,9 +54,9 @@ class TestWebhookService:
 
     def test_get_endpoint_wrong_org(self) -> None:
         """Should not return endpoint from different org."""
-        org = OrganizationFactory()
-        other_org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=other_org)
+        org = OrganizationFactory.create()
+        other_org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=other_org)
 
         service = WebhookService(org)
         result = service.get_endpoint(endpoint.id)
@@ -65,8 +65,8 @@ class TestWebhookService:
 
     def test_create_endpoint(self) -> None:
         """Should create new endpoint."""
-        org = OrganizationFactory()
-        user = UserFactory()
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
         service = WebhookService(org)
 
         data = WebhookEndpointCreate(
@@ -86,8 +86,8 @@ class TestWebhookService:
 
     def test_update_endpoint(self) -> None:
         """Should update endpoint fields."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org, name="Old Name")
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org, name="Old Name")
 
         service = WebhookService(org)
         data = WebhookEndpointUpdate(name="New Name", active=False)
@@ -99,8 +99,8 @@ class TestWebhookService:
 
     def test_update_endpoint_partial(self) -> None:
         """Should only update provided fields."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(
             organization=org,
             name="Original",
             description="Original desc",
@@ -116,8 +116,8 @@ class TestWebhookService:
 
     def test_delete_endpoint(self) -> None:
         """Should delete endpoint."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org)
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org)
 
         service = WebhookService(org)
         result = service.delete_endpoint(endpoint.id)
@@ -127,9 +127,9 @@ class TestWebhookService:
 
     def test_delete_endpoint_wrong_org(self) -> None:
         """Should not delete endpoint from different org."""
-        org = OrganizationFactory()
-        other_org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=other_org)
+        org = OrganizationFactory.create()
+        other_org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=other_org)
 
         service = WebhookService(org)
         result = service.delete_endpoint(endpoint.id)
@@ -139,11 +139,11 @@ class TestWebhookService:
 
     def test_list_deliveries(self) -> None:
         """Should list deliveries for endpoint."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org)
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org)
         # Create deliveries to verify they're returned
-        _delivery1 = WebhookDeliveryFactory(endpoint=endpoint)
-        _delivery2 = WebhookDeliveryFactory(endpoint=endpoint)
+        _delivery1 = WebhookDeliveryFactory.create(endpoint=endpoint)
+        _delivery2 = WebhookDeliveryFactory.create(endpoint=endpoint)
 
         service = WebhookService(org)
         deliveries = service.list_deliveries(endpoint.id)
@@ -157,7 +157,7 @@ class TestWebhookDispatcher:
 
     def test_dispatch_success(self) -> None:
         """Should return success result on 200 response."""
-        endpoint = WebhookEndpointFactory()
+        endpoint = WebhookEndpointFactory.create()
         dispatcher = WebhookDispatcher()
 
         with patch.object(httpx.Client, "post") as mock_post:
@@ -181,7 +181,7 @@ class TestWebhookDispatcher:
 
     def test_dispatch_failure_http_error(self) -> None:
         """Should return failure result on non-2xx response."""
-        endpoint = WebhookEndpointFactory()
+        endpoint = WebhookEndpointFactory.create()
         dispatcher = WebhookDispatcher()
 
         with patch.object(httpx.Client, "post") as mock_post:
@@ -204,7 +204,7 @@ class TestWebhookDispatcher:
 
     def test_dispatch_failure_timeout(self) -> None:
         """Should return failure result on timeout."""
-        endpoint = WebhookEndpointFactory()
+        endpoint = WebhookEndpointFactory.create()
         dispatcher = WebhookDispatcher(timeout=1)
 
         with patch.object(httpx.Client, "post") as mock_post:
@@ -224,7 +224,7 @@ class TestWebhookDispatcher:
 
     def test_dispatch_failure_connection_error(self) -> None:
         """Should return failure result on connection error."""
-        endpoint = WebhookEndpointFactory()
+        endpoint = WebhookEndpointFactory.create()
         dispatcher = WebhookDispatcher()
 
         with patch.object(httpx.Client, "post") as mock_post:
@@ -244,7 +244,7 @@ class TestWebhookDispatcher:
 
     def test_send_test_uses_example_payload(self) -> None:
         """Should use example payload from event catalog."""
-        endpoint = WebhookEndpointFactory()
+        endpoint = WebhookEndpointFactory.create()
         dispatcher = WebhookDispatcher()
 
         with patch.object(httpx.Client, "post") as mock_post:
@@ -263,7 +263,7 @@ class TestWebhookDispatcher:
 
     def test_send_test_invalid_event(self) -> None:
         """Should return error for invalid event type."""
-        endpoint = WebhookEndpointFactory()
+        endpoint = WebhookEndpointFactory.create()
         dispatcher = WebhookDispatcher()
 
         result = dispatcher.send_test(endpoint, "invalid.event")
@@ -278,18 +278,18 @@ class TestGetSubscribedEndpoints:
 
     def test_returns_matching_endpoints(self) -> None:
         """Should return endpoints subscribed to event."""
-        org = OrganizationFactory()
-        ep1 = WebhookEndpointFactory(
+        org = OrganizationFactory.create()
+        ep1 = WebhookEndpointFactory.create(
             organization=org,
             events=["member.created"],
             active=True,
         )
-        ep2 = WebhookEndpointFactory(
+        ep2 = WebhookEndpointFactory.create(
             organization=org,
             events=["member.*"],
             active=True,
         )
-        _ep3 = WebhookEndpointFactory(
+        _ep3 = WebhookEndpointFactory.create(
             organization=org,
             events=["billing.payment_succeeded"],
             active=True,
@@ -302,8 +302,8 @@ class TestGetSubscribedEndpoints:
 
     def test_excludes_inactive_endpoints(self) -> None:
         """Should not return inactive endpoints."""
-        org = OrganizationFactory()
-        _inactive = WebhookEndpointFactory(
+        org = OrganizationFactory.create()
+        _inactive = WebhookEndpointFactory.create(
             organization=org,
             events=["member.created"],
             active=False,
@@ -315,10 +315,10 @@ class TestGetSubscribedEndpoints:
 
     def test_filters_by_organization(self) -> None:
         """Should only return endpoints for specified org."""
-        org1 = OrganizationFactory()
-        org2 = OrganizationFactory()
-        ep1 = WebhookEndpointFactory(organization=org1, events=["member.created"])
-        _ep2 = WebhookEndpointFactory(organization=org2, events=["member.created"])
+        org1 = OrganizationFactory.create()
+        org2 = OrganizationFactory.create()
+        ep1 = WebhookEndpointFactory.create(organization=org1, events=["member.created"])
+        _ep2 = WebhookEndpointFactory.create(organization=org2, events=["member.created"])
 
         endpoints = get_subscribed_endpoints(str(org1.id), "member.created")
 
@@ -332,10 +332,10 @@ class TestDispatchEventToSubscribers:
 
     def test_dispatches_to_all_subscribers(self) -> None:
         """Should dispatch to all subscribed endpoints."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
         # Create endpoints to receive webhooks
-        _ep1 = WebhookEndpointFactory(organization=org, events=["member.created"])
-        _ep2 = WebhookEndpointFactory(organization=org, events=["member.*"])
+        _ep1 = WebhookEndpointFactory.create(organization=org, events=["member.created"])
+        _ep2 = WebhookEndpointFactory.create(organization=org, events=["member.*"])
 
         with patch("apps.webhooks.services.WebhookDispatcher.dispatch") as mock_dispatch:
             mock_dispatch.return_value = DeliveryResult(
@@ -358,8 +358,8 @@ class TestDispatchEventToSubscribers:
 
     def test_creates_delivery_records(self) -> None:
         """Should create delivery records for each endpoint."""
-        org = OrganizationFactory()
-        WebhookEndpointFactory(organization=org, events=["member.created"])
+        org = OrganizationFactory.create()
+        WebhookEndpointFactory.create(organization=org, events=["member.created"])
 
         with patch("apps.webhooks.services.WebhookDispatcher.dispatch") as mock_dispatch:
             mock_dispatch.return_value = DeliveryResult(
@@ -381,11 +381,11 @@ class TestDispatchEventToSubscribers:
 
     def test_skips_already_delivered(self) -> None:
         """Should skip events already successfully delivered."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org, events=["member.created"])
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org, events=["member.created"])
 
         # Pre-create successful delivery
-        WebhookDeliveryFactory(
+        WebhookDeliveryFactory.create(
             endpoint=endpoint,
             event_id="evt_already_done",
             status=WebhookDelivery.Status.SUCCESS,

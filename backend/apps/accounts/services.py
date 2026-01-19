@@ -268,9 +268,9 @@ def invite_member(
 
     if search_result.members:
         # Member already exists - check their status
-        existing_member = search_result.members[0]
-        stytch_member_id = existing_member.member_id
-        member_status = getattr(existing_member, "status", "active")
+        stytch_existing_member = search_result.members[0]
+        stytch_member_id = stytch_existing_member.member_id
+        member_status = getattr(stytch_existing_member, "status", "active")
 
         if member_status == "deleted":
             # Reactivate deleted member and send invite
@@ -679,6 +679,9 @@ def provision_mobile_user(
 
     if creating_org:
         # Create new organization
+        # Assertions help mypy understand the earlier validation
+        assert organization_name is not None
+        assert organization_slug is not None
         org_response = stytch.organizations.create(
             organization_name=organization_name,
             organization_slug=organization_slug,
@@ -706,8 +709,8 @@ def provision_mobile_user(
         stytch_org_id = organization_id  # type: ignore[assignment]
 
         # Get org details
-        org_response = stytch.organizations.get(organization_id=stytch_org_id)
-        stytch_organization = org_response.organization
+        get_org_response = stytch.organizations.get(organization_id=stytch_org_id)
+        stytch_organization = get_org_response.organization
 
         # Check if member already exists
         search_result = stytch.organizations.members.search(
@@ -719,17 +722,17 @@ def provision_mobile_user(
         )
 
         if search_result.members:
-            existing_member = search_result.members[0]
-            member_status = getattr(existing_member, "status", "active")
+            stytch_existing_member = search_result.members[0]
+            member_status = getattr(stytch_existing_member, "status", "active")
 
             if member_status == "deleted":
                 # Reactivate deleted member
                 stytch.organizations.members.reactivate(
                     organization_id=stytch_org_id,
-                    member_id=existing_member.member_id,
+                    member_id=stytch_existing_member.member_id,
                 )
 
-            stytch_member_id = existing_member.member_id
+            stytch_member_id = stytch_existing_member.member_id
 
             # Update name if provided
             if name:
@@ -740,20 +743,20 @@ def provision_mobile_user(
                 )
 
             # Fetch updated member
-            member_response = stytch.organizations.members.get(
+            get_member_response = stytch.organizations.members.get(
                 organization_id=stytch_org_id,
                 member_id=stytch_member_id,
             )
-            stytch_member = member_response.member
+            stytch_member = get_member_response.member
         else:
             # Create new member
-            member_response = stytch.organizations.members.create(
+            create_member_response = stytch.organizations.members.create(
                 organization_id=stytch_org_id,
                 email_address=email,
                 name=name or None,
             )
-            stytch_member_id = member_response.member.member_id
-            stytch_member = member_response.member
+            stytch_member_id = create_member_response.member.member_id
+            stytch_member = create_member_response.member
 
     # Sync to local database
     user, member, org = sync_session_to_local(

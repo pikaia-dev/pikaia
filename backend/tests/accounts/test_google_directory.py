@@ -84,9 +84,9 @@ class TestSearchDirectoryUsers:
 
     def setup_method(self) -> None:
         """Create test user and member."""
-        self.org = OrganizationFactory()
-        self.user = UserFactory(email="admin@example.com")
-        self.member = MemberFactory(
+        self.org = OrganizationFactory.create()
+        self.user = UserFactory.create(email="admin@example.com")
+        self.member = MemberFactory.create(
             user=self.user,
             organization=self.org,
             role="admin",
@@ -166,8 +166,8 @@ class TestSearchDirectoryUsers:
 
     def test_returns_empty_list_when_user_email_invalid(self) -> None:
         """Should return empty list when user email has no domain."""
-        user_no_domain = UserFactory(email="invalid-email")
-        member_with_invalid_email = MemberFactory(
+        user_no_domain = UserFactory.create(email="invalid-email")
+        member_with_invalid_email = MemberFactory.create(
             user=user_no_domain, organization=self.org, role="member"
         )
 

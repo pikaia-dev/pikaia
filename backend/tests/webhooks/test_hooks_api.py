@@ -23,7 +23,7 @@ class TestAuthorization:
 
     def test_non_admin_cannot_subscribe(self, authenticated_request):
         """Only admins can create subscriptions."""
-        member = MemberFactory(role="member")  # Not admin
+        member = MemberFactory.create(role="member")  # Not admin
         request = authenticated_request(member, method="post", path="/api/v1/hooks")
 
         payload = RestHookSubscribeRequest(
@@ -40,7 +40,7 @@ class TestAuthorization:
 
     def test_non_admin_cannot_list_subscriptions(self, authenticated_request):
         """Only admins can list subscriptions."""
-        member = MemberFactory(role="member")
+        member = MemberFactory.create(role="member")
         request = authenticated_request(member, method="get", path="/api/v1/hooks")
 
         from ninja.errors import HttpError
@@ -52,7 +52,7 @@ class TestAuthorization:
 
     def test_non_admin_cannot_unsubscribe(self, authenticated_request):
         """Only admins can delete subscriptions."""
-        member = MemberFactory(role="member")
+        member = MemberFactory.create(role="member")
 
         endpoint = WebhookEndpoint.objects.create(
             organization=member.organization,
@@ -78,7 +78,7 @@ class TestSubscribe:
     """Tests for POST /api/v1/hooks (subscribe)."""
 
     def test_subscribe_creates_endpoint(self, authenticated_request):
-        member = MemberFactory(role="admin")
+        member = MemberFactory.create(role="admin")
         request = authenticated_request(member, method="post", path="/api/v1/hooks")
 
         payload = RestHookSubscribeRequest(
@@ -99,7 +99,7 @@ class TestSubscribe:
         assert endpoint.organization == member.organization
 
     def test_subscribe_detects_make_source(self, authenticated_request):
-        member = MemberFactory(role="admin")
+        member = MemberFactory.create(role="admin")
         request = authenticated_request(member, method="post", path="/api/v1/hooks")
 
         payload = RestHookSubscribeRequest(
@@ -114,7 +114,7 @@ class TestSubscribe:
         assert endpoint.source == WebhookEndpoint.Source.MAKE
 
     def test_subscribe_detects_generic_rest_hooks(self, authenticated_request):
-        member = MemberFactory(role="admin")
+        member = MemberFactory.create(role="admin")
         request = authenticated_request(member, method="post", path="/api/v1/hooks")
 
         payload = RestHookSubscribeRequest(
@@ -130,7 +130,7 @@ class TestSubscribe:
 
     def test_subscribe_with_wildcard_event(self, authenticated_request):
         """Wildcard event types like member.* should work."""
-        member = MemberFactory(role="admin")
+        member = MemberFactory.create(role="admin")
         request = authenticated_request(member, method="post", path="/api/v1/hooks")
 
         payload = RestHookSubscribeRequest(
@@ -168,7 +168,7 @@ class TestUnsubscribe:
     """Tests for DELETE /api/v1/hooks/{id} (unsubscribe)."""
 
     def test_unsubscribe_deletes_endpoint(self, authenticated_request):
-        member = MemberFactory(role="admin")
+        member = MemberFactory.create(role="admin")
 
         # Create a subscription first
         endpoint = WebhookEndpoint.objects.create(
@@ -187,7 +187,7 @@ class TestUnsubscribe:
         assert not WebhookEndpoint.objects.filter(id=endpoint.id).exists()
 
     def test_unsubscribe_returns_404_for_unknown_id(self, authenticated_request):
-        member = MemberFactory(role="admin")
+        member = MemberFactory.create(role="admin")
         request = authenticated_request(member, method="delete", path="/api/v1/hooks/x")
 
         from ninja.errors import HttpError
@@ -199,9 +199,9 @@ class TestUnsubscribe:
 
     def test_unsubscribe_cannot_delete_other_orgs_endpoint(self, authenticated_request):
         """Endpoints belong to organizations - can't delete others'."""
-        org1 = OrganizationFactory()
-        org2 = OrganizationFactory()
-        member2 = MemberFactory(organization=org2, role="admin")
+        org1 = OrganizationFactory.create()
+        org2 = OrganizationFactory.create()
+        member2 = MemberFactory.create(organization=org2, role="admin")
 
         # Create endpoint for org1
         endpoint = WebhookEndpoint.objects.create(
@@ -229,7 +229,7 @@ class TestListSubscriptions:
     """Tests for GET /api/v1/hooks (list)."""
 
     def test_list_returns_rest_hook_subscriptions(self, authenticated_request):
-        member = MemberFactory(role="admin")
+        member = MemberFactory.create(role="admin")
 
         # Create mixed endpoints
         _manual = WebhookEndpoint.objects.create(
@@ -256,9 +256,9 @@ class TestListSubscriptions:
 
     def test_list_does_not_include_other_orgs(self, authenticated_request):
         """Subscriptions are scoped to organization."""
-        org1 = OrganizationFactory()
-        org2 = OrganizationFactory()
-        member1 = MemberFactory(organization=org1, role="admin")
+        org1 = OrganizationFactory.create()
+        org2 = OrganizationFactory.create()
+        member1 = MemberFactory.create(organization=org1, role="admin")
 
         # Create endpoints for each org
         _ep1 = WebhookEndpoint.objects.create(
@@ -287,7 +287,7 @@ class TestGetSample:
     """Tests for GET /api/v1/hooks/samples/{event_type}."""
 
     def test_get_sample_returns_payload(self, authenticated_request):
-        member = MemberFactory(role="admin")
+        member = MemberFactory.create(role="admin")
         request = authenticated_request(
             member, method="get", path="/api/v1/hooks/samples/member.created"
         )
@@ -304,7 +304,7 @@ class TestGetSample:
         assert "timestamp" in result.sample_payload
 
     def test_get_sample_returns_404_for_unknown_event(self, authenticated_request):
-        member = MemberFactory(role="admin")
+        member = MemberFactory.create(role="admin")
         request = authenticated_request(
             member, method="get", path="/api/v1/hooks/samples/unknown.event"
         )
@@ -321,8 +321,8 @@ class TestAuthTest:
     """Tests for GET /api/v1/hooks/auth/test."""
 
     def test_auth_test_returns_org_info(self, authenticated_request):
-        org = OrganizationFactory(name="Test Company")
-        member = MemberFactory(organization=org, role="admin")
+        org = OrganizationFactory.create(name="Test Company")
+        member = MemberFactory.create(organization=org, role="admin")
         request = authenticated_request(member, method="get", path="/api/v1/hooks/auth/test")
 
         result = verify_auth(request)

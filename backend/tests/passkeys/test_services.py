@@ -27,7 +27,7 @@ def passkey_service() -> PasskeyService:
 @pytest.fixture
 def user_with_member(db):
     """Create a user with an organization membership."""
-    member = MemberFactory()
+    member = MemberFactory.create()
     return member.user, member
 
 
@@ -66,7 +66,7 @@ class TestPasskeyServiceRegistration:
         user, member = user_with_member
 
         # Create an existing passkey for the user
-        PasskeyFactory(user=user, credential_id=b"existing_cred_123")
+        PasskeyFactory.create(user=user, credential_id=b"existing_cred_123")
 
         result = passkey_service.generate_registration_options(user=user, member=member)
 
@@ -96,7 +96,7 @@ class TestPasskeyServiceRegistration:
     ):
         """Should reject challenge created for different user."""
         user, member = user_with_member
-        other_user = UserFactory()
+        other_user = UserFactory.create()
 
         # Create challenge for user
         options = passkey_service.generate_registration_options(user=user, member=member)
@@ -166,7 +166,9 @@ class TestPasskeyServiceRegistration:
         user, member = user_with_member
 
         # Create existing passkey
-        existing = PasskeyFactory(user=user, credential_id=b"same_credential", name="Old Name")
+        existing = PasskeyFactory.create(
+            user=user, credential_id=b"same_credential", name="Old Name"
+        )
 
         # Generate options
         options = passkey_service.generate_registration_options(user=user, member=member)
@@ -198,10 +200,10 @@ class TestPasskeyServiceRegistration:
     ):
         """Should reject credential already registered to active user."""
         user, member = user_with_member
-        other_member = MemberFactory()  # Other user with active membership
+        other_member = MemberFactory.create()  # Other user with active membership
 
         # Create passkey owned by other user
-        PasskeyFactory(user=other_member.user, credential_id=b"taken_credential")
+        PasskeyFactory.create(user=other_member.user, credential_id=b"taken_credential")
 
         # Generate options
         options = passkey_service.generate_registration_options(user=user, member=member)
@@ -252,7 +254,7 @@ class TestPasskeyServiceAuthentication:
     ):
         """Should filter credentials by email when provided."""
         user, _ = user_with_member
-        PasskeyFactory(user=user, credential_id=b"user_cred_123")
+        PasskeyFactory.create(user=user, credential_id=b"user_cred_123")
 
         result = passkey_service.generate_authentication_options(email=user.email)
 
@@ -313,9 +315,9 @@ class TestPasskeyServiceAuthentication:
     def test_verify_authentication_success(self, mock_verify, passkey_service: PasskeyService):
         """Should return authenticated user on successful verification."""
         # Create member with passkey
-        member = MemberFactory()
+        member = MemberFactory.create()
         user = member.user
-        passkey = PasskeyFactory(
+        passkey = PasskeyFactory.create(
             user=user,
             credential_id=b"auth_credential_123",
             public_key=b"public_key_data",
@@ -362,10 +364,10 @@ class TestPasskeyServiceAuthentication:
     ):
         """Should filter by organization when specified."""
         # Create user with two memberships
-        user = UserFactory()
-        _member1 = MemberFactory(user=user)
-        member2 = MemberFactory(user=user)
-        _passkey = PasskeyFactory(user=user, credential_id=b"multi_org_cred")
+        user = UserFactory.create()
+        _member1 = MemberFactory.create(user=user)
+        member2 = MemberFactory.create(user=user)
+        _passkey = PasskeyFactory.create(user=user, credential_id=b"multi_org_cred")
 
         # Generate options
         options = passkey_service.generate_authentication_options()
@@ -397,8 +399,8 @@ class TestPasskeyServiceAuthentication:
         self, mock_verify, passkey_service: PasskeyService
     ):
         """Should reject if user not member of specified organization."""
-        member = MemberFactory()
-        _passkey = PasskeyFactory(user=member.user, credential_id=b"wrong_org_cred")
+        member = MemberFactory.create()
+        _passkey = PasskeyFactory.create(user=member.user, credential_id=b"wrong_org_cred")
 
         options = passkey_service.generate_authentication_options()
 
@@ -426,8 +428,8 @@ class TestPasskeyServiceAuthentication:
     ):
         """Should reject if user has no organization memberships."""
         # Create user without any membership
-        user = UserFactory()
-        _passkey = PasskeyFactory(user=user, credential_id=b"no_membership_cred")
+        user = UserFactory.create()
+        _passkey = PasskeyFactory.create(user=user, credential_id=b"no_membership_cred")
 
         options = passkey_service.generate_authentication_options()
 
@@ -454,7 +456,7 @@ class TestPasskeyModel:
     @pytest.mark.django_db
     def test_create_passkey(self):
         """Should create a passkey with all fields."""
-        passkey = PasskeyFactory()
+        passkey = PasskeyFactory.create()
 
         assert passkey.id is not None
         assert passkey.user is not None
@@ -466,7 +468,7 @@ class TestPasskeyModel:
     @pytest.mark.django_db
     def test_credential_id_b64_property(self):
         """Should return base64url encoded credential ID."""
-        passkey = PasskeyFactory(credential_id=b"test_credential")
+        passkey = PasskeyFactory.create(credential_id=b"test_credential")
 
         # Should be base64url encoded without padding
         assert passkey.credential_id_b64 == "dGVzdF9jcmVkZW50aWFs"
@@ -474,7 +476,7 @@ class TestPasskeyModel:
     @pytest.mark.django_db
     def test_passkey_str(self):
         """Should have readable string representation."""
-        user = UserFactory(email="test@example.com")
-        passkey = PasskeyFactory(user=user, name="My iPhone")
+        user = UserFactory.create(email="test@example.com")
+        passkey = PasskeyFactory.create(user=user, name="My iPhone")
 
         assert str(passkey) == "My iPhone (test@example.com)"

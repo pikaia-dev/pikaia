@@ -57,9 +57,9 @@ class TestRequireAdmin:
 
     def test_allows_admin_user(self, request_factory) -> None:
         """Should allow admin users through."""
-        user = UserFactory()
-        org = OrganizationFactory()
-        member = MemberFactory(user=user, organization=org, role="admin")
+        user = UserFactory.create()
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="admin")
 
         request = request_factory.get("/")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -87,9 +87,9 @@ class TestRequireAdmin:
 
     def test_rejects_non_admin_user(self, request_factory) -> None:
         """Should reject non-admin users with 403."""
-        user = UserFactory()
-        org = OrganizationFactory()
-        member = MemberFactory(user=user, organization=org, role="member")
+        user = UserFactory.create()
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="member")
 
         request = request_factory.get("/")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -112,9 +112,9 @@ class TestGetAuthContext:
         """Should return (user, member, org) tuple when authenticated."""
         from apps.core.security import get_auth_context
 
-        user = UserFactory()
-        org = OrganizationFactory()
-        member = MemberFactory(user=user, organization=org)
+        user = UserFactory.create()
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.get("/")
         request.auth = AuthContext(user=user, member=member, organization=org)

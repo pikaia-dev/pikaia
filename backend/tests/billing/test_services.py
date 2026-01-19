@@ -38,7 +38,7 @@ class TestGetOrCreateStripeCustomer:
         mock_get_stripe.return_value = mock_stripe
         mock_stripe.Customer.create.return_value = MagicMock(id="cus_new_123")
 
-        org = OrganizationFactory(stripe_customer_id="")
+        org = OrganizationFactory.create(stripe_customer_id="")
 
         customer_id = get_or_create_stripe_customer(org)
 
@@ -49,7 +49,7 @@ class TestGetOrCreateStripeCustomer:
     @patch("apps.billing.services.get_stripe")
     def test_returns_existing_customer_id(self, mock_get_stripe) -> None:
         """Should return existing customer ID without creating new one."""
-        org = OrganizationFactory(stripe_customer_id="cus_existing_456")
+        org = OrganizationFactory.create(stripe_customer_id="cus_existing_456")
 
         customer_id = get_or_create_stripe_customer(org)
 
@@ -63,7 +63,7 @@ class TestGetOrCreateStripeCustomer:
         mock_get_stripe.return_value = mock_stripe
         mock_stripe.Customer.create.return_value = MagicMock(id="cus_addr_123")
 
-        org = OrganizationFactory(
+        org = OrganizationFactory.create(
             stripe_customer_id="",
             billing_address_line1="123 Main St",
             billing_city="New York",
@@ -83,7 +83,7 @@ class TestGetOrCreateStripeCustomer:
         mock_get_stripe.return_value = mock_stripe
         mock_stripe.Customer.create.return_value = MagicMock(id="cus_eu_123")
 
-        org = OrganizationFactory(
+        org = OrganizationFactory.create(
             stripe_customer_id="",
             billing_country="DE",
             vat_id="DE123456789",
@@ -102,7 +102,7 @@ class TestSyncBillingToStripe:
     @patch("apps.billing.services.get_stripe")
     def test_skips_when_no_customer_id(self, mock_get_stripe) -> None:
         """Should do nothing when org has no Stripe customer."""
-        org = OrganizationFactory(stripe_customer_id="")
+        org = OrganizationFactory.create(stripe_customer_id="")
 
         sync_billing_to_stripe(org)
 
@@ -114,7 +114,7 @@ class TestSyncBillingToStripe:
         mock_stripe = MagicMock()
         mock_get_stripe.return_value = mock_stripe
 
-        org = OrganizationFactory(
+        org = OrganizationFactory.create(
             stripe_customer_id="cus_existing",
             billing_name="Acme Corp",
             billing_address_line1="456 Oak Ave",
@@ -140,7 +140,7 @@ class TestCreateCheckoutSession:
             url="https://checkout.stripe.com/test"
         )
 
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         url = create_checkout_session(
             org=org,
@@ -173,7 +173,7 @@ class TestCreateSubscriptionIntent:
         mock_subscription.latest_invoice.confirmation_secret.client_secret = "pi_secret_test"
         mock_stripe.Subscription.create.return_value = mock_subscription
 
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         client_secret, sub_id = create_subscription_intent(org=org, quantity=3)
 
@@ -228,7 +228,7 @@ class TestSyncSubscriptionQuantity:
     @patch("apps.billing.services.get_stripe")
     def test_skips_when_no_subscription(self, mock_get_stripe) -> None:
         """Should do nothing when org has no subscription."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         sync_subscription_quantity(org)
 
@@ -237,7 +237,7 @@ class TestSyncSubscriptionQuantity:
     @patch("apps.billing.services.get_stripe")
     def test_skips_when_inactive_subscription(self, mock_get_stripe) -> None:
         """Should do nothing when subscription is not active."""
-        sub = SubscriptionFactory(status=Subscription.Status.CANCELED)
+        sub = SubscriptionFactory.create(status=Subscription.Status.CANCELED)
 
         sync_subscription_quantity(sub.organization)
 
@@ -248,9 +248,9 @@ class TestSyncSubscriptionQuantity:
         """Should do nothing when member count matches subscription quantity."""
         from tests.accounts.factories import MemberFactory
 
-        sub = SubscriptionFactory(quantity=2)
-        MemberFactory(organization=sub.organization)
-        MemberFactory(organization=sub.organization)
+        sub = SubscriptionFactory.create(quantity=2)
+        MemberFactory.create(organization=sub.organization)
+        MemberFactory.create(organization=sub.organization)
 
         sync_subscription_quantity(sub.organization)
 
@@ -270,7 +270,7 @@ class TestCreateCustomerPortalSession:
             url="https://billing.stripe.com/portal"
         )
 
-        org = OrganizationFactory(stripe_customer_id="cus_test")
+        org = OrganizationFactory.create(stripe_customer_id="cus_test")
 
         url = create_customer_portal_session(org=org, return_url="https://example.com/billing")
 
@@ -278,7 +278,7 @@ class TestCreateCustomerPortalSession:
 
     def test_raises_when_no_customer(self) -> None:
         """Should raise ValueError when org has no Stripe customer."""
-        org = OrganizationFactory(stripe_customer_id="")
+        org = OrganizationFactory.create(stripe_customer_id="")
 
         with pytest.raises(ValueError, match="no Stripe customer"):
             create_customer_portal_session(org=org, return_url="https://example.com")
@@ -290,7 +290,7 @@ class TestHandleSubscriptionCreated:
 
     def test_creates_subscription_from_stripe_data(self) -> None:
         """Should create local subscription from Stripe webhook data."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         stripe_data = {
             "id": "sub_webhook_123",
@@ -313,7 +313,7 @@ class TestHandleSubscriptionCreated:
 
     def test_handles_legacy_period_format(self) -> None:
         """Should handle old Stripe API format with flat period fields."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         stripe_data = {
             "id": "sub_legacy_123",
@@ -347,7 +347,7 @@ class TestHandleSubscriptionCreated:
 
     def test_updates_existing_subscription(self) -> None:
         """Should update subscription if it already exists."""
-        sub = SubscriptionFactory(
+        sub = SubscriptionFactory.create(
             stripe_subscription_id="sub_existing",
             status=Subscription.Status.INCOMPLETE,
             quantity=1,
@@ -376,7 +376,7 @@ class TestHandleSubscriptionUpdated:
 
     def test_updates_existing_subscription(self) -> None:
         """Should update an existing subscription."""
-        sub = SubscriptionFactory(
+        sub = SubscriptionFactory.create(
             stripe_subscription_id="sub_update_test",
             status=Subscription.Status.ACTIVE,
             quantity=1,
@@ -399,7 +399,7 @@ class TestHandleSubscriptionUpdated:
 
     def test_creates_subscription_if_not_exists(self) -> None:
         """Should create subscription via handle_subscription_created if not found."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         stripe_data = {
             "id": "sub_new_from_update",
@@ -421,7 +421,7 @@ class TestHandleSubscriptionDeleted:
 
     def test_marks_subscription_as_canceled(self) -> None:
         """Should set subscription status to canceled."""
-        sub = SubscriptionFactory(
+        sub = SubscriptionFactory.create(
             stripe_subscription_id="sub_delete_test",
             status=Subscription.Status.ACTIVE,
         )

@@ -22,8 +22,8 @@ class TestPublishEvent:
 
     def test_publish_event_creates_outbox_entry(self):
         """Test that publish_event creates an OutboxEvent."""
-        org = OrganizationFactory()
-        user = UserFactory()
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
 
         event = publish_event(
             event_type="organization.updated",
@@ -49,7 +49,7 @@ class TestPublishEvent:
 
     def test_publish_event_extracts_organization_from_member(self):
         """Test organization_id extraction from member aggregate."""
-        member = MemberFactory()
+        member = MemberFactory.create()
 
         event = publish_event(
             event_type="member.role_changed",
@@ -62,7 +62,7 @@ class TestPublishEvent:
 
     def test_publish_event_system_actor_when_no_user(self):
         """Test system actor when no user provided."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         event = publish_event(
             event_type="subscription.activated",
@@ -82,7 +82,7 @@ class TestPublishEvent:
         set_correlation_id(correlation_id)
 
         try:
-            org = OrganizationFactory()
+            org = OrganizationFactory.create()
             event = publish_event(
                 event_type="organization.created",
                 aggregate=org,
@@ -95,7 +95,7 @@ class TestPublishEvent:
 
     def test_publish_event_validates_payload_size(self):
         """Test that oversized payloads are rejected."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         # Create data that exceeds 256KB
         large_data = {"content": "x" * (MAX_PAYLOAD_SIZE_BYTES + 1000)}
@@ -109,7 +109,7 @@ class TestPublishEvent:
 
     def test_publish_event_atomic_with_transaction(self):
         """Test event is created atomically with business data."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         try:
             with transaction.atomic():
@@ -140,8 +140,8 @@ class TestCreateAuditLog:
 
     def test_create_audit_log_basic(self):
         """Test creating a basic audit log entry."""
-        org = OrganizationFactory()
-        user = UserFactory()
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
 
         log = create_audit_log(
             action="organization.billing_updated",
@@ -158,8 +158,8 @@ class TestCreateAuditLog:
 
     def test_create_audit_log_with_context(self):
         """Test audit log with request context."""
-        org = OrganizationFactory()
-        user = UserFactory()
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
 
         log = create_audit_log(
             action="member.removed",
@@ -200,8 +200,8 @@ class TestPublishEventRequestContext:
         """Test that publish_event enriches data with IP and user-agent from contextvars."""
         import structlog
 
-        org = OrganizationFactory()
-        user = UserFactory()
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
 
         # Simulate middleware binding request context
         structlog.contextvars.bind_contextvars(
@@ -231,7 +231,7 @@ class TestPublishEventRequestContext:
         """Test that publish_event handles missing request context gracefully."""
         import structlog
 
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         # Ensure no request context is bound
         structlog.contextvars.clear_contextvars()
@@ -252,7 +252,7 @@ class TestPublishEventRequestContext:
         """Test that explicit data takes precedence over auto-enriched context."""
         import structlog
 
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         # Bind context with middleware IP
         structlog.contextvars.bind_contextvars(

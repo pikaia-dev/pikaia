@@ -36,6 +36,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "pytest-django>=4.11",
     "ruff>=0.14",
+    "types-factory-boy>=0.4.1",
 ]
 
 [tool.ruff]

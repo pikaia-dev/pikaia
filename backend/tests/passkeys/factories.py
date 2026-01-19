@@ -3,12 +3,13 @@ Factory for Passkey model.
 """
 
 import factory
+from factory.django import DjangoModelFactory
 
 from apps.passkeys.models import Passkey
 from tests.accounts.factories import UserFactory
 
 
-class PasskeyFactory(factory.django.DjangoModelFactory):
+class PasskeyFactory(DjangoModelFactory[Passkey]):
     """Factory for creating Passkey instances."""
 
     class Meta:

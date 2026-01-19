@@ -16,43 +16,43 @@ class TestSubscriptionModel:
 
     def test_str_representation(self) -> None:
         """Should return org name and status."""
-        sub = SubscriptionFactory(status=Subscription.Status.ACTIVE)
+        sub = SubscriptionFactory.create(status=Subscription.Status.ACTIVE)
         assert sub.organization.name in str(sub)
         assert "active" in str(sub)
 
     def test_is_active_when_active(self) -> None:
         """Should return True when status is active."""
-        sub = SubscriptionFactory(status=Subscription.Status.ACTIVE)
+        sub = SubscriptionFactory.create(status=Subscription.Status.ACTIVE)
         assert sub.is_active is True
 
     def test_is_active_when_trialing(self) -> None:
         """Should return True when status is trialing."""
-        sub = SubscriptionFactory(status=Subscription.Status.TRIALING)
+        sub = SubscriptionFactory.create(status=Subscription.Status.TRIALING)
         assert sub.is_active is True
 
     def test_is_active_when_past_due(self) -> None:
         """Should return False when status is past_due."""
-        sub = SubscriptionFactory(status=Subscription.Status.PAST_DUE)
+        sub = SubscriptionFactory.create(status=Subscription.Status.PAST_DUE)
         assert sub.is_active is False
 
     def test_is_active_when_canceled(self) -> None:
         """Should return False when status is canceled."""
-        sub = SubscriptionFactory(status=Subscription.Status.CANCELED)
+        sub = SubscriptionFactory.create(status=Subscription.Status.CANCELED)
         assert sub.is_active is False
 
     def test_is_active_when_incomplete(self) -> None:
         """Should return False when status is incomplete."""
-        sub = SubscriptionFactory(status=Subscription.Status.INCOMPLETE)
+        sub = SubscriptionFactory.create(status=Subscription.Status.INCOMPLETE)
         assert sub.is_active is False
 
     def test_is_active_when_unpaid(self) -> None:
         """Should return False when status is unpaid."""
-        sub = SubscriptionFactory(status=Subscription.Status.UNPAID)
+        sub = SubscriptionFactory.create(status=Subscription.Status.UNPAID)
         assert sub.is_active is False
 
     def test_is_active_when_paused(self) -> None:
         """Should return False when status is paused."""
-        sub = SubscriptionFactory(status=Subscription.Status.PAUSED)
+        sub = SubscriptionFactory.create(status=Subscription.Status.PAUSED)
         assert sub.is_active is False
 
 
@@ -62,19 +62,19 @@ class TestSubscriptionConstraints:
 
     def test_stripe_subscription_id_is_unique(self) -> None:
         """Should enforce unique constraint on stripe_subscription_id."""
-        _sub1 = SubscriptionFactory(stripe_subscription_id="sub_same_id")
+        _sub1 = SubscriptionFactory.create(stripe_subscription_id="sub_same_id")
 
         with pytest.raises(IntegrityError):
-            SubscriptionFactory(
+            SubscriptionFactory.create(
                 stripe_subscription_id="sub_same_id",
             )
 
     def test_one_subscription_per_org(self) -> None:
         """Should enforce OneToOne relationship with organization."""
-        sub = SubscriptionFactory()
+        sub = SubscriptionFactory.create()
 
         with pytest.raises(IntegrityError):
-            SubscriptionFactory(
+            SubscriptionFactory.create(
                 organization=sub.organization,
                 stripe_subscription_id="sub_different_id",
             )
@@ -82,7 +82,7 @@ class TestSubscriptionConstraints:
     def test_quantity_must_be_positive(self) -> None:
         """Quantity should be a positive integer (enforced by database check constraint)."""
         with pytest.raises(IntegrityError):
-            SubscriptionFactory(quantity=-1)
+            SubscriptionFactory.create(quantity=-1)
 
 
 @pytest.mark.django_db
@@ -91,12 +91,12 @@ class TestSubscriptionTimestamps:
 
     def test_created_at_set_on_create(self) -> None:
         """Should set created_at automatically."""
-        sub = SubscriptionFactory()
+        sub = SubscriptionFactory.create()
         assert sub.created_at is not None
 
     def test_updated_at_changes_on_save(self) -> None:
         """Should update updated_at on each save."""
-        sub = SubscriptionFactory()
+        sub = SubscriptionFactory.create()
         original_updated = sub.updated_at
 
         sub.status = Subscription.Status.PAST_DUE

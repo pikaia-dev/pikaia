@@ -20,9 +20,9 @@ class TestSendVerificationOTPEndpoint:
 
     def test_sends_otp_when_authenticated(self, request_factory: RequestFactory) -> None:
         """Should send OTP for authenticated user."""
-        user = UserFactory()
-        org = OrganizationFactory()
-        _member = MemberFactory(user=user, organization=org)
+        user = UserFactory.create()
+        org = OrganizationFactory.create()
+        _member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/phone/send")
         request.auth = AuthContext(user=user, member=_member, organization=org)
@@ -52,9 +52,9 @@ class TestSendVerificationOTPEndpoint:
 
     def test_rate_limits_requests(self, request_factory: RequestFactory) -> None:
         """Should return 429 when rate limited."""
-        user = UserFactory()
-        org = OrganizationFactory()
-        member = MemberFactory(user=user, organization=org)
+        user = UserFactory.create()
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/phone/send")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -78,9 +78,9 @@ class TestSendVerificationOTPEndpoint:
         """Should return 400 when SMS sending fails."""
         from apps.sms.aws_client import SMSError
 
-        user = UserFactory()
-        org = OrganizationFactory()
-        member = MemberFactory(user=user, organization=org)
+        user = UserFactory.create()
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/phone/send")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -102,9 +102,9 @@ class TestVerifyPhoneOTPEndpoint:
 
     def test_verifies_phone_successfully(self, request_factory: RequestFactory) -> None:
         """Should verify phone and return success."""
-        user = UserFactory(phone_number="", phone_verified_at=None)
-        org = OrganizationFactory()
-        member = MemberFactory(user=user, organization=org)
+        user = UserFactory.create(phone_number="", phone_verified_at=None)
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
         phone = "+14155551234"
 
         # First send OTP
@@ -145,9 +145,9 @@ class TestVerifyPhoneOTPEndpoint:
 
     def test_rejects_invalid_code(self, request_factory: RequestFactory) -> None:
         """Should return 400 for invalid OTP code."""
-        user = UserFactory()
-        org = OrganizationFactory()
-        member = MemberFactory(user=user, organization=org)
+        user = UserFactory.create()
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
         phone = "+14155551234"
 
         # Send OTP
@@ -176,9 +176,9 @@ class TestVerifyPhoneOTPEndpoint:
 
         from django.utils import timezone
 
-        user = UserFactory()
-        org = OrganizationFactory()
-        member = MemberFactory(user=user, organization=org)
+        user = UserFactory.create()
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
         phone = "+14155551234"
 
         # Send OTP and expire it

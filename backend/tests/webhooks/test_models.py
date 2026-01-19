@@ -54,7 +54,7 @@ class TestWebhookEndpoint:
 
     def test_creates_with_defaults(self) -> None:
         """Should create endpoint with default values."""
-        endpoint = WebhookEndpointFactory()
+        endpoint = WebhookEndpointFactory.create()
 
         assert endpoint.active is True
         assert endpoint.consecutive_failures == 0
@@ -64,7 +64,7 @@ class TestWebhookEndpoint:
 
     def test_regenerate_secret(self) -> None:
         """Should generate new secret and save."""
-        endpoint = WebhookEndpointFactory()
+        endpoint = WebhookEndpointFactory.create()
         old_secret = endpoint.secret
 
         new_secret = endpoint.regenerate_secret()
@@ -75,7 +75,7 @@ class TestWebhookEndpoint:
 
     def test_record_delivery_success(self) -> None:
         """Should update status on delivery success."""
-        endpoint = WebhookEndpointFactory(consecutive_failures=3)
+        endpoint = WebhookEndpointFactory.create(consecutive_failures=3)
 
         endpoint.record_delivery_success()
 
@@ -86,7 +86,7 @@ class TestWebhookEndpoint:
 
     def test_record_delivery_failure(self) -> None:
         """Should increment failures on delivery failure."""
-        endpoint = WebhookEndpointFactory(consecutive_failures=2)
+        endpoint = WebhookEndpointFactory.create(consecutive_failures=2)
 
         endpoint.record_delivery_failure()
 
@@ -102,7 +102,7 @@ class TestWebhookDelivery:
 
     def test_creates_with_defaults(self) -> None:
         """Should create delivery with default values."""
-        delivery = WebhookDeliveryFactory()
+        delivery = WebhookDeliveryFactory.create()
 
         assert delivery.status == WebhookDelivery.Status.PENDING
         assert delivery.attempt_number == 1
@@ -110,7 +110,7 @@ class TestWebhookDelivery:
 
     def test_mark_success(self) -> None:
         """Should mark delivery as successful."""
-        delivery = WebhookDeliveryFactory()
+        delivery = WebhookDeliveryFactory.create()
 
         delivery.mark_success(
             http_status=200,
@@ -127,7 +127,7 @@ class TestWebhookDelivery:
 
     def test_mark_failure_schedules_retry(self) -> None:
         """Should schedule retry on failure."""
-        delivery = WebhookDeliveryFactory(attempt_number=1)
+        delivery = WebhookDeliveryFactory.create(attempt_number=1)
 
         delivery.mark_failure(
             error_type=WebhookDelivery.ErrorType.HTTP_ERROR,
@@ -143,7 +143,7 @@ class TestWebhookDelivery:
 
     def test_mark_failure_terminal_no_retry(self) -> None:
         """Should not retry on terminal failure."""
-        delivery = WebhookDeliveryFactory(attempt_number=1)
+        delivery = WebhookDeliveryFactory.create(attempt_number=1)
 
         delivery.mark_failure(
             error_type=WebhookDelivery.ErrorType.HTTP_ERROR,
@@ -157,7 +157,7 @@ class TestWebhookDelivery:
 
     def test_mark_failure_after_max_attempts(self) -> None:
         """Should fail permanently after max attempts."""
-        delivery = WebhookDeliveryFactory(attempt_number=6)  # At max
+        delivery = WebhookDeliveryFactory.create(attempt_number=6)  # At max
 
         delivery.mark_failure(
             error_type=WebhookDelivery.ErrorType.TIMEOUT,
@@ -170,7 +170,7 @@ class TestWebhookDelivery:
 
     def test_create_for_event_is_idempotent(self) -> None:
         """Should return existing delivery if already exists."""
-        endpoint = WebhookEndpointFactory()
+        endpoint = WebhookEndpointFactory.create()
         event_id = "evt_test_123"
 
         delivery1 = WebhookDelivery.create_for_event(
@@ -189,7 +189,7 @@ class TestWebhookDelivery:
 
     def test_truncates_long_response_snippet(self) -> None:
         """Should truncate response snippets over 500 chars."""
-        delivery = WebhookDeliveryFactory()
+        delivery = WebhookDeliveryFactory.create()
         long_response = "x" * 1000
 
         delivery.mark_success(
@@ -221,24 +221,24 @@ class TestUniqueConstraint:
 
     def test_allows_same_event_to_different_endpoints(self) -> None:
         """Should allow same event to be delivered to different endpoints."""
-        endpoint1 = WebhookEndpointFactory()
-        endpoint2 = WebhookEndpointFactory()
+        endpoint1 = WebhookEndpointFactory.create()
+        endpoint2 = WebhookEndpointFactory.create()
         event_id = "evt_shared_123"
 
-        delivery1 = WebhookDeliveryFactory(endpoint=endpoint1, event_id=event_id)
-        delivery2 = WebhookDeliveryFactory(endpoint=endpoint2, event_id=event_id)
+        delivery1 = WebhookDeliveryFactory.create(endpoint=endpoint1, event_id=event_id)
+        delivery2 = WebhookDeliveryFactory.create(endpoint=endpoint2, event_id=event_id)
 
         assert delivery1.id != delivery2.id
         assert WebhookDelivery.objects.filter(event_id=event_id).count() == 2
 
     def test_prevents_duplicate_delivery_to_same_endpoint(self) -> None:
         """Should prevent duplicate deliveries to same endpoint."""
-        endpoint = WebhookEndpointFactory()
+        endpoint = WebhookEndpointFactory.create()
         event_id = "evt_unique_123"
 
-        WebhookDeliveryFactory(endpoint=endpoint, event_id=event_id)
+        WebhookDeliveryFactory.create(endpoint=endpoint, event_id=event_id)
 
         from django.db import IntegrityError
 
         with pytest.raises(IntegrityError):
-            WebhookDeliveryFactory(endpoint=endpoint, event_id=event_id)
+            WebhookDeliveryFactory.create(endpoint=endpoint, event_id=event_id)

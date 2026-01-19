@@ -41,7 +41,7 @@ class TestGetOrCreateUserFromStytch:
 
     def test_preserves_existing_user_name(self) -> None:
         """Should preserve existing user's name when they join another org."""
-        existing = UserFactory(
+        existing = UserFactory.create(
             email="existing@example.com",
             name="Original Name",
         )
@@ -57,7 +57,7 @@ class TestGetOrCreateUserFromStytch:
 
     def test_sets_name_when_user_has_none(self) -> None:
         """Should set name when existing user doesn't have one."""
-        existing = UserFactory(
+        existing = UserFactory.create(
             email="existing@example.com",
             name="",  # No name set
         )
@@ -91,7 +91,7 @@ class TestGetOrCreateOrganizationFromStytch:
 
     def test_updates_existing_organization(self) -> None:
         """Should update an existing organization when one exists."""
-        existing = OrganizationFactory(
+        existing = OrganizationFactory.create(
             stytch_org_id="org-existing-123",
             name="Old Corp",
             slug="old-corp",
@@ -115,8 +115,8 @@ class TestGetOrCreateMemberFromStytch:
 
     def test_creates_new_member(self) -> None:
         """Should create a new member when none exists."""
-        user = UserFactory()
-        org = OrganizationFactory()
+        user = UserFactory.create()
+        org = OrganizationFactory.create()
 
         member = get_or_create_member_from_stytch(
             user=user,
@@ -133,7 +133,7 @@ class TestGetOrCreateMemberFromStytch:
 
     def test_updates_existing_member_role(self) -> None:
         """Should update role when member already exists."""
-        existing = MemberFactory(
+        existing = MemberFactory.create(
             stytch_member_id="member-existing-123",
             role="member",
         )
@@ -239,8 +239,8 @@ class TestSyncSessionEdgeCases:
 
     def test_admin_role_detection(self) -> None:
         """When the Stytch member has the admin flag, the Member role should be 'admin'."""
-        org = OrganizationFactory()
-        user = UserFactory()
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
         # Stytch objects are simple mocks with the needed attributes
         stytch_member = type(
             "StytchMember",
@@ -268,8 +268,8 @@ class TestSyncSessionEdgeCases:
 
     def test_member_role_detection_when_no_roles(self) -> None:
         """When the Stytch member has no roles list, default to 'member'."""
-        org = OrganizationFactory()
-        user = UserFactory()
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
         stytch_member = type(
             "StytchMember",
             (),
@@ -299,7 +299,7 @@ class TestUpdateExistingRecords:
 
     def test_preserve_user_name_on_sync(self) -> None:
         """Syncing an existing user should preserve their name, not overwrite it."""
-        existing = UserFactory(name="Original Name")
+        existing = UserFactory.create(name="Original Name")
         updated_user = get_or_create_user_from_stytch(
             email=existing.email,
             name="Name From New Org",
@@ -309,9 +309,9 @@ class TestUpdateExistingRecords:
 
     def test_update_member_role(self) -> None:
         """If a Member already exists, calling get_or_create_member_from_stytch with a new role updates it."""
-        user = UserFactory()
-        org = OrganizationFactory()
-        member = MemberFactory(user=user, organization=org, role="member")
+        user = UserFactory.create()
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="member")
         # Call with admin role – should update the existing record
         updated_member = get_or_create_member_from_stytch(
             user=user,
@@ -329,9 +329,9 @@ class TestListOrganizationMembers:
 
     def test_returns_all_active_members(self) -> None:
         """Should return all active members of the organization."""
-        org = OrganizationFactory()
-        member1 = MemberFactory(organization=org, role="admin")
-        member2 = MemberFactory(organization=org, role="member")
+        org = OrganizationFactory.create()
+        member1 = MemberFactory.create(organization=org, role="admin")
+        member2 = MemberFactory.create(organization=org, role="member")
 
         members, total = list_organization_members(org)
 
@@ -342,7 +342,7 @@ class TestListOrganizationMembers:
 
     def test_returns_empty_list_for_org_with_no_members(self) -> None:
         """Should return empty list when organization has no members."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         members, total = list_organization_members(org)
 
@@ -351,10 +351,10 @@ class TestListOrganizationMembers:
 
     def test_excludes_members_from_other_orgs(self) -> None:
         """Should only return members from the specified organization."""
-        org1 = OrganizationFactory()
-        org2 = OrganizationFactory()
-        member1 = MemberFactory(organization=org1)
-        MemberFactory(organization=org2)  # Should not be included
+        org1 = OrganizationFactory.create()
+        org2 = OrganizationFactory.create()
+        member1 = MemberFactory.create(organization=org1)
+        MemberFactory.create(organization=org2)  # Should not be included
 
         members, total = list_organization_members(org1)
 
@@ -364,9 +364,9 @@ class TestListOrganizationMembers:
 
     def test_uses_select_related_for_user(self) -> None:
         """Should prefetch user data to avoid N+1 queries."""
-        org = OrganizationFactory()
-        MemberFactory(organization=org)
-        MemberFactory(organization=org)
+        org = OrganizationFactory.create()
+        MemberFactory.create(organization=org)
+        MemberFactory.create(organization=org)
 
         members, _ = list_organization_members(org)
 
@@ -377,9 +377,9 @@ class TestListOrganizationMembers:
 
     def test_orders_by_created_at(self) -> None:
         """Should return members ordered by creation time."""
-        org = OrganizationFactory()
-        member1 = MemberFactory(organization=org)
-        member2 = MemberFactory(organization=org)
+        org = OrganizationFactory.create()
+        member1 = MemberFactory.create(organization=org)
+        member2 = MemberFactory.create(organization=org)
 
         members, _ = list_organization_members(org)
 
@@ -389,10 +389,10 @@ class TestListOrganizationMembers:
 
     def test_pagination_with_limit(self) -> None:
         """Should return only limited number of members."""
-        org = OrganizationFactory()
-        MemberFactory(organization=org)
-        MemberFactory(organization=org)
-        MemberFactory(organization=org)
+        org = OrganizationFactory.create()
+        MemberFactory.create(organization=org)
+        MemberFactory.create(organization=org)
+        MemberFactory.create(organization=org)
 
         members, total = list_organization_members(org, limit=2)
 
@@ -401,10 +401,10 @@ class TestListOrganizationMembers:
 
     def test_pagination_with_offset(self) -> None:
         """Should skip members with offset."""
-        org = OrganizationFactory()
-        _first = MemberFactory(organization=org)
-        second = MemberFactory(organization=org)
-        third = MemberFactory(organization=org)
+        org = OrganizationFactory.create()
+        _first = MemberFactory.create(organization=org)
+        second = MemberFactory.create(organization=org)
+        third = MemberFactory.create(organization=org)
 
         members, total = list_organization_members(org, offset=1)
 
@@ -415,11 +415,11 @@ class TestListOrganizationMembers:
 
     def test_pagination_with_offset_and_limit(self) -> None:
         """Should apply both offset and limit."""
-        org = OrganizationFactory()
-        _first = MemberFactory(organization=org)
-        second = MemberFactory(organization=org)
-        _third = MemberFactory(organization=org)
-        _fourth = MemberFactory(organization=org)
+        org = OrganizationFactory.create()
+        _first = MemberFactory.create(organization=org)
+        second = MemberFactory.create(organization=org)
+        _third = MemberFactory.create(organization=org)
+        _fourth = MemberFactory.create(organization=org)
 
         members, total = list_organization_members(org, offset=1, limit=1)
 
@@ -436,7 +436,7 @@ class TestInviteMember:
     @patch("apps.billing.services.sync_subscription_quantity")
     def test_invites_new_member(self, mock_sync_qty: MagicMock, mock_stytch: MagicMock) -> None:
         """Should create a new member via Stytch and sync locally."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         # Configure mock Stytch client
         mock_client = MagicMock()
@@ -470,7 +470,7 @@ class TestInviteMember:
     @patch("apps.billing.services.sync_subscription_quantity")
     def test_invites_admin_member(self, mock_sync_qty: MagicMock, mock_stytch: MagicMock) -> None:
         """Should create admin member and set role in Stytch."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         mock_client = MagicMock()
         mock_stytch.return_value = mock_client
@@ -498,9 +498,9 @@ class TestInviteMember:
         self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
     ) -> None:
         """Should return invite_sent=False for already active member."""
-        org = OrganizationFactory()
-        existing_user = UserFactory(email="existing@example.com")
-        MemberFactory(user=existing_user, organization=org, stytch_member_id="existing-123")
+        org = OrganizationFactory.create()
+        existing_user = UserFactory.create(email="existing@example.com")
+        MemberFactory.create(user=existing_user, organization=org, stytch_member_id="existing-123")
 
         mock_client = MagicMock()
         mock_stytch.return_value = mock_client
@@ -526,7 +526,7 @@ class TestInviteMember:
         self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
     ) -> None:
         """Should return invite_sent='pending' for already invited member."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         mock_client = MagicMock()
         mock_stytch.return_value = mock_client
@@ -551,7 +551,7 @@ class TestInviteMember:
         self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
     ) -> None:
         """Should reactivate a previously deleted member."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         mock_client = MagicMock()
         mock_stytch.return_value = mock_client
@@ -577,7 +577,7 @@ class TestInviteMember:
         self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
     ) -> None:
         """Should sync subscription quantity after invite."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         mock_client = MagicMock()
         mock_stytch.return_value = mock_client
@@ -596,7 +596,7 @@ class TestUpdateMemberRole:
     @patch("apps.accounts.stytch_client.get_stytch_client")
     def test_updates_role_to_admin(self, mock_stytch: MagicMock) -> None:
         """Should update member role to admin in both local DB and Stytch."""
-        member = MemberFactory(role="member")
+        member = MemberFactory.create(role="member")
 
         mock_client = MagicMock()
         mock_stytch.return_value = mock_client
@@ -613,7 +613,7 @@ class TestUpdateMemberRole:
     @patch("apps.accounts.stytch_client.get_stytch_client")
     def test_updates_role_to_member(self, mock_stytch: MagicMock) -> None:
         """Should update member role from admin to member."""
-        member = MemberFactory(role="admin")
+        member = MemberFactory.create(role="admin")
 
         mock_client = MagicMock()
         mock_stytch.return_value = mock_client
@@ -631,7 +631,7 @@ class TestUpdateMemberRole:
     @patch("apps.accounts.stytch_client.get_stytch_client")
     def test_returns_updated_member(self, mock_stytch: MagicMock) -> None:
         """Should return the updated member object."""
-        member = MemberFactory(role="member")
+        member = MemberFactory.create(role="member")
         original_id = member.id
 
         mock_client = MagicMock()
@@ -651,7 +651,7 @@ class TestSoftDeleteMember:
     @patch("apps.billing.services.sync_subscription_quantity")
     def test_soft_deletes_locally(self, mock_sync_qty: MagicMock, mock_stytch: MagicMock) -> None:
         """Should soft delete member locally (set deleted_at)."""
-        member = MemberFactory()
+        member = MemberFactory.create()
         member_id = member.id
 
         mock_client = MagicMock()
@@ -667,7 +667,7 @@ class TestSoftDeleteMember:
     @patch("apps.billing.services.sync_subscription_quantity")
     def test_deletes_from_stytch(self, mock_sync_qty: MagicMock, mock_stytch: MagicMock) -> None:
         """Should delete member from Stytch."""
-        member = MemberFactory()
+        member = MemberFactory.create()
         org_stytch_id = member.organization.stytch_org_id
         stytch_member_id = member.stytch_member_id
 
@@ -687,7 +687,7 @@ class TestSoftDeleteMember:
         self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
     ) -> None:
         """Should sync subscription quantity after delete."""
-        member = MemberFactory()
+        member = MemberFactory.create()
         org = member.organization
 
         mock_client = MagicMock()
@@ -703,7 +703,7 @@ class TestSoftDeleteMember:
         self, mock_sync_qty: MagicMock, mock_stytch: MagicMock
     ) -> None:
         """Deleted member should not appear in default queryset."""
-        member = MemberFactory()
+        member = MemberFactory.create()
         org = member.organization
 
         mock_client = MagicMock()
@@ -724,12 +724,12 @@ class TestBulkInviteMembers:
     @patch("apps.accounts.services.invite_member")
     def test_invites_multiple_members(self, mock_invite: MagicMock) -> None:
         """Should invite multiple members and return results."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         # Mock successful invites
         mock_invite.side_effect = [
-            (MemberFactory(stytch_member_id="stytch-1"), True),
-            (MemberFactory(stytch_member_id="stytch-2"), True),
+            (MemberFactory.create(stytch_member_id="stytch-1"), True),
+            (MemberFactory.create(stytch_member_id="stytch-2"), True),
         ]
 
         members_data = [
@@ -750,11 +750,11 @@ class TestBulkInviteMembers:
         """Should handle mix of successful and failed invites."""
         from stytch.core.response_base import StytchError, StytchErrorDetails
 
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         # First succeeds, second fails
         mock_invite.side_effect = [
-            (MemberFactory(stytch_member_id="stytch-1"), True),
+            (MemberFactory.create(stytch_member_id="stytch-1"), True),
             StytchError(
                 StytchErrorDetails(
                     status_code=400,
@@ -782,9 +782,9 @@ class TestBulkInviteMembers:
     @patch("apps.accounts.services.invite_member")
     def test_stores_phone_number_unverified(self, mock_invite: MagicMock) -> None:
         """Should store phone number on user as unverified."""
-        org = OrganizationFactory()
-        user = UserFactory(phone_number="", phone_verified_at=None)
-        member = MemberFactory(user=user, organization=org, stytch_member_id="stytch-1")
+        org = OrganizationFactory.create()
+        user = UserFactory.create(phone_number="", phone_verified_at=None)
+        member = MemberFactory.create(user=user, organization=org, stytch_member_id="stytch-1")
 
         mock_invite.return_value = (member, True)
 
@@ -806,10 +806,10 @@ class TestBulkInviteMembers:
         """Should not overwrite existing phone if same number."""
         from django.utils import timezone
 
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
         verified_time = timezone.now()
-        user = UserFactory(phone_number="+14155551234", phone_verified_at=verified_time)
-        member = MemberFactory(user=user, organization=org, stytch_member_id="stytch-1")
+        user = UserFactory.create(phone_number="+14155551234", phone_verified_at=verified_time)
+        member = MemberFactory.create(user=user, organization=org, stytch_member_id="stytch-1")
 
         mock_invite.return_value = (member, True)
 
@@ -831,9 +831,9 @@ class TestBulkInviteMembers:
         """Should update phone and clear verification if different number."""
         from django.utils import timezone
 
-        org = OrganizationFactory()
-        user = UserFactory(phone_number="+14155551111", phone_verified_at=timezone.now())
-        member = MemberFactory(user=user, organization=org, stytch_member_id="stytch-1")
+        org = OrganizationFactory.create()
+        user = UserFactory.create(phone_number="+14155551111", phone_verified_at=timezone.now())
+        member = MemberFactory.create(user=user, organization=org, stytch_member_id="stytch-1")
 
         mock_invite.return_value = (member, True)
 
@@ -853,7 +853,7 @@ class TestBulkInviteMembers:
     @patch("apps.accounts.services.invite_member")
     def test_empty_members_list(self, mock_invite: MagicMock) -> None:
         """Should handle empty members list."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         result = bulk_invite_members(organization=org, members_data=[])
 
@@ -866,7 +866,7 @@ class TestBulkInviteMembers:
     @patch("apps.accounts.services.invite_member")
     def test_handles_generic_exception(self, mock_invite: MagicMock) -> None:
         """Should catch and report generic exceptions."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         mock_invite.side_effect = ValueError("Something went wrong")
 
@@ -885,8 +885,8 @@ class TestBulkInviteMembers:
     @patch("apps.accounts.services.invite_member")
     def test_already_active_member_returns_failed(self, mock_invite: MagicMock) -> None:
         """Should report failure when member is already active."""
-        org = OrganizationFactory()
-        member = MemberFactory(organization=org, stytch_member_id="stytch-active")
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(organization=org, stytch_member_id="stytch-active")
 
         # invite_member returns False for active members
         mock_invite.return_value = (member, False)
@@ -907,8 +907,8 @@ class TestBulkInviteMembers:
     @patch("apps.accounts.services.invite_member")
     def test_already_invited_member_returns_failed(self, mock_invite: MagicMock) -> None:
         """Should report failure when member already has pending invitation."""
-        org = OrganizationFactory()
-        member = MemberFactory(organization=org, stytch_member_id="stytch-invited")
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(organization=org, stytch_member_id="stytch-invited")
 
         # invite_member returns "pending" for already invited members
         mock_invite.return_value = (member, "pending")
@@ -929,8 +929,8 @@ class TestBulkInviteMembers:
     @patch("apps.accounts.services.invite_member")
     def test_deduplicates_emails_case_insensitive(self, mock_invite: MagicMock) -> None:
         """Should dedupe emails (case-insensitive), processing only first occurrence."""
-        org = OrganizationFactory()
-        member = MemberFactory(organization=org, stytch_member_id="stytch-new")
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(organization=org, stytch_member_id="stytch-new")
 
         mock_invite.return_value = (member, True)
 
@@ -966,7 +966,7 @@ class TestBulkInviteMembers:
         """Should raise ValueError if batch exceeds MAX_BULK_INVITE_SIZE."""
         from apps.accounts.services import MAX_BULK_INVITE_SIZE
 
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         # Create batch exceeding limit
         members_data = [
