@@ -58,7 +58,8 @@ Coding standards for TypeScript/React frontend.
 **Good:**
 ```typescript
 import { Button } from '@/components/ui/button'
-import { useMembers } from '@/features/members/queries'
+import { useMembers } from '@/features/members/api/queries'
+import type { MemberListItem } from '@/api/types'
 ```
 
 **Bad:**
@@ -69,13 +70,12 @@ import { Button } from '../../components/ui/button'
 ## No Barrel Re-exports
 
 - Don't create `index.ts` files that only re-export (antipattern)
-- `queries/index.ts` and `mutations/index.ts` are fine — they contain actual hook code
 - Import directly from source files
 
 **Good:**
 ```typescript
 import { MembersTable } from '@/features/members/components/members-table'
-import { useDeleteMember } from '@/features/members/mutations'
+import { useDeleteMember } from '@/features/members/api/mutations'
 ```
 
 **Bad:**
@@ -114,6 +114,12 @@ frontend/
 │   ├── app.tsx              # Root component with routes
 │   ├── main.tsx             # Entry point
 │   │
+│   ├── api/                 # API layer (shared across features)
+│   │   ├── client.ts        # API client factory
+│   │   ├── types.ts         # API response/request types
+│   │   ├── use-api.ts       # Authenticated API hook
+│   │   └── query-keys.ts    # TanStack Query key factory
+│   │
 │   ├── components/          # Shared UI components
 │   │   └── ui/              # shadcn primitives (button, card, dialog, etc.)
 │   │
@@ -126,26 +132,21 @@ frontend/
 │   │   └── webhooks/
 │   │
 │   ├── generated/           # Auto-generated code (excluded from linting)
-│   │   ├── api-schema.json  # OpenAPI schema
-│   │   └── api-types.ts     # Generated TypeScript types
+│   │   └── api-types.ts     # Generated TypeScript types (if using codegen)
 │   │
-│   ├── hooks/               # Global hooks (use-api.ts, use-image-upload.ts)
+│   ├── hooks/               # Shared hooks (use-mobile.ts, use-image-upload.ts)
 │   │
 │   ├── layouts/             # Layout components (app-layout.tsx, app-sidebar.tsx)
 │   │
 │   ├── lib/                 # Core utilities
-│   │   ├── api.ts           # API client
 │   │   ├── utils.ts         # Shared utilities (cn, etc.)
-│   │   └── env.ts           # Environment config
+│   │   ├── env.ts           # Environment config
+│   │   └── constants.ts     # App-wide constants
 │   │
-│   ├── pages/               # Page components
-│   │   ├── dashboard.tsx
-│   │   ├── login.tsx
-│   │   └── settings/        # Settings sub-pages
-│   │
-│   └── shared/              # Cross-feature shared code
-│       ├── query-keys.ts    # TanStack Query keys
-│       └── types.ts         # Shared types
+│   └── pages/               # Page components
+│       ├── dashboard.tsx
+│       ├── login.tsx
+│       └── settings/        # Settings sub-pages
 │
 └── tests/                   # Test files (mirrors src/ structure)
     ├── setup.ts
@@ -155,15 +156,34 @@ frontend/
                 └── use-auth-callback.test.ts
 ```
 
+### Shared vs Feature-Specific Code
+
+**Shared code** lives at the top level of `src/`:
+- `api/` — API client, types, and query infrastructure used by all features
+- `components/` — UI components reused across multiple features
+- `hooks/` — Utility hooks not tied to a specific domain (e.g., `use-mobile`, `use-sidebar`)
+- `lib/` — Pure utilities, config, constants
+- `layouts/` — App-wide layout components
+
+**Feature-specific code** lives in `features/{feature}/`:
+- Components, hooks, forms, and utilities that belong to one domain
+- If code is only used within a single feature, it goes in that feature's directory
+
 ### Feature Directory Convention
 
 Each feature in `features/` follows this structure:
 
-- `queries/index.ts` — TanStack Query hooks (useQuery wrappers)
-- `mutations/index.ts` — TanStack mutation hooks (useMutation wrappers)
-- `components/` — Feature-specific UI components (one file per component)
-- `forms/` — React Hook Form components with Zod schemas
-- `utils/` — Feature-specific utilities
-- `hooks/` — Feature-specific hooks (if needed)
-- `types.ts` — Feature-specific TypeScript types
-- `constants.ts` — Feature-specific constants
+```
+features/{feature}/
+├── api/
+│   ├── queries.ts     # TanStack Query hooks (useQuery wrappers)
+│   └── mutations.ts   # TanStack mutation hooks (useMutation wrappers)
+├── components/        # Feature-specific UI components
+├── forms/             # Zod schemas for form validation
+├── hooks/             # Feature-specific hooks (if needed)
+├── utils/             # Feature-specific utilities
+├── types.ts           # Feature-specific TypeScript types
+└── constants.ts       # Feature-specific constants
+```
+
+**API subdirectory**: Each feature's `api/` folder contains query and mutation hooks that use the shared `@/api/use-api` hook and `@/api/query-keys`.
