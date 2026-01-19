@@ -19,15 +19,16 @@ from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFac
 class TestBearerAuth:
     """Tests for BearerAuth authentication class."""
 
-    def test_authenticate_returns_token_when_auth_user_set(self) -> None:
-        """Should return token when request.auth.user is populated."""
-        auth = BearerAuth()
+    def test_authenticate_returns_auth_context_when_user_set(self) -> None:
+        """Should return AuthContext when request.auth.user is populated."""
+        bearer_auth = BearerAuth()
         request = HttpRequest()
-        request.auth = AuthContext(user=MagicMock(spec=User))
+        auth_context = AuthContext(user=MagicMock(spec=User))
+        request.auth = auth_context
 
-        result = auth.authenticate(request, "test-token-123")
+        result = bearer_auth.authenticate(request, "test-token-123")
 
-        assert result == "test-token-123"
+        assert result is auth_context
 
     def test_authenticate_returns_none_when_auth_missing(self) -> None:
         """Should return None when request has no auth attribute."""

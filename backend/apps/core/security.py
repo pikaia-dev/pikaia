@@ -25,18 +25,20 @@ class BearerAuth(HttpBearer):
     This class provides defense-in-depth by verifying authentication succeeded.
     """
 
-    def authenticate(self, request: HttpRequest, token: str) -> str | None:
+    def authenticate(self, request: HttpRequest, token: str) -> AuthContext | None:
         """
         Verify middleware authenticated the user.
 
-        Returns token if user is authenticated, None otherwise (triggers 401).
+        Returns AuthContext if user is authenticated, None otherwise (triggers 401).
+        Django Ninja sets request.auth to this return value, so we return the
+        AuthContext to preserve the middleware's authentication state.
         """
         # Check that middleware validated the JWT and set auth context
         auth: AuthContext | None = getattr(request, "auth", None)
         if auth is None or auth.user is None:
             return None
 
-        return token
+        return auth
 
 
 def require_admin[F: Callable[..., Any]](func: F) -> F:
