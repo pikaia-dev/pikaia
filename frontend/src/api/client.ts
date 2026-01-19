@@ -53,6 +53,11 @@ export function createApiClient(getToken: TokenProvider) {
       throw new Error(error.detail)
     }
 
+    // Handle empty-body responses (204 No Content, 205 Reset Content)
+    if (response.status === 204 || response.status === 205) {
+      return undefined as T
+    }
+
     return response.json() as Promise<T>
   }
 
