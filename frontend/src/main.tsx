@@ -7,9 +7,9 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 
-import App from './App.tsx'
-import { Toaster } from './components/ui/sonner'
-import { config } from './lib/env'
+import App from '@/app'
+import { Toaster } from '@/components/ui/sonner'
+import { config } from '@/lib/env'
 
 // Initialize Stytch client (throws if VITE_STYTCH_PUBLIC_TOKEN is missing)
 const stytchClient = new StytchB2BUIClient(config.stytchPublicToken)

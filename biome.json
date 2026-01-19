@@ -14,8 +14,7 @@
   "files": {
     "includes": [
       "**",
-      "!**/api-schema.json",
-      "!**/api-types.ts",
+      "!**/generated/**",
       "!infra/functions/**/__tests__/**"
     ]
   },

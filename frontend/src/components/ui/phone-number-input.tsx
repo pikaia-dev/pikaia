@@ -19,8 +19,8 @@ import examples from 'libphonenumber-js/mobile/examples'
 import { Check, ChevronDown } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { COUNTRIES, getCountryByCode } from '../../lib/countries'
-import { cn } from '../../lib/utils'
+import { COUNTRIES, getCountryByCode } from '@/lib/countries'
+import { cn } from '@/lib/utils'
 import {
   Command,
   CommandEmpty,

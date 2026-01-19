@@ -21,7 +21,7 @@ TypeScript types are generated from the backend's OpenAPI spec:
 pnpm generate-types   # Requires backend running at localhost:8000
 ```
 
-> Run this after any backend API changes to regenerate `src/lib/api-types.ts`.
+> Run this after any backend API changes to regenerate `src/generated/api-types.ts`.
 
 ## Structure
 
@@ -29,10 +29,12 @@ pnpm generate-types   # Requires backend running at localhost:8000
 src/
 ├── components/ui/    # shadcn-ui components
 ├── features/         # Feature modules (queries, mutations, forms, components)
+├── generated/        # Auto-generated API types (excluded from linting)
 ├── hooks/            # Custom React hooks
 ├── layouts/          # Page layouts
 ├── lib/              # Utilities, API client, constants
 ├── pages/            # Route pages
+├── shared/           # Cross-feature shared code
 └── test/             # Test setup
 ```
 
