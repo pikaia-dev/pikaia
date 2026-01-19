@@ -27,15 +27,18 @@ pnpm generate-types   # Requires backend running at localhost:8000
 
 ```
 src/
-├── components/ui/    # shadcn-ui components
-├── features/         # Feature modules (queries, mutations, forms, components)
-├── generated/        # Auto-generated API types (excluded from linting)
-├── hooks/            # Custom React hooks
-├── layouts/          # Page layouts
-├── lib/              # Utilities, API client, constants
-├── pages/            # Route pages
-├── shared/           # Cross-feature shared code
-└── test/             # Test setup
+├── router.tsx            # Route config with guards
+├── main.tsx              # App entry point
+├── api/                  # API layer (client, types, hooks)
+├── components/ui/        # shadcn-ui components
+├── features/             # Feature modules (auth, billing, members, etc.)
+├── generated/            # Auto-generated API types (excluded from linting)
+├── hooks/                # Shared React hooks
+├── layouts/              # Page layouts
+├── lib/                  # Utilities, env config, constants
+└── pages/                # Route pages
+
+tests/                    # Test files (mirrors src/ structure)
 ```
 
 ## Adding UI Components
@@ -53,4 +56,4 @@ pnpm test         # Watch mode
 pnpm test run     # Single run
 ```
 
-Tests are co-located with source files (e.g., `schema.test.ts` next to `schema.ts`).
+Tests are in `tests/` directory, mirroring the `src/` structure.
