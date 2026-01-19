@@ -5,11 +5,11 @@ import { StytchB2BUIClient } from '@stytch/vanilla-js/b2b'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
+import { RouterProvider } from 'react-router-dom'
 
-import App from '@/app'
 import { Toaster } from '@/components/ui/sonner'
 import { config } from '@/lib/env'
+import { router } from '@/router'
 
 // Initialize Stytch client (throws if VITE_STYTCH_PUBLIC_TOKEN is missing)
 const stytchClient = new StytchB2BUIClient(config.stytchPublicToken)
@@ -33,10 +33,8 @@ createRoot(rootElement).render(
   <StrictMode>
     <StytchB2BProvider stytch={stytchClient}>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <App />
-          <Toaster richColors position="top-right" />
-        </BrowserRouter>
+        <RouterProvider router={router} />
+        <Toaster richColors position="top-right" />
       </QueryClientProvider>
     </StytchB2BProvider>
   </StrictMode>
