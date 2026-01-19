@@ -53,6 +53,11 @@ export function createApiClient(getToken: TokenProvider) {
       throw new Error(error.detail)
     }
 
+    // Handle 204 No Content responses (e.g., DELETE endpoints)
+    if (response.status === 204) {
+      return undefined as T
+    }
+
     return response.json() as Promise<T>
   }
 
