@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { useApi } from '@/hooks/use-api'
+import { queryKeys } from '@/api/query-keys'
 import type {
   WebhookDeliveryListResponse,
   WebhookEndpointListResponse,
   WebhookEventListResponse,
-} from '@/lib/api'
-import { queryKeys } from '@/shared/query-keys'
+} from '@/api/types'
+import { useApi } from '@/api/use-api'
 
 /**
  * Query hook for fetching available webhook events.

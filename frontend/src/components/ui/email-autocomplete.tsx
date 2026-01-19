@@ -1,8 +1,8 @@
 import { Keyboard, Search, User } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { useApi } from '@/hooks/use-api'
-import type { DirectoryUser } from '@/lib/api'
+import type { DirectoryUser } from '@/api/types'
+import { useApi } from '@/api/use-api'
 import { cn } from '@/lib/utils'
 
 /** Minimum characters before triggering autocomplete */

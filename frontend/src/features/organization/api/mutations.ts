@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { useApi } from '@/hooks/use-api'
-import type { BillingAddress } from '@/lib/api'
-import { queryKeys } from '@/shared/query-keys'
+import { queryKeys } from '@/api/query-keys'
+import type { BillingAddress } from '@/api/types'
+import { useApi } from '@/api/use-api'
 
 /**
  * Mutation hook for updating organization name and slug.

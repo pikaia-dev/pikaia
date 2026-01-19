@@ -1,9 +1,9 @@
 import { useStytchB2BClient } from '@stytch/react/b2b'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
-import type { ImageResponse, UploadRequest } from '@/lib/api'
-import { queryKeys } from '@/shared/query-keys'
-import { useApi } from './use-api'
+import { queryKeys } from '@/api/query-keys'
+import type { ImageResponse, UploadRequest } from '@/api/types'
+import { useApi } from '@/api/use-api'
 
 interface UseImageUploadOptions {
   onSuccess?: (result: ImageResponse) => void

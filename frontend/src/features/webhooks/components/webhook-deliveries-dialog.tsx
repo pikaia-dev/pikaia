@@ -1,5 +1,5 @@
 import { AlertTriangle, Check, Clock, RefreshCw } from 'lucide-react'
-
+import type { WebhookDelivery, WebhookEndpoint } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -9,8 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
-import { useWebhookDeliveries } from '@/features/webhooks/queries'
-import type { WebhookDelivery, WebhookEndpoint } from '@/lib/api'
+import { useWebhookDeliveries } from '@/features/webhooks/api/queries'
 
 interface WebhookDeliveriesDialogProps {
   open: boolean

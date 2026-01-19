@@ -32,7 +32,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
-import { useCurrentUser } from '@/features/auth/queries'
+import { useCurrentUser } from '@/features/auth/api/queries'
 import { STYTCH_ROLES } from '@/lib/constants'
 
 const mainNavItems = [{ to: '/dashboard', label: 'Dashboard', icon: Home }]

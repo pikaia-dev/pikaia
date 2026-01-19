@@ -7,7 +7,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { useApi } from '@/hooks/use-api'
+import { useApi } from '@/api/use-api'
 
 // --- API Types ---
 

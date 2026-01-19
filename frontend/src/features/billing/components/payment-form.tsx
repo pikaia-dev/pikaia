@@ -9,10 +9,9 @@ import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-
 import type { StripeElementsOptions } from '@stripe/stripe-js'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-
+import { useApi } from '@/api/use-api'
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
-import { useApi } from '@/hooks/use-api'
 import { getStripe } from '@/lib/stripe'
 
 interface PaymentFormProps {

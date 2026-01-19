@@ -10,7 +10,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useState } from 'react'
-
+import type { WebhookEndpoint, WebhookEventType } from '@/api/types'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,8 +34,7 @@ import {
   useDeleteWebhookEndpoint,
   useTestWebhookEndpoint,
   useUpdateWebhookEndpoint,
-} from '@/features/webhooks/mutations'
-import type { WebhookEndpoint, WebhookEventType } from '@/lib/api'
+} from '@/features/webhooks/api/mutations'
 
 interface WebhookEndpointsListProps {
   endpoints: WebhookEndpoint[]

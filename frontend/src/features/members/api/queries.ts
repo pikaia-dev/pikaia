@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { useApi } from '@/hooks/use-api'
-import type { MemberListResponse } from '@/lib/api'
-import { queryKeys } from '@/shared/query-keys'
+import { queryKeys } from '@/api/query-keys'
+import type { MemberListResponse } from '@/api/types'
+import { useApi } from '@/api/use-api'
 
 /**
  * Query hook for fetching organization members.

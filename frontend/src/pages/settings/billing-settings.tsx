@@ -1,18 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-
+import type { BillingAddress, Invoice } from '@/api/types'
 import { AddressAutocomplete } from '@/components/ui/address-autocomplete'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { CountryCombobox } from '@/components/ui/country-combobox'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
+import { useInvoices, useSubscription } from '@/features/billing/api/queries'
 import { InvoiceHistoryCard } from '@/features/billing/components/invoice-history-card'
 import { SubscriptionCard } from '@/features/billing/components/subscription-card'
-import { useInvoices, useSubscription } from '@/features/billing/queries'
-import { useUpdateBilling } from '@/features/organization/mutations'
-import { useOrganization } from '@/features/organization/queries'
-import type { BillingAddress, Invoice } from '@/lib/api'
+import { useUpdateBilling } from '@/features/organization/api/mutations'
+import { useOrganization } from '@/features/organization/api/queries'
 import {
   DEFAULT_COUNTRY,
   getPostalCodeLabel,

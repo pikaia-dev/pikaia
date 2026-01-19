@@ -1,3 +1,4 @@
+import type { MemberListItem } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -7,7 +8,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { MemberListItem } from '@/lib/api'
 
 interface MembersTableProps {
   members: MemberListItem[]

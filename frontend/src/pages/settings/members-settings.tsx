@@ -1,6 +1,6 @@
 import { Users } from 'lucide-react'
 import { useState } from 'react'
-
+import type { DirectoryUser } from '@/api/types'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,16 +22,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { BulkInviteDialog } from '@/features/members/components/bulk-invite-dialog'
-import { MembersTable } from '@/features/members/components/members-table'
 import {
   useBulkInviteMembers,
   useDeleteMember,
   useInviteMember,
   useUpdateMemberRole,
-} from '@/features/members/mutations'
-import { useMembers } from '@/features/members/queries'
-import type { DirectoryUser } from '@/lib/api'
+} from '@/features/members/api/mutations'
+import { useMembers } from '@/features/members/api/queries'
+import { BulkInviteDialog } from '@/features/members/components/bulk-invite-dialog'
+import { MembersTable } from '@/features/members/components/members-table'
 
 export default function MembersSettings() {
   const { data: membersData, isLoading, error } = useMembers()
