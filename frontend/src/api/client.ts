@@ -53,8 +53,8 @@ export function createApiClient(getToken: TokenProvider) {
       throw new Error(error.detail)
     }
 
-    // Handle 204 No Content responses (e.g., DELETE endpoints)
-    if (response.status === 204) {
+    // Handle empty-body responses (204 No Content, 205 Reset Content)
+    if (response.status === 204 || response.status === 205) {
       return undefined as T
     }
 
