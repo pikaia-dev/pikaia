@@ -70,7 +70,7 @@ class TestGetSubscription:
         request = request_factory.get("/api/v1/billing/subscription")
 
         with pytest.raises(HttpError) as exc_info:
-            get_subscription(request)
+            get_subscription(request)  # type: ignore[arg-type]  # Testing unauthenticated
 
         assert exc_info.value.status_code == 401
 

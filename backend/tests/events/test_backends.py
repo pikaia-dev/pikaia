@@ -26,7 +26,7 @@ def create_test_envelope(**kwargs) -> EventEnvelope:
         "data": {"key": "value"},
     }
     defaults.update(kwargs)
-    return EventEnvelope(**defaults)
+    return EventEnvelope(**defaults)  # type: ignore[arg-type]
 
 
 class TestLocalBackend:

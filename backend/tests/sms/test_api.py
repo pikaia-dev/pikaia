@@ -50,7 +50,7 @@ class TestSendVerificationOTPEndpoint:
         payload = SendOTPRequest(phone_number="+14155551234")
 
         with pytest.raises(HttpError) as exc_info:
-            send_verification_otp(request, payload)
+            send_verification_otp(request, payload)  # type: ignore[arg-type]  # Testing unauthenticated
 
         assert exc_info.value.status_code == 401
 
@@ -149,7 +149,7 @@ class TestVerifyPhoneOTPEndpoint:
         payload = VerifyOTPRequest(phone_number="+14155551234", code="1234")
 
         with pytest.raises(HttpError) as exc_info:
-            verify_phone_otp(request, payload)
+            verify_phone_otp(request, payload)  # type: ignore[arg-type]  # Testing unauthenticated
 
         assert exc_info.value.status_code == 401
 

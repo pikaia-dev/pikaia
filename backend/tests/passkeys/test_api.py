@@ -41,7 +41,7 @@ class TestGetRegistrationOptions:
         user = member.user
 
         request = request_factory.post("/api/v1/passkeys/register/options")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=member.organization)
         )
 
@@ -60,7 +60,7 @@ class TestGetRegistrationOptions:
         PasskeyFactory.create(user=user, credential_id=b"existing_cred")
 
         request = request_factory.post("/api/v1/passkeys/register/options")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=member.organization)
         )
 
@@ -80,7 +80,7 @@ class TestVerifyRegistration:
         user = member.user
 
         request = request_factory.post("/api/v1/passkeys/register/verify")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=member.organization)
         )
 
@@ -103,14 +103,14 @@ class TestVerifyRegistration:
 
         # Create challenge for member.user
         request1 = request_factory.post("/api/v1/passkeys/register/options")
-        request1 = make_request_with_auth(
+        request1 = make_request_with_auth(  # type: ignore[assignment]
             request1, AuthContext(user=member.user, member=member, organization=member.organization)
         )
         options_response = get_registration_options(request1)
 
         # Try to use it with other_member's user
         request2 = request_factory.post("/api/v1/passkeys/register/verify")
-        request2 = make_request_with_auth(
+        request2 = make_request_with_auth(  # type: ignore[assignment]
             request2,
             AuthContext(
                 user=other_member.user, member=other_member, organization=other_member.organization
@@ -139,7 +139,7 @@ class TestVerifyRegistration:
 
         # Generate options
         request1 = request_factory.post("/api/v1/passkeys/register/options")
-        request1 = make_request_with_auth(
+        request1 = make_request_with_auth(  # type: ignore[assignment]
             request1, AuthContext(user=user, member=member, organization=member.organization)
         )
         options_response = get_registration_options(request1)
@@ -155,7 +155,7 @@ class TestVerifyRegistration:
 
         # Verify registration
         request2 = request_factory.post("/api/v1/passkeys/register/verify")
-        request2 = make_request_with_auth(
+        request2 = make_request_with_auth(  # type: ignore[assignment]
             request2, AuthContext(user=user, member=member, organization=member.organization)
         )
 
@@ -305,7 +305,7 @@ class TestListPasskeys:
         PasskeyFactory.create(user=other_member.user, name="Other User Passkey")
 
         request = request_factory.get("/api/v1/passkeys/")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=member.organization)
         )
 
@@ -322,7 +322,7 @@ class TestListPasskeys:
         member = MemberFactory.create()
 
         request = request_factory.get("/api/v1/passkeys/")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=member.user, member=member, organization=member.organization)
         )
 
@@ -336,7 +336,7 @@ class TestListPasskeys:
         passkey = PasskeyFactory.create(user=member.user, backup_eligible=True, backup_state=False)
 
         request = request_factory.get("/api/v1/passkeys/")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=member.user, member=member, organization=member.organization)
         )
 
@@ -364,7 +364,7 @@ class TestDeletePasskey:
         passkey_id = passkey.id
 
         request = request_factory.delete(f"/api/v1/passkeys/{passkey_id}")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=member.user, member=member, organization=member.organization)
         )
 
@@ -382,7 +382,7 @@ class TestDeletePasskey:
         passkey = PasskeyFactory.create(user=other_member.user, name="Other's Passkey")
 
         request = request_factory.delete(f"/api/v1/passkeys/{passkey.id}")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=member.user, member=member, organization=member.organization)
         )
 
@@ -397,7 +397,7 @@ class TestDeletePasskey:
         member = MemberFactory.create()
 
         request = request_factory.delete("/api/v1/passkeys/99999")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=member.user, member=member, organization=member.organization)
         )
 
