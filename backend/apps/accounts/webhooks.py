@@ -324,7 +324,7 @@ def stytch_webhook(request: HttpRequest) -> HttpResponse:
     # Verify Svix signature
     try:
         wh = Webhook(settings.STYTCH_WEBHOOK_SECRET)
-        event = wh.verify(payload, request.headers)
+        event = wh.verify(payload, dict(request.headers))
     except WebhookVerificationError as e:
         logger.warning("stytch_webhook_invalid_signature", error=str(e))
         return HttpResponse(status=400)

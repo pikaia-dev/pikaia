@@ -49,7 +49,7 @@ def _parse_transports(transports: list[str] | None) -> list[AuthenticatorTranspo
 class RegistrationOptions:
     """Options returned to client for passkey registration."""
 
-    options_json: dict
+    options_json: str  # JSON string from webauthn.helpers.options_to_json
     challenge_id: str
 
 
@@ -57,7 +57,7 @@ class RegistrationOptions:
 class AuthenticationOptions:
     """Options returned to client for passkey authentication."""
 
-    options_json: dict
+    options_json: str  # JSON string from webauthn.helpers.options_to_json
     challenge_id: str
 
 

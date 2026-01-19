@@ -9,9 +9,11 @@ from django.test import RequestFactory
 from ninja.errors import HttpError
 
 from apps.core.auth import AuthContext
+from apps.core.types import AuthenticatedHttpRequest
 from apps.sms.api import send_verification_otp, verify_phone_otp
 from apps.sms.schemas import SendOTPRequest, VerifyOTPRequest
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
+from tests.conftest import make_request_with_auth
 
 
 @pytest.mark.django_db
@@ -24,15 +26,17 @@ class TestSendVerificationOTPEndpoint:
         org = OrganizationFactory.create()
         _member = MemberFactory.create(user=user, organization=org)
 
-        request = request_factory.post("/api/v1/auth/phone/send")
-        request.auth = AuthContext(user=user, member=_member, organization=org)
+        auth_request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/auth/phone/send"),
+            AuthContext(user=user, member=_member, organization=org),
+        )
 
         payload = SendOTPRequest(phone_number="+14155551234")
 
         with patch("apps.sms.services.send_otp_message") as mock_send:
             mock_send.return_value = {"message_id": "msg-123", "success": True}
 
-            result = send_verification_otp(request, payload)
+            result = send_verification_otp(auth_request, payload)
 
         assert result.success is True
         assert "+14155551234" in result.message
@@ -56,8 +60,10 @@ class TestSendVerificationOTPEndpoint:
         org = OrganizationFactory.create()
         member = MemberFactory.create(user=user, organization=org)
 
-        request = request_factory.post("/api/v1/auth/phone/send")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        auth_request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/auth/phone/send"),
+            AuthContext(user=user, member=member, organization=org),
+        )
 
         payload = SendOTPRequest(phone_number="+14155551234")
 
@@ -66,11 +72,11 @@ class TestSendVerificationOTPEndpoint:
 
             # Send 3 OTPs successfully
             for _ in range(3):
-                send_verification_otp(request, payload)
+                send_verification_otp(auth_request, payload)
 
             # 4th should be rate limited
             with pytest.raises(HttpError) as exc_info:
-                send_verification_otp(request, payload)
+                send_verification_otp(auth_request, payload)
 
             assert exc_info.value.status_code == 429
 
@@ -82,8 +88,10 @@ class TestSendVerificationOTPEndpoint:
         org = OrganizationFactory.create()
         member = MemberFactory.create(user=user, organization=org)
 
-        request = request_factory.post("/api/v1/auth/phone/send")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        auth_request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/auth/phone/send"),
+            AuthContext(user=user, member=member, organization=org),
+        )
 
         payload = SendOTPRequest(phone_number="+14155551234")
 
@@ -91,7 +99,7 @@ class TestSendVerificationOTPEndpoint:
             mock_send.side_effect = SMSError("AWS error")
 
             with pytest.raises(HttpError) as exc_info:
-                send_verification_otp(request, payload)
+                send_verification_otp(auth_request, payload)
 
             assert exc_info.value.status_code == 400
 
@@ -116,12 +124,14 @@ class TestVerifyPhoneOTPEndpoint:
             otp = send_phone_verification_otp(phone, user)
 
         # Then verify
-        request = request_factory.post("/api/v1/auth/phone/verify")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        auth_request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/auth/phone/verify"),
+            AuthContext(user=user, member=member, organization=org),
+        )
 
         payload = VerifyOTPRequest(phone_number=phone, code=otp.code)
 
-        result = verify_phone_otp(request, payload)
+        result = verify_phone_otp(auth_request, payload)
 
         assert result.success is True
         assert result.phone_verified is True
@@ -159,13 +169,15 @@ class TestVerifyPhoneOTPEndpoint:
             send_phone_verification_otp(phone, user)
 
         # Try to verify with wrong code
-        request = request_factory.post("/api/v1/auth/phone/verify")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        auth_request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/auth/phone/verify"),
+            AuthContext(user=user, member=member, organization=org),
+        )
 
         payload = VerifyOTPRequest(phone_number=phone, code="0000")
 
         with pytest.raises(HttpError) as exc_info:
-            verify_phone_otp(request, payload)
+            verify_phone_otp(auth_request, payload)
 
         assert exc_info.value.status_code == 400
         assert "Invalid" in str(exc_info.value.message)
@@ -193,13 +205,15 @@ class TestVerifyPhoneOTPEndpoint:
         otp.save()
 
         # Try to verify
-        request = request_factory.post("/api/v1/auth/phone/verify")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        auth_request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/auth/phone/verify"),
+            AuthContext(user=user, member=member, organization=org),
+        )
 
         payload = VerifyOTPRequest(phone_number=phone, code=otp.code)
 
         with pytest.raises(HttpError) as exc_info:
-            verify_phone_otp(request, payload)
+            verify_phone_otp(auth_request, payload)
 
         assert exc_info.value.status_code == 400
         assert "expired" in str(exc_info.value.message).lower()

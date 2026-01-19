@@ -128,13 +128,13 @@ class MobileProvisionRequest(BaseModel):
         examples=["user@example.com"],
     )
     name: str = Field(
-        "",
+        default="",
         max_length=255,
         description="User's display name (optional)",
         examples=["Jane Doe"],
     )
     phone_number: str = Field(
-        "",
+        default="",
         max_length=20,
         description="User's phone number in E.164 format (optional, stored unverified)",
         examples=["+14155551234"],
@@ -142,18 +142,18 @@ class MobileProvisionRequest(BaseModel):
 
     # Either provide organization_id to join existing, or org name/slug to create new
     organization_id: str | None = Field(
-        None,
+        default=None,
         description="Stytch org ID to join (mutually exclusive with org creation fields)",
         examples=["organization-live-abc123"],
     )
     organization_name: str | None = Field(
-        None,
+        default=None,
         max_length=255,
         description="Name for new organization (requires organization_slug)",
         examples=["Acme Corp"],
     )
     organization_slug: str | None = Field(
-        None,
+        default=None,
         description="Slug for new organization (requires organization_name)",
         examples=["acme-corp"],
     )
@@ -495,13 +495,13 @@ class InviteMemberRequest(BaseModel):
         examples=["newuser@example.com"],
     )
     name: str = Field(
-        "",
+        default="",
         max_length=255,
         description="Optional display name for the member",
         examples=["Jane Doe"],
     )
     role: str = Field(
-        "member",
+        default="member",
         pattern="^(admin|member)$",
         description="Role to assign: 'admin' or 'member'",
         examples=["member"],

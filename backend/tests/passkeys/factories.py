@@ -2,6 +2,8 @@
 Factory for Passkey model.
 """
 
+from typing import Any
+
 import factory
 from factory.django import DjangoModelFactory
 
@@ -15,7 +17,7 @@ class PasskeyFactory(DjangoModelFactory[Passkey]):
     class Meta:
         model = Passkey
 
-    user = factory.SubFactory(UserFactory)
+    user: Any = factory.SubFactory(UserFactory)
     credential_id = factory.Sequence(lambda n: f"credential_{n}".encode())
     public_key = factory.Sequence(lambda n: f"public_key_{n}".encode())
     sign_count = 0
@@ -24,4 +26,4 @@ class PasskeyFactory(DjangoModelFactory[Passkey]):
     is_discoverable = True
     backup_eligible = False
     backup_state = False
-    transports = factory.LazyFunction(list)
+    transports: Any = factory.LazyFunction(list)

@@ -162,7 +162,7 @@ class TestSyncSessionToLocal:
             member_id: str
             email_address: str
             name: str | None
-            roles: list[str]  # type: ignore[type-arg]
+            roles: list[str]
 
         @dataclass
         class MockStytchOrg:
@@ -207,7 +207,7 @@ class TestSyncSessionToLocal:
             member_id: str
             email_address: str
             name: str | None
-            roles: list[str]  # type: ignore[type-arg]
+            roles: list[dict[str, str]]
 
         @dataclass
         class MockStytchOrg:

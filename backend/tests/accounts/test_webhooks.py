@@ -215,7 +215,7 @@ class TestHandleMemberUpdated:
 
     def test_ignores_missing_member_id(self) -> None:
         """Should handle missing member_id gracefully."""
-        data = {"member": {}}
+        data: dict[str, dict[str, str]] = {"member": {}}
 
         # Should not raise
         handle_member_updated(data)

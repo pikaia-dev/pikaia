@@ -4,6 +4,8 @@ Factories for accounts app models.
 Used in tests to create test data.
 """
 
+from typing import Any
+
 import factory
 from factory.django import DjangoModelFactory
 
@@ -18,7 +20,7 @@ class UserFactory(DjangoModelFactory[User]):
         model = User
 
     email = factory.Sequence(lambda n: f"user{n}@example.com")
-    name = factory.Faker("name")
+    name: Any = factory.Faker("name")
     is_active = True
     is_staff = False
 
@@ -30,7 +32,7 @@ class OrganizationFactory(DjangoModelFactory[Organization]):
         model = Organization
 
     stytch_org_id = factory.Sequence(lambda n: f"org-test-{n}")
-    name = factory.Faker("company")
+    name: Any = factory.Faker("company")
     slug = factory.Sequence(lambda n: f"org-{n}")
 
 
@@ -40,7 +42,7 @@ class MemberFactory(DjangoModelFactory[Member]):
     class Meta:
         model = Member
 
-    user = factory.SubFactory(UserFactory)
-    organization = factory.SubFactory(OrganizationFactory)
+    user: Any = factory.SubFactory(UserFactory)
+    organization: Any = factory.SubFactory(OrganizationFactory)
     stytch_member_id = factory.Sequence(lambda n: f"member-test-{n}")
     role = "member"
