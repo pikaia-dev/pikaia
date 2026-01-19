@@ -160,6 +160,9 @@ const routes: AppRouteConfig[] = [
       },
     ],
   },
+
+  // Catch-all 404 route
+  { path: '*', lazy: () => import('@/pages/not-found') },
 ]
 
 // ============ Route Builder ============
