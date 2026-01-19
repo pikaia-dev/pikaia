@@ -11,8 +11,8 @@
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/TangoAgency/tango-django-ninja-stytch-saas-starter.git
-cd tango-django-ninja-stytch-saas-starter
+git clone https://github.com/pikaia-dev/pikaia.git
+cd pikaia
 ```
 
 ### 2. PostgreSQL Setup (macOS)
@@ -24,7 +24,7 @@ export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"  # Add to ~/.zshrc
 
 createuser -s postgres 2>/dev/null || true
 psql -U postgres -c "ALTER USER postgres PASSWORD 'postgres';"
-createdb -U postgres tango
+createdb -U postgres pikaia
 ```
 
 ### 3. Backend Setup
@@ -67,7 +67,7 @@ pnpm dev  # http://localhost:5173
 
 ```env
 # Database
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/tango
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/pikaia
 
 # Stytch
 STYTCH_PROJECT_ID=project-xxx
@@ -80,7 +80,7 @@ STRIPE_PRICE_ID=price_xxx  # Created by setup_stripe
 
 # WebAuthn (Passkeys)
 WEBAUTHN_RP_ID=localhost
-WEBAUTHN_RP_NAME=Tango B2B
+WEBAUTHN_RP_NAME=Pikaia
 WEBAUTHN_ORIGIN=http://localhost:5173
 
 # Stytch Trusted Auth Token (for passkey -> Stytch session)

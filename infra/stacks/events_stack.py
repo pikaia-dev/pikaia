@@ -156,7 +156,7 @@ class EventsStack(Stack):
         database_secret: secretsmanager.ISecret,
         database_security_group: ec2.ISecurityGroup,
         rds_proxy_endpoint: str,
-        event_bus_name: str = "tango-events",
+        event_bus_name: str = "pikaia-events",
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -168,7 +168,7 @@ class EventsStack(Stack):
         # EventBridge bus for domain events
         self.event_bus = events.EventBus(
             self,
-            "TangoEventBus",
+            "PikaiaEventBus",
             event_bus_name=event_bus_name,
         )
 
@@ -176,7 +176,7 @@ class EventsStack(Stack):
         self.dlq = sqs.Queue(
             self,
             "EventPublisherDLQ",
-            queue_name="tango-events-publisher-dlq",
+            queue_name="pikaia-events-publisher-dlq",
             retention_period=Duration.days(14),
             removal_policy=RemovalPolicy.RETAIN,
         )
@@ -207,7 +207,7 @@ class EventsStack(Stack):
         self.publisher_lambda = _create_python_lambda(
             self,
             "EventPublisher",
-            function_name="tango-event-publisher",
+            function_name="pikaia-event-publisher",
             handler="handler.handler",
             code_path=FUNCTIONS_DIR / "event-publisher",
             vpc=vpc,
@@ -236,7 +236,7 @@ class EventsStack(Stack):
         events.Rule(
             self,
             "EventPublisherSchedule",
-            rule_name="tango-event-publisher-schedule",
+            rule_name="pikaia-event-publisher-schedule",
             schedule=events.Schedule.rate(Duration.minutes(1)),
             targets=[events_targets.LambdaFunction(self.publisher_lambda)],
             description="Fallback polling for event publisher",
@@ -250,7 +250,7 @@ class EventsStack(Stack):
         self.audit_dlq = sqs.Queue(
             self,
             "AuditDLQ",
-            queue_name="tango-audit-dlq",
+            queue_name="pikaia-audit-dlq",
             retention_period=Duration.days(14),  # Retain for investigation
             removal_policy=RemovalPolicy.RETAIN,
         )
@@ -280,7 +280,7 @@ class EventsStack(Stack):
         self.audit_lambda = _create_python_lambda(
             self,
             "AuditConsumer",
-            function_name="tango-audit-consumer",
+            function_name="pikaia-audit-consumer",
             handler="handler.handler",
             code_path=FUNCTIONS_DIR / "audit-consumer",
             vpc=vpc,
@@ -301,7 +301,7 @@ class EventsStack(Stack):
         events.Rule(
             self,
             "AuditEventRule",
-            rule_name="tango-audit-event-rule",
+            rule_name="pikaia-audit-event-rule",
             event_bus=self.event_bus,
             event_pattern=events.EventPattern(
                 detail_type=AUDIT_EVENT_TYPES,
@@ -322,7 +322,7 @@ class EventsStack(Stack):
             "EventBusName",
             value=self.event_bus.event_bus_name,
             description="EventBridge bus name for domain events",
-            export_name="TangoEventBusName",
+            export_name="PikaiaEventBusName",
         )
 
         CfnOutput(
@@ -330,7 +330,7 @@ class EventsStack(Stack):
             "EventBusArn",
             value=self.event_bus.event_bus_arn,
             description="EventBridge bus ARN",
-            export_name="TangoEventBusArn",
+            export_name="PikaiaEventBusArn",
         )
 
         CfnOutput(
@@ -338,7 +338,7 @@ class EventsStack(Stack):
             "DLQUrl",
             value=self.dlq.queue_url,
             description="Dead Letter Queue URL for failed events",
-            export_name="TangoEventsDLQUrl",
+            export_name="PikaiaEventsDLQUrl",
         )
 
         CfnOutput(
@@ -346,7 +346,7 @@ class EventsStack(Stack):
             "AuditDLQUrl",
             value=self.audit_dlq.queue_url,
             description="Dead Letter Queue URL for failed audit events",
-            export_name="TangoAuditDLQUrl",
+            export_name="PikaiaAuditDLQUrl",
         )
 
         CfnOutput(
@@ -354,7 +354,7 @@ class EventsStack(Stack):
             "AuditLambdaArn",
             value=self.audit_lambda.function_arn,
             description="Audit consumer Lambda ARN",
-            export_name="TangoAuditConsumerArn",
+            export_name="PikaiaAuditConsumerArn",
         )
 
         CfnOutput(
@@ -362,5 +362,5 @@ class EventsStack(Stack):
             "PublisherLambdaArn",
             value=self.publisher_lambda.function_arn,
             description="Event publisher Lambda ARN",
-            export_name="TangoEventPublisherArn",
+            export_name="PikaiaEventPublisherArn",
         )

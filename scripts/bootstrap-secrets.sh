@@ -19,7 +19,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 ENV_FILE="$PROJECT_ROOT/.env.production"
 
 # AWS profile (default or from argument)
-AWS_PROFILE="${1:-tango-b2b-demo}"
+AWS_PROFILE="${1:-pikaia}"
 export AWS_PROFILE
 
 # Colors for output
@@ -117,7 +117,7 @@ SECRET_JSON=$(jq -n \
     --arg trusted_issuer "${STYTCH_TRUSTED_AUTH_ISSUER:-passkey-auth}" \
     --arg passkey_key "${PASSKEY_JWT_PRIVATE_KEY:-}" \
     --arg webauthn_rp "${WEBAUTHN_RP_ID:-}" \
-    --arg webauthn_name "${WEBAUTHN_RP_NAME:-Tango B2B}" \
+    --arg webauthn_name "${WEBAUTHN_RP_NAME:-Pikaia}" \
     --arg webauthn_origin "${WEBAUTHN_ORIGIN:-}" \
     --arg cors_origins "${CORS_ALLOWED_ORIGINS:-}" \
     '{
@@ -140,7 +140,7 @@ SECRET_JSON=$(jq -n \
 )
 
 # Update secrets
-SECRET_NAME="tango/app-secrets"
+SECRET_NAME="pikaia/app-secrets"
 echo_info "Updating secret: $SECRET_NAME"
 
 VERSION_ID=$(aws secretsmanager put-secret-value \

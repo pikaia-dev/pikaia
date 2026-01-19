@@ -1,7 +1,7 @@
 [project]
-name = "tango-infra"
+name = "pikaia-infra"
 version = "0.1.0"
-description = "AWS CDK infrastructure for Tango SaaS Starter"
+description = "AWS CDK infrastructure for Pikaia"
 requires-python = ">=3.12"
 dependencies = [
     # Use latest CDK lib for Python 3.13 compatibility

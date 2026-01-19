@@ -1,6 +1,6 @@
 # AWS Production Deployment Guide
 
-This guide covers deploying the Tango SaaS application to AWS using CDK.
+This guide covers deploying the application to AWS using CDK.
 
 ## Prerequisites
 
@@ -84,11 +84,11 @@ AWS_PROFILE=your-profile aws ecr get-login-password --region us-east-1 | \
   docker login --username AWS --password-stdin YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
 
 # Build for linux/amd64 (required for ECS Fargate)
-docker build --platform linux/amd64 -t tango-backend:latest .
+docker build --platform linux/amd64 -t pikaia-backend:latest .
 
 # Tag and push
-docker tag tango-backend:latest YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/tango-backend:latest
-docker push YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/tango-backend:latest
+docker tag pikaia-backend:latest YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/pikaia-backend:latest
+docker push YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/pikaia-backend:latest
 ```
 
 ## Step 5: Deploy Infrastructure
@@ -100,7 +100,7 @@ AWS_PROFILE=your-profile npx cdk deploy --all --require-approval never
 
 This will output your ALB URL, e.g.:
 ```
-TangoApp.LoadBalancerDNS = TangoA-Tango-XXXXX.us-east-1.elb.amazonaws.com
+PikaiaApp.LoadBalancerDNS = Pikaia-XXXXX.us-east-1.elb.amazonaws.com
 ```
 
 ## Step 6: Configure Stripe Webhook
@@ -208,10 +208,10 @@ The repository includes GitHub Actions workflows for automatic deployment:
 
 ## Observability
 
-The `TangoObservability` stack deploys CloudWatch dashboards and alarms automatically. To enable email notifications for alarms:
+The `PikaiaObservability` stack deploys CloudWatch dashboards and alarms automatically. To enable email notifications for alarms:
 
 ```bash
-AWS_PROFILE=your-profile npx cdk deploy TangoObservability --context alarm_email=ops@example.com
+AWS_PROFILE=your-profile npx cdk deploy PikaiaObservability --context alarm_email=ops@example.com
 ```
 
 See [Observability Guide](../observability.md) for:

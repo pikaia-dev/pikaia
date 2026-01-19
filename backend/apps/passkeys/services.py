@@ -80,7 +80,7 @@ class PasskeyService:
 
     def __init__(self) -> None:
         self.rp_id = getattr(settings, "WEBAUTHN_RP_ID", "localhost")
-        self.rp_name = getattr(settings, "WEBAUTHN_RP_NAME", "Tango B2B")
+        self.rp_name = getattr(settings, "WEBAUTHN_RP_NAME", "Pikaia")
         self.origin = getattr(settings, "WEBAUTHN_ORIGIN", "http://localhost:5173")
 
     # --- Registration ---

@@ -51,7 +51,7 @@ IMAGE_TRANSFORM_URL = ""  # URL for on-the-fly image resizing
 | Variable | Description |
 |----------|-------------|
 | `USE_S3_STORAGE` | `true` when media bucket is configured |
-| `AWS_STORAGE_BUCKET_NAME` | S3 bucket from `TangoMedia` stack |
+| `AWS_STORAGE_BUCKET_NAME` | S3 bucket from `PikaiaMedia` stack |
 | `AWS_S3_REGION_NAME` | AWS region |
 | `AWS_S3_CUSTOM_DOMAIN` | CloudFront distribution domain |
 | `IMAGE_TRANSFORM_URL` | CloudFront URL for Lambda@Edge image transformation |

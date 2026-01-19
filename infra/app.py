@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-AWS CDK app entry point for Tango infrastructure.
+AWS CDK app entry point for Pikaia infrastructure.
 
 Stacks:
-- TangoNetwork: VPC, subnets, NAT gateway, database security group
-- TangoApp: Aurora PostgreSQL, ECS Fargate, ALB, Secrets Manager
-- TangoFrontend: S3 + CloudFront for React SPA with API routing
-- TangoMedia: S3 bucket, CloudFront CDN, image transformation Lambda
-- TangoEvents: EventBridge bus, publisher Lambda, DLQ
-- TangoObservability: CloudWatch dashboards and alarms
+- PikaiaNetwork: VPC, subnets, NAT gateway, database security group
+- PikaiaApp: Aurora PostgreSQL, ECS Fargate, ALB, Secrets Manager
+- PikaiaFrontend: S3 + CloudFront for React SPA with API routing
+- PikaiaMedia: S3 bucket, CloudFront CDN, image transformation Lambda
+- PikaiaEvents: EventBridge bus, publisher Lambda, DLQ
+- PikaiaObservability: CloudWatch dashboards and alarms
 
 Usage:
     # Synth (validate)
     cdk synth --all
 
     # Deploy foundation (development - HTTP allowed)
-    cdk deploy TangoNetwork TangoApp TangoFrontend
+    cdk deploy PikaiaNetwork PikaiaApp PikaiaFrontend
 
     # Deploy for production (HTTPS required)
     cdk deploy --all \\
@@ -24,10 +24,10 @@ Usage:
         --context cors_origins='["https://app.example.com"]'
 
     # Deploy with custom domain
-    cdk deploy TangoApp --context domain_name=api.example.com --context certificate_arn=arn:aws:acm:...
+    cdk deploy PikaiaApp --context domain_name=api.example.com --context certificate_arn=arn:aws:acm:...
 
     # Deploy with alarm notifications
-    cdk deploy TangoObservability --context alarm_email=ops@example.com
+    cdk deploy PikaiaObservability --context alarm_email=ops@example.com
 """
 
 import aws_cdk as cdk
@@ -52,7 +52,7 @@ env = cdk.Environment(
 # Foundation: Network + Security Groups
 # =============================================================================
 
-network = NetworkStack(app, "TangoNetwork", env=env)
+network = NetworkStack(app, "PikaiaNetwork", env=env)
 
 # =============================================================================
 # Media: S3 + CloudFront + Image Transformation
@@ -63,7 +63,7 @@ network = NetworkStack(app, "TangoNetwork", env=env)
 #   cors_origins: CORS allowed origins (default: ["*"] for dev, required for production)
 #   enable_versioning: Enable S3 versioning for data recovery (default: false)
 #   require_https: Enforce HTTPS/certificate for production (default: false)
-# Example: cdk deploy TangoMedia --context cors_origins='["https://app.example.com"]'
+# Example: cdk deploy PikaiaMedia --context cors_origins='["https://app.example.com"]'
 cors_origins = app.node.try_get_context("cors_origins") or ["*"]
 enable_versioning = app.node.try_get_context("enable_versioning") or False
 require_https = app.node.try_get_context("require_https") or False
@@ -77,7 +77,7 @@ if require_https and cors_origins == ["*"]:
 
 media = MediaStack(
     app,
-    "TangoMedia",
+    "PikaiaMedia",
     cors_allowed_origins=cors_origins,
     enable_versioning=enable_versioning,
     enable_image_transformation=True,
@@ -107,7 +107,7 @@ if require_https and not certificate_arn:
 
 app_stack = AppStack(
     app,
-    "TangoApp",
+    "PikaiaApp",
     vpc=network.vpc,
     media_bucket=media.bucket,
     media_cdn_domain=media.distribution.distribution_domain_name,
@@ -130,7 +130,7 @@ frontend_certificate_arn = app.node.try_get_context("frontend_certificate_arn")
 
 frontend = FrontendStack(
     app,
-    "TangoFrontend",
+    "PikaiaFrontend",
     alb=app_stack.alb,
     domain_name=frontend_domain,
     certificate_arn=frontend_certificate_arn,
@@ -144,12 +144,12 @@ frontend.add_dependency(app_stack)
 
 events_stack = EventsStack(
     app,
-    "TangoEvents",
+    "PikaiaEvents",
     vpc=network.vpc,
     database_secret=app_stack.database_secret,
     database_security_group=app_stack.database_security_group,
     rds_proxy_endpoint=app_stack.rds_proxy.endpoint,
-    event_bus_name="tango-events",
+    event_bus_name="pikaia-events",
     env=env,
 )
 events_stack.add_dependency(app_stack)
@@ -163,7 +163,7 @@ alarm_email = app.node.try_get_context("alarm_email")
 
 observability = ObservabilityStack(
     app,
-    "TangoObservability",
+    "PikaiaObservability",
     alb=app_stack.alb,
     target_group=app_stack.target_group,
     ecs_cluster=app_stack.cluster,

@@ -94,5 +94,5 @@ def generate_headers(payload: str, secret: str, event_id: str) -> dict[str, str]
         "X-Webhook-ID": event_id,
         "X-Webhook-Timestamp": str(timestamp),
         "X-Webhook-Signature": signature,
-        "User-Agent": "Tango-Webhooks/1.0",
+        "User-Agent": "Pikaia-Webhooks/1.0",
     }

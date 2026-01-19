@@ -11,13 +11,13 @@ export default function WelcomeEmail({ organizationName, userName }: WelcomeEmai
       <Head />
       <Body style={main}>
         <Container style={container}>
-          <Text style={heading}>Welcome to Tango!</Text>
+          <Text style={heading}>Welcome!</Text>
           <Text style={text}>Hi {userName},</Text>
           <Text style={text}>
             You've successfully joined <strong>{organizationName}</strong>.
           </Text>
           <Hr style={hr} />
-          <Text style={footer}>The Tango Team</Text>
+          <Text style={footer}>The Team</Text>
         </Container>
       </Body>
     </Html>
