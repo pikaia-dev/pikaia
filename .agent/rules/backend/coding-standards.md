@@ -1,6 +1,9 @@
 ---
 trigger: always_on
 globs: "backend/**/*.py,infra/**/*.py"
+paths:
+  - "backend/**/*.py"
+  - "infra/**/*.py"
 ---
 
 # Backend Rules
