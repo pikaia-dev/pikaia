@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useCurrentUser } from '@/features/auth/queries'
+import { useCurrentUser } from '@/features/auth/api/queries'
 import {
   analyzePhones,
   type ColumnType,
@@ -39,7 +39,7 @@ import {
   parseCsvData,
   parseRowsWithMappings,
 } from '@/features/members/utils/csv-import'
-import { useOrganization } from '@/features/organization/queries'
+import { useOrganization } from '@/features/organization/api/queries'
 import { COUNTRIES, type Country, getCountryByCode } from '@/lib/countries'
 import { cn } from '@/lib/utils'
 

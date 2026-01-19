@@ -1,9 +1,8 @@
 import { useState } from 'react'
-
+import type { SubscriptionInfo } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useConfirmSubscription, useCreatePortalSession } from '@/features/billing/mutations'
-import type { SubscriptionInfo } from '@/lib/api'
+import { useConfirmSubscription, useCreatePortalSession } from '@/features/billing/api/mutations'
 import { PaymentForm } from './payment-form'
 
 interface SubscriptionCardProps {

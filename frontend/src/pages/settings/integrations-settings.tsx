@@ -1,14 +1,13 @@
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
-
+import type { WebhookEndpoint } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
+import { useWebhookEndpoints, useWebhookEvents } from '@/features/webhooks/api/queries'
 import { WebhookDeliveriesDialog } from '@/features/webhooks/components/webhook-deliveries-dialog'
 import { WebhookEndpointDialog } from '@/features/webhooks/components/webhook-endpoint-dialog'
 import { WebhookEndpointsList } from '@/features/webhooks/components/webhook-endpoints-list'
-import { useWebhookEndpoints, useWebhookEvents } from '@/features/webhooks/queries'
-import type { WebhookEndpoint } from '@/lib/api'
 
 export default function IntegrationsSettings() {
   const {

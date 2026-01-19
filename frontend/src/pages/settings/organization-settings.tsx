@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ImageUploader } from '@/components/ui/image-uploader'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
+import { useUpdateOrganization } from '@/features/organization/api/mutations'
+import { useOrganization } from '@/features/organization/api/queries'
 import {
   normalizeSlug,
   type OrganizationFormData,
   organizationSchema,
 } from '@/features/organization/forms/schema'
-import { useUpdateOrganization } from '@/features/organization/mutations'
-import { useOrganization } from '@/features/organization/queries'
 
 export default function OrganizationSettings() {
   const { data: organization, isLoading, error } = useOrganization()

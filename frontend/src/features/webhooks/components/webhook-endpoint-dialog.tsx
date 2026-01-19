@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
-
+import type { WebhookEndpoint, WebhookEndpointWithSecret, WebhookEventType } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -17,8 +17,10 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useCreateWebhookEndpoint, useUpdateWebhookEndpoint } from '@/features/webhooks/mutations'
-import type { WebhookEndpoint, WebhookEndpointWithSecret, WebhookEventType } from '@/lib/api'
+import {
+  useCreateWebhookEndpoint,
+  useUpdateWebhookEndpoint,
+} from '@/features/webhooks/api/mutations'
 
 const webhookSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),

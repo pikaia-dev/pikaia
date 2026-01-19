@@ -15,13 +15,13 @@ import {
 import { ImageUploader } from '@/components/ui/image-uploader'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { PhoneNumberInput } from '@/components/ui/phone-number-input'
-import { useCurrentUser } from '@/features/auth/queries'
+import { useCurrentUser } from '@/features/auth/api/queries'
 import {
   useSendPhoneOtp,
   useStartEmailUpdate,
   useUpdateProfile,
   useVerifyPhoneOtp,
-} from '@/features/profile/mutations'
+} from '@/features/profile/api/mutations'
 import { PasskeySettings } from '@/features/settings/components/passkey-settings'
 
 // Delay before updating state after dialog close animation

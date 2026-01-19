@@ -2,7 +2,7 @@ import { useStytchMemberSession } from '@stytch/react/b2b'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
-import { useCurrentUser } from '@/features/auth/queries'
+import { useCurrentUser } from '@/features/auth/api/queries'
 
 export default function Dashboard() {
   const { session } = useStytchMemberSession()

@@ -1,15 +1,15 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { useApi } from '@/hooks/use-api'
+import { queryKeys } from '@/api/query-keys'
 import type {
   BulkInviteRequest,
   BulkInviteResponse,
   InviteMemberRequest,
   InviteMemberResponse,
   MessageResponse,
-} from '@/lib/api'
-import { queryKeys } from '@/shared/query-keys'
+} from '@/api/types'
+import { useApi } from '@/api/use-api'
 
 /**
  * Mutation hook for inviting a new member.

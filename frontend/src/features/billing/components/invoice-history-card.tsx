@@ -1,7 +1,7 @@
+import type { Invoice } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
-import type { Invoice } from '@/lib/api'
 
 interface InvoiceHistoryCardProps {
   invoices: Invoice[]
