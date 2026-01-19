@@ -1,6 +1,9 @@
 ---
 trigger: always_on
 globs: "frontend/**/*.{ts,tsx},emails/**/*.{ts,tsx}"
+paths:
+  - "frontend/**/*.{ts,tsx}"
+  - "emails/**/*.{ts,tsx}"
 ---
 
 # Frontend Rules
@@ -10,7 +13,8 @@ Coding standards for TypeScript/React frontend.
 ## Typing & Linting
 
 - TypeScript strict mode; avoid `any`
-- Prettier + ESLint (enforced in CI: typecheck + lint + test + build)
+- Biome for linting and formatting (enforced in CI: typecheck + lint + test + build)
+- Run `pnpm run format` to auto-fix formatting issues
 
 ## Package Manager
 
@@ -31,13 +35,56 @@ Coding standards for TypeScript/React frontend.
 - shadcn-ui primitives; limit custom CSS
 - Forms: React Hook Form + Zod validation
 
-## Auth
+## Auth & Routing
 
 - Route guards for auth UX; backend is source of truth
+- All routes defined in `router.tsx` using `AppRouteConfig` interface
+- Guards are composable: `guards: [ProtectedRoute, RequireAdminRole]`
+- All pages lazy-loaded via `lazy: () => import('@/pages/...')`
 
 ## Security
 
 - No secrets in frontend; only `VITE_*` config
+
+## File Naming
+
+- Use **kebab-case** for all files (matches shadcn convention)
+- Examples: `email-login-form.tsx`, `use-auth-callback.ts`, `bulk-invite-dialog.tsx`
+- Component exports remain PascalCase: `export function MembersTable` from `members-table.tsx`
+
+## Imports
+
+- Always use `@/` path alias (configured in `tsconfig.json`)
+- Never use relative imports (`../`)
+- Same-directory imports (`./`) acceptable for tightly coupled files
+
+**Good:**
+```typescript
+import { Button } from '@/components/ui/button'
+import { useMembers } from '@/features/members/api/queries'
+import type { MemberListItem } from '@/api/types'
+```
+
+**Bad:**
+```typescript
+import { Button } from '../../components/ui/button'
+```
+
+## No Barrel Re-exports
+
+- Don't create `index.ts` files that only re-export (antipattern)
+- Import directly from source files
+
+**Good:**
+```typescript
+import { MembersTable } from '@/features/members/components/members-table'
+import { useDeleteMember } from '@/features/members/api/mutations'
+```
+
+**Bad:**
+```typescript
+import { MembersTable } from '@/features/members/components' // barrel re-export
+```
 
 ## Performance
 
@@ -58,22 +105,89 @@ Coding standards for TypeScript/React frontend.
 
 ## Testing
 
-- Vitest for lib/API tests
+- Vitest for unit/integration tests
+- Tests in `tests/` directory (mirrors `src/` structure)
 - E2E: TBD (add after core flows stabilize)
 
 ## Structure
 
-- `components/` — reusable UI
-- `features/` — feature-scoped (components, hooks, queries)
-- `lib/` — API client, utilities
+```
+frontend/
+├── src/
+│   ├── router.tsx           # Route config, guards, and router instance
+│   ├── main.tsx             # Entry point (renders RouterProvider)
+│   │
+│   ├── api/                 # API layer (shared across features)
+│   │   ├── client.ts        # API client factory
+│   │   ├── types.ts         # API response/request types
+│   │   ├── use-api.ts       # Authenticated API hook
+│   │   └── query-keys.ts    # TanStack Query key factory
+│   │
+│   ├── components/          # Shared UI components
+│   │   └── ui/              # shadcn primitives (button, card, dialog, etc.)
+│   │
+│   ├── features/            # Feature modules (domain-specific)
+│   │   ├── auth/
+│   │   ├── billing/
+│   │   ├── members/
+│   │   ├── organization/
+│   │   ├── profile/
+│   │   └── webhooks/
+│   │
+│   ├── generated/           # Auto-generated code (excluded from linting)
+│   │   └── api-types.ts     # Generated TypeScript types (if using codegen)
+│   │
+│   ├── hooks/               # Shared hooks (use-mobile.ts, use-image-upload.ts)
+│   │
+│   ├── layouts/             # Layout components (app-layout.tsx, app-sidebar.tsx)
+│   │
+│   ├── lib/                 # Core utilities
+│   │   ├── utils.ts         # Shared utilities (cn, etc.)
+│   │   ├── env.ts           # Environment config
+│   │   └── constants.ts     # App-wide constants
+│   │
+│   └── pages/               # Page components
+│       ├── dashboard.tsx
+│       ├── login.tsx
+│       └── settings/        # Settings sub-pages
+│
+└── tests/                   # Test files (mirrors src/ structure)
+    ├── setup.ts
+    └── features/
+        └── auth/
+            └── hooks/
+                └── use-auth-callback.test.ts
+```
+
+### Shared vs Feature-Specific Code
+
+**Shared code** lives at the top level of `src/`:
+- `router.tsx` — Route configuration, guards, fallbacks, and `createBrowserRouter` instance
+- `api/` — API client, types, and query infrastructure used by all features
+- `components/` — UI components reused across multiple features
+- `hooks/` — Utility hooks not tied to a specific domain (e.g., `use-mobile`, `use-sidebar`)
+- `lib/` — Pure utilities, config, constants
+- `layouts/` — App-wide layout components
+
+**Feature-specific code** lives in `features/{feature}/`:
+- Components, hooks, forms, and utilities that belong to one domain
+- If code is only used within a single feature, it goes in that feature's directory
 
 ### Feature Directory Convention
 
 Each feature in `features/` follows this structure:
 
-- `queries/` — TanStack Query hooks (useQuery wrappers)
-- `mutations/` — TanStack mutation hooks (useMutation wrappers)
-- `components/` — Feature-specific UI components
-- `forms/` — React Hook Form components with Zod schemas
-- `types.ts` — Feature-specific TypeScript types
-- `api.ts` — API call functions (optional, can reuse lib/api)
+```
+features/{feature}/
+├── api/
+│   ├── queries.ts     # TanStack Query hooks (useQuery wrappers)
+│   └── mutations.ts   # TanStack mutation hooks (useMutation wrappers)
+├── components/        # Feature-specific UI components
+├── forms/             # Zod schemas for form validation
+├── hooks/             # Feature-specific hooks (if needed)
+├── utils/             # Feature-specific utilities
+├── types.ts           # Feature-specific TypeScript types
+└── constants.ts       # Feature-specific constants
+```
+
+**API subdirectory**: Each feature's `api/` folder contains query and mutation hooks that use the shared `@/api/use-api` hook and `@/api/query-keys`.

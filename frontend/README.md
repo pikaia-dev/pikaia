@@ -21,19 +21,24 @@ TypeScript types are generated from the backend's OpenAPI spec:
 pnpm generate-types   # Requires backend running at localhost:8000
 ```
 
-> Run this after any backend API changes to regenerate `src/lib/api-types.ts`.
+> Run this after any backend API changes to regenerate `src/generated/api-types.ts`.
 
 ## Structure
 
 ```
 src/
-├── components/ui/    # shadcn-ui components
-├── features/         # Feature modules (queries, mutations, forms, components)
-├── hooks/            # Custom React hooks
-├── layouts/          # Page layouts
-├── lib/              # Utilities, API client, constants
-├── pages/            # Route pages
-└── test/             # Test setup
+├── router.tsx            # Route config with guards
+├── main.tsx              # App entry point
+├── api/                  # API layer (client, types, hooks)
+├── components/ui/        # shadcn-ui components
+├── features/             # Feature modules (auth, billing, members, etc.)
+├── generated/            # Auto-generated API types (excluded from linting)
+├── hooks/                # Shared React hooks
+├── layouts/              # Page layouts
+├── lib/                  # Utilities, env config, constants
+└── pages/                # Route pages
+
+tests/                    # Test files (mirrors src/ structure)
 ```
 
 ## Adding UI Components
@@ -51,4 +56,4 @@ pnpm test         # Watch mode
 pnpm test run     # Single run
 ```
 
-Tests are co-located with source files (e.g., `schema.test.ts` next to `schema.ts`).
+Tests are in `tests/` directory, mirroring the `src/` structure.
