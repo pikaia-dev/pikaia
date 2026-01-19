@@ -227,20 +227,26 @@ def main():
     try:
         input_data = json.load(sys.stdin)
     except json.JSONDecodeError:
-        sys.exit(0)  # Allow on parse error
+        # Must output valid JSON even on parse error
+        print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'allow'}}))
+        sys.exit(0)
 
     tool_name = input_data.get('tool_name', '')
     tool_input = input_data.get('tool_input', {})
 
     # Load config
     config_path = Path(__file__).parent / 'patterns.yaml'
+    allow_output = json.dumps({'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'allow'}})
+
     if not config_path.exists():
-        sys.exit(0)  # Allow if no config
+        print(allow_output)
+        sys.exit(0)
 
     try:
         config = load_yaml_simple(config_path)
     except Exception:
-        sys.exit(0)  # Allow on config error
+        print(allow_output)
+        sys.exit(0)
 
     result = None
 
