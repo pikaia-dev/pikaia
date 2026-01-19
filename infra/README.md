@@ -1,6 +1,6 @@
 # Infrastructure (AWS CDK)
 
-AWS CDK stacks for deploying Tango to AWS.
+AWS CDK stacks for deploying Pikaia to AWS.
 
 ## Prerequisites
 
@@ -23,18 +23,18 @@ cd functions/image-transform && npm install && cd ../..
 
 | Stack | Description |
 |-------|-------------|
-| **TangoNetwork** | VPC with public/private subnets, NAT gateway, database security group |
-| **TangoApp** | Aurora PostgreSQL Serverless v2, ECS Fargate, ALB, RDS Proxy, Secrets |
-| **TangoFrontend** | S3 + CloudFront for React SPA with API routing to ALB |
-| **TangoMedia** | S3 bucket, CloudFront CDN, image transformation Lambda@Edge |
-| **TangoEvents** | EventBridge bus, publisher Lambda, audit consumer Lambda, SQS DLQs |
-| **TangoObservability** | CloudWatch dashboards, alarms, SNS notifications |
+| **PikaiaNetwork** | VPC with public/private subnets, NAT gateway, database security group |
+| **PikaiaApp** | Aurora PostgreSQL Serverless v2, ECS Fargate, ALB, RDS Proxy, Secrets |
+| **PikaiaFrontend** | S3 + CloudFront for React SPA with API routing to ALB |
+| **PikaiaMedia** | S3 bucket, CloudFront CDN, image transformation Lambda@Edge |
+| **PikaiaEvents** | EventBridge bus, publisher Lambda, audit consumer Lambda, SQS DLQs |
+| **PikaiaObservability** | CloudWatch dashboards, alarms, SNS notifications |
 
 ## Architecture
 
 ### Event-Driven Audit Logging
 
-The `TangoEvents` stack implements an event-driven audit log system:
+The `PikaiaEvents` stack implements an event-driven audit log system:
 
 ```
 Django Backend
@@ -73,7 +73,7 @@ The audit consumer processes these event types (defined in `generate_audit_schem
 npx cdk bootstrap aws://ACCOUNT_ID/REGION
 
 # Deploy foundation stacks
-npx cdk deploy TangoNetwork TangoApp
+npx cdk deploy PikaiaNetwork PikaiaApp
 ```
 
 ### Full Deployment
@@ -83,7 +83,7 @@ npx cdk deploy TangoNetwork TangoApp
 npx cdk deploy --all
 
 # With custom domain and certificate
-npx cdk deploy TangoApp \
+npx cdk deploy PikaiaApp \
   --context domain_name=api.example.com \
   --context certificate_arn=arn:aws:acm:us-east-1:123456789:certificate/xxx
 ```
@@ -100,7 +100,7 @@ uv run python manage.py generate_audit_schema
 git add infra/functions/audit-consumer/generated_schema.py
 
 # 3. Deploy updated Lambda
-npx cdk deploy TangoEvents
+npx cdk deploy PikaiaEvents
 ```
 
 CI validates the schema is up-to-date via `--check` flag.
@@ -117,8 +117,8 @@ CI validates the schema is up-to-date via `--check` flag.
 
 Key CloudFormation outputs after deployment:
 
-- `TangoApiDns` - ALB DNS name for API
-- `TangoDatabaseEndpoint` - Aurora cluster endpoint
-- `TangoRdsProxyEndpoint` - RDS Proxy endpoint (for Lambda)
-- `TangoEventBusArn` - EventBridge bus ARN
-- `TangoAuditDLQUrl` - Audit consumer DLQ URL
+- `PikaiaApiDns` - ALB DNS name for API
+- `PikaiaDatabaseEndpoint` - Aurora cluster endpoint
+- `PikaiaRdsProxyEndpoint` - RDS Proxy endpoint (for Lambda)
+- `PikaiaEventBusArn` - EventBridge bus ARN
+- `PikaiaAuditDLQUrl` - Audit consumer DLQ URL

@@ -405,9 +405,9 @@ Response sent
 
 ### Overview
 
-The `TangoObservability` CDK stack deploys CloudWatch dashboards and alarms for operational monitoring.
+The `PikaiaObservability` CDK stack deploys CloudWatch dashboards and alarms for operational monitoring.
 
-### Dashboard: `tango-operations`
+### Dashboard: `pikaia-operations`
 
 The main operations dashboard includes:
 
@@ -418,29 +418,29 @@ The main operations dashboard includes:
 | **Database** | Connections, CPU, ACU capacity, read/write latency |
 | **Alarms** | Status of all configured alarms |
 
-Access: `https://{region}.console.aws.amazon.com/cloudwatch/home#dashboards:name=tango-operations`
+Access: `https://{region}.console.aws.amazon.com/cloudwatch/home#dashboards:name=pikaia-operations`
 
 ### Alarms
 
 | Alarm | Condition | Evaluation |
 |-------|-----------|------------|
-| `tango-high-error-rate` | 5xx errors > 5% of requests | 2 periods of 5 min |
-| `tango-high-latency` | p99 response time > 2 seconds | 3 periods of 1 min |
-| `tango-unhealthy-hosts` | Healthy hosts < 1 | 2 periods of 1 min |
-| `tango-ecs-high-cpu` | ECS CPU > 85% | 3 periods of 1 min |
-| `tango-ecs-high-memory` | ECS memory > 85% | 3 periods of 1 min |
-| `tango-db-high-cpu` | Database CPU > 80% | 3 periods of 1 min |
-| `tango-db-high-connections` | DB connections > 500 | 2 periods of 1 min |
+| `pikaia-high-error-rate` | 5xx errors > 5% of requests | 2 periods of 5 min |
+| `pikaia-high-latency` | p99 response time > 2 seconds | 3 periods of 1 min |
+| `pikaia-unhealthy-hosts` | Healthy hosts < 1 | 2 periods of 1 min |
+| `pikaia-ecs-high-cpu` | ECS CPU > 85% | 3 periods of 1 min |
+| `pikaia-ecs-high-memory` | ECS memory > 85% | 3 periods of 1 min |
+| `pikaia-db-high-cpu` | Database CPU > 80% | 3 periods of 1 min |
+| `pikaia-db-high-connections` | DB connections > 500 | 2 periods of 1 min |
 
-All alarms notify the `tango-alarms` SNS topic.
+All alarms notify the `pikaia-alarms` SNS topic.
 
 ### Deployment
 
 ```bash
 # Deploy with alarm email notifications
-cdk deploy TangoObservability --context alarm_email=ops@example.com
+cdk deploy PikaiaObservability --context alarm_email=ops@example.com
 
-# Deploy all stacks (observability depends on TangoApp)
+# Deploy all stacks (observability depends on PikaiaApp)
 cdk deploy --all
 ```
 

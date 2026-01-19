@@ -1,5 +1,5 @@
 """
-URL configuration for Tango backend.
+URL configuration for the backend.
 """
 
 from django.conf import settings

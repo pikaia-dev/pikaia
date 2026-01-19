@@ -62,7 +62,7 @@ class FrontendStack(Stack):
         self.frontend_bucket = s3.Bucket(
             self,
             "FrontendBucket",
-            bucket_name=f"tango-frontend-{self.account}-{self.region}",
+            bucket_name=f"pikaia-frontend-{self.account}-{self.region}",
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
@@ -104,7 +104,7 @@ class FrontendStack(Stack):
         self.distribution = cloudfront.Distribution(
             self,
             "FrontendDistribution",
-            comment="Tango SaaS Frontend",
+            comment="Pikaia SaaS Frontend",
             domain_names=domain_names,
             certificate=certificate,
             default_behavior=cloudfront.BehaviorOptions(

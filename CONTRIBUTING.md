@@ -1,6 +1,6 @@
 # Contributing
 
-Guidelines for Tango teams and AI agents.
+Guidelines for contributors and AI agents.
 
 ## Commit Format
 

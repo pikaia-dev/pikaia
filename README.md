@@ -1,4 +1,4 @@
-# Tango Django Ninja Stytch SaaS Starter
+# Pikaia
 
 A production-ready B2B SaaS starter built with Django Ninja, Stytch authentication, Stripe billing, and AWS infrastructure.
 
@@ -14,15 +14,15 @@ A production-ready B2B SaaS starter built with Django Ninja, Stytch authenticati
 
 ```bash
 # Clone and enter
-git clone https://github.com/TangoAgency/tango-django-ninja-stytch-saas-starter.git
-cd tango-django-ninja-stytch-saas-starter
+git clone https://github.com/pikaia-dev/pikaia.git
+cd pikaia
 
 # PostgreSQL (macOS)
 brew services start postgresql@16
 export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"  # Add to ~/.zshrc
 createuser -s postgres 2>/dev/null || true
 psql -U postgres -c "ALTER USER postgres PASSWORD 'postgres';"
-createdb -U postgres tango
+createdb -U postgres pikaia
 
 # Backend
 cd backend

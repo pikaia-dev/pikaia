@@ -1,4 +1,4 @@
-"""CDK Stacks for Tango infrastructure."""
+"""CDK Stacks for Pikaia infrastructure."""
 
 from .app_stack import AppStack
 from .events_stack import EventsStack

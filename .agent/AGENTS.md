@@ -1,4 +1,4 @@
-# Tango SaaS Starter
+# Pikaia
 
 B2B SaaS starter with Django Ninja, Stytch auth, Stripe billing, React frontend.
 

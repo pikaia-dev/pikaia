@@ -70,7 +70,7 @@ Presigned URLs provide controlled access:
 
 CloudFront + Lambda@Edge enables on-the-fly transformation:
 ```
-https://cdn.tango.app/uploads/org_123/avatar.jpg?w=100&h=100&fit=cover
+https://cdn.example.com/uploads/org_123/avatar.jpg?w=100&h=100&fit=cover
 ```
 
 Benefits:

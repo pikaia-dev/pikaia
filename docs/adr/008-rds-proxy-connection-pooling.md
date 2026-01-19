@@ -149,7 +149,7 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "HOST": os.environ.get("RDS_PROXY_HOST", "localhost"),
-        "NAME": "tango",
+        "NAME": "pikaia",
         "USER": "app_user",
         "PASSWORD": os.environ.get("DATABASE_PASSWORD"),
         "PORT": 5432,
@@ -171,7 +171,7 @@ def get_connection():
     """Cached connection, reused across warm invocations."""
     return psycopg2.connect(
         host=os.environ["RDS_PROXY_HOST"],
-        database="tango",
+        database="pikaia",
         user="app_user",
         password=get_secret(),
         sslmode="require",

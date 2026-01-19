@@ -11,7 +11,7 @@ Organizations can configure webhook endpoints to receive HTTP POST requests when
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
 │  Django App     │────▶│   EventBridge    │────▶│  Webhook Lambda │
-│  (publishes     │     │   (tango-events) │     │  (dispatches)   │
+│  (publishes     │     │   (pikaia-events) │     │  (dispatches)   │
 │   events)       │     └──────────────────┘     └────────┬────────┘
 └─────────────────┘                                       │
                                                           ▼
@@ -228,7 +228,7 @@ Response:
       "id": "wh_01HN...",
       "name": "Production Webhook",
       "description": "Sends events to our main integration",
-      "url": "https://api.example.com/webhooks/tango",
+      "url": "https://api.example.com/webhooks/pikaia",
       "events": ["member.created", "member.deleted"],
       "active": true,
       "last_delivery_status": "success",
@@ -250,7 +250,7 @@ Request:
 {
   "name": "Production Webhook",
   "description": "Sends events to our main integration",
-  "url": "https://api.example.com/webhooks/tango",
+  "url": "https://api.example.com/webhooks/pikaia",
   "events": ["member.created", "member.deleted"]
 }
 ```
@@ -260,7 +260,7 @@ Response:
 {
   "id": "wh_01HN...",
   "name": "Production Webhook",
-  "url": "https://api.example.com/webhooks/tango",
+  "url": "https://api.example.com/webhooks/pikaia",
   "events": ["member.created", "member.deleted"],
   "secret": "whsec_abc123...",
   "active": true,
@@ -393,7 +393,7 @@ The webhook consumer infrastructure needs to be added to the CDK stacks. This in
 # Filter for webhook-eligible events
 Rule(
     event_pattern={
-        "source": ["tango"],
+        "source": ["pikaia"],
         "detail-type": [
             {"prefix": "member."},
             {"prefix": "organization."},

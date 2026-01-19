@@ -1,6 +1,6 @@
 # System Documentation
 
-Technical documentation for the Tango Django SaaS Starter.
+Technical documentation for Pikaia.
 
 ## Contents
 

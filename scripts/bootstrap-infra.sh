@@ -12,19 +12,19 @@
 #   - AWS CLI configured with appropriate credentials
 #
 # Created resources:
-#   - ECR repository: tango-backend (for Docker images)
-#   - Secrets Manager secret: tango/app-secrets (for API keys)
+#   - ECR repository: pikaia-backend (for Docker images)
+#   - Secrets Manager secret: pikaia/app-secrets (for API keys)
 # =============================================================================
 
 set -euo pipefail
 
 # AWS profile (default or from argument)
-AWS_PROFILE="${1:-tango-b2b-demo}"
+AWS_PROFILE="${1:-pikaia}"
 export AWS_PROFILE
 
 # Resource names
-ECR_REPO_NAME="tango-backend"
-SECRETS_NAME="tango/app-secrets"
+ECR_REPO_NAME="pikaia-backend"
+SECRETS_NAME="pikaia/app-secrets"
 
 # Colors for output
 RED='\033[0;31m'
@@ -74,7 +74,7 @@ else
     echo_info "Creating Secrets Manager secret placeholder: $SECRETS_NAME"
     aws secretsmanager create-secret \
         --name "$SECRETS_NAME" \
-        --description "Tango application secrets (API keys, etc.)" \
+        --description "Application secrets (API keys, etc.)" \
         --secret-string '{"placeholder": "run bootstrap-secrets.sh to populate"}' \
         --query 'ARN' \
         --output text

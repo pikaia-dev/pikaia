@@ -1,5 +1,5 @@
 {
-  "name": "@tango/image-transform-lambda",
+  "name": "@pikaia/image-transform-lambda",
   "version": "1.0.0",
   "description": "Lambda@Edge function for CloudFront image transformation using Sharp",
   "main": "index.js",

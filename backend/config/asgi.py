@@ -1,5 +1,5 @@
 """
-ASGI config for Tango backend.
+ASGI config for the backend.
 """
 
 import os

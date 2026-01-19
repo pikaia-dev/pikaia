@@ -28,8 +28,8 @@ describe('detectHasHeader', () => {
   })
 
   it('returns false for data row even with text', () => {
-    // "wojtek" looks like text but wojtek+11@tango.agency is an email
-    expect(detectHasHeader(['wojtek', 'wojtek+11@tango.agency', '728340556'])).toBe(false)
+    // "wojtek" looks like text but wojtek+11@example.com is an email
+    expect(detectHasHeader(['wojtek', 'wojtek+11@example.com', '728340556'])).toBe(false)
   })
 
   it('handles empty row', () => {
@@ -158,7 +158,7 @@ describe('parseCsvData', () => {
   })
 
   it('handles single row without header', () => {
-    const data = [['wojtek', 'wojtek+11@tango.agency', '728340556', 'member']]
+    const data = [['wojtek', 'wojtek+11@example.com', '728340556', 'member']]
 
     const result = parseCsvData(data)
 
@@ -346,7 +346,7 @@ describe('parseRowsWithMappings', () => {
 
   it('handles real-world CSV data with assumed country code', () => {
     // User's actual test case - Polish number without country code
-    const rows = [['wojtek', 'wojtek+11@tango.agency', '728340556', ' member']]
+    const rows = [['wojtek', 'wojtek+11@example.com', '728340556', ' member']]
     const mappings = {
       0: 'name' as const,
       1: 'email' as const,
@@ -357,7 +357,7 @@ describe('parseRowsWithMappings', () => {
     const result = parseRowsWithMappings(rows, mappings, '+48')
 
     expect(result[0]).toEqual({
-      email: 'wojtek+11@tango.agency',
+      email: 'wojtek+11@example.com',
       name: 'wojtek',
       phone: '+48728340556',
       rawPhone: '728340556',

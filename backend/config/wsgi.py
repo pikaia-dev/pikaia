@@ -1,5 +1,5 @@
 """
-WSGI config for Tango backend.
+WSGI config for the backend.
 """
 
 import os

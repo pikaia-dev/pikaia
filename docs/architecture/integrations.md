@@ -140,7 +140,7 @@ Content-Type: application/json
 X-Webhook-ID: wh_01HN8J9K2M3N4P5Q6R7S8T9U0V
 X-Webhook-Timestamp: 1704236400
 X-Webhook-Signature: sha256=abc123...
-User-Agent: TangoWebhooks/1.0
+User-Agent: PikaiaWebhooks/1.0
 
 {
   "event_id": "550e8400-e29b-41d4-a716-446655440000",
