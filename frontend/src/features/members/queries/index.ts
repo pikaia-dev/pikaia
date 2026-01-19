@@ -1,16 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
+import { useQuery } from '@tanstack/react-query'
 
-import { useApi } from '../../../hooks/useApi'
-import type {
-  BulkInviteRequest,
-  BulkInviteResponse,
-  InviteMemberRequest,
-  InviteMemberResponse,
-  MemberListResponse,
-  MessageResponse,
-} from '../../../lib/api'
-import { queryKeys } from '../../shared/query-keys'
+import { useApi } from '@/hooks/use-api'
+import type { MemberListResponse } from '@/lib/api'
+import { queryKeys } from '@/shared/query-keys'
 
 /**
  * Query hook for fetching organization members.
@@ -21,87 +13,5 @@ export function useMembers() {
   return useQuery<MemberListResponse>({
     queryKey: queryKeys.members.list(),
     queryFn: listMembers,
-  })
-}
-
-/**
- * Mutation hook for inviting a new member.
- */
-export function useInviteMember() {
-  const { inviteMember } = useApi()
-  const queryClient = useQueryClient()
-
-  return useMutation<InviteMemberResponse, Error, InviteMemberRequest>({
-    mutationFn: inviteMember,
-    onSuccess: () => {
-      // Invalidate to refetch the members list
-      void queryClient.invalidateQueries({ queryKey: queryKeys.members.all })
-      toast.success('Invitation sent')
-    },
-    onError: (error) => {
-      toast.error(error.message || 'Failed to invite member')
-    },
-  })
-}
-
-/**
- * Mutation hook for updating a member's role.
- */
-export function useUpdateMemberRole() {
-  const { updateMemberRole } = useApi()
-  const queryClient = useQueryClient()
-
-  return useMutation<MessageResponse, Error, { memberId: number; role: 'admin' | 'member' }>({
-    mutationFn: ({ memberId, role }) => updateMemberRole(memberId, { role }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.members.all })
-      toast.success('Role updated')
-    },
-    onError: (error) => {
-      toast.error(error.message || 'Failed to update role')
-    },
-  })
-}
-
-/**
- * Mutation hook for deleting a member.
- */
-export function useDeleteMember() {
-  const { deleteMember } = useApi()
-  const queryClient = useQueryClient()
-
-  return useMutation<MessageResponse, Error, number>({
-    mutationFn: deleteMember,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.members.all })
-      toast.success('Member removed')
-    },
-    onError: (error) => {
-      toast.error(error.message || 'Failed to remove member')
-    },
-  })
-}
-
-/**
- * Mutation hook for bulk inviting members.
- */
-export function useBulkInviteMembers() {
-  const { bulkInviteMembers } = useApi()
-  const queryClient = useQueryClient()
-
-  return useMutation<BulkInviteResponse, Error, BulkInviteRequest>({
-    mutationFn: bulkInviteMembers,
-    onSuccess: (data) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.members.all })
-      if (data.succeeded > 0) {
-        toast.success(`${String(data.succeeded)} invitation${data.succeeded > 1 ? 's' : ''} sent`)
-      }
-      if (data.failed > 0) {
-        toast.error(`${String(data.failed)} invitation${data.failed > 1 ? 's' : ''} failed`)
-      }
-    },
-    onError: (error) => {
-      toast.error(error.message || 'Failed to invite members')
-    },
   })
 }

@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { useApi } from '../../../hooks/useApi'
-import type { MeResponse } from '../../../lib/api'
-import { queryKeys } from '../../shared/query-keys'
+import { useApi } from '@/hooks/use-api'
+import type { MeResponse } from '@/lib/api'
+import { queryKeys } from '@/shared/query-keys'
 
 /**
  * Query hook for fetching the current authenticated user.

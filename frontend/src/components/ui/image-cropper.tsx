@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import type { Area, Point } from 'react-easy-crop'
 import Cropper from 'react-easy-crop'
 
-import { cn } from '../../lib/utils'
+import { cn } from '@/lib/utils'
 import { Button } from './button'
 
 interface ImageCropperProps {
