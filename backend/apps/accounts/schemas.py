@@ -397,7 +397,7 @@ class UpdateOrganizationRequest(BaseModel):
         examples=["Acme Corp"],
     )
     slug: str | None = Field(
-        None,
+        default=None,
         description="URL-safe identifier for the organization (2-128 chars, lowercase)",
         examples=["acme-corp"],
     )
@@ -434,26 +434,26 @@ class UpdateBillingRequest(BaseModel):
     """Request to update organization billing info (admin only)."""
 
     use_billing_email: bool = Field(
-        False,
+        default=False,
         description="If True, send invoices to billing_email; otherwise send to admin",
     )
     billing_email: EmailStr | None = Field(
-        None,
+        default=None,
         description="Email for invoices (used only if use_billing_email is True)",
         examples=["billing@company.com"],
     )
     billing_name: str = Field(
-        "",
+        default="",
         max_length=255,
         description="Legal/company name for invoices",
         examples=["Acme Corporation Inc."],
     )
     address: BillingAddressSchema | None = Field(
-        None,
+        default=None,
         description="Billing address",
     )
     vat_id: str = Field(
-        "",
+        default="",
         max_length=50,
         description="EU VAT number",
         examples=["DE123456789"],

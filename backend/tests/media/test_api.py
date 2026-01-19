@@ -45,7 +45,7 @@ class TestUploadRequest:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/upload-request")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -56,7 +56,7 @@ class TestUploadRequest:
             image_type="avatar",
         )
 
-        result = request_upload(request, payload)
+        result = request_upload(request, payload)  # type: ignore[arg-type]
 
         assert result.upload_url
         assert result.key.startswith("avatars/")
@@ -70,7 +70,7 @@ class TestUploadRequest:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/upload-request")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -81,7 +81,7 @@ class TestUploadRequest:
             image_type="logo",
         )
 
-        result = request_upload(request, payload)
+        result = request_upload(request, payload)  # type: ignore[arg-type]
 
         assert result.upload_url
         assert result.key.startswith("logos/")
@@ -94,7 +94,7 @@ class TestUploadRequest:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/upload-request")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -106,7 +106,7 @@ class TestUploadRequest:
         )
 
         with pytest.raises(HttpError) as exc_info:
-            request_upload(request, payload)
+            request_upload(request, payload)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 400
         assert "content type" in str(exc_info.value.message).lower()
@@ -118,7 +118,7 @@ class TestUploadRequest:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/upload-request")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -130,7 +130,7 @@ class TestUploadRequest:
         )
 
         with pytest.raises(HttpError) as exc_info:
-            request_upload(request, payload)
+            request_upload(request, payload)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 400
         assert "too large" in str(exc_info.value.message).lower()
@@ -147,7 +147,7 @@ class TestUploadRequest:
         )
 
         with pytest.raises(HttpError) as exc_info:
-            request_upload(request, payload)
+            request_upload(request, payload)  # type: ignore[arg-type]  # Testing unauthenticated
 
         assert exc_info.value.status_code == 401
 
@@ -163,7 +163,7 @@ class TestConfirmUpload:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/confirm")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -182,7 +182,7 @@ class TestConfirmUpload:
             mock_storage.get_public_url.return_value = f"/media/{key}"
             mock_get_storage.return_value = mock_storage
 
-            result = confirm_upload(request, payload)
+            result = confirm_upload(request, payload)  # type: ignore[arg-type]
 
         assert result.url == f"/media/{key}"
         assert result.width == 200
@@ -202,7 +202,7 @@ class TestConfirmUpload:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/confirm")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -214,7 +214,7 @@ class TestConfirmUpload:
             mock_get_storage.return_value = mock_storage
 
             with pytest.raises(HttpError) as exc_info:
-                confirm_upload(request, payload)
+                confirm_upload(request, payload)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 404
 
@@ -239,7 +239,7 @@ class TestDeleteImage:
         )
 
         request = request_factory.delete(f"/api/v1/media/{image.id}")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -247,7 +247,7 @@ class TestDeleteImage:
             mock_storage = MagicMock()
             mock_get_storage.return_value = mock_storage
 
-            result = delete_image(request, str(image.id))
+            result = delete_image(request, str(image.id))  # type: ignore[arg-type]
 
         assert result["message"] == "Image deleted successfully"
         assert not UploadedImage.objects.filter(id=image.id).exists()
@@ -273,12 +273,12 @@ class TestDeleteImage:
         )
 
         request = request_factory.delete(f"/api/v1/media/{image.id}")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user1, member=member, organization=org)
         )
 
         with pytest.raises(HttpError) as exc_info:
-            delete_image(request, str(image.id))
+            delete_image(request, str(image.id))  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 403
 
@@ -298,7 +298,7 @@ class TestDeleteImage:
         )
 
         request = request_factory.delete(f"/api/v1/media/{image.id}")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -306,7 +306,7 @@ class TestDeleteImage:
             mock_storage = MagicMock()
             mock_get_storage.return_value = mock_storage
 
-            result = delete_image(request, str(image.id))
+            result = delete_image(request, str(image.id))  # type: ignore[arg-type]
 
         assert result["message"] == "Image deleted successfully"
         assert not UploadedImage.objects.filter(id=image.id).exists()
@@ -318,12 +318,12 @@ class TestDeleteImage:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.delete(f"/api/v1/media/{uuid.uuid4()}")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
         with pytest.raises(HttpError) as exc_info:
-            delete_image(request, str(uuid.uuid4()))
+            delete_image(request, str(uuid.uuid4()))  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 404
 
@@ -339,7 +339,7 @@ class TestLogoStytchSync:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/confirm")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -363,7 +363,7 @@ class TestLogoStytchSync:
             mock_client = MagicMock()
             mock_stytch.return_value = mock_client
 
-            confirm_upload(request, payload)
+            confirm_upload(request, payload)  # type: ignore[arg-type]
 
         # Verify Stytch was called with the logo URL
         mock_client.organizations.update.assert_called_once_with(
@@ -387,7 +387,7 @@ class TestLogoStytchSync:
         )
 
         request = request_factory.delete(f"/api/v1/media/{image.id}")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -401,7 +401,7 @@ class TestLogoStytchSync:
             mock_client = MagicMock()
             mock_stytch.return_value = mock_client
 
-            delete_image(request, str(image.id))
+            delete_image(request, str(image.id))  # type: ignore[arg-type]
 
         # Verify Stytch was called with empty logo URL
         mock_client.organizations.update.assert_called_once_with(
@@ -420,7 +420,7 @@ class TestLogoStytchSync:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/confirm")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -449,7 +449,7 @@ class TestLogoStytchSync:
             mock_stytch.return_value = mock_client
 
             # Should not raise - graceful degradation
-            result = confirm_upload(request, payload)
+            result = confirm_upload(request, payload)  # type: ignore[arg-type]
 
         # Upload should still succeed
         assert result.url == f"/media/{key}"

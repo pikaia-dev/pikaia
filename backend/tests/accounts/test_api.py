@@ -520,11 +520,11 @@ class TestGetCurrentUser:
         )
 
         request = request_factory.get("/api/v1/auth/me")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
-        result = get_current_user(request)
+        result = get_current_user(request)  # type: ignore[arg-type]
 
         assert result.user.id == user.id
         assert result.user.email == "me@example.com"
@@ -538,7 +538,7 @@ class TestGetCurrentUser:
         # Don't set auth attributes - simulates unauthenticated request
 
         with pytest.raises(HttpError):
-            get_current_user(request)
+            get_current_user(request)  # type: ignore[arg-type]  # Testing unauthenticated
 
 
 # --- Settings Endpoints Tests ---
@@ -555,7 +555,7 @@ class TestUpdateProfile:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.patch("/api/v1/auth/me/profile")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -565,7 +565,7 @@ class TestUpdateProfile:
             mock_client = MagicMock()
             mock_get_client.return_value = mock_client
 
-            result = update_profile(request, payload)
+            result = update_profile(request, payload)  # type: ignore[arg-type]
 
         assert result.name == "New Name"
         user.refresh_from_db()
@@ -581,7 +581,7 @@ class TestUpdateProfile:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.patch("/api/v1/auth/me/profile")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -599,7 +599,7 @@ class TestUpdateProfile:
             )
             mock_get_client.return_value = mock_client
 
-            result = update_profile(request, payload)
+            result = update_profile(request, payload)  # type: ignore[arg-type]
 
         # Local update should succeed even if Stytch fails
         assert result.name == "New Name"
@@ -612,7 +612,7 @@ class TestUpdateProfile:
         payload = UpdateProfileRequest(name="Test")
 
         with pytest.raises(HttpError):
-            update_profile(request, payload)
+            update_profile(request, payload)  # type: ignore[arg-type]  # Testing unauthenticated
 
 
 @pytest.mark.django_db
@@ -626,7 +626,7 @@ class TestStartEmailUpdate:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/email/start-update")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -636,7 +636,7 @@ class TestStartEmailUpdate:
             mock_client = MagicMock()
             mock_get_client.return_value = mock_client
 
-            result = start_email_update(request, payload)
+            result = start_email_update(request, payload)  # type: ignore[arg-type]
 
         assert result.success is True
         assert "new@example.com" in result.message
@@ -653,14 +653,14 @@ class TestStartEmailUpdate:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/email/start-update")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
         payload = StartEmailUpdateRequest(new_email="same@example.com")
 
         with pytest.raises(HttpError) as exc_info:
-            start_email_update(request, payload)
+            start_email_update(request, payload)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 400
         assert "same as current" in str(exc_info.value.message).lower()
@@ -674,7 +674,7 @@ class TestStartEmailUpdate:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/email/start-update")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -693,7 +693,7 @@ class TestStartEmailUpdate:
             mock_get_client.return_value = mock_client
 
             with pytest.raises(HttpError) as exc_info:
-                start_email_update(request, payload)
+                start_email_update(request, payload)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 400
 
@@ -703,7 +703,7 @@ class TestStartEmailUpdate:
         payload = StartEmailUpdateRequest(new_email="new@example.com")
 
         with pytest.raises(HttpError) as exc_info:
-            start_email_update(request, payload)
+            start_email_update(request, payload)  # type: ignore[arg-type]  # Testing unauthenticated
 
         assert exc_info.value.status_code == 401
 
@@ -733,11 +733,11 @@ class TestGetOrganization:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.get("/api/v1/auth/organization")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
-        result = get_organization(request)
+        result = get_organization(request)  # type: ignore[arg-type]
 
         assert result.name == org.name
         assert result.billing.billing_email == "billing@example.com"
@@ -751,7 +751,7 @@ class TestGetOrganization:
         request = request_factory.get("/api/v1/auth/organization")
 
         with pytest.raises(HttpError):
-            get_organization(request)
+            get_organization(request)  # type: ignore[arg-type]  # Testing unauthenticated
 
 
 @pytest.mark.django_db
@@ -765,7 +765,7 @@ class TestUpdateOrganization:
         member = MemberFactory.create(user=user, organization=org, role="admin")
 
         request = request_factory.patch("/api/v1/auth/organization")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -775,7 +775,7 @@ class TestUpdateOrganization:
             mock_client = MagicMock()
             mock_get_client.return_value = mock_client
 
-            result = update_organization(request, payload)
+            result = update_organization(request, payload)  # type: ignore[arg-type]
 
         assert result.name == "New Name"
         org.refresh_from_db()
@@ -789,14 +789,14 @@ class TestUpdateOrganization:
         member = MemberFactory.create(user=user, organization=org, role="member")
 
         request = request_factory.patch("/api/v1/auth/organization")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
         payload = UpdateOrganizationRequest(name="New Name")
 
         with pytest.raises(HttpError) as exc_info:
-            update_organization(request, payload)
+            update_organization(request, payload)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 403
 
@@ -806,7 +806,7 @@ class TestUpdateOrganization:
         payload = UpdateOrganizationRequest(name="Test")
 
         with pytest.raises(HttpError):
-            update_organization(request, payload)
+            update_organization(request, payload)  # type: ignore[arg-type]  # Testing unauthenticated
 
     def test_admin_can_update_slug(self, request_factory: RequestFactory) -> None:
         """Admin should be able to update organization slug."""
@@ -815,7 +815,7 @@ class TestUpdateOrganization:
         member = MemberFactory.create(user=user, organization=org, role="admin")
 
         request = request_factory.patch("/api/v1/auth/organization")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -825,7 +825,7 @@ class TestUpdateOrganization:
             mock_client = MagicMock()
             mock_get_client.return_value = mock_client
 
-            result = update_organization(request, payload)
+            result = update_organization(request, payload)  # type: ignore[arg-type]
 
         assert result.slug == "new-slug"
         org.refresh_from_db()
@@ -857,7 +857,7 @@ class TestUpdateBilling:
         member = MemberFactory.create(user=user, organization=org, role="admin")
 
         request = request_factory.patch("/api/v1/auth/organization/billing")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -875,7 +875,7 @@ class TestUpdateBilling:
             vat_id="DE999888777",
         )
 
-        result = update_billing(request, payload)
+        result = update_billing(request, payload)  # type: ignore[arg-type]
 
         assert result.billing.billing_email == "new-billing@example.com"
         assert result.billing.billing_name == "New Corp Inc."
@@ -893,7 +893,7 @@ class TestUpdateBilling:
         member = MemberFactory.create(user=user, organization=org, role="member")
 
         request = request_factory.patch("/api/v1/auth/organization/billing")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
@@ -903,7 +903,7 @@ class TestUpdateBilling:
         )
 
         with pytest.raises(HttpError) as exc_info:
-            update_billing(request, payload)
+            update_billing(request, payload)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 403
 
@@ -913,7 +913,7 @@ class TestUpdateBilling:
         payload = UpdateBillingRequest(billing_name="Test", vat_id="")
 
         with pytest.raises(HttpError):
-            update_billing(request, payload)
+            update_billing(request, payload)  # type: ignore[arg-type]  # Testing unauthenticated
 
 
 # --- Member Management Endpoints Tests ---
@@ -946,11 +946,11 @@ class TestListMembers:
         MemberFactory.create(user=member_user, organization=org, role="member")
 
         request = request_factory.get("/api/v1/auth/organization/members")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
-        result = list_members(request)
+        result = list_members(request)  # type: ignore[arg-type]
 
         assert len(result.members) == 2
         assert result.total == 2
@@ -965,12 +965,12 @@ class TestListMembers:
         member = MemberFactory.create(user=user, organization=org, role="member")
 
         request = request_factory.get("/api/v1/auth/organization/members")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
         with pytest.raises(HttpError) as exc_info:
-            list_members(request)
+            list_members(request)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 403
 
@@ -979,7 +979,7 @@ class TestListMembers:
         request = request_factory.get("/api/v1/auth/organization/members")
 
         with pytest.raises(HttpError):
-            list_members(request)
+            list_members(request)  # type: ignore[arg-type]  # Testing unauthenticated
 
     def test_returns_total_count(self, request_factory: RequestFactory) -> None:
         """Response should include total count of members."""
@@ -994,11 +994,11 @@ class TestListMembers:
             )
 
         request = request_factory.get("/api/v1/auth/organization/members")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
-        result = list_members(request)
+        result = list_members(request)  # type: ignore[arg-type]
 
         assert result.total == 6  # admin + 5 members
         assert len(result.members) == 6
@@ -1018,11 +1018,14 @@ class TestListMembers:
             )
 
         request = request_factory.get("/api/v1/auth/organization/members?limit=3")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
-        result = list_members(request, limit=3)
+        result = list_members(
+            request,  # type: ignore[arg-type]
+            limit=3,
+        )
 
         assert result.total == 6
         assert len(result.members) == 3
@@ -1042,11 +1045,14 @@ class TestListMembers:
             )
 
         request = request_factory.get("/api/v1/auth/organization/members?offset=4")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
-        result = list_members(request, offset=4)
+        result = list_members(
+            request,  # type: ignore[arg-type]
+            offset=4,
+        )
 
         assert result.total == 6
         assert len(result.members) == 2  # 6 - 4 = 2 remaining
@@ -1066,11 +1072,15 @@ class TestListMembers:
             )
 
         request = request_factory.get("/api/v1/auth/organization/members?offset=2&limit=3")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
-        result = list_members(request, offset=2, limit=3)
+        result = list_members(
+            request,  # type: ignore[arg-type]
+            offset=2,
+            limit=3,
+        )
 
         assert result.total == 11  # admin + 10 members
         assert len(result.members) == 3
@@ -1095,14 +1105,14 @@ class TestInviteMember:
         mock_client.magic_links.email.invite.return_value = MagicMock(member_id="member-new-123")
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
         payload = InviteMemberRequest(email="newuser@example.com", name="New User", role="member")
 
         with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
-            result = invite_member_endpoint(request, payload)
+            result = invite_member_endpoint(request, payload)  # type: ignore[arg-type]
 
         assert "newuser@example.com" in result.message
         assert result.stytch_member_id == "member-new-123"
@@ -1119,14 +1129,14 @@ class TestInviteMember:
         member = MemberFactory.create(user=user, organization=org, role="member")
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
         payload = InviteMemberRequest(email="newuser@example.com")
 
         with pytest.raises(HttpError) as exc_info:
-            invite_member_endpoint(request, payload)
+            invite_member_endpoint(request, payload)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 403
 
@@ -1172,7 +1182,7 @@ class TestInviteMember:
         )
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
@@ -1181,7 +1191,7 @@ class TestInviteMember:
         )
 
         with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
-            result = invite_member_endpoint(request, payload)
+            result = invite_member_endpoint(request, payload)  # type: ignore[arg-type]
 
         assert "deleted@example.com" in result.message
         # Verify member was reactivated
@@ -1197,14 +1207,14 @@ class TestInviteMember:
         member = MemberFactory.create(user=user, organization=org, role="admin")
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
         payload = InviteMemberRequest(email="admin@example.com")
 
         with pytest.raises(HttpError) as exc_info:
-            invite_member_endpoint(request, payload)
+            invite_member_endpoint(request, payload)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 400
         assert "yourself" in str(exc_info.value.message).lower()
@@ -1249,14 +1259,14 @@ class TestInviteMember:
         )
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
         payload = InviteMemberRequest(email="existing@example.com", role="admin")
 
         with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
-            result = invite_member_endpoint(request, payload)
+            result = invite_member_endpoint(request, payload)  # type: ignore[arg-type]
 
         assert "existing@example.com" in result.message
         assert "already an active member" in result.message.lower()
@@ -1290,14 +1300,14 @@ class TestInviteMember:
         )
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
         payload = InviteMemberRequest(email="pending@example.com", role="member")
 
         with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
-            result = invite_member_endpoint(request, payload)
+            result = invite_member_endpoint(request, payload)  # type: ignore[arg-type]
 
         assert "pending@example.com" in result.message
         assert "pending invitation" in result.message.lower()
@@ -1323,14 +1333,18 @@ class TestUpdateMemberRole:
         request = request_factory.patch(
             f"/api/v1/auth/organization/members/{target_member.stytch_member_id}"
         )
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
         payload = UpdateMemberRoleRequest(role="admin")
 
         with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
-            result = update_member_role_endpoint(request, target_member.stytch_member_id, payload)
+            result = update_member_role_endpoint(
+                request,  # type: ignore[arg-type]
+                target_member.stytch_member_id,
+                payload,
+            )
 
         assert "admin" in result.message
         target_member.refresh_from_db()
@@ -1345,14 +1359,14 @@ class TestUpdateMemberRole:
         request = request_factory.patch(
             f"/api/v1/auth/organization/members/{member.stytch_member_id}"
         )
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
         payload = UpdateMemberRoleRequest(role="member")
 
         with pytest.raises(HttpError) as exc_info:
-            update_member_role_endpoint(request, member.stytch_member_id, payload)
+            update_member_role_endpoint(request, member.stytch_member_id, payload)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 400
         assert "own role" in str(exc_info.value.message).lower()
@@ -1367,14 +1381,14 @@ class TestUpdateMemberRole:
         request = request_factory.patch(
             f"/api/v1/auth/organization/members/{target_member.stytch_member_id}"
         )
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
         payload = UpdateMemberRoleRequest(role="admin")
 
         with pytest.raises(HttpError) as exc_info:
-            update_member_role_endpoint(request, target_member.stytch_member_id, payload)
+            update_member_role_endpoint(request, target_member.stytch_member_id, payload)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 403
 
@@ -1396,12 +1410,15 @@ class TestDeleteMember:
         request = request_factory.delete(
             f"/api/v1/auth/organization/members/{target_member.stytch_member_id}"
         )
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
         with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
-            result = delete_member_endpoint(request, target_member.stytch_member_id)
+            result = delete_member_endpoint(
+                request,  # type: ignore[arg-type]
+                target_member.stytch_member_id,
+            )
 
         assert "target@example.com" in result.message
         target_member.refresh_from_db()
@@ -1416,12 +1433,12 @@ class TestDeleteMember:
         request = request_factory.delete(
             f"/api/v1/auth/organization/members/{member.stytch_member_id}"
         )
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
         with pytest.raises(HttpError) as exc_info:
-            delete_member_endpoint(request, member.stytch_member_id)
+            delete_member_endpoint(request, member.stytch_member_id)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 400
         assert "yourself" in str(exc_info.value.message).lower()
@@ -1436,12 +1453,12 @@ class TestDeleteMember:
         request = request_factory.delete(
             f"/api/v1/auth/organization/members/{target_member.stytch_member_id}"
         )
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=org)
         )
 
         with pytest.raises(HttpError) as exc_info:
-            delete_member_endpoint(request, target_member.stytch_member_id)
+            delete_member_endpoint(request, target_member.stytch_member_id)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 403
 
@@ -1460,11 +1477,11 @@ class TestDeleteMember:
         deleted_member.save()
 
         request = request_factory.get("/api/v1/auth/organization/members")
-        request = make_request_with_auth(
+        request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
-        result = list_members(request)
+        result = list_members(request)  # type: ignore[arg-type]
 
         assert len(result.members) == 1
         assert result.members[0].email == "admin@example.com"
