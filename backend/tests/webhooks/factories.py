@@ -12,7 +12,7 @@ from apps.webhooks.models import WebhookDelivery, WebhookEndpoint
 from ..accounts.factories import OrganizationFactory, UserFactory
 
 
-class WebhookEndpointFactory(DjangoModelFactory):
+class WebhookEndpointFactory(DjangoModelFactory[WebhookEndpoint]):
     """Factory for WebhookEndpoint model."""
 
     class Meta:
@@ -27,7 +27,7 @@ class WebhookEndpointFactory(DjangoModelFactory):
     active = True
 
 
-class WebhookDeliveryFactory(DjangoModelFactory):
+class WebhookDeliveryFactory(DjangoModelFactory[WebhookDelivery]):
     """Factory for WebhookDelivery model."""
 
     class Meta:

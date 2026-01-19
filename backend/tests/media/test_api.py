@@ -39,9 +39,9 @@ class TestUploadRequest:
 
     def test_request_avatar_upload(self, request_factory: RequestFactory) -> None:
         """Should return upload URL for avatar."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org)
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/upload-request")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -62,9 +62,9 @@ class TestUploadRequest:
 
     def test_request_logo_upload(self, request_factory: RequestFactory) -> None:
         """Should return upload URL for logo."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org)
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/upload-request")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -84,9 +84,9 @@ class TestUploadRequest:
 
     def test_rejects_invalid_content_type(self, request_factory: RequestFactory) -> None:
         """Should reject non-image content types."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org)
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/upload-request")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -106,9 +106,9 @@ class TestUploadRequest:
 
     def test_rejects_oversized_avatar(self, request_factory: RequestFactory) -> None:
         """Should reject avatars larger than 10MB."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org)
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/upload-request")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -149,9 +149,9 @@ class TestConfirmUpload:
 
     def test_confirm_avatar_upload(self, request_factory: RequestFactory) -> None:
         """Should confirm upload and update user avatar_url."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org)
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/confirm")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -186,9 +186,9 @@ class TestConfirmUpload:
 
     def test_confirm_missing_file(self, request_factory: RequestFactory) -> None:
         """Should return 404 when file not found."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org)
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/confirm")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -212,9 +212,9 @@ class TestDeleteImage:
 
     def test_user_can_delete_own_avatar(self, request_factory: RequestFactory) -> None:
         """User should be able to delete their own avatar."""
-        org = OrganizationFactory()
-        user = UserFactory(avatar_url="/media/avatars/1/test.png")
-        member = MemberFactory(user=user, organization=org)
+        org = OrganizationFactory.create()
+        user = UserFactory.create(avatar_url="/media/avatars/1/test.png")
+        member = MemberFactory.create(user=user, organization=org)
 
         image = UploadedImage.objects.create(
             storage_key="avatars/1/test.png",
@@ -243,10 +243,10 @@ class TestDeleteImage:
 
     def test_user_cannot_delete_others_avatar(self, request_factory: RequestFactory) -> None:
         """User should not be able to delete another user's avatar."""
-        org = OrganizationFactory()
-        user1 = UserFactory()
-        user2 = UserFactory()
-        member = MemberFactory(user=user1, organization=org)
+        org = OrganizationFactory.create()
+        user1 = UserFactory.create()
+        user2 = UserFactory.create()
+        member = MemberFactory.create(user=user1, organization=org)
 
         image = UploadedImage.objects.create(
             storage_key="avatars/2/test.png",
@@ -267,9 +267,9 @@ class TestDeleteImage:
 
     def test_admin_can_delete_org_logo(self, request_factory: RequestFactory) -> None:
         """Admin should be able to delete organization logo."""
-        org = OrganizationFactory(logo_url="/media/logos/1/test.png")
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org, role="admin")
+        org = OrganizationFactory.create(logo_url="/media/logos/1/test.png")
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="admin")
 
         image = UploadedImage.objects.create(
             storage_key="logos/1/test.png",
@@ -294,9 +294,9 @@ class TestDeleteImage:
 
     def test_delete_nonexistent_image(self, request_factory: RequestFactory) -> None:
         """Should return 404 for nonexistent image."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org)
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.delete(f"/api/v1/media/{uuid.uuid4()}")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -313,9 +313,9 @@ class TestLogoStytchSync:
 
     def test_confirm_logo_upload_syncs_to_stytch(self, request_factory: RequestFactory) -> None:
         """Should sync logo URL to Stytch after confirming logo upload."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org)
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/confirm")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -350,9 +350,9 @@ class TestLogoStytchSync:
 
     def test_delete_logo_syncs_to_stytch(self, request_factory: RequestFactory) -> None:
         """Should sync empty logo URL to Stytch after deleting logo."""
-        org = OrganizationFactory(logo_url="/media/logos/1/test.png")
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org, role="admin")
+        org = OrganizationFactory.create(logo_url="/media/logos/1/test.png")
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="admin")
 
         image = UploadedImage.objects.create(
             storage_key="logos/1/test.png",
@@ -390,9 +390,9 @@ class TestLogoStytchSync:
         """Logo upload should succeed even if Stytch sync fails."""
         from stytch.core.response_base import StytchError
 
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org)
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/confirm")
         request.auth = AuthContext(user=user, member=member, organization=org)

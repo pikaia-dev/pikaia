@@ -36,7 +36,7 @@ class TestGetSubscription:
 
     def test_returns_active_subscription(self, request_factory: RequestFactory) -> None:
         """Should return subscription details when org has active subscription."""
-        sub = SubscriptionFactory(status=Subscription.Status.ACTIVE, quantity=5)
+        sub = SubscriptionFactory.create(status=Subscription.Status.ACTIVE, quantity=5)
         org = sub.organization
 
         request = create_authenticated_request(
@@ -53,8 +53,8 @@ class TestGetSubscription:
         self, request_factory: RequestFactory
     ) -> None:
         """Should return 'none' status when org has no subscription."""
-        org = OrganizationFactory()
-        MemberFactory(organization=org)  # Add at least one member
+        org = OrganizationFactory.create()
+        MemberFactory.create(organization=org)  # Add at least one member
 
         request = create_authenticated_request(
             request_factory, "get", "/api/v1/billing/subscription", org=org
@@ -85,7 +85,7 @@ class TestCreateCheckout:
     ) -> None:
         """Admin should be able to create checkout session."""
         mock_create_session.return_value = "https://checkout.stripe.com/test"
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/checkout", org=org, role="admin"
@@ -103,7 +103,7 @@ class TestCreateCheckout:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/checkout", org=org, role="member"
@@ -120,7 +120,7 @@ class TestCreateCheckout:
 
     def test_already_subscribed_returns_400(self, request_factory: RequestFactory) -> None:
         """Should return 400 if org already has active subscription."""
-        sub = SubscriptionFactory(status=Subscription.Status.ACTIVE)
+        sub = SubscriptionFactory.create(status=Subscription.Status.ACTIVE)
         org = sub.organization
 
         request = create_authenticated_request(
@@ -148,7 +148,7 @@ class TestCreatePortal:
     ) -> None:
         """Admin should be able to create billing portal session."""
         mock_create_portal.return_value = "https://billing.stripe.com/portal"
-        org = OrganizationFactory(stripe_customer_id="cus_test")
+        org = OrganizationFactory.create(stripe_customer_id="cus_test")
 
         request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/portal", org=org, role="admin"
@@ -161,7 +161,7 @@ class TestCreatePortal:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory(stripe_customer_id="cus_test")
+        org = OrganizationFactory.create(stripe_customer_id="cus_test")
 
         request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/portal", org=org, role="member"
@@ -175,7 +175,7 @@ class TestCreatePortal:
 
     def test_no_customer_returns_400(self, request_factory: RequestFactory) -> None:
         """Should return 400 if org has no Stripe customer."""
-        org = OrganizationFactory(stripe_customer_id="")
+        org = OrganizationFactory.create(stripe_customer_id="")
 
         request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/portal", org=org, role="admin"
@@ -198,7 +198,7 @@ class TestCreateSubscriptionIntent:
     ) -> None:
         """Admin should be able to create subscription intent."""
         mock_create_intent.return_value = ("pi_secret_test", "sub_test_123")
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/subscription-intent", org=org, role="admin"
@@ -216,11 +216,11 @@ class TestCreateSubscriptionIntent:
     ) -> None:
         """Should use org member count when quantity not specified."""
         mock_create_intent.return_value = ("pi_secret", "sub_123")
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
         # Create 3 members
-        MemberFactory(organization=org)
-        MemberFactory(organization=org)
-        MemberFactory(organization=org)
+        MemberFactory.create(organization=org)
+        MemberFactory.create(organization=org)
+        MemberFactory.create(organization=org)
 
         request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/subscription-intent", org=org, role="admin"
@@ -235,7 +235,7 @@ class TestCreateSubscriptionIntent:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/subscription-intent", org=org, role="member"
@@ -249,7 +249,7 @@ class TestCreateSubscriptionIntent:
 
     def test_already_subscribed_returns_400(self, request_factory: RequestFactory) -> None:
         """Should return 400 if org already has active subscription."""
-        sub = SubscriptionFactory(status=Subscription.Status.ACTIVE)
+        sub = SubscriptionFactory.create(status=Subscription.Status.ACTIVE)
         org = sub.organization
 
         request = create_authenticated_request(
@@ -273,7 +273,7 @@ class TestConfirmSubscription:
     ) -> None:
         """Admin should be able to confirm subscription."""
         mock_sync.return_value = True
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/confirm-subscription", org=org, role="admin"
@@ -291,7 +291,7 @@ class TestConfirmSubscription:
     ) -> None:
         """Should return is_active=False when subscription is not yet active."""
         mock_sync.return_value = False
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/confirm-subscription", org=org, role="admin"
@@ -304,7 +304,7 @@ class TestConfirmSubscription:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/confirm-subscription", org=org, role="member"
@@ -320,7 +320,7 @@ class TestConfirmSubscription:
     def test_stripe_error_returns_500(self, mock_sync, request_factory: RequestFactory) -> None:
         """Should return 500 on Stripe errors."""
         mock_sync.side_effect = Exception("Stripe API error")
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory, "post", "/api/v1/billing/confirm-subscription", org=org, role="admin"
@@ -365,7 +365,7 @@ class TestListInvoices:
         mock_stripe.Invoice.list.return_value = mock_invoice_list
         mock_get_stripe.return_value = mock_stripe
 
-        org = OrganizationFactory(stripe_customer_id="cus_test")
+        org = OrganizationFactory.create(stripe_customer_id="cus_test")
 
         request = create_authenticated_request(
             request_factory, "get", "/api/v1/billing/invoices", org=org, role="admin"
@@ -384,7 +384,7 @@ class TestListInvoices:
         """Should return empty list when org has no Stripe customer."""
         from apps.billing.api import list_invoices
 
-        org = OrganizationFactory(stripe_customer_id="")
+        org = OrganizationFactory.create(stripe_customer_id="")
 
         request = create_authenticated_request(
             request_factory, "get", "/api/v1/billing/invoices", org=org, role="admin"
@@ -409,7 +409,7 @@ class TestListInvoices:
         mock_stripe.Invoice.list.return_value = mock_invoice_list
         mock_get_stripe.return_value = mock_stripe
 
-        org = OrganizationFactory(stripe_customer_id="cus_test")
+        org = OrganizationFactory.create(stripe_customer_id="cus_test")
 
         request = create_authenticated_request(
             request_factory, "get", "/api/v1/billing/invoices", org=org, role="admin"
@@ -427,7 +427,7 @@ class TestListInvoices:
         """Non-admin should be rejected with 403."""
         from apps.billing.api import list_invoices
 
-        org = OrganizationFactory(stripe_customer_id="cus_test")
+        org = OrganizationFactory.create(stripe_customer_id="cus_test")
 
         request = create_authenticated_request(
             request_factory, "get", "/api/v1/billing/invoices", org=org, role="member"
@@ -449,7 +449,7 @@ class TestListInvoices:
         mock_stripe.Invoice.list.side_effect = Exception("Stripe API error")
         mock_get_stripe.return_value = mock_stripe
 
-        org = OrganizationFactory(stripe_customer_id="cus_test")
+        org = OrganizationFactory.create(stripe_customer_id="cus_test")
 
         request = create_authenticated_request(
             request_factory, "get", "/api/v1/billing/invoices", org=org, role="admin"

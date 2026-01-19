@@ -38,7 +38,7 @@ class TestListEvents:
 
     def test_returns_event_catalog(self, request_factory: RequestFactory) -> None:
         """Should return list of available events."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
         request = create_authenticated_request(
             request_factory, "get", "/api/v1/webhooks/events", org=org
         )
@@ -52,7 +52,7 @@ class TestListEvents:
 
     def test_includes_member_events(self, request_factory: RequestFactory) -> None:
         """Should include member events in catalog."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
         request = create_authenticated_request(
             request_factory, "get", "/api/v1/webhooks/events", org=org
         )
@@ -70,9 +70,9 @@ class TestListEndpoints:
 
     def test_admin_can_list_endpoints(self, request_factory: RequestFactory) -> None:
         """Admin should be able to list endpoints."""
-        org = OrganizationFactory()
-        _ep1 = WebhookEndpointFactory(organization=org, name="Endpoint 1")
-        _ep2 = WebhookEndpointFactory(organization=org, name="Endpoint 2")
+        org = OrganizationFactory.create()
+        _ep1 = WebhookEndpointFactory.create(organization=org, name="Endpoint 1")
+        _ep2 = WebhookEndpointFactory.create(organization=org, name="Endpoint 2")
 
         request = create_authenticated_request(
             request_factory, "get", "/api/v1/webhooks/endpoints", org=org, role="admin"
@@ -84,8 +84,8 @@ class TestListEndpoints:
 
     def test_list_does_not_expose_secret(self, request_factory: RequestFactory) -> None:
         """List endpoint should never expose the signing secret."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org)
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org)
 
         request = create_authenticated_request(
             request_factory, "get", "/api/v1/webhooks/endpoints", org=org, role="admin"
@@ -102,7 +102,7 @@ class TestListEndpoints:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory, "get", "/api/v1/webhooks/endpoints", org=org, role="member"
@@ -115,10 +115,10 @@ class TestListEndpoints:
 
     def test_only_returns_org_endpoints(self, request_factory: RequestFactory) -> None:
         """Should only return endpoints for the authenticated org."""
-        org1 = OrganizationFactory()
-        org2 = OrganizationFactory()
-        _ep1 = WebhookEndpointFactory(organization=org1)
-        _ep2 = WebhookEndpointFactory(organization=org2)
+        org1 = OrganizationFactory.create()
+        org2 = OrganizationFactory.create()
+        _ep1 = WebhookEndpointFactory.create(organization=org1)
+        _ep2 = WebhookEndpointFactory.create(organization=org2)
 
         request = create_authenticated_request(
             request_factory, "get", "/api/v1/webhooks/endpoints", org=org1, role="admin"
@@ -135,7 +135,7 @@ class TestCreateEndpoint:
 
     def test_admin_can_create_endpoint(self, request_factory: RequestFactory) -> None:
         """Admin should be able to create endpoint."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory, "post", "/api/v1/webhooks/endpoints", org=org, role="admin"
@@ -156,7 +156,7 @@ class TestCreateEndpoint:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory,
@@ -178,7 +178,7 @@ class TestCreateEndpoint:
 
     def test_endpoint_saved_to_database(self, request_factory: RequestFactory) -> None:
         """Created endpoint should be persisted."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory, "post", "/api/v1/webhooks/endpoints", org=org, role="admin"
@@ -203,8 +203,8 @@ class TestGetEndpoint:
 
     def test_admin_can_get_endpoint(self, request_factory: RequestFactory) -> None:
         """Admin should be able to get endpoint."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org, name="My Endpoint")
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org, name="My Endpoint")
 
         request = create_authenticated_request(
             request_factory,
@@ -221,8 +221,8 @@ class TestGetEndpoint:
 
     def test_get_does_not_expose_secret(self, request_factory: RequestFactory) -> None:
         """Get endpoint should never expose the signing secret."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org)
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org)
 
         request = create_authenticated_request(
             request_factory,
@@ -242,8 +242,8 @@ class TestGetEndpoint:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org)
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org)
 
         request = create_authenticated_request(
             request_factory,
@@ -260,7 +260,7 @@ class TestGetEndpoint:
 
     def test_returns_404_for_nonexistent(self, request_factory: RequestFactory) -> None:
         """Should return 404 for nonexistent endpoint."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory,
@@ -277,9 +277,9 @@ class TestGetEndpoint:
 
     def test_returns_404_for_other_org_endpoint(self, request_factory: RequestFactory) -> None:
         """Should return 404 when endpoint belongs to different org."""
-        org1 = OrganizationFactory()
-        org2 = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org2)
+        org1 = OrganizationFactory.create()
+        org2 = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org2)
 
         request = create_authenticated_request(
             request_factory,
@@ -301,8 +301,8 @@ class TestUpdateEndpoint:
 
     def test_admin_can_update_endpoint(self, request_factory: RequestFactory) -> None:
         """Admin should be able to update endpoint."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org, name="Old Name")
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org, name="Old Name")
 
         request = create_authenticated_request(
             request_factory,
@@ -319,8 +319,8 @@ class TestUpdateEndpoint:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org)
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org)
 
         request = create_authenticated_request(
             request_factory,
@@ -340,8 +340,8 @@ class TestUpdateEndpoint:
         self, request_factory: RequestFactory
     ) -> None:
         """Partial update should only change provided fields."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(
             organization=org, name="Original", description="Original desc"
         )
 
@@ -361,7 +361,7 @@ class TestUpdateEndpoint:
 
     def test_returns_404_for_nonexistent(self, request_factory: RequestFactory) -> None:
         """Should return 404 for nonexistent endpoint."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory,
@@ -384,8 +384,8 @@ class TestDeleteEndpoint:
 
     def test_admin_can_delete_endpoint(self, request_factory: RequestFactory) -> None:
         """Admin should be able to delete endpoint."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org)
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org)
         endpoint_id = endpoint.id
 
         request = create_authenticated_request(
@@ -403,8 +403,8 @@ class TestDeleteEndpoint:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org)
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org)
 
         request = create_authenticated_request(
             request_factory,
@@ -421,7 +421,7 @@ class TestDeleteEndpoint:
 
     def test_returns_404_for_nonexistent(self, request_factory: RequestFactory) -> None:
         """Should return 404 for nonexistent endpoint."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory,
@@ -443,10 +443,10 @@ class TestListDeliveries:
 
     def test_admin_can_list_deliveries(self, request_factory: RequestFactory) -> None:
         """Admin should be able to list deliveries."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org)
-        _delivery1 = WebhookDeliveryFactory(endpoint=endpoint)
-        _delivery2 = WebhookDeliveryFactory(endpoint=endpoint)
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org)
+        _delivery1 = WebhookDeliveryFactory.create(endpoint=endpoint)
+        _delivery2 = WebhookDeliveryFactory.create(endpoint=endpoint)
 
         request = create_authenticated_request(
             request_factory,
@@ -462,8 +462,8 @@ class TestListDeliveries:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org)
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org)
 
         request = create_authenticated_request(
             request_factory,
@@ -480,7 +480,7 @@ class TestListDeliveries:
 
     def test_returns_404_for_nonexistent_endpoint(self, request_factory: RequestFactory) -> None:
         """Should return 404 for nonexistent endpoint."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory,
@@ -497,10 +497,10 @@ class TestListDeliveries:
 
     def test_respects_limit_parameter(self, request_factory: RequestFactory) -> None:
         """Should respect limit parameter."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org)
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org)
         for _ in range(10):
-            WebhookDeliveryFactory(endpoint=endpoint)
+            WebhookDeliveryFactory.create(endpoint=endpoint)
 
         request = create_authenticated_request(
             request_factory,
@@ -532,8 +532,8 @@ class TestSendTestWebhook:
             response_snippet='{"received": true}',
         )
 
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org)
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org)
 
         request = create_authenticated_request(
             request_factory,
@@ -552,8 +552,8 @@ class TestSendTestWebhook:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org)
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org)
 
         request = create_authenticated_request(
             request_factory,
@@ -571,7 +571,7 @@ class TestSendTestWebhook:
 
     def test_returns_404_for_nonexistent_endpoint(self, request_factory: RequestFactory) -> None:
         """Should return 404 for nonexistent endpoint."""
-        org = OrganizationFactory()
+        org = OrganizationFactory.create()
 
         request = create_authenticated_request(
             request_factory,
@@ -602,8 +602,8 @@ class TestSendTestWebhook:
             error_message="HTTP 500",
         )
 
-        org = OrganizationFactory()
-        endpoint = WebhookEndpointFactory(organization=org)
+        org = OrganizationFactory.create()
+        endpoint = WebhookEndpointFactory.create(organization=org)
 
         request = create_authenticated_request(
             request_factory,

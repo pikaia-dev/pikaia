@@ -502,16 +502,16 @@ class TestGetCurrentUser:
     def test_success_returns_user_info(self, request_factory: RequestFactory) -> None:
         """Should return authenticated user, member, and org info."""
         # Create test data using factories
-        user = UserFactory(
+        user = UserFactory.create(
             email="me@example.com",
             name="Test User",
         )
-        org = OrganizationFactory(
+        org = OrganizationFactory.create(
             stytch_org_id="org-me-456",
             name="My Org",
             slug="my-org",
         )
-        member = MemberFactory(
+        member = MemberFactory.create(
             user=user,
             organization=org,
             stytch_member_id="member-me-789",
@@ -547,9 +547,9 @@ class TestUpdateProfile:
 
     def test_success_updates_name(self, request_factory: RequestFactory) -> None:
         """Should update user name locally and sync to Stytch."""
-        user = UserFactory(name="Old Name")
-        org = OrganizationFactory()
-        member = MemberFactory(user=user, organization=org)
+        user = UserFactory.create(name="Old Name")
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.patch("/api/v1/auth/me/profile")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -571,9 +571,9 @@ class TestUpdateProfile:
         """Should succeed even if Stytch sync fails."""
         from stytch.core.response_base import StytchError, StytchErrorDetails
 
-        user = UserFactory(name="Old Name")
-        org = OrganizationFactory()
-        member = MemberFactory(user=user, organization=org)
+        user = UserFactory.create(name="Old Name")
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.patch("/api/v1/auth/me/profile")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -614,9 +614,9 @@ class TestStartEmailUpdate:
 
     def test_success_initiates_email_update(self, request_factory: RequestFactory) -> None:
         """Should call Stytch and return success."""
-        user = UserFactory(email="old@example.com")
-        org = OrganizationFactory()
-        member = MemberFactory(user=user, organization=org)
+        user = UserFactory.create(email="old@example.com")
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/email/start-update")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -639,9 +639,9 @@ class TestStartEmailUpdate:
 
     def test_same_email_returns_400(self, request_factory: RequestFactory) -> None:
         """Should return 400 if new email is same as current."""
-        user = UserFactory(email="same@example.com")
-        org = OrganizationFactory()
-        member = MemberFactory(user=user, organization=org)
+        user = UserFactory.create(email="same@example.com")
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/email/start-update")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -658,9 +658,9 @@ class TestStartEmailUpdate:
         """Should return 400 on Stytch API failure."""
         from stytch.core.response_base import StytchError, StytchErrorDetails
 
-        user = UserFactory(email="old@example.com")
-        org = OrganizationFactory()
-        member = MemberFactory(user=user, organization=org)
+        user = UserFactory.create(email="old@example.com")
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/email/start-update")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -708,7 +708,7 @@ class TestGetOrganization:
 
     def test_success_returns_org_with_billing(self, request_factory: RequestFactory) -> None:
         """Should return organization details including billing info."""
-        org = OrganizationFactory(
+        org = OrganizationFactory.create(
             billing_email="billing@example.com",
             billing_name="Acme Corp Inc.",
             billing_address_line1="123 Main St",
@@ -716,8 +716,8 @@ class TestGetOrganization:
             billing_country="US",
             vat_id="DE123456789",
         )
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org)
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.get("/api/v1/auth/organization")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -745,9 +745,9 @@ class TestUpdateOrganization:
 
     def test_admin_can_update_name(self, request_factory: RequestFactory) -> None:
         """Admin should be able to update organization name."""
-        org = OrganizationFactory(name="Old Name")
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org, role="admin")
+        org = OrganizationFactory.create(name="Old Name")
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="admin")
 
         request = request_factory.patch("/api/v1/auth/organization")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -767,9 +767,9 @@ class TestUpdateOrganization:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org, role="member")
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="member")
 
         request = request_factory.patch("/api/v1/auth/organization")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -791,9 +791,9 @@ class TestUpdateOrganization:
 
     def test_admin_can_update_slug(self, request_factory: RequestFactory) -> None:
         """Admin should be able to update organization slug."""
-        org = OrganizationFactory(name="Test Org", slug="old-slug")
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org, role="admin")
+        org = OrganizationFactory.create(name="Test Org", slug="old-slug")
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="admin")
 
         request = request_factory.patch("/api/v1/auth/organization")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -831,9 +831,9 @@ class TestUpdateBilling:
 
     def test_admin_can_update_billing(self, request_factory: RequestFactory) -> None:
         """Admin should be able to update billing info."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org, role="admin")
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="admin")
 
         request = request_factory.patch("/api/v1/auth/organization/billing")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -865,9 +865,9 @@ class TestUpdateBilling:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org, role="member")
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="member")
 
         request = request_factory.patch("/api/v1/auth/organization/billing")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -914,11 +914,11 @@ class TestListMembers:
 
     def test_admin_can_list_members(self, request_factory: RequestFactory) -> None:
         """Admin should see all active organization members."""
-        org = OrganizationFactory()
-        admin_user = UserFactory(email="admin@example.com", name="Admin")
-        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
-        member_user = UserFactory(email="member@example.com", name="Member")
-        MemberFactory(user=member_user, organization=org, role="member")
+        org = OrganizationFactory.create()
+        admin_user = UserFactory.create(email="admin@example.com", name="Admin")
+        admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
+        member_user = UserFactory.create(email="member@example.com", name="Member")
+        MemberFactory.create(user=member_user, organization=org, role="member")
 
         request = request_factory.get("/api/v1/auth/organization/members")
         request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
@@ -933,9 +933,9 @@ class TestListMembers:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org, role="member")
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="member")
 
         request = request_factory.get("/api/v1/auth/organization/members")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -954,12 +954,12 @@ class TestListMembers:
 
     def test_returns_total_count(self, request_factory: RequestFactory) -> None:
         """Response should include total count of members."""
-        org = OrganizationFactory()
-        admin_user = UserFactory(email="admin@example.com")
-        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+        org = OrganizationFactory.create()
+        admin_user = UserFactory.create(email="admin@example.com")
+        admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
         for i in range(5):
-            MemberFactory(
-                user=UserFactory(email=f"member{i}@example.com"),
+            MemberFactory.create(
+                user=UserFactory.create(email=f"member{i}@example.com"),
                 organization=org,
                 role="member",
             )
@@ -976,12 +976,12 @@ class TestListMembers:
 
     def test_pagination_with_limit(self, request_factory: RequestFactory) -> None:
         """Should return only the requested number of members."""
-        org = OrganizationFactory()
-        admin_user = UserFactory(email="admin@example.com")
-        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+        org = OrganizationFactory.create()
+        admin_user = UserFactory.create(email="admin@example.com")
+        admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
         for i in range(5):
-            MemberFactory(
-                user=UserFactory(email=f"member{i}@example.com"),
+            MemberFactory.create(
+                user=UserFactory.create(email=f"member{i}@example.com"),
                 organization=org,
                 role="member",
             )
@@ -998,12 +998,12 @@ class TestListMembers:
 
     def test_pagination_with_offset(self, request_factory: RequestFactory) -> None:
         """Should skip the requested number of members."""
-        org = OrganizationFactory()
-        admin_user = UserFactory(email="admin@example.com")
-        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+        org = OrganizationFactory.create()
+        admin_user = UserFactory.create(email="admin@example.com")
+        admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
         for i in range(5):
-            MemberFactory(
-                user=UserFactory(email=f"member{i}@example.com"),
+            MemberFactory.create(
+                user=UserFactory.create(email=f"member{i}@example.com"),
                 organization=org,
                 role="member",
             )
@@ -1020,12 +1020,12 @@ class TestListMembers:
 
     def test_pagination_with_offset_and_limit(self, request_factory: RequestFactory) -> None:
         """Should skip and limit as requested."""
-        org = OrganizationFactory()
-        admin_user = UserFactory(email="admin@example.com")
-        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+        org = OrganizationFactory.create()
+        admin_user = UserFactory.create(email="admin@example.com")
+        admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
         for i in range(10):
-            MemberFactory(
-                user=UserFactory(email=f"member{i}@example.com"),
+            MemberFactory.create(
+                user=UserFactory.create(email=f"member{i}@example.com"),
                 organization=org,
                 role="member",
             )
@@ -1047,9 +1047,9 @@ class TestInviteMember:
 
     def test_admin_can_invite_member(self, request_factory: RequestFactory) -> None:
         """Admin should be able to invite new members."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org, role="admin")
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="admin")
 
         mock_client = MagicMock()
         # Search returns no existing members (new user)
@@ -1075,9 +1075,9 @@ class TestInviteMember:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org, role="member")
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="member")
 
         request = request_factory.post("/api/v1/auth/organization/members")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -1094,13 +1094,13 @@ class TestInviteMember:
         from django.utils import timezone
         from stytch.core.response_base import StytchError, StytchErrorDetails
 
-        org = OrganizationFactory()
-        admin_user = UserFactory()
-        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+        org = OrganizationFactory.create()
+        admin_user = UserFactory.create()
+        admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
 
         # Create a soft-deleted member
-        deleted_user = UserFactory(email="deleted@example.com", name="Deleted User")
-        deleted_member = MemberFactory(
+        deleted_user = UserFactory.create(email="deleted@example.com", name="Deleted User")
+        deleted_member = MemberFactory.create(
             user=deleted_user, organization=org, role="member", stytch_member_id="old-stytch-id"
         )
         deleted_member.deleted_at = timezone.now()
@@ -1149,9 +1149,9 @@ class TestInviteMember:
 
     def test_cannot_invite_yourself(self, request_factory: RequestFactory) -> None:
         """Admin should not be able to invite themselves."""
-        org = OrganizationFactory()
-        user = UserFactory(email="admin@example.com")
-        member = MemberFactory(user=user, organization=org, role="admin")
+        org = OrganizationFactory.create()
+        user = UserFactory.create(email="admin@example.com")
+        member = MemberFactory.create(user=user, organization=org, role="admin")
 
         request = request_factory.post("/api/v1/auth/organization/members")
         request.auth = AuthContext(user=user, member=member, organization=org)
@@ -1170,13 +1170,13 @@ class TestInviteMember:
         """Inviting an already-active member should update their role but not send invite email."""
         from stytch.core.response_base import StytchError, StytchErrorDetails
 
-        org = OrganizationFactory()
-        admin_user = UserFactory()
-        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+        org = OrganizationFactory.create()
+        admin_user = UserFactory.create()
+        admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
 
         # Create an existing active member
-        existing_user = UserFactory(email="existing@example.com")
-        _existing_member = MemberFactory(
+        existing_user = UserFactory.create(email="existing@example.com")
+        _existing_member = MemberFactory.create(
             user=existing_user,
             organization=org,
             role="member",
@@ -1222,13 +1222,13 @@ class TestInviteMember:
         self, request_factory: RequestFactory
     ) -> None:
         """Inviting an already-invited member should show pending message."""
-        org = OrganizationFactory()
-        admin_user = UserFactory()
-        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
+        org = OrganizationFactory.create()
+        admin_user = UserFactory.create()
+        admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
 
         # Create an existing invited member
-        pending_user = UserFactory(email="pending@example.com")
-        _pending_member = MemberFactory(
+        pending_user = UserFactory.create(email="pending@example.com")
+        _pending_member = MemberFactory.create(
             user=pending_user, organization=org, role="member", stytch_member_id="pending-stytch-id"
         )
 
@@ -1263,11 +1263,11 @@ class TestUpdateMemberRole:
 
     def test_admin_can_update_role(self, request_factory: RequestFactory) -> None:
         """Admin should be able to update member's role."""
-        org = OrganizationFactory()
-        admin_user = UserFactory()
-        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
-        target_user = UserFactory()
-        target_member = MemberFactory(user=target_user, organization=org, role="member")
+        org = OrganizationFactory.create()
+        admin_user = UserFactory.create()
+        admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
+        target_user = UserFactory.create()
+        target_member = MemberFactory.create(user=target_user, organization=org, role="member")
 
         mock_client = MagicMock()
 
@@ -1287,9 +1287,9 @@ class TestUpdateMemberRole:
 
     def test_cannot_change_own_role(self, request_factory: RequestFactory) -> None:
         """Admin should not be able to change their own role."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org, role="admin")
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="admin")
 
         request = request_factory.patch(
             f"/api/v1/auth/organization/members/{member.stytch_member_id}"
@@ -1306,10 +1306,10 @@ class TestUpdateMemberRole:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org, role="member")
-        target_member = MemberFactory(organization=org, role="member")
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="member")
+        target_member = MemberFactory.create(organization=org, role="member")
 
         request = request_factory.patch(
             f"/api/v1/auth/organization/members/{target_member.stytch_member_id}"
@@ -1330,11 +1330,11 @@ class TestDeleteMember:
 
     def test_admin_can_delete_member(self, request_factory: RequestFactory) -> None:
         """Admin should be able to remove a member."""
-        org = OrganizationFactory()
-        admin_user = UserFactory()
-        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
-        target_user = UserFactory(email="target@example.com")
-        target_member = MemberFactory(user=target_user, organization=org, role="member")
+        org = OrganizationFactory.create()
+        admin_user = UserFactory.create()
+        admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
+        target_user = UserFactory.create(email="target@example.com")
+        target_member = MemberFactory.create(user=target_user, organization=org, role="member")
 
         mock_client = MagicMock()
 
@@ -1352,9 +1352,9 @@ class TestDeleteMember:
 
     def test_cannot_delete_yourself(self, request_factory: RequestFactory) -> None:
         """Admin should not be able to remove themselves."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org, role="admin")
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="admin")
 
         request = request_factory.delete(
             f"/api/v1/auth/organization/members/{member.stytch_member_id}"
@@ -1369,10 +1369,10 @@ class TestDeleteMember:
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
-        org = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=org, role="member")
-        target_member = MemberFactory(organization=org, role="member")
+        org = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="member")
+        target_member = MemberFactory.create(organization=org, role="member")
 
         request = request_factory.delete(
             f"/api/v1/auth/organization/members/{target_member.stytch_member_id}"
@@ -1388,11 +1388,11 @@ class TestDeleteMember:
         """Soft-deleted members should not appear in list."""
         from django.utils import timezone
 
-        org = OrganizationFactory()
-        admin_user = UserFactory(email="admin@example.com")
-        admin_member = MemberFactory(user=admin_user, organization=org, role="admin")
-        deleted_user = UserFactory(email="deleted@example.com")
-        deleted_member = MemberFactory(user=deleted_user, organization=org, role="member")
+        org = OrganizationFactory.create()
+        admin_user = UserFactory.create(email="admin@example.com")
+        admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
+        deleted_user = UserFactory.create(email="deleted@example.com")
+        deleted_member = MemberFactory.create(user=deleted_user, organization=org, role="member")
 
         # Soft delete the member
         deleted_member.deleted_at = timezone.now()

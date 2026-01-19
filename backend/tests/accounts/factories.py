@@ -11,7 +11,7 @@ from apps.accounts.models import Member, User
 from apps.organizations.models import Organization
 
 
-class UserFactory(DjangoModelFactory):
+class UserFactory(DjangoModelFactory[User]):
     """Factory for User model."""
 
     class Meta:
@@ -23,7 +23,7 @@ class UserFactory(DjangoModelFactory):
     is_staff = False
 
 
-class OrganizationFactory(DjangoModelFactory):
+class OrganizationFactory(DjangoModelFactory[Organization]):
     """Factory for Organization model."""
 
     class Meta:
@@ -34,7 +34,7 @@ class OrganizationFactory(DjangoModelFactory):
     slug = factory.Sequence(lambda n: f"org-{n}")
 
 
-class MemberFactory(DjangoModelFactory):
+class MemberFactory(DjangoModelFactory[Member]):
     """Factory for Member model."""
 
     class Meta:

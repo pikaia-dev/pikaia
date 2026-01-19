@@ -54,7 +54,7 @@ class TestSendPhoneVerificationOTP:
 
     def test_sends_otp_successfully(self) -> None:
         """Should send OTP and create verification record."""
-        user = UserFactory()
+        user = UserFactory.create()
         phone = "+14155551234"
 
         with patch("apps.sms.services.send_otp_message") as mock_send:
@@ -190,7 +190,7 @@ class TestVerifyPhoneForUser:
 
     def test_updates_user_phone_verified_at(self) -> None:
         """Should update user's phone_verified_at on success."""
-        user = UserFactory(phone_number="", phone_verified_at=None)
+        user = UserFactory.create(phone_number="", phone_verified_at=None)
         phone = "+14155551234"
 
         with patch("apps.sms.services.send_otp_message") as mock_send:
@@ -204,7 +204,7 @@ class TestVerifyPhoneForUser:
 
     def test_raises_on_invalid_code(self) -> None:
         """Should raise error on invalid OTP code."""
-        user = UserFactory()
+        user = UserFactory.create()
         phone = "+14155551234"
 
         with patch("apps.sms.services.send_otp_message") as mock_send:

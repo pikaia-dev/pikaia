@@ -13,7 +13,7 @@ from apps.billing.models import Subscription
 from tests.accounts.factories import OrganizationFactory
 
 
-class SubscriptionFactory(DjangoModelFactory):
+class SubscriptionFactory(DjangoModelFactory[Subscription]):
     """Factory for Subscription model."""
 
     class Meta:

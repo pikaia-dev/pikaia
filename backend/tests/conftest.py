@@ -17,9 +17,9 @@ Example usage:
 
     @pytest.mark.django_db
     def test_something():
-        user = UserFactory(email="test@example.com")
-        org = OrganizationFactory()
-        member = MemberFactory(user=user, organization=org, role="admin")
+        user = UserFactory.create(email="test@example.com")
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="admin")
 """
 
 import pytest
@@ -74,7 +74,7 @@ def authenticated_request(request_factory):
         def test_authenticated_endpoint(authenticated_request):
             from tests.accounts.factories import MemberFactory
 
-            member = MemberFactory(role="admin")
+            member = MemberFactory.create(role="admin")
             request = authenticated_request(member, method="post", path="/api/v1/something")
             result = my_endpoint(request)
     """
@@ -88,7 +88,7 @@ def authenticated_request(request_factory):
         content_type: str = "application/json",
     ):
         if member is None:
-            member = MemberFactory()
+            member = MemberFactory.create()
 
         method_func = getattr(request_factory, method.lower())
         kwargs = {}
@@ -133,9 +133,9 @@ def create_authenticated_request(
     from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
 
     if org is None:
-        org = OrganizationFactory()
-    user = UserFactory()
-    member = MemberFactory(user=user, organization=org, role=role)
+        org = OrganizationFactory.create()
+    user = UserFactory.create()
+    member = MemberFactory.create(user=user, organization=org, role=role)
 
     method_func = getattr(request_factory, method.lower())
     request = method_func(path)
@@ -160,7 +160,7 @@ def admin_member(db):
     """
     from tests.accounts.factories import MemberFactory
 
-    return MemberFactory(role="admin")
+    return MemberFactory.create(role="admin")
 
 
 @pytest.fixture
@@ -176,4 +176,4 @@ def member(db):
     """
     from tests.accounts.factories import MemberFactory
 
-    return MemberFactory(role="member")
+    return MemberFactory.create(role="member")
