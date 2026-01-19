@@ -7,14 +7,14 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "type-check": "tsc --noEmit",
-    "lint": "biome lint src",
-    "format": "biome format --write src",
-    "format:check": "biome check src",
+    "lint": "biome lint src tests",
+    "format": "biome format --write src tests",
+    "format:check": "biome check src tests",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "rm -rf dist .turbo",
-    "generate-types": "curl -s http://localhost:8000/api/v1/openapi.json > src/lib/api-schema.json && openapi-typescript src/lib/api-schema.json -o src/lib/api-types.ts"
+    "generate-types": "curl -s http://localhost:8000/api/v1/openapi.json > src/generated/api-schema.json && openapi-typescript src/generated/api-schema.json -o src/generated/api-types.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

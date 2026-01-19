@@ -66,12 +66,17 @@ backend/
 
 frontend/
 ├── src/
-│   ├── components/    # Reusable UI components
-│   ├── features/      # Feature-specific code
-│   ├── hooks/         # Custom React hooks
-│   ├── lib/           # API client, utilities
-│   └── pages/         # Route components
-└── public/            # Static assets
+│   ├── router.tsx        # Route config with guards
+│   ├── api/              # API client, types, query hooks
+│   ├── components/       # Reusable UI (shadcn)
+│   ├── features/         # Feature modules
+│   ├── generated/        # Auto-generated types
+│   ├── hooks/            # Shared hooks
+│   ├── layouts/          # Page layouts
+│   ├── lib/              # Utilities, constants
+│   └── pages/            # Route pages
+├── tests/                # Test files
+└── public/               # Static assets
 ```
 
 ## Design Principles
