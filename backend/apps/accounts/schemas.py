@@ -197,7 +197,7 @@ class MagicLinkAuthenticateResponse(BaseModel):
     model_config = {
         "json_schema_extra": {
             "example": {
-                "intermediate_session_token": "ist_xxx...",
+                "intermediate_session_token": "ist_xxx...",  # nosec B105
                 "email": "user@company.com",
                 "discovered_organizations": [
                     {
@@ -225,7 +225,7 @@ class SessionResponse(BaseModel):
     model_config = {
         "json_schema_extra": {
             "example": {
-                "session_token": "stytch_session_xxx...",
+                "session_token": "stytch_session_xxx...",  # nosec B105
                 "session_jwt": "eyJhbGciOiJSUzI1NiI...",
                 "member_id": "member-live-abc123",
                 "organization_id": "organization-live-abc123",
