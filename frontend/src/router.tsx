@@ -158,10 +158,10 @@ const routes: AppRouteConfig[] = [
         lazy: () => import('@/pages/settings/integrations-settings'),
         fallback: SettingsFallback,
       },
+      { path: '*', lazy: () => import('@/pages/not-found') },
     ],
   },
 
-  // Catch-all 404 route
   { path: '*', lazy: () => import('@/pages/not-found') },
 ]
 
