@@ -2,6 +2,7 @@
 Tests for cleanup_outbox management command.
 """
 
+from datetime import timedelta
 from io import StringIO
 
 import pytest
@@ -23,7 +24,7 @@ def _create_event(status: str, days_old: int) -> OutboxEvent:
     )
     # Manually set created_at since auto_now_add can't be overridden
     OutboxEvent.objects.filter(id=event.id).update(
-        created_at=timezone.now() - timezone.timedelta(days=days_old)
+        created_at=timezone.now() - timedelta(days=days_old)
     )
     return event
 

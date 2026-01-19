@@ -5,6 +5,7 @@ Used in tests to create test data.
 """
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import factory
 from factory.django import DjangoModelFactory
@@ -19,7 +20,7 @@ class SubscriptionFactory(DjangoModelFactory[Subscription]):
     class Meta:
         model = Subscription
 
-    organization = factory.SubFactory(OrganizationFactory)
+    organization: Any = factory.SubFactory(OrganizationFactory)
     stripe_subscription_id = factory.Sequence(lambda n: f"sub_test_{n}")
     stripe_price_id = factory.Sequence(lambda n: f"price_test_{n}")
     status = Subscription.Status.ACTIVE

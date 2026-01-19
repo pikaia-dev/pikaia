@@ -46,6 +46,7 @@ from apps.accounts.schemas import (
 )
 from apps.core.auth import AuthContext
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
+from tests.conftest import make_request_with_auth
 
 # --- Mock Stytch Response Objects ---
 
@@ -519,7 +520,9 @@ class TestGetCurrentUser:
         )
 
         request = request_factory.get("/api/v1/auth/me")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         result = get_current_user(request)
 
@@ -552,7 +555,9 @@ class TestUpdateProfile:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.patch("/api/v1/auth/me/profile")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = UpdateProfileRequest(name="New Name")
 
@@ -576,7 +581,9 @@ class TestUpdateProfile:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.patch("/api/v1/auth/me/profile")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = UpdateProfileRequest(name="New Name")
 
@@ -619,7 +626,9 @@ class TestStartEmailUpdate:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/email/start-update")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = StartEmailUpdateRequest(new_email="new@example.com")
 
@@ -644,7 +653,9 @@ class TestStartEmailUpdate:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/email/start-update")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = StartEmailUpdateRequest(new_email="same@example.com")
 
@@ -663,7 +674,9 @@ class TestStartEmailUpdate:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/auth/email/start-update")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = StartEmailUpdateRequest(new_email="new@example.com")
 
@@ -720,7 +733,9 @@ class TestGetOrganization:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.get("/api/v1/auth/organization")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         result = get_organization(request)
 
@@ -750,7 +765,9 @@ class TestUpdateOrganization:
         member = MemberFactory.create(user=user, organization=org, role="admin")
 
         request = request_factory.patch("/api/v1/auth/organization")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = UpdateOrganizationRequest(name="New Name")
 
@@ -772,7 +789,9 @@ class TestUpdateOrganization:
         member = MemberFactory.create(user=user, organization=org, role="member")
 
         request = request_factory.patch("/api/v1/auth/organization")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = UpdateOrganizationRequest(name="New Name")
 
@@ -796,7 +815,9 @@ class TestUpdateOrganization:
         member = MemberFactory.create(user=user, organization=org, role="admin")
 
         request = request_factory.patch("/api/v1/auth/organization")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = UpdateOrganizationRequest(name="Test Org", slug="new-slug")
 
@@ -836,7 +857,9 @@ class TestUpdateBilling:
         member = MemberFactory.create(user=user, organization=org, role="admin")
 
         request = request_factory.patch("/api/v1/auth/organization/billing")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = UpdateBillingRequest(
             billing_email="new-billing@example.com",
@@ -870,7 +893,9 @@ class TestUpdateBilling:
         member = MemberFactory.create(user=user, organization=org, role="member")
 
         request = request_factory.patch("/api/v1/auth/organization/billing")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = UpdateBillingRequest(
             billing_name="Test",
@@ -921,7 +946,9 @@ class TestListMembers:
         MemberFactory.create(user=member_user, organization=org, role="member")
 
         request = request_factory.get("/api/v1/auth/organization/members")
-        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=admin_user, member=admin_member, organization=org)
+        )
 
         result = list_members(request)
 
@@ -938,7 +965,9 @@ class TestListMembers:
         member = MemberFactory.create(user=user, organization=org, role="member")
 
         request = request_factory.get("/api/v1/auth/organization/members")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         with pytest.raises(HttpError) as exc_info:
             list_members(request)
@@ -965,7 +994,9 @@ class TestListMembers:
             )
 
         request = request_factory.get("/api/v1/auth/organization/members")
-        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=admin_user, member=admin_member, organization=org)
+        )
 
         result = list_members(request)
 
@@ -987,7 +1018,9 @@ class TestListMembers:
             )
 
         request = request_factory.get("/api/v1/auth/organization/members?limit=3")
-        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=admin_user, member=admin_member, organization=org)
+        )
 
         result = list_members(request, limit=3)
 
@@ -1009,7 +1042,9 @@ class TestListMembers:
             )
 
         request = request_factory.get("/api/v1/auth/organization/members?offset=4")
-        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=admin_user, member=admin_member, organization=org)
+        )
 
         result = list_members(request, offset=4)
 
@@ -1031,7 +1066,9 @@ class TestListMembers:
             )
 
         request = request_factory.get("/api/v1/auth/organization/members?offset=2&limit=3")
-        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=admin_user, member=admin_member, organization=org)
+        )
 
         result = list_members(request, offset=2, limit=3)
 
@@ -1058,7 +1095,9 @@ class TestInviteMember:
         mock_client.magic_links.email.invite.return_value = MagicMock(member_id="member-new-123")
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = InviteMemberRequest(email="newuser@example.com", name="New User", role="member")
 
@@ -1080,7 +1119,9 @@ class TestInviteMember:
         member = MemberFactory.create(user=user, organization=org, role="member")
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = InviteMemberRequest(email="newuser@example.com")
 
@@ -1131,7 +1172,9 @@ class TestInviteMember:
         )
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=admin_user, member=admin_member, organization=org)
+        )
 
         payload = InviteMemberRequest(
             email="deleted@example.com", name="Deleted User", role="member"
@@ -1154,7 +1197,9 @@ class TestInviteMember:
         member = MemberFactory.create(user=user, organization=org, role="admin")
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = InviteMemberRequest(email="admin@example.com")
 
@@ -1204,7 +1249,9 @@ class TestInviteMember:
         )
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=admin_user, member=admin_member, organization=org)
+        )
 
         payload = InviteMemberRequest(email="existing@example.com", role="admin")
 
@@ -1243,7 +1290,9 @@ class TestInviteMember:
         )
 
         request = request_factory.post("/api/v1/auth/organization/members")
-        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=admin_user, member=admin_member, organization=org)
+        )
 
         payload = InviteMemberRequest(email="pending@example.com", role="member")
 
@@ -1274,7 +1323,9 @@ class TestUpdateMemberRole:
         request = request_factory.patch(
             f"/api/v1/auth/organization/members/{target_member.stytch_member_id}"
         )
-        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=admin_user, member=admin_member, organization=org)
+        )
 
         payload = UpdateMemberRoleRequest(role="admin")
 
@@ -1294,7 +1345,9 @@ class TestUpdateMemberRole:
         request = request_factory.patch(
             f"/api/v1/auth/organization/members/{member.stytch_member_id}"
         )
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = UpdateMemberRoleRequest(role="member")
 
@@ -1314,7 +1367,9 @@ class TestUpdateMemberRole:
         request = request_factory.patch(
             f"/api/v1/auth/organization/members/{target_member.stytch_member_id}"
         )
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = UpdateMemberRoleRequest(role="admin")
 
@@ -1341,7 +1396,9 @@ class TestDeleteMember:
         request = request_factory.delete(
             f"/api/v1/auth/organization/members/{target_member.stytch_member_id}"
         )
-        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=admin_user, member=admin_member, organization=org)
+        )
 
         with patch("apps.accounts.stytch_client.get_stytch_client", return_value=mock_client):
             result = delete_member_endpoint(request, target_member.stytch_member_id)
@@ -1359,7 +1416,9 @@ class TestDeleteMember:
         request = request_factory.delete(
             f"/api/v1/auth/organization/members/{member.stytch_member_id}"
         )
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         with pytest.raises(HttpError) as exc_info:
             delete_member_endpoint(request, member.stytch_member_id)
@@ -1377,7 +1436,9 @@ class TestDeleteMember:
         request = request_factory.delete(
             f"/api/v1/auth/organization/members/{target_member.stytch_member_id}"
         )
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         with pytest.raises(HttpError) as exc_info:
             delete_member_endpoint(request, target_member.stytch_member_id)
@@ -1399,7 +1460,9 @@ class TestDeleteMember:
         deleted_member.save()
 
         request = request_factory.get("/api/v1/auth/organization/members")
-        request.auth = AuthContext(user=admin_user, member=admin_member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=admin_user, member=admin_member, organization=org)
+        )
 
         result = list_members(request)
 

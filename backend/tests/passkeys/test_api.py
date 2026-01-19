@@ -27,6 +27,7 @@ from apps.passkeys.schemas import (
     PasskeyRegistrationVerifyRequest,
 )
 from tests.accounts.factories import MemberFactory, UserFactory
+from tests.conftest import make_request_with_auth
 from tests.passkeys.factories import PasskeyFactory
 
 
@@ -40,7 +41,9 @@ class TestGetRegistrationOptions:
         user = member.user
 
         request = request_factory.post("/api/v1/passkeys/register/options")
-        request.auth = AuthContext(user=user, member=member, organization=member.organization)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=member.organization)
+        )
 
         response = get_registration_options(request)
 
@@ -57,7 +60,9 @@ class TestGetRegistrationOptions:
         PasskeyFactory.create(user=user, credential_id=b"existing_cred")
 
         request = request_factory.post("/api/v1/passkeys/register/options")
-        request.auth = AuthContext(user=user, member=member, organization=member.organization)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=member.organization)
+        )
 
         response = get_registration_options(request)
 
@@ -75,7 +80,9 @@ class TestVerifyRegistration:
         user = member.user
 
         request = request_factory.post("/api/v1/passkeys/register/verify")
-        request.auth = AuthContext(user=user, member=member, organization=member.organization)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=member.organization)
+        )
 
         payload = PasskeyRegistrationVerifyRequest(
             challenge_id="invalid_challenge",
@@ -96,15 +103,18 @@ class TestVerifyRegistration:
 
         # Create challenge for member.user
         request1 = request_factory.post("/api/v1/passkeys/register/options")
-        request1.auth = AuthContext(
-            user=member.user, member=member, organization=member.organization
+        request1 = make_request_with_auth(
+            request1, AuthContext(user=member.user, member=member, organization=member.organization)
         )
         options_response = get_registration_options(request1)
 
         # Try to use it with other_member's user
         request2 = request_factory.post("/api/v1/passkeys/register/verify")
-        request2.auth = AuthContext(
-            user=other_member.user, member=other_member, organization=other_member.organization
+        request2 = make_request_with_auth(
+            request2,
+            AuthContext(
+                user=other_member.user, member=other_member, organization=other_member.organization
+            ),
         )
 
         payload = PasskeyRegistrationVerifyRequest(
@@ -129,7 +139,9 @@ class TestVerifyRegistration:
 
         # Generate options
         request1 = request_factory.post("/api/v1/passkeys/register/options")
-        request1.auth = AuthContext(user=user, member=member, organization=member.organization)
+        request1 = make_request_with_auth(
+            request1, AuthContext(user=user, member=member, organization=member.organization)
+        )
         options_response = get_registration_options(request1)
 
         # Mock webauthn verification
@@ -143,7 +155,9 @@ class TestVerifyRegistration:
 
         # Verify registration
         request2 = request_factory.post("/api/v1/passkeys/register/verify")
-        request2.auth = AuthContext(user=user, member=member, organization=member.organization)
+        request2 = make_request_with_auth(
+            request2, AuthContext(user=user, member=member, organization=member.organization)
+        )
 
         payload = PasskeyRegistrationVerifyRequest(
             challenge_id=options_response.challenge_id,
@@ -291,7 +305,9 @@ class TestListPasskeys:
         PasskeyFactory.create(user=other_member.user, name="Other User Passkey")
 
         request = request_factory.get("/api/v1/passkeys/")
-        request.auth = AuthContext(user=user, member=member, organization=member.organization)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=member.organization)
+        )
 
         response = list_passkeys(request)
 
@@ -306,8 +322,8 @@ class TestListPasskeys:
         member = MemberFactory.create()
 
         request = request_factory.get("/api/v1/passkeys/")
-        request.auth = AuthContext(
-            user=member.user, member=member, organization=member.organization
+        request = make_request_with_auth(
+            request, AuthContext(user=member.user, member=member, organization=member.organization)
         )
 
         response = list_passkeys(request)
@@ -320,8 +336,8 @@ class TestListPasskeys:
         passkey = PasskeyFactory.create(user=member.user, backup_eligible=True, backup_state=False)
 
         request = request_factory.get("/api/v1/passkeys/")
-        request.auth = AuthContext(
-            user=member.user, member=member, organization=member.organization
+        request = make_request_with_auth(
+            request, AuthContext(user=member.user, member=member, organization=member.organization)
         )
 
         response = list_passkeys(request)
@@ -348,8 +364,8 @@ class TestDeletePasskey:
         passkey_id = passkey.id
 
         request = request_factory.delete(f"/api/v1/passkeys/{passkey_id}")
-        request.auth = AuthContext(
-            user=member.user, member=member, organization=member.organization
+        request = make_request_with_auth(
+            request, AuthContext(user=member.user, member=member, organization=member.organization)
         )
 
         response = delete_passkey(request, passkey_id)
@@ -366,8 +382,8 @@ class TestDeletePasskey:
         passkey = PasskeyFactory.create(user=other_member.user, name="Other's Passkey")
 
         request = request_factory.delete(f"/api/v1/passkeys/{passkey.id}")
-        request.auth = AuthContext(
-            user=member.user, member=member, organization=member.organization
+        request = make_request_with_auth(
+            request, AuthContext(user=member.user, member=member, organization=member.organization)
         )
 
         with pytest.raises(HttpError) as exc_info:
@@ -381,8 +397,8 @@ class TestDeletePasskey:
         member = MemberFactory.create()
 
         request = request_factory.delete("/api/v1/passkeys/99999")
-        request.auth = AuthContext(
-            user=member.user, member=member, organization=member.organization
+        request = make_request_with_auth(
+            request, AuthContext(user=member.user, member=member, organization=member.organization)
         )
 
         with pytest.raises(HttpError) as exc_info:

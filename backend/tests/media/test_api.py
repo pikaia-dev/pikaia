@@ -17,6 +17,7 @@ from apps.media.models import UploadedImage
 from apps.media.schemas import ConfirmUploadSchema, UploadRequestSchema
 from apps.media.services import StorageService
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
+from tests.conftest import make_request_with_auth
 
 
 def create_test_image_bytes(width: int = 100, height: int = 100) -> bytes:
@@ -44,7 +45,9 @@ class TestUploadRequest:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/upload-request")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = UploadRequestSchema(
             filename="avatar.png",
@@ -67,7 +70,9 @@ class TestUploadRequest:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/upload-request")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = UploadRequestSchema(
             filename="logo.jpg",
@@ -89,7 +94,9 @@ class TestUploadRequest:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/upload-request")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = UploadRequestSchema(
             filename="document.pdf",
@@ -111,7 +118,9 @@ class TestUploadRequest:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/upload-request")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = UploadRequestSchema(
             filename="big_avatar.png",
@@ -154,7 +163,9 @@ class TestConfirmUpload:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/confirm")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         key = f"avatars/{user.id}/test123.png"
         payload = ConfirmUploadSchema(key=key, image_type="avatar")
@@ -191,7 +202,9 @@ class TestConfirmUpload:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/confirm")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         payload = ConfirmUploadSchema(key="nonexistent/file.png", image_type="avatar")
 
@@ -226,7 +239,9 @@ class TestDeleteImage:
         )
 
         request = request_factory.delete(f"/api/v1/media/{image.id}")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         with patch("apps.media.api.get_storage_service") as mock_get_storage:
             mock_storage = MagicMock()
@@ -258,7 +273,9 @@ class TestDeleteImage:
         )
 
         request = request_factory.delete(f"/api/v1/media/{image.id}")
-        request.auth = AuthContext(user=user1, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user1, member=member, organization=org)
+        )
 
         with pytest.raises(HttpError) as exc_info:
             delete_image(request, str(image.id))
@@ -281,7 +298,9 @@ class TestDeleteImage:
         )
 
         request = request_factory.delete(f"/api/v1/media/{image.id}")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         with patch("apps.media.api.get_storage_service") as mock_get_storage:
             mock_storage = MagicMock()
@@ -299,7 +318,9 @@ class TestDeleteImage:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.delete(f"/api/v1/media/{uuid.uuid4()}")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         with pytest.raises(HttpError) as exc_info:
             delete_image(request, str(uuid.uuid4()))
@@ -318,7 +339,9 @@ class TestLogoStytchSync:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/confirm")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         key = f"logos/{org.id}/logo123.png"
         payload = ConfirmUploadSchema(key=key, image_type="logo")
@@ -364,7 +387,9 @@ class TestLogoStytchSync:
         )
 
         request = request_factory.delete(f"/api/v1/media/{image.id}")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         with (
             patch("apps.media.api.get_storage_service") as mock_get_storage,
@@ -395,7 +420,9 @@ class TestLogoStytchSync:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.post("/api/v1/media/confirm")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         key = f"logos/{org.id}/logo123.png"
         payload = ConfirmUploadSchema(key=key, image_type="logo")

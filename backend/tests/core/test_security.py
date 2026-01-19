@@ -14,6 +14,7 @@ from apps.accounts.models import User
 from apps.core.auth import AuthContext
 from apps.core.security import BearerAuth, require_admin
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
+from tests.conftest import MockRequest, make_request_with_auth
 
 
 class TestBearerAuth:
@@ -22,7 +23,7 @@ class TestBearerAuth:
     def test_authenticate_returns_auth_context_when_user_set(self) -> None:
         """Should return AuthContext when request.auth.user is populated."""
         bearer_auth = BearerAuth()
-        request = HttpRequest()
+        request = MockRequest()
         auth_context = AuthContext(user=MagicMock(spec=User))
         request.auth = auth_context
 
@@ -33,7 +34,7 @@ class TestBearerAuth:
     def test_authenticate_returns_none_when_auth_missing(self) -> None:
         """Should return None when request has no auth attribute."""
         auth = BearerAuth()
-        request = HttpRequest()
+        request = MockRequest()
         # No auth attribute
 
         result = auth.authenticate(request, "test-token-123")
@@ -43,7 +44,7 @@ class TestBearerAuth:
     def test_authenticate_returns_none_when_auth_user_is_none(self) -> None:
         """Should return None when request.auth.user is None."""
         auth = BearerAuth()
-        request = HttpRequest()
+        request = MockRequest()
         request.auth = AuthContext(user=None)
 
         result = auth.authenticate(request, "test-token-123")
@@ -62,7 +63,9 @@ class TestRequireAdmin:
         member = MemberFactory.create(user=user, organization=org, role="admin")
 
         request = request_factory.get("/")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         @require_admin
         def view(request: HttpRequest) -> HttpResponse:
@@ -74,7 +77,7 @@ class TestRequireAdmin:
     def test_rejects_unauthenticated_user(self, request_factory) -> None:
         """Should reject unauthenticated users with 401."""
         request = request_factory.get("/")
-        request.auth = AuthContext()  # No user/member/org
+        request = make_request_with_auth(request, AuthContext())  # No user/member/org
 
         @require_admin
         def view(request: HttpRequest) -> HttpResponse:
@@ -92,7 +95,9 @@ class TestRequireAdmin:
         member = MemberFactory.create(user=user, organization=org, role="member")
 
         request = request_factory.get("/")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         @require_admin
         def view(request: HttpRequest) -> HttpResponse:
@@ -117,7 +122,9 @@ class TestGetAuthContext:
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.get("/")
-        request.auth = AuthContext(user=user, member=member, organization=org)
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
 
         result_user, result_member, result_org = get_auth_context(request)
 
@@ -130,7 +137,7 @@ class TestGetAuthContext:
         from apps.core.security import get_auth_context
 
         request = request_factory.get("/")
-        request.auth = AuthContext()  # No user
+        request = make_request_with_auth(request, AuthContext())  # No user
 
         with pytest.raises(HttpError) as exc:
             get_auth_context(request)

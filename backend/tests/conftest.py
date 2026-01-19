@@ -22,10 +22,58 @@ Example usage:
         member = MemberFactory.create(user=user, organization=org, role="admin")
 """
 
+from collections.abc import Callable
+from typing import Any, cast
+
 import pytest
+from django.http import HttpRequest
 from django.test import Client, RequestFactory
+from django.test.client import WSGIRequest  # type: ignore[attr-defined]
 
 from apps.core.auth import AuthContext
+from apps.core.types import AuthenticatedHttpRequest
+
+
+class MockRequest(HttpRequest):
+    """
+    HttpRequest subclass for tests that allows setting auth attribute.
+
+    Use this instead of HttpRequest() in tests that need to set request.auth.
+
+    Example:
+        request = MockRequest()
+        request.auth = AuthContext(user=user, member=member, organization=org)
+    """
+
+    auth: AuthContext
+
+
+class MockWSGIRequest(AuthenticatedHttpRequest):
+    """
+    Test request type compatible with AuthenticatedHttpRequest.
+
+    RequestFactory returns WSGIRequest, so we cast to this type after
+    setting auth. This type extends AuthenticatedHttpRequest to be
+    compatible with API endpoint signatures.
+    """
+
+    organization: Any
+    user: Any
+
+
+def make_request_with_auth(request: "WSGIRequest", auth: AuthContext) -> AuthenticatedHttpRequest:
+    """
+    Set auth on a request and return it typed as AuthenticatedHttpRequest.
+
+    Use this helper to set request.auth while satisfying mypy.
+    Returns AuthenticatedHttpRequest for compatibility with API endpoints.
+
+    Example:
+        request = request_factory.get("/api/v1/endpoint")
+        request = make_request_with_auth(request, AuthContext(user=user, member=member))
+    """
+    request.auth = auth  # type: ignore[attr-defined]
+    return cast(AuthenticatedHttpRequest, request)
 
 
 @pytest.fixture
@@ -63,7 +111,9 @@ def api_client() -> Client:
 
 
 @pytest.fixture
-def authenticated_request(request_factory):
+def authenticated_request(
+    request_factory: RequestFactory,
+) -> Callable[..., AuthenticatedHttpRequest]:
     """
     Factory fixture for creating authenticated requests.
 
@@ -81,28 +131,30 @@ def authenticated_request(request_factory):
     from tests.accounts.factories import MemberFactory
 
     def _make_request(
-        member=None,
+        member: Any = None,
         method: str = "get",
         path: str = "/",
         data: dict | None = None,
         content_type: str = "application/json",
-    ):
+    ) -> AuthenticatedHttpRequest:
         if member is None:
             member = MemberFactory.create()
 
         method_func = getattr(request_factory, method.lower())
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
         if data is not None:
             kwargs["data"] = data
             kwargs["content_type"] = content_type
 
         request = method_func(path, **kwargs)
-        request.auth = AuthContext(
-            user=member.user,
-            member=member,
-            organization=member.organization,
+        return make_request_with_auth(
+            request,
+            AuthContext(
+                user=member.user,
+                member=member,
+                organization=member.organization,
+            ),
         )
-        return request
 
     return _make_request
 
@@ -111,9 +163,9 @@ def create_authenticated_request(
     request_factory: RequestFactory,
     method: str,
     path: str,
-    org=None,
+    org: Any = None,
     role: str = "admin",
-):
+) -> AuthenticatedHttpRequest:
     """
     Helper to create an authenticated request with member/org attached.
 
@@ -140,11 +192,13 @@ def create_authenticated_request(
     method_func = getattr(request_factory, method.lower())
     request = method_func(path)
 
-    request.auth = AuthContext(user=user, member=member, organization=org)
+    typed_request = make_request_with_auth(
+        request, AuthContext(user=user, member=member, organization=org)
+    )
     # Legacy attributes for backward compatibility
-    request.organization = org
-    request.user = user
-    return request
+    typed_request.organization = org  # type: ignore[attr-defined]
+    typed_request.user = user
+    return typed_request
 
 
 @pytest.fixture

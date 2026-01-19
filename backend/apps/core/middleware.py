@@ -27,7 +27,7 @@ def get_client_ip(request: HttpRequest) -> str | None:
     Handles the case where X-Forwarded-For contains multiple IPs
     (from proxy chain) by taking the first (original client).
     """
-    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    x_forwarded_for: str | None = request.META.get("HTTP_X_FORWARDED_FOR")
     if x_forwarded_for:
         return x_forwarded_for.split(",")[0].strip()
     return cast(str | None, request.META.get("REMOTE_ADDR"))

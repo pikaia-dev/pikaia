@@ -4,6 +4,8 @@ Factories for webhooks app models.
 Used in tests to create test data.
 """
 
+from typing import Any
+
 import factory
 from factory.django import DjangoModelFactory
 
@@ -18,8 +20,8 @@ class WebhookEndpointFactory(DjangoModelFactory[WebhookEndpoint]):
     class Meta:
         model = WebhookEndpoint
 
-    organization = factory.SubFactory(OrganizationFactory)
-    created_by = factory.SubFactory(UserFactory)
+    organization: Any = factory.SubFactory(OrganizationFactory)
+    created_by: Any = factory.SubFactory(UserFactory)
     name = factory.Sequence(lambda n: f"Webhook Endpoint {n}")
     description = "Test webhook endpoint"
     url = factory.Sequence(lambda n: f"https://example.com/webhook/{n}")
@@ -33,8 +35,8 @@ class WebhookDeliveryFactory(DjangoModelFactory[WebhookDelivery]):
     class Meta:
         model = WebhookDelivery
 
-    endpoint = factory.SubFactory(WebhookEndpointFactory)
+    endpoint: Any = factory.SubFactory(WebhookEndpointFactory)
     event_id = factory.Sequence(lambda n: f"evt_test_{n}")
     event_type = "member.created"
-    url_snapshot = factory.LazyAttribute(lambda obj: obj.endpoint.url)
+    url_snapshot: Any = factory.LazyAttribute(lambda obj: obj.endpoint.url)
     status = WebhookDelivery.Status.PENDING
