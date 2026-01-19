@@ -35,9 +35,12 @@ Coding standards for TypeScript/React frontend.
 - shadcn-ui primitives; limit custom CSS
 - Forms: React Hook Form + Zod validation
 
-## Auth
+## Auth & Routing
 
 - Route guards for auth UX; backend is source of truth
+- All routes defined in `router.tsx` using `AppRouteConfig` interface
+- Guards are composable: `guards: [ProtectedRoute, RequireAdminRole]`
+- All pages lazy-loaded via `lazy: () => import('@/pages/...')`
 
 ## Security
 
@@ -111,8 +114,8 @@ import { MembersTable } from '@/features/members/components' // barrel re-export
 ```
 frontend/
 ├── src/
-│   ├── app.tsx              # Root component with routes
-│   ├── main.tsx             # Entry point
+│   ├── router.tsx           # Route config, guards, and router instance
+│   ├── main.tsx             # Entry point (renders RouterProvider)
 │   │
 │   ├── api/                 # API layer (shared across features)
 │   │   ├── client.ts        # API client factory
@@ -159,6 +162,7 @@ frontend/
 ### Shared vs Feature-Specific Code
 
 **Shared code** lives at the top level of `src/`:
+- `router.tsx` — Route configuration, guards, fallbacks, and `createBrowserRouter` instance
 - `api/` — API client, types, and query infrastructure used by all features
 - `components/` — UI components reused across multiple features
 - `hooks/` — Utility hooks not tied to a specific domain (e.g., `use-mobile`, `use-sidebar`)
