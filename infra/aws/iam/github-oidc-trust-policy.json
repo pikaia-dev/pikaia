@@ -5,7 +5,7 @@
       "Sid": "GitHubOIDCTrust",
       "Effect": "Allow",
       "Principal": {
-        "Federated": "arn:aws:iam::603628786616:oidc-provider/token.actions.githubusercontent.com"
+        "Federated": "arn:aws:iam::YOUR_ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
       },
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
@@ -13,7 +13,7 @@
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
         },
         "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:TangoAgency/tango-django-ninja-stytch-saas-starter:*"
+          "token.actions.githubusercontent.com:sub": "repo:YOUR_ORG/YOUR_REPO:*"
         }
       }
     }

@@ -10,18 +10,18 @@
 #   - LocalStack: http://localhost:4566
 #   - Mailpit UI: http://localhost:8025
 
-name: tango-saas
+name: pikaia
 
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: tango-saas-postgres
+    container_name: pikaia-postgres
     ports:
       - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: tango
+      POSTGRES_DB: pikaia
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -32,7 +32,7 @@ services:
 
   localstack:
     image: localstack/localstack:latest
-    container_name: tango-saas-localstack
+    container_name: pikaia-localstack
     ports:
       - "4566:4566"  # LocalStack Gateway (all AWS services)
     environment:
@@ -50,7 +50,7 @@ services:
   # Init container to create S3 bucket and EventBridge event bus
   localstack-init:
     image: amazon/aws-cli:latest
-    container_name: tango-saas-localstack-init
+    container_name: pikaia-localstack-init
     depends_on:
       localstack:
         condition: service_healthy
@@ -61,15 +61,15 @@ services:
     entrypoint: >
       /bin/sh -c "
       echo 'Creating S3 bucket...';
-      aws --endpoint-url=http://localstack:4566 s3 mb s3://tango-media || true;
+      aws --endpoint-url=http://localstack:4566 s3 mb s3://pikaia-media || true;
       echo 'Creating EventBridge event bus...';
-      aws --endpoint-url=http://localstack:4566 events create-event-bus --name tango-events || true;
+      aws --endpoint-url=http://localstack:4566 events create-event-bus --name pikaia-events || true;
       echo 'LocalStack initialization complete';
       "
 
   mailpit:
     image: axllent/mailpit:latest
-    container_name: tango-saas-mailpit
+    container_name: pikaia-mailpit
     ports:
       - "1025:1025"  # SMTP
       - "8025:8025"  # Web UI

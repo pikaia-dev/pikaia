@@ -57,7 +57,7 @@ class Command(BaseCommand):
 
         if not options["force"]:
             # Search for existing product by metadata
-            products = stripe.Product.search(query="metadata['app']:'tango' AND active:'true'")
+            products = stripe.Product.search(query="metadata['app']:'pikaia' AND active:'true'")
             if products.data:
                 existing_product = products.data[0]
                 self.stdout.write(
@@ -92,7 +92,7 @@ class Command(BaseCommand):
                 name=product_name,
                 description="Per-seat monthly subscription",
                 metadata={
-                    "app": "tango",
+                    "app": "pikaia",
                     "tier": "pro",
                 },
             )
@@ -111,7 +111,7 @@ class Command(BaseCommand):
             },
             billing_scheme="per_unit",
             metadata={
-                "app": "tango",
+                "app": "pikaia",
                 "tier": "pro",
             },
         )

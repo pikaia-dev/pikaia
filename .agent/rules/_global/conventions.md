@@ -4,7 +4,7 @@ trigger: always_on
 
 # Coding Conventions
 
-Coding standards for Tango teams and AI agents.
+Coding standards for contributors and AI agents.
 
 ## Comments
 

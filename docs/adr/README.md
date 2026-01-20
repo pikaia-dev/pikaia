@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-This directory contains Architecture Decision Records (ADRs) documenting significant technical decisions made in the Tango SaaS Starter project.
+This directory contains Architecture Decision Records (ADRs) documenting significant technical decisions made in this project.
 
 ## Index
 

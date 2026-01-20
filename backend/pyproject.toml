@@ -1,7 +1,7 @@
 [project]
-name = "tango-backend"
+name = "pikaia-backend"
 version = "0.1.0"
-description = "Django Ninja backend for Tango SaaS Starter"
+description = "Django Ninja backend for Pikaia"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

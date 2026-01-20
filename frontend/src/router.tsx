@@ -158,8 +158,11 @@ const routes: AppRouteConfig[] = [
         lazy: () => import('@/pages/settings/integrations-settings'),
         fallback: SettingsFallback,
       },
+      { path: '*', lazy: () => import('@/pages/not-found') },
     ],
   },
+
+  { path: '*', lazy: () => import('@/pages/not-found') },
 ]
 
 // ============ Route Builder ============

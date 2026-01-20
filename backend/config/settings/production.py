@@ -59,7 +59,7 @@ _REQUIRED_SECRETS = {
 
 # Secrets that have obviously insecure defaults
 _INSECURE_DEFAULTS = {
-    "SECRET_KEY": "django-insecure-change-me-in-production",
+    "SECRET_KEY": "django-insecure-change-me-in-production",  # nosec B105
 }
 
 
@@ -122,7 +122,7 @@ SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"  # Control referrer l
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"  # Isolate browsing context
 
 # Use the original host header from CloudFront, not the ALB's internal hostname
-# This ensures redirects go to b2b.demo.tango.agency, not the ALB DNS name
+# This ensures redirects go to your domain, not the ALB DNS name
 USE_X_FORWARDED_HOST = True
 
 # CORS - read from environment, required for frontend to work

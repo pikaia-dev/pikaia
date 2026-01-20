@@ -16,7 +16,7 @@ class NetworkStack(Stack):
         # VPC with public and private subnets
         self.vpc = ec2.Vpc(
             self,
-            "TangoVpc",
+            "PikaiaVpc",
             max_azs=2,
             nat_gateways=1,  # Cost optimization: single NAT for dev
             subnet_configuration=[

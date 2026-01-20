@@ -1,5 +1,5 @@
 """
-Base Django settings for Tango SaaS Starter.
+Base Django settings.
 
 Shared configuration for all environments.
 """
@@ -201,7 +201,7 @@ def _get_database_config() -> dict:
             "ENGINE": "django.db.backends.postgresql",
             "NAME": settings.DB_NAME or "app",
             "USER": "postgres",
-            "PASSWORD": "postgres",
+            "PASSWORD": "postgres",  # nosec B105
             "HOST": "localhost",
             "PORT": "5432",
         }
@@ -276,7 +276,7 @@ EVENT_BUS_NAME = settings.EVENT_BUS_NAME
 
 # WebAuthn / Passkeys
 WEBAUTHN_RP_ID = settings.WEBAUTHN_RP_ID
-WEBAUTHN_RP_NAME = "Tango B2B"
+WEBAUTHN_RP_NAME = "Pikaia"
 WEBAUTHN_ORIGIN = settings.WEBAUTHN_ORIGIN
 
 # Stytch Trusted Auth Token (for passkey -> Stytch session)

@@ -154,7 +154,7 @@ from ninja import NinjaAPI
 from apps.members.api import router as members_router
 
 api = NinjaAPI(
-    title="Tango API",
+    title="Pikaia API",
     version="1.0.0",
 )
 

@@ -109,11 +109,11 @@ jobs:
         run: |
           npm install -g aws-cdk
           uv sync
-          # Deploy TangoApp exclusively first to handle cross-stack export changes
+          # Deploy PikaiaApp exclusively first to handle cross-stack export changes
           # (prevents "Cannot delete export" errors when moving resources between stacks)
-          uv run cdk deploy TangoApp --exclusively --require-approval never
-          # Then deploy all stacks including TangoNetwork
-          uv run cdk deploy TangoNetwork TangoMedia TangoApp TangoEvents TangoObservability --require-approval never
+          uv run cdk deploy PikaiaApp --exclusively --require-approval never
+          # Then deploy all stacks including PikaiaNetwork
+          uv run cdk deploy PikaiaNetwork PikaiaMedia PikaiaApp PikaiaEvents PikaiaObservability --require-approval never
 
       # Update ECS task definition when backend changes but not infra
       # (CDK deploy already handles this when infra changes)

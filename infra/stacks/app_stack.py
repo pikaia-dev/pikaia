@@ -94,7 +94,7 @@ class AppStack(Stack):
         # Aurora Serverless v2 cluster
         self.database = rds.DatabaseCluster(
             self,
-            "TangoDatabase",
+            "PikaiaDatabase",
             engine=rds.DatabaseClusterEngine.aurora_postgres(
                 version=rds.AuroraPostgresEngineVersion.VER_16_4,
             ),
@@ -104,7 +104,7 @@ class AppStack(Stack):
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             security_groups=[self.database_security_group],
-            default_database_name="tango",
+            default_database_name="pikaia",
             removal_policy=RemovalPolicy.SNAPSHOT,  # Take snapshot on delete
             deletion_protection=True,  # Prevent accidental deletion
             backup=rds.BackupProps(retention=Duration.days(7)),
@@ -119,7 +119,7 @@ class AppStack(Stack):
         # This is required for Lambda functions to efficiently connect to Aurora
         self.rds_proxy = rds.DatabaseProxy(
             self,
-            "TangoRdsProxy",
+            "PikaiaRdsProxy",
             proxy_target=rds.ProxyTarget.from_cluster(self.database),
             secrets=[self.database.secret],
             vpc=vpc,
@@ -142,7 +142,7 @@ class AppStack(Stack):
         self.app_secrets = secretsmanager.Secret.from_secret_name_v2(
             self,
             "AppSecrets",
-            secret_name="tango/app-secrets",
+            secret_name="pikaia/app-secrets",
         )
 
         # =================================================================
@@ -151,20 +151,20 @@ class AppStack(Stack):
 
         self.cluster = ecs.Cluster(
             self,
-            "TangoCluster",
+            "PikaiaCluster",
             vpc=vpc,
             container_insights_v2=ecs.ContainerInsights.ENABLED,
         )
 
         # ECR repository for Django app - PREREQUISITE: Repository must exist
         # Using from_repository_name to handle retained repositories from previous deployments.
-        # The repository should be created via `aws ecr create-repository --repository-name tango-backend`
+        # The repository should be created via `aws ecr create-repository --repository-name pikaia-backend`
         # or by running scripts/bootstrap-infra.sh before first deployment.
         # If the repository doesn't exist, deployment will fail with image pull errors.
         self.ecr_repository = ecr.Repository.from_repository_name(
             self,
-            "TangoBackendRepo",
-            repository_name="tango-backend",
+            "PikaiaBackendRepo",
+            repository_name="pikaia-backend",
         )
 
         # =================================================================
@@ -174,7 +174,7 @@ class AppStack(Stack):
         # Task definition
         task_definition = ecs.FargateTaskDefinition(
             self,
-            "TangoBackendTask",
+            "PikaiaBackendTask",
             cpu=512,
             memory_limit_mib=1024,
         )
@@ -205,7 +205,7 @@ class AppStack(Stack):
             "django",
             image=ecs.ContainerImage.from_ecr_repository(self.ecr_repository, "latest"),
             logging=ecs.LogDrivers.aws_logs(
-                stream_prefix="tango-backend",
+                stream_prefix="pikaia-backend",
                 log_retention=logs.RetentionDays.ONE_MONTH,
             ),
             environment=container_env,
@@ -343,7 +343,7 @@ class AppStack(Stack):
         # Fargate service with ALB
         self.fargate_service = ecs_patterns.ApplicationLoadBalancedFargateService(
             self,
-            "TangoBackendService",
+            "PikaiaBackendService",
             cluster=self.cluster,
             task_definition=task_definition,
             desired_count=min_capacity,
@@ -399,7 +399,7 @@ class AppStack(Stack):
             "LoadBalancerDNS",
             value=self.fargate_service.load_balancer.load_balancer_dns_name,
             description="Application Load Balancer DNS name",
-            export_name="TangoApiDns",
+            export_name="PikaiaApiDns",
         )
 
         CfnOutput(
@@ -407,7 +407,7 @@ class AppStack(Stack):
             "DatabaseEndpoint",
             value=self.database.cluster_endpoint.hostname,
             description="Aurora cluster endpoint",
-            export_name="TangoDatabaseEndpoint",
+            export_name="PikaiaDatabaseEndpoint",
         )
 
         CfnOutput(
@@ -415,7 +415,7 @@ class AppStack(Stack):
             "DatabaseSecretArn",
             value=self.database_secret.secret_arn,
             description="Database credentials secret ARN",
-            export_name="TangoDatabaseSecretArn",
+            export_name="PikaiaDatabaseSecretArn",
         )
 
         CfnOutput(
@@ -423,7 +423,7 @@ class AppStack(Stack):
             "AppSecretsArn",
             value=self.app_secrets.secret_arn,
             description="Application secrets ARN (update with API keys)",
-            export_name="TangoAppSecretsArn",
+            export_name="PikaiaAppSecretsArn",
         )
 
         CfnOutput(
@@ -431,7 +431,7 @@ class AppStack(Stack):
             "EcrRepositoryUri",
             value=self.ecr_repository.repository_uri,
             description="ECR repository URI for Docker images",
-            export_name="TangoBackendEcrUri",
+            export_name="PikaiaBackendEcrUri",
         )
 
         CfnOutput(
@@ -439,5 +439,5 @@ class AppStack(Stack):
             "RdsProxyEndpoint",
             value=self.rds_proxy.endpoint,
             description="RDS Proxy endpoint for Lambda connections",
-            export_name="TangoRdsProxyEndpoint",
+            export_name="PikaiaRdsProxyEndpoint",
         )

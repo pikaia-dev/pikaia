@@ -71,7 +71,7 @@ import resend
 resend.api_key = settings.RESEND_API_KEY
 
 resend.Emails.send({
-    "from": "Tango <noreply@tango.app>",
+    "from": "YourApp <noreply@example.com>",
     "to": member.email,
     "subject": f"You're invited to {org.name}",
     "html": render_email("invite-member", context),
@@ -180,10 +180,10 @@ def resend_webhook(request, payload: ResendWebhookPayload):
 ```bash
 # .env
 RESEND_API_KEY=re_xxxxx
-DEFAULT_FROM_EMAIL="Tango <noreply@mail.tango.app>"
+DEFAULT_FROM_EMAIL="YourApp <noreply@mail.example.com>"
 
 # Use subdomain for transactional email
-# mail.tango.app - keeps tango.app reputation clean
+# mail.example.com - keeps example.com reputation clean
 ```
 
 ### Testing
@@ -195,7 +195,7 @@ def test_invitation_email():
     email_id = send_invitation_email(
         to="test@example.com",
         org_name="Test Org",
-        invite_url="https://app.tango.app/invite/xxx",
+        invite_url="https://app.example.com/invite/xxx",
     )
     assert email_id is not None
 ```

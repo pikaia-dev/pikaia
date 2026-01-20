@@ -38,8 +38,8 @@ Coding standards for Python/Django backend. Scoped to `*.py` files.
 
 ## AWS / Infrastructure
 
-- Always use `--profile tango-b2b-demo` for AWS CLI commands
-- Examples: `aws --profile tango-b2b-demo ecs list-clusters`, `aws --profile tango-b2b-demo logs tail ...`
+- Use a named AWS CLI profile for project commands (configure in `~/.aws/config`)
+- Examples: `aws --profile pikaia ecs list-clusters`, `aws --profile pikaia logs tail ...`
 
 ## Django
 

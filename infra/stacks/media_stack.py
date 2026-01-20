@@ -144,7 +144,7 @@ class MediaStack(Stack):
             self,
             "MediaDistribution",
             default_behavior=default_behavior_config,
-            comment="Tango Media CDN with image transformation",
+            comment="Pikaia Media CDN with image transformation",
             price_class=cloudfront.PriceClass.PRICE_CLASS_100,  # US, Canada, Europe
         )
 
@@ -154,7 +154,7 @@ class MediaStack(Stack):
             "BucketName",
             value=self.bucket.bucket_name,
             description="S3 bucket name for media storage",
-            export_name="TangoMediaBucketName",
+            export_name="PikaiaMediaBucketName",
         )
 
         CfnOutput(
@@ -162,7 +162,7 @@ class MediaStack(Stack):
             "DistributionDomainName",
             value=self.distribution.distribution_domain_name,
             description="CloudFront distribution domain name",
-            export_name="TangoMediaCdnDomain",
+            export_name="PikaiaMediaCdnDomain",
         )
 
         CfnOutput(
@@ -170,7 +170,7 @@ class MediaStack(Stack):
             "ImageTransformUrl",
             value=f"https://{self.distribution.distribution_domain_name}",
             description="Base URL for image transformation (set as IMAGE_TRANSFORM_URL)",
-            export_name="TangoImageTransformUrl",
+            export_name="PikaiaImageTransformUrl",
         )
 
     def _create_origin_request_lambda(self) -> lambda_.Function:

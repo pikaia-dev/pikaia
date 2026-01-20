@@ -48,7 +48,7 @@ def get_db_connection():
     return psycopg2.connect(
         host=os.environ.get("RDS_PROXY_HOST", creds["host"]),
         port=creds.get("port", "5432"),
-        dbname=creds.get("dbname", "tango"),
+        dbname=creds.get("dbname", "pikaia"),
         user=creds["username"],
         password=creds["password"],
         sslmode="require",

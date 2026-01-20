@@ -3,7 +3,7 @@
 # Removes orphaned resources not managed by CDK
 #
 # Usage: ./cleanup-aws.sh [--dry-run]
-#        AWS_PROFILE=tango-b2b-demo ./cleanup-aws.sh
+#        AWS_PROFILE=pikaia ./cleanup-aws.sh
 #
 # Prerequisites:
 #   - AWS CLI configured (profile or environment credentials)
@@ -63,7 +63,7 @@ for LOG_GROUP in $LOG_GROUPS; do
     fi
 
     # Check for empty ECS log groups (0 stored bytes)
-    if [[ "$LOG_GROUP" == TangoApp-* ]]; then
+    if [[ "$LOG_GROUP" == PikaiaApp-* ]]; then
         STORED_BYTES=$(aws_cmd logs describe-log-groups \
             --log-group-name-prefix "$LOG_GROUP" \
             --query 'logGroups[0].storedBytes' --output text)
