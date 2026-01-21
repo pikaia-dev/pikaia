@@ -4,15 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0011_fix_member_unique_constraint_for_soft_delete'),
+        ("accounts", "0011_fix_member_unique_constraint_for_soft_delete"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='member',
-            name='deleted_at',
-            field=models.DateTimeField(blank=True, db_index=True, help_text='Soft delete timestamp. NULL = active record.', null=True),
+            model_name="member",
+            name="deleted_at",
+            field=models.DateTimeField(
+                blank=True,
+                db_index=True,
+                help_text="Soft delete timestamp. NULL = active record.",
+                null=True,
+            ),
         ),
     ]

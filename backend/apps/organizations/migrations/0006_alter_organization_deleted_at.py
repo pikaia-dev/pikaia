@@ -4,15 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('organizations', '0005_add_soft_delete'),
+        ("organizations", "0005_add_soft_delete"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='organization',
-            name='deleted_at',
-            field=models.DateTimeField(blank=True, db_index=True, help_text='Soft delete timestamp. NULL = active record.', null=True),
+            model_name="organization",
+            name="deleted_at",
+            field=models.DateTimeField(
+                blank=True,
+                db_index=True,
+                help_text="Soft delete timestamp. NULL = active record.",
+                null=True,
+            ),
         ),
     ]
