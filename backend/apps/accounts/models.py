@@ -4,7 +4,8 @@ Accounts models - user and membership management.
 
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
-from django.utils import timezone
+
+from apps.core.models import SoftDeleteAllManager, SoftDeleteManager, SoftDeleteMixin
 
 
 class UserManager(BaseUserManager):
@@ -95,21 +96,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.email
 
 
-class MemberManager(models.Manager):
-    """Custom manager for Member model that excludes soft-deleted members."""
-
-    def get_queryset(self) -> models.QuerySet:
-        """Return only active (non-deleted) members by default."""
-        return super().get_queryset().filter(deleted_at__isnull=True)
-
-
-class MemberAllManager(models.Manager):
-    """Manager that includes all members, including soft-deleted ones."""
-
-    pass
-
-
-class Member(models.Model):
+class Member(SoftDeleteMixin, models.Model):
     """
     Org-scoped membership linking User to Organization.
 
@@ -145,21 +132,13 @@ class Member(models.Model):
         help_text="Org-level role from Stytch RBAC",
     )
 
-    # Soft delete
-    deleted_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        db_index=True,
-        help_text="Soft delete timestamp. NULL = active member.",
-    )
-
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # Managers
-    objects = MemberManager()
-    all_objects = MemberAllManager()
+    # Managers - SoftDeleteManager excludes deleted by default
+    objects = SoftDeleteManager()
+    all_objects = SoftDeleteAllManager()
 
     class Meta:
         ordering = ["-created_at"]
@@ -181,13 +160,3 @@ class Member(models.Model):
     def is_admin(self) -> bool:
         """Check if member has admin role."""
         return self.role == "admin"
-
-    @property
-    def is_deleted(self) -> bool:
-        """Check if member is soft-deleted."""
-        return self.deleted_at is not None
-
-    def soft_delete(self) -> None:
-        """Soft delete this member by setting deleted_at timestamp."""
-        self.deleted_at = timezone.now()
-        self.save(update_fields=["deleted_at", "updated_at"])
