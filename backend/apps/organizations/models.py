@@ -4,22 +4,10 @@ Organizations models - multi-tenancy foundation.
 
 from django.db import models
 
-
-class OrganizationManager(models.Manager):
-    """Custom manager for Organization model that excludes soft-deleted orgs."""
-
-    def get_queryset(self) -> models.QuerySet:
-        """Return only active (non-deleted) organizations by default."""
-        return super().get_queryset().filter(deleted_at__isnull=True)
+from apps.core.models import SoftDeleteAllManager, SoftDeleteManager, SoftDeleteMixin
 
 
-class OrganizationAllManager(models.Manager):
-    """Manager that includes all organizations, including soft-deleted ones."""
-
-    pass
-
-
-class Organization(models.Model):
+class Organization(SoftDeleteMixin, models.Model):
     """
     Local replica of Stytch Organization.
 
@@ -87,36 +75,16 @@ class Organization(models.Model):
         help_text="EU VAT number, e.g. 'DE123456789'",
     )
 
-    # Soft delete
-    deleted_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        db_index=True,
-        help_text="Soft delete timestamp. NULL = active organization.",
-    )
-
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # Managers
-    objects = OrganizationManager()
-    all_objects = OrganizationAllManager()
+    # Managers - SoftDeleteManager excludes deleted by default
+    objects = SoftDeleteManager()
+    all_objects = SoftDeleteAllManager()
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
         return self.name
-
-    @property
-    def is_deleted(self) -> bool:
-        """Check if organization is soft-deleted."""
-        return self.deleted_at is not None
-
-    def soft_delete(self) -> None:
-        """Soft delete this organization by setting deleted_at timestamp."""
-        from django.utils import timezone
-
-        self.deleted_at = timezone.now()
-        self.save(update_fields=["deleted_at", "updated_at"])
