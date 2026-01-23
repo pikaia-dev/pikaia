@@ -11,6 +11,7 @@ import { GoogleOAuthButton } from '@/features/auth/components/google-oauth-butto
 import { OrganizationSelector } from '@/features/auth/components/organization-selector'
 import { PasskeyLoginButton } from '@/features/auth/components/passkey-login-button'
 import { useDiscoveryAuth } from '@/features/auth/hooks/use-discovery-auth'
+import { useGoogleOneTap } from '@/features/auth/hooks/use-google-one-tap'
 import { hasPasskeyHint, isWebAuthnSupported } from '@/features/auth/hooks/use-passkey-auth'
 
 // Passkey placeholder token before Stytch session attestation
@@ -126,6 +127,11 @@ export default function Login() {
   const { session, isInitialized } = useStytchMemberSession()
   const { state, sendMagicLink, startGoogleOAuth, exchangeSession, resetToEmail } =
     useDiscoveryAuth()
+
+  // Try to show Google One Tap prompt on page load
+  // If successful, it redirects to /auth/callback like regular OAuth
+  // If it can't render (dismissed, blocked, etc.), user uses regular login UI
+  useGoogleOneTap({ autoShow: true })
 
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- isInitialized can be false
