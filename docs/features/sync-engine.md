@@ -279,6 +279,235 @@ class SyncOperation(models.Model):
         ]
 ```
 
+### 2.3 Field-Level Timestamps for LWW
+
+Field-level Last-Write-Wins requires tracking **when each field was last modified**, not just the entity as a whole.
+
+#### Storage Format
+
+```python
+# apps/sync/models.py
+
+class FieldLevelLWWMixin(models.Model):
+    """
+    Mixin for entities using field-level LWW conflict resolution.
+
+    Tracks per-field modification timestamps to enable granular merge.
+    """
+
+    class Meta:
+        abstract = True
+
+    # JSON object mapping field names to ISO timestamps
+    # Example: {"name": "2025-01-23T10:00:00Z", "phone": "2025-01-23T09:30:00Z"}
+    field_timestamps = models.JSONField(
+        default=dict,
+        help_text="Per-field modification timestamps for LWW resolution",
+    )
+
+    def update_field_timestamp(self, field: str, timestamp: datetime) -> None:
+        """Update the timestamp for a single field."""
+        self.field_timestamps[field] = timestamp.isoformat()
+
+    def get_field_timestamp(self, field: str) -> datetime | None:
+        """Get the timestamp for a field, or None if never set."""
+        ts = self.field_timestamps.get(field)
+        if ts:
+            return datetime.fromisoformat(ts)
+        return None
+
+    def update_fields_with_timestamps(
+        self,
+        updates: dict,
+        timestamp: datetime,
+    ) -> None:
+        """
+        Update multiple fields and their timestamps atomically.
+        Call this instead of setting fields directly.
+        """
+        for field, value in updates.items():
+            setattr(self, field, value)
+            self.update_field_timestamp(field, timestamp)
+```
+
+#### Write Path: Updating Field Timestamps
+
+```python
+# apps/sync/services.py
+
+def apply_field_level_lww(
+    entity: FieldLevelLWWMixin,
+    client_data: dict,
+    client_timestamp: datetime,
+) -> tuple[dict, dict]:
+    """
+    Apply field-level LWW merge.
+
+    Returns:
+        (applied_fields, rejected_fields)
+        - applied_fields: {field: value} that were applied
+        - rejected_fields: {field: {client: v1, server: v2}} that were rejected
+    """
+    applied = {}
+    rejected = {}
+
+    for field, client_value in client_data.items():
+        server_value = getattr(entity, field, None)
+        server_ts = entity.get_field_timestamp(field)
+
+        # Client wins if:
+        # 1. Server has no timestamp for this field (new field or migration)
+        # 2. Client timestamp is newer than server timestamp
+        if server_ts is None or client_timestamp > server_ts:
+            setattr(entity, field, client_value)
+            entity.update_field_timestamp(field, client_timestamp)
+            applied[field] = client_value
+        else:
+            # Server wins - field was modified more recently
+            if client_value != server_value:
+                rejected[field] = {
+                    'client_value': client_value,
+                    'client_timestamp': client_timestamp.isoformat(),
+                    'server_value': server_value,
+                    'server_timestamp': server_ts.isoformat(),
+                }
+
+    if applied:
+        # Also update entity-level updated_at for sync stream
+        entity.save()
+
+    return applied, rejected
+```
+
+#### Migration Strategy for Existing Data
+
+For entities that exist before field-level LWW is implemented:
+
+```python
+# Option 1: Treat missing timestamps as "infinitely old"
+# Any incoming update wins. This is the default behavior above (server_ts is None → client wins)
+
+# Option 2: Backfill with entity's updated_at
+# apps/sync/management/commands/backfill_field_timestamps.py
+
+class Command(BaseCommand):
+    """Backfill field_timestamps for existing entities."""
+
+    help = "Initialize field_timestamps from entity updated_at for existing records"
+
+    def handle(self, *args, **options):
+        for model in SyncRegistry.get_lww_models():
+            # Get syncable fields (exclude id, timestamps, etc.)
+            syncable_fields = model.get_syncable_fields()
+
+            updated = 0
+            for entity in model.all_objects.filter(field_timestamps={}):
+                # Initialize all fields to entity's updated_at
+                entity.field_timestamps = {
+                    field: entity.updated_at.isoformat()
+                    for field in syncable_fields
+                }
+                entity.save(update_fields=['field_timestamps'])
+                updated += 1
+
+            self.stdout.write(f"{model.__name__}: backfilled {updated} records")
+```
+
+#### Defining Syncable Fields
+
+```python
+# apps/sync/models.py
+
+class FieldLevelLWWMixin(models.Model):
+    # ... existing code ...
+
+    # Fields to exclude from LWW tracking
+    LWW_EXCLUDED_FIELDS = {
+        'id', 'workspace', 'workspace_id',
+        'created_at', 'updated_at', 'deleted_at',
+        'sync_version', 'field_timestamps',
+        'last_modified_by', 'last_modified_by_id',
+        'device_id',
+    }
+
+    @classmethod
+    def get_syncable_fields(cls) -> list[str]:
+        """Return list of fields that participate in field-level LWW."""
+        return [
+            f.name for f in cls._meta.get_fields()
+            if f.concrete
+            and not f.primary_key
+            and f.name not in cls.LWW_EXCLUDED_FIELDS
+        ]
+```
+
+#### Client-Side: Sending Field Timestamps
+
+Clients should track when they modified each field locally:
+
+```typescript
+// client/models/Contact.ts
+
+interface FieldTimestamps {
+  [fieldName: string]: string; // ISO timestamp
+}
+
+interface Contact {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  // ... other fields
+
+  // Track local modification times
+  _fieldTimestamps: FieldTimestamps;
+}
+
+// When user edits a field
+function updateContactField(contact: Contact, field: string, value: any): Contact {
+  return {
+    ...contact,
+    [field]: value,
+    _fieldTimestamps: {
+      ...contact._fieldTimestamps,
+      [field]: new Date().toISOString(),
+    },
+  };
+}
+
+// When creating sync operation, use the field's timestamp
+function createSyncOperation(contact: Contact, changedFields: string[]): SyncOperation {
+  const data: Record<string, any> = {};
+  let latestTimestamp = new Date(0);
+
+  for (const field of changedFields) {
+    data[field] = contact[field];
+    const fieldTs = new Date(contact._fieldTimestamps[field]);
+    if (fieldTs > latestTimestamp) {
+      latestTimestamp = fieldTs;
+    }
+  }
+
+  return {
+    idempotencyKey: generateULID(),
+    entityType: 'contact',
+    entityId: contact.id,
+    intent: 'update',
+    clientTimestamp: latestTimestamp, // Use latest field timestamp
+    data,
+  };
+}
+```
+
+#### When to Use Field-Level vs Entity-Level LWW
+
+| Scenario | Recommendation |
+|----------|----------------|
+| Simple entities (tags, labels) | Entity-level LWW (simpler) |
+| Entities with independent fields (contacts) | Field-level LWW |
+| Entities where fields are related (address fields) | Entity-level or grouped field LWW |
+| High-conflict entities | Consider CRDT or manual resolution |
+
 ---
 
 ## 3. Sync Protocol
@@ -439,14 +668,40 @@ Client pulls with cursor "10:00:00.150"
 → Client permanently misses entity Y
 ```
 
+#### Critical: Server Timestamps vs Client Timestamps
+
+The cursor **MUST** use server-controlled values, never client-supplied timestamps:
+
+| Field | Source | Used For |
+|-------|--------|----------|
+| `updated_at` | Server (`auto_now=True`) | **Cursor** - ordering pull results |
+| `sync_version` | Server (incremented on save) | **Cursor** (alternative) - guaranteed ordering |
+| `client_timestamp` | Client | **Conflict resolution only** - LWW comparison |
+
+```python
+# In push handler:
+operation.client_timestamp  # ← Used for LWW conflict resolution
+entity.updated_at           # ← Set by server, used for cursor/pull ordering
+
+# These are DIFFERENT timestamps with DIFFERENT purposes:
+# - client_timestamp: "when did the user make this change?" (for LWW)
+# - updated_at: "when did the server persist this?" (for cursor)
+```
+
+**Why this matters**: If the cursor used `client_timestamp`:
+- Clients with wrong clocks could corrupt ordering
+- Malicious clients could manipulate sync order
+- Clock drift would cause missed records
+
 #### Design Decisions
 
 | Aspect | Choice | Rationale |
 |--------|--------|-----------|
-| Primary cursor field | `updated_at` (server-set) | Simple, works 99%+ of the time with NTP |
+| Primary cursor field | `updated_at` (server-set via `auto_now`) | Simple, server-controlled, works 99%+ with NTP |
 | Tiebreaker | `id` (ULID) | Deterministic ordering for same-timestamp records |
-| Clock skew mitigation | Overlap window | Catches records from slightly-behind clocks |
-| High-consistency option | `sync_sequence_id` | Optional, for use cases requiring guaranteed ordering |
+| Clock skew mitigation | Overlap window | Catches records from slightly-behind server clocks |
+| High-consistency option | `sync_sequence_id` | Optional, database sequence for guaranteed ordering |
+| **NOT used for cursor** | `client_timestamp` | Only for LWW conflict resolution |
 
 #### Solution: Overlap Window
 
@@ -646,6 +901,163 @@ def sync_push(request: AuthenticatedHttpRequest, payload: SyncPushRequest):
 
     return results
 ```
+
+#### Security: Delegate to Existing Business Logic
+
+**The sync engine is a transport layer, not an authorization layer.**
+
+Authorization, validation, and business rules already exist in your service layer. The sync engine should delegate to these existing services rather than reimplementing them.
+
+```
+WRONG: Sync engine with parallel auth system
+┌─────────────────────────────────────────────────────┐
+│ sync_push()                                         │
+│   └── process_sync_operation()                      │
+│         └── can_modify_entity()  ← DUPLICATE AUTH!  │
+│               └── entity.save()  ← BYPASSES LOGIC!  │
+└─────────────────────────────────────────────────────┘
+
+RIGHT: Sync engine delegates to existing services
+┌─────────────────────────────────────────────────────┐
+│ sync_push()                                         │
+│   └── process_sync_operation()                      │
+│         └── ContactService.update()  ← EXISTING!    │
+│               ├── authorization     (already there) │
+│               ├── validation        (already there) │
+│               ├── business rules    (already there) │
+│               └── audit logging     (already there) │
+└─────────────────────────────────────────────────────┘
+```
+
+**Sync engine responsibilities:**
+- Idempotency (don't process same operation twice)
+- Batching (handle multiple operations efficiently)
+- Conflict resolution (LWW, field merge)
+- Cursor management (track sync progress)
+- Error aggregation (collect results for batch response)
+
+**Delegated to existing services:**
+- Authorization (who can do what)
+- Validation (is the data valid)
+- Business rules (domain logic)
+- Side effects (notifications, webhooks)
+- Audit logging
+
+```python
+# apps/sync/services.py
+
+from apps.contacts.services import ContactService
+from apps.timetracker.services import TimeEntryService
+
+# Registry maps entity types to their service classes
+SERVICE_REGISTRY = {
+    'contact': ContactService,
+    'time_entry': TimeEntryService,
+    # ... other entity types
+}
+
+def process_sync_operation(
+    workspace: Organization,
+    actor: Member,
+    operation: SyncOperationIn,
+) -> SyncResult:
+    """
+    Process sync operation by delegating to existing service layer.
+
+    The service layer handles auth, validation, and business logic.
+    We handle idempotency and conflict resolution.
+    """
+    # 1. Idempotency check
+    if SyncOperation.objects.filter(idempotency_key=operation.idempotency_key).exists():
+        return SyncResult(status='duplicate')
+
+    # 2. Get the appropriate service
+    service_class = SERVICE_REGISTRY.get(operation.entity_type)
+    if not service_class:
+        return SyncResult(status='rejected', error_code='UNKNOWN_ENTITY_TYPE')
+
+    service = service_class(workspace=workspace, actor=actor)
+
+    # 3. Delegate to service (which has all the business logic)
+    try:
+        if operation.intent == 'create':
+            entity = service.create(**operation.data)
+
+        elif operation.intent == 'update':
+            # Apply conflict resolution first if needed
+            resolved_data = resolve_conflicts(
+                workspace, operation.entity_type, operation.entity_id,
+                operation.data, operation.client_timestamp
+            )
+            entity = service.update(operation.entity_id, **resolved_data)
+
+        elif operation.intent == 'delete':
+            service.delete(operation.entity_id)
+            entity = None
+
+        # 4. Log the operation
+        SyncOperation.objects.create(
+            idempotency_key=operation.idempotency_key,
+            workspace=workspace,
+            actor=actor,
+            entity_type=operation.entity_type,
+            entity_id=operation.entity_id,
+            intent=operation.intent,
+            payload=operation.data,
+            client_timestamp=operation.client_timestamp,
+            status='applied',
+        )
+
+        return SyncResult(
+            status='applied',
+            server_timestamp=entity.updated_at if entity else timezone.now(),
+            server_version=entity.sync_version if entity else None,
+        )
+
+    except PermissionDenied:
+        return SyncResult(status='rejected', error_code='FORBIDDEN')
+    except ValidationError as e:
+        return SyncResult(status='rejected', error_code='VALIDATION_ERROR', details=e.messages)
+    except ObjectDoesNotExist:
+        return SyncResult(status='rejected', error_code='NOT_FOUND')
+```
+
+**Service layer example (already exists in your app):**
+
+```python
+# apps/contacts/services.py
+
+class ContactService:
+    def __init__(self, workspace: Organization, actor: Member):
+        self.workspace = workspace
+        self.actor = actor
+
+    def update(self, contact_id: str, **data) -> Contact:
+        contact = Contact.objects.get(id=contact_id, workspace=self.workspace)
+
+        # Authorization (already implemented)
+        if not self._can_edit(contact):
+            raise PermissionDenied("Cannot edit this contact")
+
+        # Validation (already implemented)
+        self._validate_update(contact, data)
+
+        # Business logic (already implemented)
+        for field, value in data.items():
+            setattr(contact, field, value)
+        contact.save()
+
+        # Side effects (already implemented)
+        self._notify_if_needed(contact)
+
+        return contact
+
+    def _can_edit(self, contact: Contact) -> bool:
+        # Your existing authorization logic
+        ...
+```
+
+**Key insight**: The sync engine adds offline/batching capabilities to your existing API. It doesn't replace your business logic—it routes through it.
 
 ### 3.2 Pull Endpoint (Server → Client)
 
@@ -933,7 +1345,12 @@ class SyncEngine {
 ```python
 # apps/snowball/models.py
 
-class Contact(SyncableModel):
+class Contact(FieldLevelLWWMixin, SyncableModel):
+    """
+    Contact with field-level LWW conflict resolution.
+
+    Uses FieldLevelLWWMixin for per-field timestamps.
+    """
     PREFIX = 'ct_'
 
     name = models.CharField(max_length=255)
@@ -941,8 +1358,7 @@ class Contact(SyncableModel):
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=32, blank=True)
 
-    # Field-level timestamps for LWW merge
-    field_timestamps = models.JSONField(default=dict)
+    # field_timestamps inherited from FieldLevelLWWMixin
 
     class Meta(SyncableModel.Meta):
         conflict_strategy = 'lww_field'
