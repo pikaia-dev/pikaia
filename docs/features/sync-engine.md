@@ -1889,7 +1889,531 @@ CREATE TABLE sync_operations (
 
 ---
 
-## 10. Key Design Decisions
+## 10. Full Re-Sync Triggers
+
+Sometimes the client needs to throw away its cursor and re-sync from scratch. This is called a "full re-sync" or "reset sync."
+
+### When to Trigger Full Re-Sync
+
+| Trigger | Who Initiates | How |
+|---------|---------------|-----|
+| App upgrade | Client | Compare local schema version with app's expected version |
+| Server says cursor invalid | Server | Return `CURSOR_INVALID` error on pull |
+| Periodic safety net | Client | Every 24 hours (configurable) |
+| User manually requests | User | "Refresh all data" button in settings |
+| Server forces it | Server | Set `force_resync: true` in pull response |
+| Corrupt local database | Client | Detect SQLite corruption, wipe and re-sync |
+
+### Client Implementation
+
+```typescript
+class SyncEngine {
+  private readonly SCHEMA_VERSION = 3; // Bump when entity schema changes
+  private readonly FULL_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+  async initialize(): Promise<void> {
+    const storedVersion = await this.db.getSchemaVersion();
+
+    if (storedVersion !== this.SCHEMA_VERSION) {
+      // App was upgraded, schema may have changed
+      await this.triggerFullResync('schema_upgrade');
+      await this.db.setSchemaVersion(this.SCHEMA_VERSION);
+    }
+  }
+
+  async triggerFullResync(reason: string): Promise<void> {
+    console.log(`Full re-sync triggered: ${reason}`);
+
+    // Clear cursor - next pull starts from beginning
+    await this.db.clearSyncCursor();
+
+    // Clear local data (or mark as stale)
+    await this.db.clearAllSyncableEntities();
+
+    // Pull everything
+    await this.pullChanges(null);
+  }
+
+  async handlePullResponse(response: SyncPullResponse): Promise<void> {
+    if (response.force_resync) {
+      await this.triggerFullResync('server_requested');
+      return;
+    }
+
+    // Normal processing...
+  }
+}
+```
+
+### Server: Force Re-Sync Flag
+
+When the server needs all clients to re-sync (e.g., after a data migration):
+
+```python
+# apps/sync/models.py
+
+class SyncConfig(models.Model):
+    """Per-workspace sync configuration."""
+    workspace = models.OneToOneField(Organization, on_delete=models.CASCADE)
+    force_resync_before = models.DateTimeField(null=True)
+
+# apps/sync/api.py
+
+@router.get("/pull", response=SyncPullResponse)
+def sync_pull(request: AuthenticatedHttpRequest, params: Query[SyncPullRequest]):
+    config = SyncConfig.objects.filter(workspace=request.organization).first()
+
+    # If client's cursor is older than force_resync_before, tell them to re-sync
+    cursor_ts = parse_cursor(params.since).timestamp if params.since else None
+    force_resync = (
+        config and
+        config.force_resync_before and
+        cursor_ts and
+        cursor_ts < config.force_resync_before
+    )
+
+    return SyncPullResponse(
+        changes=changes,
+        cursor=next_cursor,
+        has_more=has_more,
+        force_resync=force_resync,
+    )
+```
+
+---
+
+## 11. Error Codes
+
+The sync API returns structured errors. Clients should handle each category differently.
+
+### Error Response Format
+
+```json
+{
+  "idempotency_key": "op_01HN8J...",
+  "status": "rejected",
+  "error_code": "VALIDATION_ERROR",
+  "error_message": "Phone number format invalid",
+  "error_details": {"field": "phone", "value": "not-a-phone"}
+}
+```
+
+### Error Code Reference
+
+| Code | HTTP Status | Retryable | Client Action |
+|------|-------------|-----------|---------------|
+| `VALIDATION_ERROR` | 400 | No | Show error to user, let them fix |
+| `NOT_FOUND` | 404 | No | Remove from local DB (entity was deleted) |
+| `FORBIDDEN` | 403 | No | Show "no permission" error |
+| `CONFLICT` | 409 | No | Fetch latest server state, re-resolve |
+| `ENTITY_ARCHIVED` | 400 | No | Show "cannot modify archived" error |
+| `WORKSPACE_SUSPENDED` | 403 | No | Show "workspace suspended" message |
+| `RATE_LIMITED` | 429 | Yes | Back off, retry with delay from `Retry-After` header |
+| `SERVER_ERROR` | 500 | Yes | Retry with exponential backoff |
+| `CURSOR_INVALID` | 400 | No | Trigger full re-sync |
+| `DUPLICATE` | 200 | N/A | Operation already processed, treat as success |
+
+### Rate Limit Response
+
+```json
+HTTP/1.1 429 Too Many Requests
+Retry-After: 60
+
+{
+  "error_code": "RATE_LIMITED",
+  "error_message": "Rate limit exceeded",
+  "retry_after_seconds": 60
+}
+```
+
+Client should use `retry_after_seconds` as the minimum delay before retrying.
+
+---
+
+## 12. Schema Changes and Versioning
+
+### Entity Schema Changes
+
+Schema changes (adding/removing fields) happen with app releases. The approach is simple:
+
+1. Bump `SCHEMA_VERSION` in the client app
+2. On app launch, client detects version mismatch
+3. Client triggers full re-sync
+4. Done
+
+This avoids complex migration logic. The trade-off is that users re-download all data on upgrade, which is acceptable for most B2B apps with <100k entities per workspace.
+
+```typescript
+// In your app's version constants
+const SYNC_SCHEMA_VERSION = 4; // Bump this when you add/remove/rename fields
+```
+
+### API Versioning
+
+The sync API lives at `/api/v1/sync/`. If you need breaking changes:
+
+| Change Type | Approach |
+|-------------|----------|
+| Add optional field to response | No version bump needed |
+| Add required field to request | New version (`/api/v2/sync/`) |
+| Remove field from response | Deprecate, then remove in v2 |
+| Change field type | New version |
+| Change conflict resolution behavior | New version |
+
+Maintain old versions for 6-12 months to allow client upgrades.
+
+```python
+# apps/sync/api.py
+
+# v1 - original
+router_v1 = Router(tags=["sync"])
+
+@router_v1.post("/push")
+def sync_push_v1(request, payload: SyncPushRequestV1):
+    ...
+
+# v2 - breaking changes
+router_v2 = Router(tags=["sync"])
+
+@router_v2.post("/push")
+def sync_push_v2(request, payload: SyncPushRequestV2):
+    ...
+```
+
+---
+
+## 13. Failed Operations Handling
+
+What happens when an operation permanently fails (validation error, permission denied, etc.)?
+
+### Client-Side Dead Letter Queue
+
+Operations that fail with non-retryable errors go to a "dead letter" state:
+
+```typescript
+interface FailedOperation extends PendingOperation {
+  failedAt: Date;
+  errorCode: string;
+  errorMessage: string;
+  userAcknowledged: boolean;
+}
+
+class OperationQueue {
+  async markPermanentlyFailed(
+    idempotencyKey: string,
+    errorCode: string,
+    errorMessage: string
+  ): Promise<void> {
+    await this.db.run(`
+      UPDATE pending_operations
+      SET status = 'failed',
+          error_code = ?,
+          error_message = ?,
+          failed_at = datetime('now')
+      WHERE idempotency_key = ?
+    `, [errorCode, errorMessage, idempotencyKey]);
+
+    // Notify UI to show error badge
+    this.eventEmitter.emit('operation_failed', { idempotencyKey, errorCode });
+  }
+}
+```
+
+### User Resolution Options
+
+| Option | When to Use | Implementation |
+|--------|-------------|----------------|
+| Retry | User fixed the issue (e.g., restored permissions) | Move back to pending queue |
+| Discard | User accepts data loss | Delete from queue, revert local change |
+| Edit and retry | Validation error | Show edit UI, create new operation |
+
+### UI Considerations
+
+- Show a badge/indicator when failed operations exist
+- Don't block the user from using the app
+- Provide a "Sync Issues" screen listing failed operations
+- Auto-clear acknowledged failures after 30 days
+
+```typescript
+// Example: Sync status indicator
+function SyncStatusBadge() {
+  const failedCount = useSyncFailedCount();
+
+  if (failedCount === 0) return null;
+
+  return (
+    <Badge color="red" onClick={openSyncIssuesScreen}>
+      {failedCount} sync issue{failedCount > 1 ? 's' : ''}
+    </Badge>
+  );
+}
+```
+
+---
+
+## 14. Compression and Batching
+
+### Response Compression
+
+Enable gzip for sync responses. This significantly reduces bandwidth on mobile:
+
+```python
+# Django middleware
+MIDDLEWARE = [
+    "django.middleware.gzip.GZipMiddleware",
+    ...
+]
+
+# Or in nginx (preferred for production)
+location /api/v1/sync/ {
+    gzip on;
+    gzip_types application/json;
+    gzip_min_length 1000;
+}
+```
+
+Typical compression ratios for JSON sync payloads: 5-10x reduction.
+
+### Batch Size Limits
+
+| Limit | Value | Rationale |
+|-------|-------|-----------|
+| Max operations per push | 100 | Prevents request timeout, keeps transactions small |
+| Max changes per pull | 500 | Balances latency vs round-trips |
+| Max payload size | 1MB | Mobile-friendly, fits in memory |
+
+Why 100 operations per push:
+- Each operation may trigger validation, business logic, event emission
+- Database transactions should be short
+- If 1 operation fails, you only retry a small batch
+- Fits comfortably in a single HTTP request
+
+```typescript
+class SyncScheduler {
+  private readonly BATCH_SIZE = 100;
+
+  async pushPendingOperations(): Promise<void> {
+    const pending = await this.queue.getReadyOperations();
+
+    // Process in batches
+    for (let i = 0; i < pending.length; i += this.BATCH_SIZE) {
+      const batch = pending.slice(i, i + this.BATCH_SIZE);
+      await this.pushBatch(batch);
+    }
+  }
+}
+```
+
+---
+
+## 15. Background Notifications (Optional)
+
+Reduce polling by notifying clients when server has changes. This is optional—polling works fine for most cases.
+
+### Options
+
+| Method | Latency | Complexity | Best For |
+|--------|---------|------------|----------|
+| Polling | 30s-5min | Low | Default, always works |
+| Push notification | 1-5s | Medium | Mobile apps |
+| WebSocket | <100ms | High | Desktop, real-time features |
+
+### Push Notification Flow
+
+```
+Server writes entity → OutboxEvent → EventBridge → Lambda → SNS → Mobile push → Client pulls
+```
+
+The push notification is a "nudge"—it just tells the client "there's new data, go pull." It doesn't contain the actual data.
+
+```python
+# Lambda: Send silent push notification
+def notify_clients_to_sync(event, context):
+    workspace_id = event["detail"]["workspace_id"]
+
+    # Get device tokens for workspace members
+    tokens = get_device_tokens_for_workspace(workspace_id)
+
+    for token in tokens:
+        sns.publish(
+            TargetArn=token.sns_endpoint_arn,
+            Message=json.dumps({"type": "sync_nudge"}),
+            MessageAttributes={
+                "AWS.SNS.MOBILE.APNS.PUSH_TYPE": {
+                    "DataType": "String",
+                    "StringValue": "background",  # Silent push
+                },
+            },
+        )
+```
+
+Client handles the nudge:
+
+```typescript
+// React Native
+messaging().setBackgroundMessageHandler(async (message) => {
+  if (message.data?.type === 'sync_nudge') {
+    await syncEngine.triggerSync();
+  }
+});
+```
+
+---
+
+## 16. Testing Strategy
+
+### Unit Tests (Server)
+
+Test conflict resolution, cursor parsing, and operation processing in isolation:
+
+```python
+# tests/sync/test_conflict_resolution.py
+
+class TestFieldLevelLWW:
+    def test_client_wins_when_newer(self):
+        entity = ContactFactory(
+            name="Old Name",
+            field_timestamps={"name": "2025-01-01T10:00:00Z"}
+        )
+
+        applied, rejected = apply_field_level_lww(
+            entity=entity,
+            client_data={"name": "New Name"},
+            client_timestamp=datetime(2025, 1, 1, 11, 0, 0, tzinfo=UTC),
+        )
+
+        assert applied == {"name": "New Name"}
+        assert rejected == {}
+        assert entity.name == "New Name"
+
+    def test_server_wins_when_newer(self):
+        entity = ContactFactory(
+            name="Server Name",
+            field_timestamps={"name": "2025-01-01T12:00:00Z"}
+        )
+
+        applied, rejected = apply_field_level_lww(
+            entity=entity,
+            client_data={"name": "Client Name"},
+            client_timestamp=datetime(2025, 1, 1, 11, 0, 0, tzinfo=UTC),
+        )
+
+        assert applied == {}
+        assert "name" in rejected
+        assert entity.name == "Server Name"
+```
+
+### Integration Tests (Server)
+
+Test the full push/pull cycle:
+
+```python
+# tests/sync/test_api.py
+
+class TestSyncPushPull:
+    def test_push_then_pull_returns_changes(self, api_client, workspace):
+        # Push a create operation
+        response = api_client.post("/api/v1/sync/push", json={
+            "operations": [{
+                "idempotency_key": "op_123",
+                "entity_type": "contact",
+                "entity_id": "ct_456",
+                "intent": "create",
+                "client_timestamp": "2025-01-01T10:00:00Z",
+                "data": {"name": "Alice", "email": "alice@example.com"}
+            }]
+        })
+        assert response.json()["results"][0]["status"] == "applied"
+
+        # Pull should return the created entity
+        response = api_client.get("/api/v1/sync/pull")
+        changes = response.json()["changes"]
+
+        assert len(changes) == 1
+        assert changes[0]["entity_id"] == "ct_456"
+        assert changes[0]["data"]["name"] == "Alice"
+```
+
+### Client-Side Tests
+
+Mock the server and test queue behavior, retry logic, and conflict handling:
+
+```typescript
+// __tests__/sync/OperationQueue.test.ts
+
+describe('OperationQueue', () => {
+  it('retries on server error', async () => {
+    const mockApi = {
+      push: jest.fn()
+        .mockRejectedValueOnce(new HttpError(500))
+        .mockResolvedValueOnce([{ status: 'applied' }])
+    };
+
+    const queue = new OperationQueue(mockApi);
+    await queue.enqueue(createOperation);
+
+    // First attempt fails
+    await queue.processQueue();
+    expect(mockApi.push).toHaveBeenCalledTimes(1);
+
+    // Wait for retry delay
+    jest.advanceTimersByTime(2000);
+
+    // Second attempt succeeds
+    await queue.processQueue();
+    expect(mockApi.push).toHaveBeenCalledTimes(2);
+    expect(await queue.getPending()).toHaveLength(0);
+  });
+
+  it('does not retry validation errors', async () => {
+    const mockApi = {
+      push: jest.fn().mockResolvedValue([{
+        status: 'rejected',
+        error_code: 'VALIDATION_ERROR'
+      }])
+    };
+
+    const queue = new OperationQueue(mockApi);
+    await queue.enqueue(createOperation);
+    await queue.processQueue();
+
+    const failed = await queue.getFailed();
+    expect(failed).toHaveLength(1);
+    expect(failed[0].errorCode).toBe('VALIDATION_ERROR');
+  });
+});
+```
+
+### End-to-End Tests
+
+Test the full flow with a real server (use in CI):
+
+```typescript
+// e2e/sync.test.ts
+
+describe('Sync E2E', () => {
+  it('syncs data between two clients', async () => {
+    // Client A creates a contact offline
+    const clientA = new SyncEngine(workspaceId, deviceIdA);
+    await clientA.createContact({ name: 'Bob' });
+
+    // Client A syncs
+    await clientA.sync();
+
+    // Client B pulls
+    const clientB = new SyncEngine(workspaceId, deviceIdB);
+    await clientB.sync();
+
+    // Client B should have the contact
+    const contacts = await clientB.db.getAllContacts();
+    expect(contacts).toContainEqual(expect.objectContaining({ name: 'Bob' }));
+  });
+});
+```
+
+---
+
+## 17. Key Design Decisions
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
