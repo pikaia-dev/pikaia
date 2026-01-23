@@ -47,8 +47,7 @@ class Command(BaseCommand):
         cutoff = timezone.now() - timedelta(days=retention_days)
 
         self.stdout.write(
-            f"Cleaning tombstones older than {retention_days} days "
-            f"(before {cutoff.isoformat()})"
+            f"Cleaning tombstones older than {retention_days} days (before {cutoff.isoformat()})"
         )
 
         if dry_run:
@@ -59,16 +58,13 @@ class Command(BaseCommand):
         # Get models to process
         if entity_type_filter:
             if not SyncRegistry.is_registered(entity_type_filter):
-                self.stderr.write(
-                    self.style.ERROR(f"Unknown entity type: {entity_type_filter}")
-                )
+                self.stderr.write(self.style.ERROR(f"Unknown entity type: {entity_type_filter}"))
                 return
 
             models_to_process = [(entity_type_filter, SyncRegistry.get_model(entity_type_filter))]
         else:
             models_to_process = [
-                (et, SyncRegistry.get_model(et))
-                for et in SyncRegistry.get_all_entity_types()
+                (et, SyncRegistry.get_model(et)) for et in SyncRegistry.get_all_entity_types()
             ]
 
         for entity_type, model in models_to_process:

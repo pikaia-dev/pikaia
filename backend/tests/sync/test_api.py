@@ -236,9 +236,7 @@ class TestSyncPushEndpoint:
         assert response.results[0].status == "rejected"
         assert response.results[0].error_code == "UNKNOWN_ENTITY_TYPE"
 
-    def test_push_batch_max_limit(
-        self, request_factory: RequestFactory, sync_registry, settings
-    ):
+    def test_push_batch_max_limit(self, request_factory: RequestFactory, sync_registry, settings):
         """Should reject batches exceeding max size."""
         from ninja.errors import HttpError
 
@@ -481,9 +479,7 @@ class TestSyncPullEndpoint:
         assert len(response.changes) == 1
         assert response.changes[0].data["name"] == "Org1"
 
-    def test_pull_invalid_cursor_returns_400(
-        self, request_factory: RequestFactory, sync_registry
-    ):
+    def test_pull_invalid_cursor_returns_400(self, request_factory: RequestFactory, sync_registry):
         """Should return 400 for invalid cursor."""
         from ninja.errors import HttpError
 
@@ -569,9 +565,7 @@ class TestSyncPullEndpoint:
 
         assert response.changes[0].updated_at is not None
         # Updated at should match contact's
-        assert abs(
-            (response.changes[0].updated_at - contact.updated_at).total_seconds()
-        ) < 1
+        assert abs((response.changes[0].updated_at - contact.updated_at).total_seconds()) < 1
 
     def test_pull_empty_returns_same_cursor(
         self, request_factory: RequestFactory, sync_registry, test_contact_factory

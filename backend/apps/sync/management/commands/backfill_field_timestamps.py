@@ -51,17 +51,13 @@ class Command(BaseCommand):
 
         if entity_type_filter:
             if not SyncRegistry.is_registered(entity_type_filter):
-                self.stderr.write(
-                    self.style.ERROR(f"Unknown entity type: {entity_type_filter}")
-                )
+                self.stderr.write(self.style.ERROR(f"Unknown entity type: {entity_type_filter}"))
                 return
 
             model = SyncRegistry.get_model(entity_type_filter)
             if not issubclass(model, FieldLevelLWWMixin):
                 self.stderr.write(
-                    self.style.ERROR(
-                        f"{entity_type_filter} does not use field-level LWW"
-                    )
+                    self.style.ERROR(f"{entity_type_filter} does not use field-level LWW")
                 )
                 return
 
@@ -98,8 +94,9 @@ class Command(BaseCommand):
             while processed < total_count:
                 # Get batch of entity IDs (re-query to handle concurrent changes)
                 batch_ids = list(
-                    model.all_objects.filter(field_timestamps={})
-                    .values_list("id", flat=True)[:batch_size]
+                    model.all_objects.filter(field_timestamps={}).values_list("id", flat=True)[
+                        :batch_size
+                    ]
                 )
 
                 if not batch_ids:
@@ -116,8 +113,7 @@ class Command(BaseCommand):
 
                         # Initialize all fields to entity's updated_at
                         entity.field_timestamps = {
-                            field: entity.updated_at.isoformat()
-                            for field in syncable_fields
+                            field: entity.updated_at.isoformat() for field in syncable_fields
                         }
                         entity.save(update_fields=["field_timestamps"])
                         updated_count += 1
@@ -128,8 +124,7 @@ class Command(BaseCommand):
 
                 processed += len(batch_ids)
                 self.stdout.write(
-                    f"    Processed {processed}/{total_count} "
-                    f"(updated {updated_count})"
+                    f"    Processed {processed}/{total_count} (updated {updated_count})"
                 )
 
             self.stdout.write(

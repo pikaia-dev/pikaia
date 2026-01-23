@@ -29,7 +29,9 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 # Clock skew tolerance for pull queries (covers typical NTP drift)
-CLOCK_SKEW_TOLERANCE = timedelta(milliseconds=getattr(settings, "SYNC_CLOCK_SKEW_TOLERANCE_MS", 100))
+CLOCK_SKEW_TOLERANCE = timedelta(
+    milliseconds=getattr(settings, "SYNC_CLOCK_SKEW_TOLERANCE_MS", 100)
+)
 
 
 @dataclass
