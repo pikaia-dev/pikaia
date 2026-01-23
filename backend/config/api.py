@@ -12,6 +12,7 @@ from apps.devices.api import router as devices_router
 from apps.media.api import router as media_router
 from apps.passkeys.api import router as passkeys_router
 from apps.sms.api import router as sms_router
+from apps.sync.api import router as sync_router
 from apps.webhooks.api import router as webhooks_router
 from apps.webhooks.hooks_api import router as hooks_router
 
@@ -43,6 +44,10 @@ api = NinjaAPI(
             {
                 "name": "devices",
                 "description": "Mobile device linking and management",
+            },
+            {
+                "name": "sync",
+                "description": "Offline-first sync engine for mobile/desktop apps",
             },
             {
                 "name": "webhooks",
@@ -89,6 +94,7 @@ api.add_router("/auth/phone", sms_router)
 api.add_router("/webhooks", webhooks_router)
 api.add_router("/hooks", hooks_router)
 api.add_router("/devices", devices_router)
+api.add_router("/sync", sync_router)
 
 
 @api.get("/health", tags=["health"], operation_id="healthCheck", summary="Health check")
