@@ -272,12 +272,105 @@ class SyncOperation(models.Model):
     status = models.CharField(max_length=16, choices=Status.choices)
     resolution_details = models.JSONField(null=True)  # Conflict info
 
+    # Observability metrics (per-operation, negligible overhead)
+    drift_ms = models.IntegerField(null=True, help_text="client_timestamp - server_timestamp in ms")
+    conflict_fields = models.JSONField(null=True, help_text="Fields that had conflicts (for field-level LWW)")
+    client_retry_count = models.PositiveSmallIntegerField(default=0, help_text="Times client retried this op")
+
     class Meta:
         indexes = [
             models.Index(fields=['workspace', 'server_timestamp']),
             models.Index(fields=['entity_type', 'entity_id']),
         ]
 ```
+
+#### Observability: Per-Operation Metrics
+
+Since every push already writes to `SyncOperation`, we get per-operation metrics for free:
+
+| Metric | Field | What it tells you |
+|--------|-------|-------------------|
+| **Drift** | `drift_ms` | How far off are client clocks? |
+| **Conflicts** | `conflict_fields` | Which fields conflict most? |
+| **Retries** | `client_retry_count` | Network reliability issues? |
+
+**Setting metrics in the handler:**
+
+```python
+def process_sync_operation(...) -> SyncResult:
+    # Calculate drift (negative = client ahead, positive = client behind)
+    drift_ms = int((timezone.now() - operation.client_timestamp).total_seconds() * 1000)
+
+    # Track conflicts from field-level LWW
+    conflict_fields = None
+    if using_field_level_lww:
+        applied, rejected = apply_field_level_lww(entity, operation.data, operation.client_timestamp)
+        if rejected:
+            conflict_fields = list(rejected.keys())
+
+    # Create the operation log with metrics
+    SyncOperation.objects.create(
+        idempotency_key=operation.idempotency_key,
+        # ... other fields ...
+        drift_ms=drift_ms,
+        conflict_fields=conflict_fields,
+        client_retry_count=operation.retry_count or 0,
+        status='applied' if not rejected else 'conflict',
+    )
+```
+
+**Dashboard queries:**
+
+```sql
+-- Average drift by hour (are clocks drifting?)
+SELECT
+    DATE_TRUNC('hour', server_timestamp) AS hour,
+    AVG(drift_ms) AS avg_drift_ms,
+    PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ABS(drift_ms)) AS p95_drift_ms
+FROM sync_operations
+WHERE server_timestamp > NOW() - INTERVAL '7 days'
+GROUP BY 1 ORDER BY 1;
+
+-- Conflict rate by entity type (which entities conflict most?)
+SELECT
+    entity_type,
+    COUNT(*) AS total_ops,
+    SUM(CASE WHEN conflict_fields IS NOT NULL THEN 1 ELSE 0 END) AS conflicts,
+    ROUND(100.0 * SUM(CASE WHEN conflict_fields IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*), 2) AS conflict_pct
+FROM sync_operations
+WHERE server_timestamp > NOW() - INTERVAL '7 days'
+GROUP BY 1 ORDER BY conflict_pct DESC;
+
+-- Most conflicted fields (where should we improve UX?)
+SELECT
+    field_name,
+    COUNT(*) AS conflict_count
+FROM sync_operations,
+    LATERAL jsonb_array_elements_text(conflict_fields) AS field_name
+WHERE conflict_fields IS NOT NULL
+    AND server_timestamp > NOW() - INTERVAL '7 days'
+GROUP BY 1 ORDER BY 2 DESC;
+
+-- Retry patterns (network issues by device/user?)
+SELECT
+    device_id,
+    AVG(client_retry_count) AS avg_retries,
+    MAX(client_retry_count) AS max_retries,
+    COUNT(*) AS total_ops
+FROM sync_operations
+WHERE server_timestamp > NOW() - INTERVAL '7 days'
+GROUP BY 1
+HAVING AVG(client_retry_count) > 1
+ORDER BY avg_retries DESC;
+```
+
+**What the metrics tell you:**
+
+| Metric | Normal | Warning | Action |
+|--------|--------|---------|--------|
+| `avg_drift_ms` | < 1000ms | > 5000ms | Client clocks off, warn user |
+| `conflict_pct` | < 5% | > 20% | UX issue - users editing same things |
+| `avg_retries` | < 0.5 | > 2 | Network issues, check connectivity |
 
 ### 2.3 Field-Level Timestamps for LWW
 
@@ -1262,6 +1355,151 @@ class OperationQueue {
   }
 }
 ```
+
+#### Exponential Backoff with Jitter
+
+**Problem**: When the server goes down, all clients retry at the same time (thundering herd).
+
+```
+Without backoff:                    With backoff + jitter:
+┌────────────────────────────┐     ┌────────────────────────────┐
+│ 10:00:01 - 1000 retry      │     │ 10:00:01 - 50 retry        │
+│ 10:00:02 - 1000 retry      │     │ 10:00:02 - 80 retry        │
+│ 10:00:03 - 1000 retry      │     │ 10:00:03 - 120 retry       │
+│ Server crushed repeatedly  │     │ Load spread over time ✅   │
+└────────────────────────────┘     └────────────────────────────┘
+```
+
+**Solution**: Wait longer after each failure, with random variation.
+
+```typescript
+// client/sync/RetryStrategy.ts
+
+interface RetryConfig {
+  baseDelayMs: number;      // Starting delay (e.g., 1000ms)
+  maxDelayMs: number;       // Cap the delay (e.g., 5 minutes)
+  maxAttempts: number;      // Give up after N attempts
+  jitterFactor: number;     // 0.5 = ±50% randomness
+}
+
+const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  baseDelayMs: 1000,        // Start with 1 second
+  maxDelayMs: 5 * 60 * 1000, // Max 5 minutes
+  maxAttempts: 10,
+  jitterFactor: 0.5,        // ±50% jitter
+};
+
+/**
+ * Calculate delay for retry attempt with exponential backoff + jitter.
+ *
+ * Exponential: delay doubles each attempt (1s, 2s, 4s, 8s, 16s...)
+ * Jitter: add randomness so clients don't retry in sync
+ *
+ * Example with jitterFactor=0.5:
+ *   Base delay: 4000ms
+ *   Jitter range: 2000ms to 6000ms (±50%)
+ *   Actual delay: random value in that range
+ */
+function calculateRetryDelay(attempt: number, config: RetryConfig = DEFAULT_RETRY_CONFIG): number {
+  // Exponential: 2^attempt * baseDelay
+  const exponentialDelay = Math.min(
+    config.baseDelayMs * Math.pow(2, attempt),
+    config.maxDelayMs
+  );
+
+  // Jitter: multiply by random factor between (1-jitter) and (1+jitter)
+  const jitterMin = 1 - config.jitterFactor;
+  const jitterMax = 1 + config.jitterFactor;
+  const jitterMultiplier = jitterMin + Math.random() * (jitterMax - jitterMin);
+
+  return Math.floor(exponentialDelay * jitterMultiplier);
+}
+
+// Example outputs for attempt 3 (base delay 1000ms):
+// Without jitter: always 8000ms
+// With jitter (±50%): random between 4000ms and 12000ms
+```
+
+**Retry logic in OperationQueue:**
+
+```typescript
+// client/sync/OperationQueue.ts
+
+class OperationQueue {
+  private retryConfig = DEFAULT_RETRY_CONFIG;
+
+  async handleBatchError(batch: PendingOperation[], error: Error): Promise<void> {
+    const isRetryable = this.isRetryableError(error);
+
+    for (const op of batch) {
+      op.attempts += 1;
+
+      if (!isRetryable || op.attempts >= this.retryConfig.maxAttempts) {
+        // Permanent failure - move to dead letter queue or notify user
+        op.status = 'failed';
+        op.lastError = error.message;
+      } else {
+        // Schedule retry with exponential backoff + jitter
+        const delayMs = calculateRetryDelay(op.attempts, this.retryConfig);
+        op.status = 'pending';
+        op.retryAfter = new Date(Date.now() + delayMs);
+      }
+
+      await this.db.update('pending_operations', op.idempotencyKey, op);
+    }
+  }
+
+  /**
+   * Determine if error is retryable.
+   *
+   * Retryable: network issues, 5xx, 429 (rate limit)
+   * Not retryable: 4xx (validation, auth, not found)
+   */
+  isRetryableError(error: Error): boolean {
+    if (error instanceof NetworkError) return true;
+    if (error instanceof HttpError) {
+      const status = error.status;
+      // 5xx = server error, retry
+      if (status >= 500) return true;
+      // 429 = rate limited, retry after backoff
+      if (status === 429) return true;
+      // 4xx = client error, don't retry (won't help)
+      return false;
+    }
+    // Unknown error, assume retryable
+    return true;
+  }
+
+  /**
+   * Get operations ready to process (pending + past retry time).
+   */
+  async getReadyOperations(): Promise<PendingOperation[]> {
+    const now = new Date();
+    return this.db.query(
+      `SELECT * FROM pending_operations
+       WHERE status = 'pending'
+       AND (retry_after IS NULL OR retry_after <= ?)
+       ORDER BY created_at`,
+      [now.toISOString()]
+    );
+  }
+}
+```
+
+**Retry delays example:**
+
+| Attempt | Base Delay | With Jitter (±50%) |
+|---------|------------|-------------------|
+| 1 | 1s | 0.5s - 1.5s |
+| 2 | 2s | 1s - 3s |
+| 3 | 4s | 2s - 6s |
+| 4 | 8s | 4s - 12s |
+| 5 | 16s | 8s - 24s |
+| 6 | 32s | 16s - 48s |
+| 7 | 64s | 32s - 96s |
+| 8 | 128s | 64s - 192s |
+| 9 | 256s | 128s - 384s |
+| 10 | 300s (capped) | 150s - 450s |
 
 ### 5.2 Sync State Machine
 
