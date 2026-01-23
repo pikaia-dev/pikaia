@@ -268,9 +268,10 @@ def _process_create(
         "device_id": device_id,
     }
 
-    # Add data fields
+    # Add data fields (cache field names for efficiency)
+    model_fields = {f.name for f in model._meta.get_fields()}
     for field, value in data.items():
-        if hasattr(model, field) or field in [f.name for f in model._meta.get_fields()]:
+        if field in model_fields:
             create_kwargs[field] = value
 
     entity = model(**create_kwargs)
