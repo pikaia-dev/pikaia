@@ -301,6 +301,7 @@ AWS_SMS_OTP_EXPIRY_MINUTES = settings.AWS_SMS_OTP_EXPIRY_MINUTES
 
 # Device linking
 DEVICE_LINK_TOKEN_EXPIRY_SECONDS = 300  # 5 minutes
-DEVICE_MAX_LINK_ATTEMPTS_PER_HOUR = 5
+DEVICE_MAX_LINK_ATTEMPTS_PER_HOUR = 5  # Rate limit for initiating links (per user)
+DEVICE_LINK_COMPLETE_MAX_ATTEMPTS_PER_HOUR = 20  # Rate limit for completing links (per IP)
 DEVICE_SESSION_EXPIRY_MINUTES = settings.DEVICE_SESSION_EXPIRY_MINUTES
 DEVICE_LINK_URL_SCHEME = "pikaia://device/link"  # Deep link URL for QR code

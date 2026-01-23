@@ -58,6 +58,15 @@ class LinkCompleteResult:
     organization_id: str
 
 
+@dataclass
+class SessionRefreshResult:
+    """Result of refreshing a device session."""
+
+    session_token: str
+    session_jwt: str
+    session_expires_at: datetime
+
+
 def _hash_token(token: str) -> str:
     """Create SHA-256 hash of token for storage."""
     return hashlib.sha256(token.encode()).hexdigest()
@@ -351,3 +360,45 @@ def list_user_devices(user: User) -> list[Device]:
         List of active (non-revoked) devices
     """
     return list(Device.objects.filter(user=user).order_by("-created_at"))
+
+
+def refresh_device_session(
+    device_uuid: str,
+    user: User,
+    member: Member,
+    organization: Organization,
+) -> SessionRefreshResult:
+    """
+    Refresh the session for a linked device.
+
+    Args:
+        device_uuid: UUID of the device requesting refresh
+        user: User who owns the device
+        member: Member context
+        organization: Organization context
+
+    Returns:
+        SessionRefreshResult with new session tokens
+
+    Raises:
+        Device.DoesNotExist: If device not found or not owned by user
+    """
+    # Verify device belongs to user and is not revoked
+    device = Device.objects.get(device_uuid=device_uuid, user=user)
+
+    session_token, session_jwt, session_expires_at = _create_mobile_session(
+        user, member, organization
+    )
+
+    logger.info(
+        "device_session_refreshed",
+        user_id=user.id,
+        device_id=device.id,
+        device_uuid=device_uuid,
+    )
+
+    return SessionRefreshResult(
+        session_token=session_token,
+        session_jwt=session_jwt,
+        session_expires_at=session_expires_at,
+    )

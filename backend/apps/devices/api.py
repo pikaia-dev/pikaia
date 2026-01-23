@@ -4,6 +4,8 @@ Device API endpoints.
 Provides endpoints for device linking and management.
 """
 
+from django.conf import settings
+from django.core.cache import cache
 from django.http import HttpRequest
 from ninja import Router
 from ninja.errors import HttpError
@@ -23,11 +25,14 @@ from apps.devices.schemas import (
     DeviceListResponse,
     DeviceResponse,
     InitiateLinkResponse,
+    SessionRefreshRequest,
+    SessionRefreshResponse,
 )
 from apps.devices.services import (
     complete_device_link,
     create_link_token,
     list_user_devices,
+    refresh_device_session,
     revoke_device,
 )
 
@@ -60,6 +65,29 @@ def initiate_link(request: HttpRequest) -> InitiateLinkResponse:
     )
 
 
+def _get_client_ip(request: HttpRequest) -> str:
+    """Extract client IP from request, handling proxies."""
+    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "unknown")
+
+
+def _check_complete_rate_limit(request: HttpRequest) -> None:
+    """Check rate limit for link completion attempts by IP."""
+    client_ip = _get_client_ip(request)
+    cache_key = f"device_link_complete:{client_ip}"
+
+    attempts = cache.get(cache_key, 0)
+    max_attempts = getattr(settings, "DEVICE_LINK_COMPLETE_MAX_ATTEMPTS_PER_HOUR", 20)
+
+    if attempts >= max_attempts:
+        raise RateLimitError(f"Too many link attempts. Maximum {max_attempts} per hour.")
+
+    # Increment counter with 1 hour expiry
+    cache.set(cache_key, attempts + 1, timeout=3600)
+
+
 @router.post(
     "/link/complete",
     response=CompleteLinkResponse,
@@ -71,6 +99,12 @@ def complete_link(
     payload: CompleteLinkRequest,
 ) -> CompleteLinkResponse:
     """Complete device linking with QR code token."""
+    # Rate limit by IP to prevent brute-force attacks
+    try:
+        _check_complete_rate_limit(request)
+    except RateLimitError as e:
+        raise HttpError(429, str(e)) from None
+
     try:
         result = complete_device_link(
             token=payload.token,
@@ -146,3 +180,34 @@ def delete_device(request: HttpRequest, device_id: int):
         raise HttpError(404, "Device not found") from None
 
     return 204, None
+
+
+@router.post(
+    "/session/refresh",
+    response=SessionRefreshResponse,
+    auth=bearer_auth,
+    summary="Refresh device session",
+    description="Get new session tokens for a linked device. Use when JWT expires.",
+)
+def refresh_session(
+    request: HttpRequest,
+    payload: SessionRefreshRequest,
+) -> SessionRefreshResponse:
+    """Refresh session tokens for a linked device."""
+    user, member, organization = get_auth_context(request)
+
+    try:
+        result = refresh_device_session(
+            device_uuid=payload.device_uuid,
+            user=user,
+            member=member,
+            organization=organization,
+        )
+    except Device.DoesNotExist:
+        raise HttpError(404, "Device not found or not linked to this account") from None
+
+    return SessionRefreshResponse(
+        session_token=result.session_token,
+        session_jwt=result.session_jwt,
+        session_expires_at=result.session_expires_at,
+    )

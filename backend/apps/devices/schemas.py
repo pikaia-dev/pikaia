@@ -77,3 +77,21 @@ class DeviceListResponse(Schema):
 
     devices: list[DeviceResponse]
     count: int
+
+
+class SessionRefreshRequest(Schema):
+    """Request to refresh device session."""
+
+    device_uuid: str = Field(
+        min_length=1,
+        max_length=255,
+        description="Unique device identifier",
+    )
+
+
+class SessionRefreshResponse(Schema):
+    """Response with refreshed session tokens."""
+
+    session_token: str = Field(description="New Stytch session token")
+    session_jwt: str = Field(description="New Stytch session JWT")
+    session_expires_at: datetime = Field(description="When the session expires")
