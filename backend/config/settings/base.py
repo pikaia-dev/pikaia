@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     # Mobile provisioning
     MOBILE_PROVISION_API_KEY: str = ""  # API key for mobile app user provisioning
 
+    # Device linking
+    DEVICE_SESSION_EXPIRY_MINUTES: int = 525600  # 1 year default
+
     # AWS SMS (End User Messaging)
     AWS_SMS_REGION: str = "us-east-1"  # AWS region for SMS service
     AWS_SMS_ORIGINATION_IDENTITY: str = ""  # Phone number or sender ID
@@ -117,6 +120,7 @@ INSTALLED_APPS = [
     "apps.passkeys",
     "apps.webhooks",
     "apps.sms",
+    "apps.devices",
 ]
 
 MIDDLEWARE = [
@@ -294,3 +298,10 @@ AWS_SMS_REGION = settings.AWS_SMS_REGION
 AWS_SMS_ORIGINATION_IDENTITY = settings.AWS_SMS_ORIGINATION_IDENTITY
 AWS_SMS_OTP_LENGTH = settings.AWS_SMS_OTP_LENGTH
 AWS_SMS_OTP_EXPIRY_MINUTES = settings.AWS_SMS_OTP_EXPIRY_MINUTES
+
+# Device linking
+DEVICE_LINK_TOKEN_EXPIRY_SECONDS = 300  # 5 minutes
+DEVICE_MAX_LINK_ATTEMPTS_PER_HOUR = 5  # Rate limit for initiating links (per user)
+DEVICE_LINK_COMPLETE_MAX_ATTEMPTS_PER_HOUR = 20  # Rate limit for completing links (per IP)
+DEVICE_SESSION_EXPIRY_MINUTES = settings.DEVICE_SESSION_EXPIRY_MINUTES
+DEVICE_LINK_URL_SCHEME = "pikaia://device/link"  # Deep link URL for QR code
