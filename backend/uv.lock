@@ -1096,6 +1096,81 @@ wheels = [
 ]
 
 [[package]]
+name = "pikaia-backend"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "boto3" },
+    { name = "defusedxml" },
+    { name = "django" },
+    { name = "django-cors-headers" },
+    { name = "django-ninja" },
+    { name = "django-storages", extra = ["s3"] },
+    { name = "email-validator" },
+    { name = "gunicorn" },
+    { name = "lxml" },
+    { name = "pillow" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "stripe" },
+    { name = "structlog" },
+    { name = "stytch" },
+    { name = "svix" },
+    { name = "webauthn" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "django-stubs" },
+    { name = "factory-boy" },
+    { name = "mypy" },
+    { name = "psycopg2-binary" },
+    { name = "pyright" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pytest-django" },
+    { name = "ruff" },
+    { name = "types-factory-boy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "boto3", specifier = ">=1.35" },
+    { name = "defusedxml", specifier = ">=0.7" },
+    { name = "django", specifier = ">=6.0" },
+    { name = "django-cors-headers", specifier = ">=4.6" },
+    { name = "django-ninja", specifier = ">=1.5" },
+    { name = "django-storages", extras = ["s3"], specifier = ">=1.14" },
+    { name = "email-validator", specifier = ">=2.2" },
+    { name = "gunicorn", specifier = ">=23.0" },
+    { name = "lxml", specifier = ">=5.0" },
+    { name = "pillow", specifier = ">=11.0" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3" },
+    { name = "pydantic", specifier = ">=2.12" },
+    { name = "pydantic-settings", specifier = ">=2.6" },
+    { name = "stripe", specifier = ">=11.0" },
+    { name = "structlog", specifier = ">=25.5" },
+    { name = "stytch", specifier = ">=14.0" },
+    { name = "svix", specifier = ">=1.84.1" },
+    { name = "webauthn", specifier = ">=2.0.0,<3.0.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "django-stubs", specifier = ">=5.2.8" },
+    { name = "factory-boy", specifier = ">=3.3" },
+    { name = "mypy", specifier = ">=1.19.1" },
+    { name = "psycopg2-binary", specifier = ">=2.9.11" },
+    { name = "pyright", specifier = ">=1.1.408" },
+    { name = "pytest", specifier = ">=9.0" },
+    { name = "pytest-cov", specifier = ">=7.0.0" },
+    { name = "pytest-django", specifier = ">=4.11" },
+    { name = "ruff", specifier = ">=0.14" },
+    { name = "types-factory-boy", specifier = ">=0.4.1" },
+]
+
+[[package]]
 name = "pillow"
 version = "12.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1716,81 +1791,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ef/87/0149044a9fea585aa9ab3bd140cc3b89c808592ee8da4a1a83053765aaf5/svix-1.84.1.tar.gz", hash = "sha256:ac3e32f66c5fff4fe2c65520122a37b640f38bc3ae4d1ccef65bfeb4d54eb525", size = 58952, upload-time = "2025-12-30T02:35:07.385Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ba/8f/dbcd0b40f4e599ee8578f395d6e0a8c8aafb4bdd3fd7aef2204491626f69/svix-1.84.1-py3-none-any.whl", hash = "sha256:22834fd3cd6f31e65f7da00b768e433118e032fe34b5b067394854b1442f0759", size = 131557, upload-time = "2025-12-30T02:35:05.634Z" },
-]
-
-[[package]]
-name = "tango-backend"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "boto3" },
-    { name = "defusedxml" },
-    { name = "django" },
-    { name = "django-cors-headers" },
-    { name = "django-ninja" },
-    { name = "django-storages", extra = ["s3"] },
-    { name = "email-validator" },
-    { name = "gunicorn" },
-    { name = "lxml" },
-    { name = "pillow" },
-    { name = "psycopg", extra = ["binary"] },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "stripe" },
-    { name = "structlog" },
-    { name = "stytch" },
-    { name = "svix" },
-    { name = "webauthn" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "django-stubs" },
-    { name = "factory-boy" },
-    { name = "mypy" },
-    { name = "psycopg2-binary" },
-    { name = "pyright" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "pytest-django" },
-    { name = "ruff" },
-    { name = "types-factory-boy" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "boto3", specifier = ">=1.35" },
-    { name = "defusedxml", specifier = ">=0.7" },
-    { name = "django", specifier = ">=6.0" },
-    { name = "django-cors-headers", specifier = ">=4.6" },
-    { name = "django-ninja", specifier = ">=1.5" },
-    { name = "django-storages", extras = ["s3"], specifier = ">=1.14" },
-    { name = "email-validator", specifier = ">=2.2" },
-    { name = "gunicorn", specifier = ">=23.0" },
-    { name = "lxml", specifier = ">=5.0" },
-    { name = "pillow", specifier = ">=11.0" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.3" },
-    { name = "pydantic", specifier = ">=2.12" },
-    { name = "pydantic-settings", specifier = ">=2.6" },
-    { name = "stripe", specifier = ">=11.0" },
-    { name = "structlog", specifier = ">=25.5" },
-    { name = "stytch", specifier = ">=14.0" },
-    { name = "svix", specifier = ">=1.84.1" },
-    { name = "webauthn", specifier = ">=2.0.0,<3.0.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "django-stubs", specifier = ">=5.2.8" },
-    { name = "factory-boy", specifier = ">=3.3" },
-    { name = "mypy", specifier = ">=1.19.1" },
-    { name = "psycopg2-binary", specifier = ">=2.9.11" },
-    { name = "pyright", specifier = ">=1.1.408" },
-    { name = "pytest", specifier = ">=9.0" },
-    { name = "pytest-cov", specifier = ">=7.0.0" },
-    { name = "pytest-django", specifier = ">=4.11" },
-    { name = "ruff", specifier = ">=0.14" },
-    { name = "types-factory-boy", specifier = ">=0.4.1" },
 ]
 
 [[package]]
