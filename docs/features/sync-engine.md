@@ -218,12 +218,12 @@ class SyncableModel(SoftDeleteMixin, TimestampedModel):
         abstract = True
         indexes = [
             # Critical for cursor-based pull queries (includes deleted)
-            models.Index(fields=['workspace', 'updated_at', 'id']),
+            models.Index(fields=['organization', 'updated_at', 'id']),
         ]
 
     # Use ULIDs for time-sortable, collision-free IDs
     id = models.CharField(max_length=32, primary_key=True, editable=False)
-    workspace = models.ForeignKey('organizations.Organization', on_delete=models.CASCADE)
+    organization = models.ForeignKey('organizations.Organization', on_delete=models.CASCADE)
 
     # Sync metadata
     sync_version = models.PositiveBigIntegerField(default=0)  # Lamport clock
@@ -258,7 +258,7 @@ class SyncOperation(models.Model):
     idempotency_key = models.CharField(max_length=64, unique=True, db_index=True)
 
     # Context
-    workspace = models.ForeignKey('organizations.Organization', on_delete=models.CASCADE)
+    organization = models.ForeignKey('organizations.Organization', on_delete=models.CASCADE)
     actor = models.ForeignKey('accounts.Member', on_delete=models.SET_NULL, null=True)
     device_id = models.CharField(max_length=64)
 
@@ -283,7 +283,7 @@ class SyncOperation(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['workspace', 'server_timestamp']),
+            models.Index(fields=['organization', 'server_timestamp']),
             models.Index(fields=['entity_type', 'entity_id']),
         ]
 ```
@@ -520,7 +520,7 @@ class FieldLevelLWWMixin(models.Model):
 
     # Fields to exclude from LWW tracking
     LWW_EXCLUDED_FIELDS = {
-        'id', 'workspace', 'workspace_id',
+        'id', 'organization', 'organization_id',
         'created_at', 'updated_at', 'deleted_at',
         'sync_version', 'field_timestamps',
         'last_modified_by', 'last_modified_by_id',
@@ -636,7 +636,7 @@ Contact.all_objects.filter(updated_at__gt=cursor)  # Includes deletions
 # apps/sync/services.py
 
 def fetch_changes_for_pull(
-    workspace: Organization,
+    organization: Organization,
     entity_type: str,
     since_timestamp: datetime | None,
     since_id: str | None,
@@ -650,7 +650,7 @@ def fetch_changes_for_pull(
     model = SyncRegistry.get_model(entity_type)
 
     # MUST use all_objects to include soft-deleted records
-    qs = model.all_objects.filter(workspace=workspace)
+    qs = model.all_objects.filter(organization=organization)
 
     if since_timestamp:
         # Cursor-based pagination: records updated after cursor
@@ -740,7 +740,7 @@ async processPullResponse(response: SyncPullResponse): Promise<void> {
 ```sql
 -- Index for pull queries - no partial index, we need all records including deleted
 CREATE INDEX idx_syncable_pull ON {entity_table}
-    (workspace_id, updated_at, id);
+    (organization_id, updated_at, id);
 
 -- Separate index for tombstone cleanup
 CREATE INDEX idx_syncable_tombstones ON {entity_table}
@@ -810,7 +810,7 @@ Pull queries go back slightly from the cursor to catch clock-skewed records. Cli
 CLOCK_SKEW_TOLERANCE = timedelta(milliseconds=100)
 
 def fetch_changes_for_pull(
-    workspace: Organization,
+    organization: Organization,
     entity_type: str,
     since_timestamp: datetime | None,
     since_id: str | None,
@@ -820,7 +820,7 @@ def fetch_changes_for_pull(
     Fetch changes with overlap window for clock skew tolerance.
     """
     model = SyncRegistry.get_model(entity_type)
-    qs = model.all_objects.filter(workspace=workspace)
+    qs = model.all_objects.filter(organization=organization)
 
     if since_timestamp:
         # Apply overlap window to catch clock-skewed records
@@ -979,7 +979,7 @@ def sync_push(request: AuthenticatedHttpRequest, payload: SyncPushRequest):
 
     for op in payload.operations:
         result = process_sync_operation(
-            workspace=request.organization,
+            organization=request.organization,
             actor=request.member,
             operation=op,
         )
@@ -1053,7 +1053,7 @@ SERVICE_REGISTRY = {
 }
 
 def process_sync_operation(
-    workspace: Organization,
+    organization: Organization,
     actor: Member,
     operation: SyncOperationIn,
 ) -> SyncResult:
@@ -1072,7 +1072,7 @@ def process_sync_operation(
     if not service_class:
         return SyncResult(status='rejected', error_code='UNKNOWN_ENTITY_TYPE')
 
-    service = service_class(workspace=workspace, actor=actor)
+    service = service_class(organization=organization, actor=actor)
 
     # 3. Delegate to service (which has all the business logic)
     try:
@@ -1082,7 +1082,7 @@ def process_sync_operation(
         elif operation.intent == 'update':
             # Apply conflict resolution first if needed
             resolved_data = resolve_conflicts(
-                workspace, operation.entity_type, operation.entity_id,
+                organization, operation.entity_type, operation.entity_id,
                 operation.data, operation.client_timestamp
             )
             entity = service.update(operation.entity_id, **resolved_data)
@@ -1094,7 +1094,7 @@ def process_sync_operation(
         # 4. Log the operation
         SyncOperation.objects.create(
             idempotency_key=operation.idempotency_key,
-            workspace=workspace,
+            organization=organization,
             actor=actor,
             entity_type=operation.entity_type,
             entity_id=operation.entity_id,
@@ -1124,12 +1124,12 @@ Service layer example (already exists in your app):
 # apps/contacts/services.py
 
 class ContactService:
-    def __init__(self, workspace: Organization, actor: Member):
-        self.workspace = workspace
+    def __init__(self, organization: Organization, actor: Member):
+        self.organization = organization
         self.actor = actor
 
     def update(self, contact_id: str, **data) -> Contact:
-        contact = Contact.objects.get(id=contact_id, workspace=self.workspace)
+        contact = Contact.objects.get(id=contact_id, organization=self.organization)
 
         # Authorization (already implemented)
         if not self._can_edit(contact):
@@ -1182,7 +1182,7 @@ def sync_pull(request: AuthenticatedHttpRequest, params: Query[SyncPullRequest])
 
     # Query all syncable entities changed since cursor
     changes = fetch_changes(
-        workspace=request.organization,
+        organization=request.organization,
         since_timestamp=cursor.timestamp,
         since_id=cursor.last_id,
         entity_types=params.entity_types,
@@ -1211,8 +1211,8 @@ Based on [offline-first best practices](https://medium.com/@jusuftopic/offline-f
 
 | Use Case | Entity | Strategy | Rationale |
 |----------|--------|----------|-----------|
-| CRM CRM | Contact | LWW by field | Simple, contacts rarely edited concurrently |
-| CRM CRM | Meeting Note | Append-only + merge | Notes can be appended from multiple sessions |
+| Field CRM | Contact | LWW by field | Simple, contacts rarely edited concurrently |
+| Field CRM | Meeting Note | Append-only + merge | Notes can be appended from multiple sessions |
 | Toggl-like | Time Entry | LWW with validation | Atomic updates, server validates no overlaps |
 | Toggl-like | Project/Tag | LWW by field | Metadata rarely conflicts |
 | Generic B2B | Configurable | Per-entity policy | Let app developers choose |
@@ -1653,7 +1653,7 @@ class TimeEntry(SyncableModel):
     def validate_no_overlap(self):
         """Server-side validation: no overlapping entries."""
         overlapping = TimeEntry.objects.filter(
-            workspace=self.workspace,
+            organization=self.organization,
             start_time__lt=self.end_time,
             end_time__gt=self.start_time,
         ).exclude(id=self.id)
@@ -1844,7 +1844,7 @@ After:  Mobile → API Gateway → Lambda → PostgreSQL
 -- Composite index for pull queries
 -- No partial index - we need all records including soft-deleted
 CREATE INDEX idx_syncable_pull ON {entity_table}
-    (workspace_id, updated_at, id);
+    (organization_id, updated_at, id);
 
 -- Index for tombstone cleanup job
 CREATE INDEX idx_syncable_tombstones ON {entity_table}
@@ -1953,15 +1953,15 @@ When the server needs all clients to re-sync (e.g., after a data migration):
 # apps/sync/models.py
 
 class SyncConfig(models.Model):
-    """Per-workspace sync configuration."""
-    workspace = models.OneToOneField(Organization, on_delete=models.CASCADE)
+    """Per-organization sync configuration."""
+    organization = models.OneToOneField(Organization, on_delete=models.CASCADE)
     force_resync_before = models.DateTimeField(null=True)
 
 # apps/sync/api.py
 
 @router.get("/pull", response=SyncPullResponse)
 def sync_pull(request: AuthenticatedHttpRequest, params: Query[SyncPullRequest]):
-    config = SyncConfig.objects.filter(workspace=request.organization).first()
+    config = SyncConfig.objects.filter(organization=request.organization).first()
 
     # If client's cursor is older than force_resync_before, tell them to re-sync
     cursor_ts = parse_cursor(params.since).timestamp if params.since else None
@@ -2229,10 +2229,10 @@ The push notification is a "nudge"—it just tells the client "there's new data,
 ```python
 # Lambda: Send silent push notification
 def notify_clients_to_sync(event, context):
-    workspace_id = event["detail"]["workspace_id"]
+    organization_id = event["detail"]["organization_id"]
 
-    # Get device tokens for workspace members
-    tokens = get_device_tokens_for_workspace(workspace_id)
+    # Get device tokens for organization members
+    tokens = get_device_tokens_for_organization(organization_id)
 
     for token in tokens:
         sns.publish(
@@ -2311,7 +2311,7 @@ Test the full push/pull cycle:
 # tests/sync/test_api.py
 
 class TestSyncPushPull:
-    def test_push_then_pull_returns_changes(self, api_client, workspace):
+    def test_push_then_pull_returns_changes(self, api_client, organization):
         # Push a create operation
         response = api_client.post("/api/v1/sync/push", json={
             "operations": [{
@@ -2394,14 +2394,14 @@ Test the full flow with a real server (use in CI):
 describe('Sync E2E', () => {
   it('syncs data between two clients', async () => {
     // Client A creates a contact offline
-    const clientA = new SyncEngine(workspaceId, deviceIdA);
+    const clientA = new SyncEngine(organizationId, deviceIdA);
     await clientA.createContact({ name: 'Bob' });
 
     // Client A syncs
     await clientA.sync();
 
     // Client B pulls
-    const clientB = new SyncEngine(workspaceId, deviceIdB);
+    const clientB = new SyncEngine(organizationId, deviceIdB);
     await clientB.sync();
 
     // Client B should have the contact

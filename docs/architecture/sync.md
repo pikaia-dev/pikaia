@@ -213,17 +213,17 @@ The cursor is an opaque token encoding position in the changeset:
 
 ```python
 # Pull query: Pin to snapshot semantics
-def get_changes_since(workspace_id: str, cursor: str, limit: int = 100):
+def get_changes_since(organization_id: str, cursor: str, limit: int = 100):
     """
     Fetch changes since cursor with snapshot consistency.
     """
     cursor_ts, cursor_id = parse_cursor(cursor)
 
     # Use server-assigned updated_at, not client timestamp
-    # Composite index: (workspace, updated_at, id) ensures monotonic ordering
+    # Composite index: (organization, updated_at, id) ensures monotonic ordering
     changes = (
         SyncableModel.objects
-        .filter(workspace_id=workspace_id)
+        .filter(organization_id=organization_id)
         .filter(
             Q(updated_at__gt=cursor_ts) |
             Q(updated_at=cursor_ts, id__gt=cursor_id)
@@ -241,7 +241,7 @@ def get_changes_since(workspace_id: str, cursor: str, limit: int = 100):
 class Meta:
     indexes = [
         # Composite index for cursor pagination
-        models.Index(fields=["workspace", "updated_at", "id"]),
+        models.Index(fields=["organization", "updated_at", "id"]),
     ]
 ```
 
@@ -269,7 +269,7 @@ class SyncOperation(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     idempotency_key = models.CharField(max_length=100, unique=True)
 
-    workspace = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
     actor = models.ForeignKey(Member, on_delete=models.CASCADE)
 
     entity_type = models.CharField(max_length=50)
@@ -286,7 +286,7 @@ class SyncOperation(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["workspace", "server_timestamp"]),
+            models.Index(fields=["organization", "server_timestamp"]),
             models.Index(fields=["idempotency_key"]),
         ]
 ```
@@ -296,9 +296,11 @@ class SyncOperation(models.Model):
 All entities that participate in sync must have:
 
 ```python
-class SyncableModel(models.Model):
+class SyncableModel(SoftDeleteMixin, TimestampedModel):
     """
     Abstract base for sync-enabled entities.
+
+    Inherits soft-delete and timestamps from existing mixins.
     """
     id = models.CharField(
         max_length=50,
@@ -306,21 +308,26 @@ class SyncableModel(models.Model):
         default=generate_prefixed_uuid  # e.g., "te_01HN..."
     )
 
-    workspace = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    deleted_at = models.DateTimeField(null=True, blank=True)  # Soft delete
+    # Sync metadata
+    sync_version = models.PositiveBigIntegerField(default=0)  # Incremented on each save
+    last_modified_by = models.ForeignKey('accounts.Member', null=True, on_delete=models.SET_NULL)
+    device_id = models.CharField(max_length=64, null=True)  # Origin device
+
+    # Optional: per-field timestamps for field-level LWW
+    # Example: {"name": "2025-01-23T10:00:00Z", "phone": "2025-01-23T09:30:00Z"}
+    field_timestamps = models.JSONField(default=dict, blank=True)
 
     class Meta:
         abstract = True
         indexes = [
-            models.Index(fields=["workspace", "updated_at"]),
+            models.Index(fields=["organization", "updated_at", "id"]),
         ]
 
-    @property
-    def is_deleted(self):
-        return self.deleted_at is not None
+    def save(self, *args, **kwargs):
+        self.sync_version += 1
+        super().save(*args, **kwargs)
 ```
 
 ### Client-Side (Conceptual)
@@ -341,9 +348,9 @@ Client apps maintain:
 
 | Entity | Strategy | Rationale |
 |--------|----------|-----------|
-| `time_entry` | Last-write-wins (server timestamp) | Simple, acceptable for time tracking |
-| `note` | Field-level merge | Preserve concurrent edits to different fields |
-| `contact` | Manual merge (if conflict) | High-value data, user decides |
+| `time_entry` | Last-write-wins (entity-level) | Simple, acceptable for time tracking |
+| `contact` | Field-level LWW | Independent fields, concurrent edits to different fields merge cleanly |
+| `note` | Field-level LWW or CRDT | Preserve concurrent edits; consider CRDT for rich text |
 
 ### Last-Write-Wins (LWW)
 
@@ -377,39 +384,44 @@ def apply_operation(op: SyncOperation, entity: SyncableModel):
     return "applied"
 ```
 
-### Field-Level Merge
+### Field-Level LWW
 
-For text-heavy entities like notes:
+For entities where different fields may be edited concurrently (e.g., contacts):
 
 ```python
-def merge_fields(existing: dict, incoming: dict, base: dict) -> dict:
+def apply_field_level_lww(
+    entity: SyncableModel,
+    client_data: dict,
+    client_timestamp: datetime,
+) -> tuple[dict, dict]:
     """
-    Three-way merge at field level.
+    Merge at field level using per-field timestamps.
 
-    - If only one side changed, take that change
-    - If both changed to same value, no conflict
-    - If both changed to different values, incoming wins (LWW fallback)
+    Returns (applied_fields, rejected_fields).
     """
-    result = {}
-    for field in set(existing.keys()) | set(incoming.keys()):
-        existing_val = existing.get(field)
-        incoming_val = incoming.get(field)
-        base_val = base.get(field)
+    applied = {}
+    rejected = {}
 
-        if existing_val == incoming_val:
-            result[field] = existing_val
-        elif existing_val == base_val:
-            # Only incoming changed
-            result[field] = incoming_val
-        elif incoming_val == base_val:
-            # Only existing changed
-            result[field] = existing_val
+    for field, client_value in client_data.items():
+        server_ts = entity.field_timestamps.get(field)
+
+        # Client wins if server has no timestamp or client is newer
+        if server_ts is None or client_timestamp > datetime.fromisoformat(server_ts):
+            setattr(entity, field, client_value)
+            entity.field_timestamps[field] = client_timestamp.isoformat()
+            applied[field] = client_value
         else:
-            # Both changed → LWW fallback
-            result[field] = incoming_val
+            server_value = getattr(entity, field, None)
+            if client_value != server_value:
+                rejected[field] = {'client': client_value, 'server': server_value}
 
-    return result
+    if applied:
+        entity.save()
+
+    return applied, rejected
 ```
+
+> **Alternative: Three-way merge** - For text-heavy entities requiring more sophisticated merge (e.g., collaborative notes), consider tracking a `base` snapshot and using three-way merge logic. See implementation spec for details.
 
 ### Tombstone Lifecycle
 
@@ -824,7 +836,7 @@ Critical indexes for sync performance:
 class Meta:
     indexes = [
         # Pull query: changes since cursor
-        models.Index(fields=["workspace", "updated_at"]),
+        models.Index(fields=["organization", "updated_at"]),
 
         # Idempotency check
         models.Index(fields=["idempotency_key"]),
@@ -836,11 +848,11 @@ class Meta:
 
 ### Rate Limiting
 
-Implement per-workspace rate limiting:
+Implement per-organization rate limiting:
 
 ```python
 # Django middleware or decorator
-@rate_limit(key="workspace:{workspace_id}", limit=100, period=60)
+@rate_limit(key="organization:{organization_id}", limit=100, period=60)
 def sync_push(request):
     ...
 ```
@@ -924,10 +936,10 @@ def notify_client_to_sync(event, context):
     """
     Send silent push notification to trigger client sync.
     """
-    workspace_id = event["detail"]["workspace_id"]
+    organization_id = event["detail"]["organization_id"]
 
-    # Get device tokens for workspace members
-    tokens = get_device_tokens_for_workspace(workspace_id)
+    # Get device tokens for organization members
+    tokens = get_device_tokens_for_organization(organization_id)
 
     for token in tokens:
         sns.publish(
