@@ -10,7 +10,6 @@ from datetime import datetime
 from typing import TYPE_CHECKING, ClassVar
 
 from django.db import models
-from django.utils import timezone
 from ulid import ULID
 
 from apps.core.models import (
@@ -209,7 +208,7 @@ class SyncOperation(models.Model):
 
     # Observability metrics
     drift_ms = models.IntegerField(
-        null=True, blank=True, help_text="client_timestamp - server_timestamp in ms"
+        null=True, blank=True, help_text="server_timestamp - client_timestamp in ms"
     )
     conflict_fields = models.JSONField(
         null=True, blank=True, help_text="Fields that had conflicts (for field-level LWW)"
@@ -230,6 +229,5 @@ class SyncOperation(models.Model):
 
     def calculate_drift_ms(self) -> int:
         """Calculate drift between client and server timestamps in milliseconds."""
-        now = timezone.now()
-        delta = now - self.client_timestamp
+        delta = self.server_timestamp - self.client_timestamp
         return int(delta.total_seconds() * 1000)

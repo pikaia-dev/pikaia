@@ -302,7 +302,11 @@ class SyncableModel(SoftDeleteMixin, TimestampedModel):
 
     Inherits soft-delete and timestamps from existing mixins.
     Uses ULIDs for time-sortable, collision-free IDs that work offline.
+
+    Subclasses must define PREFIX class attribute for ID generation.
     """
+    PREFIX: ClassVar[str] = ""  # Subclasses must override, e.g., "ct_" for contacts
+
     id = models.CharField(
         max_length=32,
         primary_key=True,
@@ -334,9 +338,8 @@ class SyncableModel(SoftDeleteMixin, TimestampedModel):
 
     def _generate_prefixed_ulid(self) -> str:
         """Generate prefixed ULID, e.g., 'ct_01HN8J9K2M3N4P5Q6R7S8T9U'."""
-        import ulid
-        prefix = getattr(self, 'ID_PREFIX', 'ent')
-        return f"{prefix}_{ulid.new()}"
+        from ulid import ULID
+        return f"{self.PREFIX}{ULID()}"
 ```
 
 ### Client-Side (Conceptual)

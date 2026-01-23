@@ -7,10 +7,9 @@ Core business logic for processing sync operations and fetching changes.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import IntegrityError, models, transaction
 from django.utils import timezone
@@ -27,11 +26,6 @@ if TYPE_CHECKING:
     from apps.organizations.models import Organization
 
 logger = get_logger(__name__)
-
-# Clock skew tolerance for pull queries (covers typical NTP drift)
-CLOCK_SKEW_TOLERANCE = timedelta(
-    milliseconds=getattr(settings, "SYNC_CLOCK_SKEW_TOLERANCE_MS", 100)
-)
 
 
 @dataclass
@@ -167,13 +161,19 @@ def process_sync_operation(
                 error_message=f"Invalid intent: {operation.intent}",
             )
 
-        # Mark operation as applied
-        sync_op.status = SyncOperation.Status.APPLIED
+        # Update operation status based on result
+        if result.status == "applied":
+            if result.conflict_fields:
+                sync_op.status = SyncOperation.Status.CONFLICT
+            else:
+                sync_op.status = SyncOperation.Status.APPLIED
+        elif result.status == "rejected":
+            sync_op.status = SyncOperation.Status.REJECTED
         sync_op.conflict_fields = result.conflict_fields
         sync_op.save(update_fields=["status", "conflict_fields"])
 
         logger.info(
-            "sync_operation_applied",
+            "sync_operation_processed",
             idempotency_key=operation.idempotency_key,
             entity_type=operation.entity_type,
             entity_id=operation.entity_id,
@@ -496,10 +496,12 @@ def _serialize_entity(entity_type: str, entity: SyncableModel) -> dict:
         if field.name in excluded:
             continue
         if field.is_relation:
-            # For FKs, include the ID
-            value = getattr(entity, f"{field.name}_id", None)
-            if value is not None:
-                result[f"{field.name}_id"] = str(value)
+            # For FKs, include the ID if the _id attribute exists
+            id_attr = f"{field.name}_id"
+            if hasattr(entity, id_attr):
+                value = getattr(entity, id_attr, None)
+                if value is not None:
+                    result[id_attr] = str(value)
         else:
             value = getattr(entity, field.name, None)
             if value is not None:

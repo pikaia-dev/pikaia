@@ -13,6 +13,7 @@ from apps.core.logging import get_logger
 from apps.core.security import BearerAuth, get_auth_context
 from apps.events.services import publish_event
 from apps.sync.exceptions import CursorInvalidError
+from apps.sync.registry import SyncRegistry
 from apps.sync.schemas import (
     SyncPullParams,
     SyncPullResponse,
@@ -67,8 +68,6 @@ def sync_push(request: HttpRequest, payload: SyncPushRequest) -> SyncPushRespons
         # Emit event for webhooks/integrations on successful apply
         if result.status == "applied" and op.intent != "delete":
             try:
-                from apps.sync.registry import SyncRegistry
-
                 model = SyncRegistry.get_model(op.entity_type)
                 entity = model.all_objects.filter(id=op.entity_id).first()
                 if entity:
