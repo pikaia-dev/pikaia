@@ -227,8 +227,16 @@ def main():
     try:
         input_data = json.load(sys.stdin)
     except json.JSONDecodeError:
-        # Must output valid JSON even on parse error
-        print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'allow'}}))
+        # Must output valid JSON even on parse error (use modern format)
+        print(json.dumps({
+            'continue': True,
+            'suppressOutput': False,
+            'hookSpecificOutput': {
+                'hookEventName': 'PreToolUse',
+                'permissionDecision': 'allow',
+                'permissionDecisionReason': ''
+            }
+        }))
         sys.exit(0)
 
     tool_name = input_data.get('tool_name', '')
@@ -236,7 +244,15 @@ def main():
 
     # Load config
     config_path = Path(__file__).parent / 'patterns.yaml'
-    allow_output = json.dumps({'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'allow'}})
+    allow_output = json.dumps({
+        'continue': True,
+        'suppressOutput': False,
+        'hookSpecificOutput': {
+            'hookEventName': 'PreToolUse',
+            'permissionDecision': 'allow',
+            'permissionDecisionReason': ''
+        }
+    })
 
     if not config_path.exists():
         print(allow_output)
@@ -264,9 +280,11 @@ def main():
         file_path = tool_input.get('file_path', '')
         result = check_path_access(file_path, config, is_write=False, is_delete=False)
 
-    # Output decision (explicit allow/deny/ask)
+    # Output decision using modern format (prevents phantom "hook error" label)
     if result:
         output = {
+            'continue': result['decision'] != 'deny',
+            'suppressOutput': False,
             'hookSpecificOutput': {
                 'hookEventName': 'PreToolUse',
                 'permissionDecision': result['decision'],
@@ -274,11 +292,14 @@ def main():
             }
         }
     else:
-        # Explicit allow - prevents "hook error" display in Claude Code
+        # Explicit allow with modern format
         output = {
+            'continue': True,
+            'suppressOutput': False,
             'hookSpecificOutput': {
                 'hookEventName': 'PreToolUse',
-                'permissionDecision': 'allow'
+                'permissionDecision': 'allow',
+                'permissionDecisionReason': ''
             }
         }
     print(json.dumps(output))
