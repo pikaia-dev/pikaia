@@ -972,6 +972,8 @@ class SyncResultOut(Schema):
     server_timestamp: datetime
     server_version: int | None = None
     error_code: str | None = None
+    error_message: str | None = None  # Human-readable explanation
+    error_details: dict | None = None  # Structured validation errors (field -> messages)
     conflict_data: dict | None = None  # Server state if conflict
 
 @router.post("/push", response=list[SyncResultOut])
@@ -1069,7 +1071,11 @@ def process_sync_operation(
     # 1. Get the appropriate service
     service_class = SERVICE_REGISTRY.get(operation.entity_type)
     if not service_class:
-        return SyncResult(status='rejected', error_code='UNKNOWN_ENTITY_TYPE')
+        return SyncResult(
+            status='rejected',
+            error_code='UNKNOWN_ENTITY_TYPE',
+            error_message=f'Unknown entity type: {operation.entity_type}',
+        )
 
     service = service_class(organization=organization, actor=actor)
 
@@ -1121,15 +1127,28 @@ def process_sync_operation(
     except PermissionDenied:
         sync_op.status = 'rejected'
         sync_op.save(update_fields=['status'])
-        return SyncResult(status='rejected', error_code='FORBIDDEN')
+        return SyncResult(
+            status='rejected',
+            error_code='FORBIDDEN',
+            error_message='You do not have permission to perform this action',
+        )
     except ValidationError as e:
         sync_op.status = 'rejected'
         sync_op.save(update_fields=['status'])
-        return SyncResult(status='rejected', error_code='VALIDATION_ERROR', details=e.messages)
+        return SyncResult(
+            status='rejected',
+            error_code='VALIDATION_ERROR',
+            error_message='One or more fields failed validation',
+            error_details=e.message_dict if hasattr(e, 'message_dict') else {'__all__': e.messages},
+        )
     except ObjectDoesNotExist:
         sync_op.status = 'rejected'
         sync_op.save(update_fields=['status'])
-        return SyncResult(status='rejected', error_code='NOT_FOUND')
+        return SyncResult(
+            status='rejected',
+            error_code='NOT_FOUND',
+            error_message=f'Entity {operation.entity_id} not found',
+        )
 ```
 
 Service layer example (already exists in your app):
