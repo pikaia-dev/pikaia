@@ -268,7 +268,8 @@ def complete_device_link(
                     app_version=app_version,
                 )
             except IntegrityError:
-                device = Device.objects.get(device_uuid=device_uuid)
+                # Use all_objects to include revoked devices in race condition handling
+                device = Device.all_objects.get(device_uuid=device_uuid)
                 if device.user_id != user.id:
                     raise DeviceAlreadyLinkedError(
                         "This device is already linked to another account."
