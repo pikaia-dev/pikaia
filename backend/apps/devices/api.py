@@ -67,10 +67,10 @@ def initiate_link(request: HttpRequest) -> InitiateLinkResponse:
 
 def _get_client_ip(request: HttpRequest) -> str:
     """Extract client IP from request, handling proxies."""
-    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    x_forwarded_for: str | None = request.META.get("HTTP_X_FORWARDED_FOR")
     if x_forwarded_for:
         return x_forwarded_for.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "unknown")
+    return str(request.META.get("REMOTE_ADDR", "unknown"))
 
 
 def _check_complete_rate_limit(request: HttpRequest) -> None:

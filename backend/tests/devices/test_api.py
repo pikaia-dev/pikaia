@@ -4,12 +4,10 @@ API tests for device linking endpoints.
 Tests the service layer and API endpoint behavior.
 """
 
-from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
 from django.test import RequestFactory
-from django.utils import timezone
 
 from apps.core.auth import AuthContext
 from apps.devices.api import (
@@ -19,9 +17,9 @@ from apps.devices.api import (
     list_devices,
     refresh_session,
 )
-from apps.devices.models import Device
 from apps.devices.schemas import CompleteLinkRequest, SessionRefreshRequest
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
+from tests.conftest import make_request_with_auth
 from tests.devices.factories import DeviceFactory, DeviceLinkTokenFactory
 
 # Test RSA keys for JWT signing
@@ -55,7 +53,7 @@ b8jC/mQIlWNM1U+IGB6DHVoLIw4NR5pK8jcwR5ueNzPxr2EPPmZ6+zCk3C9Mjh7z
 -----END PRIVATE KEY-----"""
 
 
-def _configure_test_settings(settings):
+def _configure_test_settings(settings) -> None:
     """Configure settings for device linking tests."""
     from apps.passkeys.trusted_auth import get_signing_public_key
 
@@ -73,33 +71,6 @@ def _configure_test_settings(settings):
     settings.STYTCH_TRUSTED_AUTH_PROFILE_ID = "test-profile"
 
 
-def _create_auth_request(
-    request_factory: RequestFactory,
-    user,
-    member,
-    organization,
-    method: str = "post",
-    path: str = "/",
-) -> MagicMock:
-    """Create a request with proper auth context."""
-    if method == "post":
-        request = request_factory.post(path)
-    elif method == "get":
-        request = request_factory.get(path)
-    elif method == "delete":
-        request = request_factory.delete(path)
-    else:
-        request = request_factory.get(path)
-
-    auth_context = AuthContext(
-        user=user,
-        member=member,
-        organization=organization,
-    )
-    request.auth = auth_context
-    return request
-
-
 @pytest.mark.django_db
 class TestInitiateLinkEndpoint:
     """Tests for initiate_link endpoint."""
@@ -108,11 +79,14 @@ class TestInitiateLinkEndpoint:
         """Should return QR URL for authenticated user."""
         _configure_test_settings(settings)
 
-        organization = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=organization)
+        organization = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=organization)
 
-        request = _create_auth_request(request_factory, user, member, organization)
+        request = request_factory.post("/")
+        request = make_request_with_auth(  # type: ignore[assignment]
+            request, AuthContext(user=user, member=member, organization=organization)
+        )
         response = initiate_link(request)
 
         assert response.qr_url.startswith("pikaia://device/link?token=")
@@ -125,15 +99,18 @@ class TestInitiateLinkEndpoint:
         _configure_test_settings(settings)
         settings.DEVICE_MAX_LINK_ATTEMPTS_PER_HOUR = 2
 
-        organization = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=organization)
+        organization = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=organization)
 
         # Create tokens to hit rate limit
         for _ in range(2):
-            DeviceLinkTokenFactory(user=user, member=member, organization=organization)
+            DeviceLinkTokenFactory.create(user=user, member=member, organization=organization)
 
-        request = _create_auth_request(request_factory, user, member, organization)
+        request = request_factory.post("/")
+        request = make_request_with_auth(  # type: ignore[assignment]
+            request, AuthContext(user=user, member=member, organization=organization)
+        )
 
         from ninja.errors import HttpError
 
@@ -146,15 +123,13 @@ class TestInitiateLinkEndpoint:
 class TestCompleteLinkEndpoint:
     """Tests for complete_link endpoint."""
 
-    def test_returns_session_on_success(
-        self, request_factory: RequestFactory, settings
-    ) -> None:
+    def test_returns_session_on_success(self, request_factory: RequestFactory, settings) -> None:
         """Should return session tokens on successful link."""
         _configure_test_settings(settings)
 
-        organization = OrganizationFactory()
-        user = UserFactory()
-        member = MemberFactory(user=user, organization=organization)
+        organization = OrganizationFactory.create()
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=organization)
 
         from apps.devices.services import create_link_token
 
@@ -183,9 +158,7 @@ class TestCompleteLinkEndpoint:
         assert response.session_token == "test-session-token"
         assert response.session_jwt == "test-session-jwt"
 
-    def test_rejects_invalid_token(
-        self, request_factory: RequestFactory, settings
-    ) -> None:
+    def test_rejects_invalid_token(self, request_factory: RequestFactory, settings) -> None:
         """Should reject invalid token."""
         _configure_test_settings(settings)
 
@@ -208,23 +181,22 @@ class TestCompleteLinkEndpoint:
 class TestListDevicesEndpoint:
     """Tests for list_devices endpoint."""
 
-    def test_returns_user_devices(
-        self, request_factory: RequestFactory, settings
-    ) -> None:
+    def test_returns_user_devices(self, request_factory: RequestFactory, settings) -> None:
         """Should return only the authenticated user's devices."""
         _configure_test_settings(settings)
 
-        user = UserFactory()
-        other_user = UserFactory()
-        organization = OrganizationFactory()
-        member = MemberFactory(user=user, organization=organization)
+        user = UserFactory.create()
+        other_user = UserFactory.create()
+        organization = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=organization)
 
-        DeviceFactory(user=user, name="My iPhone")
-        DeviceFactory(user=user, name="My iPad")
-        DeviceFactory(user=other_user, name="Other Device")
+        DeviceFactory.create(user=user, name="My iPhone")
+        DeviceFactory.create(user=user, name="My iPad")
+        DeviceFactory.create(user=other_user, name="Other Device")
 
-        request = _create_auth_request(
-            request_factory, user, member, organization, method="get"
+        request = request_factory.get("/")
+        request = make_request_with_auth(  # type: ignore[assignment]
+            request, AuthContext(user=user, member=member, organization=organization)
         )
         response = list_devices(request)
 
@@ -234,22 +206,21 @@ class TestListDevicesEndpoint:
         assert "My iPad" in device_names
         assert "Other Device" not in device_names
 
-    def test_excludes_revoked_devices(
-        self, request_factory: RequestFactory, settings
-    ) -> None:
+    def test_excludes_revoked_devices(self, request_factory: RequestFactory, settings) -> None:
         """Should not return revoked devices."""
         _configure_test_settings(settings)
 
-        user = UserFactory()
-        organization = OrganizationFactory()
-        member = MemberFactory(user=user, organization=organization)
+        user = UserFactory.create()
+        organization = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=organization)
 
-        DeviceFactory(user=user, name="Active")
-        revoked_device = DeviceFactory(user=user, name="Revoked")
+        DeviceFactory.create(user=user, name="Active")
+        revoked_device = DeviceFactory.create(user=user, name="Revoked")
         revoked_device.revoke()
 
-        request = _create_auth_request(
-            request_factory, user, member, organization, method="get"
+        request = request_factory.get("/")
+        request = make_request_with_auth(  # type: ignore[assignment]
+            request, AuthContext(user=user, member=member, organization=organization)
         )
         response = list_devices(request)
 
@@ -261,20 +232,19 @@ class TestListDevicesEndpoint:
 class TestRevokeDeviceEndpoint:
     """Tests for delete_device endpoint."""
 
-    def test_revokes_own_device(
-        self, request_factory: RequestFactory, settings
-    ) -> None:
+    def test_revokes_own_device(self, request_factory: RequestFactory, settings) -> None:
         """Should successfully revoke user's own device."""
         _configure_test_settings(settings)
 
-        user = UserFactory()
-        organization = OrganizationFactory()
-        member = MemberFactory(user=user, organization=organization)
+        user = UserFactory.create()
+        organization = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=organization)
 
-        device = DeviceFactory(user=user)
+        device = DeviceFactory.create(user=user)
 
-        request = _create_auth_request(
-            request_factory, user, member, organization, method="delete"
+        request = request_factory.delete("/")
+        request = make_request_with_auth(  # type: ignore[assignment]
+            request, AuthContext(user=user, member=member, organization=organization)
         )
         status, _ = delete_device(request, device.id)
 
@@ -288,15 +258,16 @@ class TestRevokeDeviceEndpoint:
         """Should return 404 when trying to revoke another user's device."""
         _configure_test_settings(settings)
 
-        user = UserFactory()
-        other_user = UserFactory()
-        organization = OrganizationFactory()
-        member = MemberFactory(user=user, organization=organization)
+        user = UserFactory.create()
+        other_user = UserFactory.create()
+        organization = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=organization)
 
-        other_device = DeviceFactory(user=other_user)
+        other_device = DeviceFactory.create(user=other_user)
 
-        request = _create_auth_request(
-            request_factory, user, member, organization, method="delete"
+        request = request_factory.delete("/")
+        request = make_request_with_auth(  # type: ignore[assignment]
+            request, AuthContext(user=user, member=member, organization=organization)
         )
 
         from ninja.errors import HttpError
@@ -316,16 +287,19 @@ class TestSessionRefreshEndpoint:
         """Should return new session tokens for valid device."""
         _configure_test_settings(settings)
 
-        user = UserFactory()
-        organization = OrganizationFactory()
-        member = MemberFactory(user=user, organization=organization)
-        device = DeviceFactory(user=user)
+        user = UserFactory.create()
+        organization = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=organization)
+        device = DeviceFactory.create(user=user)
 
         mock_response = MagicMock()
         mock_response.session_token = "new-session-token"
         mock_response.session_jwt = "new-session-jwt"
 
-        request = _create_auth_request(request_factory, user, member, organization)
+        request = request_factory.post("/")
+        request = make_request_with_auth(  # type: ignore[assignment]
+            request, AuthContext(user=user, member=member, organization=organization)
+        )
         payload = SessionRefreshRequest(device_uuid=device.device_uuid)
 
         with patch("apps.devices.services.get_stytch_client") as mock_client:
@@ -341,11 +315,14 @@ class TestSessionRefreshEndpoint:
         """Should return 404 for device not linked to user."""
         _configure_test_settings(settings)
 
-        user = UserFactory()
-        organization = OrganizationFactory()
-        member = MemberFactory(user=user, organization=organization)
+        user = UserFactory.create()
+        organization = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=organization)
 
-        request = _create_auth_request(request_factory, user, member, organization)
+        request = request_factory.post("/")
+        request = make_request_with_auth(  # type: ignore[assignment]
+            request, AuthContext(user=user, member=member, organization=organization)
+        )
         payload = SessionRefreshRequest(device_uuid="unknown-device")
 
         from ninja.errors import HttpError
