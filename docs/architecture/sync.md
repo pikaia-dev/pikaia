@@ -301,11 +301,12 @@ class SyncableModel(SoftDeleteMixin, TimestampedModel):
     Abstract base for sync-enabled entities.
 
     Inherits soft-delete and timestamps from existing mixins.
+    Uses ULIDs for time-sortable, collision-free IDs that work offline.
     """
     id = models.CharField(
-        max_length=50,
+        max_length=32,
         primary_key=True,
-        default=generate_prefixed_uuid  # e.g., "te_01HN..."
+        editable=False,
     )
 
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
@@ -326,8 +327,16 @@ class SyncableModel(SoftDeleteMixin, TimestampedModel):
         ]
 
     def save(self, *args, **kwargs):
+        if not self.id:
+            self.id = self._generate_prefixed_ulid()
         self.sync_version += 1
         super().save(*args, **kwargs)
+
+    def _generate_prefixed_ulid(self) -> str:
+        """Generate prefixed ULID, e.g., 'ct_01HN8J9K2M3N4P5Q6R7S8T9U'."""
+        import ulid
+        prefix = getattr(self, 'ID_PREFIX', 'ent')
+        return f"{prefix}_{ulid.new()}"
 ```
 
 ### Client-Side (Conceptual)
