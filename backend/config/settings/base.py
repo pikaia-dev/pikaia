@@ -120,6 +120,7 @@ INSTALLED_APPS = [
     "apps.passkeys",
     "apps.webhooks",
     "apps.sms",
+    "apps.devices",
 ]
 
 MIDDLEWARE = [
