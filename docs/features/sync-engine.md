@@ -249,6 +249,7 @@ class SyncOperation(models.Model):
         DELETE = 'delete'
 
     class Status(models.TextChoices):
+        PENDING = 'pending'    # Claimed but not yet processed
         APPLIED = 'applied'
         REJECTED = 'rejected'
         CONFLICT = 'conflict'
@@ -1062,17 +1063,33 @@ def process_sync_operation(
 
     The service layer handles auth, validation, and business logic.
     We handle idempotency and conflict resolution.
-    """
-    # 1. Idempotency check
-    if SyncOperation.objects.filter(idempotency_key=operation.idempotency_key).exists():
-        return SyncResult(status='duplicate')
 
-    # 2. Get the appropriate service
+    Idempotency is enforced atomically via unique constraint on idempotency_key.
+    """
+    # 1. Get the appropriate service
     service_class = SERVICE_REGISTRY.get(operation.entity_type)
     if not service_class:
         return SyncResult(status='rejected', error_code='UNKNOWN_ENTITY_TYPE')
 
     service = service_class(organization=organization, actor=actor)
+
+    # 2. Atomically claim the idempotency key by creating the log record first.
+    #    This prevents race conditions where two concurrent requests both process.
+    try:
+        sync_op = SyncOperation.objects.create(
+            idempotency_key=operation.idempotency_key,
+            organization=organization,
+            actor=actor,
+            entity_type=operation.entity_type,
+            entity_id=operation.entity_id,
+            intent=operation.intent,
+            payload=operation.data,
+            client_timestamp=operation.client_timestamp,
+            status='pending',  # Will update to applied/rejected after processing
+        )
+    except IntegrityError:
+        # Unique constraint violation = duplicate idempotency_key
+        return SyncResult(status='duplicate')
 
     # 3. Delegate to service (which has all the business logic)
     try:
@@ -1091,18 +1108,9 @@ def process_sync_operation(
             service.delete(operation.entity_id)
             entity = None
 
-        # 4. Log the operation
-        SyncOperation.objects.create(
-            idempotency_key=operation.idempotency_key,
-            organization=organization,
-            actor=actor,
-            entity_type=operation.entity_type,
-            entity_id=operation.entity_id,
-            intent=operation.intent,
-            payload=operation.data,
-            client_timestamp=operation.client_timestamp,
-            status='applied',
-        )
+        # 4. Mark operation as applied
+        sync_op.status = 'applied'
+        sync_op.save(update_fields=['status'])
 
         return SyncResult(
             status='applied',
@@ -1111,10 +1119,16 @@ def process_sync_operation(
         )
 
     except PermissionDenied:
+        sync_op.status = 'rejected'
+        sync_op.save(update_fields=['status'])
         return SyncResult(status='rejected', error_code='FORBIDDEN')
     except ValidationError as e:
+        sync_op.status = 'rejected'
+        sync_op.save(update_fields=['status'])
         return SyncResult(status='rejected', error_code='VALIDATION_ERROR', details=e.messages)
     except ObjectDoesNotExist:
+        sync_op.status = 'rejected'
+        sync_op.save(update_fields=['status'])
         return SyncResult(status='rejected', error_code='NOT_FOUND')
 ```
 
