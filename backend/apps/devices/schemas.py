@@ -50,10 +50,15 @@ class CompleteLinkRequest(Schema):
 class CompleteLinkResponse(Schema):
     """Response after successful device linking."""
 
-    session_token: str = Field(description="Stytch session token for refresh")
-    session_jwt: str = Field(description="Stytch session JWT for API calls")
+    session_token: str = Field(description="Stytch session token (use to refresh session_jwt)")
+    session_jwt: str = Field(description="Stytch session JWT for API calls (~5 min lifetime)")
+    session_expires_at: datetime = Field(
+        description="When the session fully expires (requires new QR scan)"
+    )
     device_id: int = Field(description="Device ID")
     user_id: int = Field(description="User ID")
+    member_id: str = Field(description="Stytch member ID")
+    organization_id: str = Field(description="Stytch organization ID")
 
 
 class DeviceResponse(Schema):

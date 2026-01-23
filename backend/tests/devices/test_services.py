@@ -206,7 +206,7 @@ class TestCompleteDeviceLink:
     @patch("apps.devices.services._create_mobile_session")
     def test_creates_device_on_valid_token(self, mock_session: MagicMock, settings) -> None:
         """Should create device record on valid token."""
-        mock_session.return_value = ("session_token", "session_jwt")
+        mock_session.return_value = ("session_token", "session_jwt", timezone.now())
         member = MemberFactory.create()
         token = self._create_valid_token(settings, member)
 
@@ -228,7 +228,7 @@ class TestCompleteDeviceLink:
     @patch("apps.devices.services._create_mobile_session")
     def test_returns_session_tokens(self, mock_session: MagicMock, settings) -> None:
         """Should return both session_token and session_jwt."""
-        mock_session.return_value = ("test_session_token", "test_session_jwt")
+        mock_session.return_value = ("test_session_token", "test_session_jwt", timezone.now())
         member = MemberFactory.create()
         token = self._create_valid_token(settings, member)
 
@@ -245,7 +245,7 @@ class TestCompleteDeviceLink:
     @patch("apps.devices.services._create_mobile_session")
     def test_marks_token_as_used(self, mock_session: MagicMock, settings) -> None:
         """Should mark token as used after successful link."""
-        mock_session.return_value = ("session_token", "session_jwt")
+        mock_session.return_value = ("session_token", "session_jwt", timezone.now())
         member = MemberFactory.create()
         token = self._create_valid_token(settings, member)
 
@@ -302,7 +302,7 @@ class TestCompleteDeviceLink:
     @patch("apps.devices.services._create_mobile_session")
     def test_rejects_already_used_token(self, mock_session: MagicMock, settings) -> None:
         """Should reject token that has already been used."""
-        mock_session.return_value = ("session_token", "session_jwt")
+        mock_session.return_value = ("session_token", "session_jwt", timezone.now())
         member = MemberFactory.create()
         token = self._create_valid_token(settings, member)
 
@@ -326,7 +326,7 @@ class TestCompleteDeviceLink:
     @patch("apps.devices.services._create_mobile_session")
     def test_rejects_device_linked_to_another_user(self, mock_session: MagicMock, settings) -> None:
         """Should reject if device is already linked to different user."""
-        mock_session.return_value = ("session_token", "session_jwt")
+        mock_session.return_value = ("session_token", "session_jwt", timezone.now())
 
         # Create device linked to user1
         user1 = UserFactory.create()
@@ -349,7 +349,7 @@ class TestCompleteDeviceLink:
         self, mock_session: MagicMock, settings
     ) -> None:
         """Should allow re-linking a revoked device for the same user."""
-        mock_session.return_value = ("session_token", "session_jwt")
+        mock_session.return_value = ("session_token", "session_jwt", timezone.now())
         member = MemberFactory.create()
 
         # Create and revoke device
@@ -374,7 +374,7 @@ class TestCompleteDeviceLink:
         self, mock_session: MagicMock, settings
     ) -> None:
         """Should allow linking a revoked device to different user."""
-        mock_session.return_value = ("session_token", "session_jwt")
+        mock_session.return_value = ("session_token", "session_jwt", timezone.now())
 
         # User1 has revoked device
         user1 = UserFactory.create()

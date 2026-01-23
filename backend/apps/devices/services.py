@@ -53,6 +53,7 @@ class LinkCompleteResult:
     device: Device
     session_token: str
     session_jwt: str
+    session_expires_at: datetime
     member_id: str
     organization_id: str
 
@@ -264,7 +265,9 @@ def complete_device_link(
                         "This device is already linked to another account."
                     ) from None
 
-    session_token, session_jwt = _create_mobile_session(user, member, organization)
+    session_token, session_jwt, session_expires_at = _create_mobile_session(
+        user, member, organization
+    )
 
     logger.info(
         "device_link_completed",
@@ -278,6 +281,7 @@ def complete_device_link(
         device=device,
         session_token=session_token,
         session_jwt=session_jwt,
+        session_expires_at=session_expires_at,
         member_id=member.stytch_member_id,
         organization_id=organization.stytch_org_id,
     )
@@ -287,12 +291,12 @@ def _create_mobile_session(
     user: User,
     member: Member,
     organization: Organization,
-) -> tuple[str, str]:
+) -> tuple[str, str, datetime]:
     """
     Create a Stytch session for the mobile app using trusted auth.
 
     Returns:
-        Tuple of (session_token, session_jwt)
+        Tuple of (session_token, session_jwt, session_expires_at)
     """
     trusted_token = create_trusted_auth_token(
         email=user.email,
@@ -309,7 +313,10 @@ def _create_mobile_session(
         session_duration_minutes=settings.DEVICE_SESSION_EXPIRY_MINUTES,
     )
 
-    return response.session_token, response.session_jwt
+    # Calculate session expiry time
+    session_expires_at = timezone.now() + timedelta(minutes=settings.DEVICE_SESSION_EXPIRY_MINUTES)
+
+    return response.session_token, response.session_jwt, session_expires_at
 
 
 def revoke_device(device_id: int, user: User) -> None:
