@@ -10,6 +10,8 @@ from functools import lru_cache
 from typing import Any
 
 import jwt
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from django.conf import settings
 
 # Token expiration: 5 minutes (short-lived for security)
@@ -43,14 +45,15 @@ def get_signing_public_key() -> str:
     """
     Derive public key from private key for JWT verification.
 
-    Cached since key derivation is expensive and key doesn't change.
+    Cached since key derivation is expensive and key doesn't change at runtime.
+
+    Note:
+        If the signing key is rotated, call `get_signing_public_key.cache_clear()`
+        to clear the cached value and derive from the new private key.
 
     Returns:
         PEM-encoded RSA public key string
     """
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.serialization import load_pem_private_key
-
     private_key_pem = get_signing_private_key()
     private_key = load_pem_private_key(private_key_pem.encode(), password=None)
     public_key = private_key.public_key()
