@@ -1518,8 +1518,8 @@ class OperationQueue {
     return this.db.query(
       `SELECT * FROM pending_operations
        WHERE status = 'pending'
-       AND (retry_after IS NULL OR retry_after <= ?)
-       ORDER BY created_at`,
+       AND (retryAfter IS NULL OR retryAfter <= ?)
+       ORDER BY createdAt`,
       [now.toISOString()]
     );
   }
@@ -2144,10 +2144,10 @@ class OperationQueue {
     await this.db.run(`
       UPDATE pending_operations
       SET status = 'failed',
-          error_code = ?,
-          error_message = ?,
-          failed_at = datetime('now')
-      WHERE idempotency_key = ?
+          errorCode = ?,
+          errorMessage = ?,
+          failedAt = datetime('now')
+      WHERE idempotencyKey = ?
     `, [errorCode, errorMessage, idempotencyKey]);
 
     // Notify UI to show error badge
