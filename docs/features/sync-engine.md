@@ -1,15 +1,19 @@
-# Event-Driven Sync Engine Framework Plan
+# Sync Engine Implementation Plan
+
+> Status: Implementation plan. Once implemented, archive this and refer to [Sync Architecture](../architecture/sync.md) for the stable reference.
+>
+> Relationship to architecture/sync.md: That document defines the protocol and high-level patterns. This document details how to build it, with code examples, use cases, and phased rollout.
 
 ## Executive Summary
 
-Pikaia already has **strong foundations** for a sync engine:
-- ✅ Transactional outbox pattern with `OutboxEvent`
-- ✅ Webhook delivery system with retry/circuit breaker
-- ✅ Soft-delete pattern across models
-- ✅ Device linking infrastructure
-- ✅ Multi-tenant isolation
+Pikaia already has the foundations for a sync engine:
+- Transactional outbox pattern (`OutboxEvent`)
+- Webhook delivery with retry and circuit breaker
+- Soft-delete pattern across models
+- Device linking infrastructure
+- Multi-tenant isolation
 
-What's needed: **Sync endpoints, operation queue, cursor-based pull, and conflict resolution strategies tailored to each use case**.
+What's needed: sync endpoints, an operation queue, cursor-based pull, and conflict resolution strategies for each use case.
 
 ---
 
@@ -45,25 +49,25 @@ Based on research from [Sandro Maglione's sync engine lessons](https://www.sandr
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Key principle**: The local database is the Single Source of Truth for the client. The server is authoritative for conflict resolution and final state.
+The local database is the single source of truth for the client. The server is authoritative for conflict resolution and final state.
 
 ### Design Principles
 
 #### 1. Stale-Read Tolerant
 
-Clients may operate on stale state. This is fundamental to offline-first design:
+Clients often have old data. That's expected and fine.
 
-- Clients do **not** need to be fully up-to-date before pushing changes
-- Updates are applied as **field-level patches** (see PATCH semantics below)
-- Server resolves conflicts using configured strategy (LWW, merge, etc.)
-- Temporary inconsistency is acceptable; eventual consistency is guaranteed
+- Clients can push changes without being fully up-to-date first
+- Updates are field-level patches (only changed fields are sent)
+- Server resolves conflicts using the configured strategy (LWW, merge, etc.)
+- Things may be temporarily inconsistent, but they converge eventually
 
 #### 2. PATCH Semantics for Updates
 
-For `update` operations, `data` is a **partial payload**:
+For `update` operations, `data` contains only the changed fields:
 
 ```python
-# Client sends only changed fields
+# Client sends only what changed
 {
     "intent": "update",
     "entity_id": "ct_01HN8J...",
@@ -71,64 +75,64 @@ For `update` operations, `data` is a **partial payload**:
 }
 
 # Server behavior:
-# ✅ Update phone field
-# ✅ Preserve all other fields (name, email, company, etc.)
-# ❌ Do NOT null out omitted fields
+# - Updates the phone field
+# - Keeps all other fields (name, email, company) unchanged
+# - Does NOT null out omitted fields
 ```
 
-**Server implementation MUST**:
+Server implementation must:
 - Only update fields present in `data`
 - Preserve existing values for omitted fields
 - Track field-level timestamps if using field-level LWW
 
-#### 3. Empty Queue ≠ Up-to-Date
+#### 3. Empty Queue Does Not Mean Up-to-Date
 
-An empty local operation queue only means **"no local changes to push"**.
+An empty local operation queue means "no local changes to push." That's it.
 
-It does **not** imply:
+It does not mean:
 - Client has received all server changes
 - Client state matches server state
 - No pull is needed
 
 ```typescript
-// WRONG assumption
+// Wrong assumption
 if (operationQueue.isEmpty()) {
-  console.log("Client is in sync"); // ❌ False!
+  console.log("Client is in sync"); // False!
 }
 
-// CORRECT understanding
+// Correct understanding
 if (operationQueue.isEmpty()) {
-  console.log("No pending local changes"); // ✅
+  console.log("No pending local changes");
   // Still need to pull to get server changes
 }
 ```
 
 #### 4. Server-Side Mutations Must Enter Sync Stream
 
-**Any server-side mutation** that should be reflected on clients must update the entity's `updated_at` timestamp:
+Any server-side mutation that should be reflected on clients must update `updated_at`. Otherwise, clients will never see the change.
 
 | Mutation Source | Must Update `updated_at`? | Example |
 |-----------------|---------------------------|---------|
-| Client push | ✅ Yes (automatic via `save()`) | User edits contact |
-| Admin panel | ✅ Yes | Admin fixes data |
-| Background job | ✅ Yes | Scheduled cleanup |
-| Cron task | ✅ Yes | Nightly recalculation |
-| Database trigger | ✅ Yes | Denormalization |
-| Webhook handler | ✅ Yes | External integration |
+| Client push | Yes (automatic via `save()`) | User edits contact |
+| Admin panel | Yes | Admin fixes data |
+| Background job | Yes | Scheduled cleanup |
+| Cron task | Yes | Nightly recalculation |
+| Database trigger | Yes | Denormalization |
+| Webhook handler | Yes | External integration |
 
 ```python
-# WRONG: Direct update bypasses updated_at
-Contact.objects.filter(id=contact_id).update(status='archived')  # ❌
+# Wrong: Direct update bypasses updated_at
+Contact.objects.filter(id=contact_id).update(status='archived')
 
-# CORRECT: Use save() or explicit updated_at
+# Correct: Use save() or explicit updated_at
 contact = Contact.objects.get(id=contact_id)
 contact.status = 'archived'
-contact.save()  # ✅ updated_at set automatically
+contact.save()  # updated_at set automatically
 
 # Or with bulk update:
 Contact.objects.filter(id=contact_id).update(
     status='archived',
-    updated_at=timezone.now(),  # ✅ Explicit
+    updated_at=timezone.now(),  # Explicit
 )
 ```
 
@@ -138,21 +142,21 @@ With field-level patches and stale-read tolerance:
 
 | Scenario | Behavior | Acceptable? |
 |----------|----------|-------------|
-| Client A and B both update different fields | Both changes merge | ✅ Yes |
-| Client A updates field X, server job updates field X | LWW resolves | ✅ Yes |
-| Client pulls, server updates entity, client pushes stale patch | Client's field wins (LWW) | ⚠️ Intentional |
+| Client A and B both update different fields | Both changes merge | Yes |
+| Client A updates field X, server job updates field X | LWW resolves | Yes |
+| Client pulls, server updates entity, client pushes stale patch | Client's field wins (LWW) | Intentional |
 
-**This is acceptable when**:
+This is acceptable when:
 - Field-level LWW is the configured strategy
 - "Last writer wins" is intentional policy
 - Business logic doesn't require strict ordering
 
-**Requires additional business logic for**:
+Requires additional business logic for:
 - Inventory counts
 - Financial balances
 - Any domain with constraints that can be violated by concurrent offline writes
 
-Note: LWW sync **does not lose data** in these cases. All operations are recorded. The question is how to handle constraint violations after sync:
+LWW sync does not lose data in these cases. All operations are recorded. The question is how to handle constraint violations after sync:
 
 ```
 Example: Inventory over-commitment
@@ -162,17 +166,17 @@ Client A (offline): Sells 3 → records sale of 3
 Client B (offline): Sells 4 → records sale of 4
 Both sync: 7 units sold from 5 available
 
-Sync engine's job: ✅ Record both sales accurately
+Sync engine's job: Record both sales accurately
 Business logic's job: Decide what to do
-  → Backorder 2 units
-  → Cancel later order + notify customer
-  → Allow negative stock (common in B2B)
-  → Flag for manual review
+  - Backorder 2 units
+  - Cancel later order + notify customer
+  - Allow negative stock (common in B2B)
+  - Flag for manual review
 ```
 
-This is a **policy decision**, not a sync failure. The sync engine reliably captures intent; business rules handle reconciliation.
+This is a policy decision, not a sync failure. The sync engine captures intent; business rules handle reconciliation.
 
-**Use CRDTs for**:
+Use CRDTs for:
 - Collaborative text editing (character-level convergence)
 - Counters that must converge (G-Counter, PN-Counter)
 - Sets with add/remove semantics (OR-Set)
@@ -290,11 +294,11 @@ Since every push already writes to `SyncOperation`, we get per-operation metrics
 
 | Metric | Field | What it tells you |
 |--------|-------|-------------------|
-| **Drift** | `drift_ms` | How far off are client clocks? |
-| **Conflicts** | `conflict_fields` | Which fields conflict most? |
-| **Retries** | `client_retry_count` | Network reliability issues? |
+| Drift | `drift_ms` | How far off are client clocks? |
+| Conflicts | `conflict_fields` | Which fields conflict most? |
+| Retries | `client_retry_count` | Network reliability issues? |
 
-**Setting metrics in the handler:**
+Setting metrics in the handler:
 
 ```python
 def process_sync_operation(...) -> SyncResult:
@@ -319,7 +323,7 @@ def process_sync_operation(...) -> SyncResult:
     )
 ```
 
-**Dashboard queries:**
+Dashboard queries:
 
 ```sql
 -- Average drift by hour (are clocks drifting?)
@@ -364,7 +368,7 @@ HAVING AVG(client_retry_count) > 1
 ORDER BY avg_retries DESC;
 ```
 
-**What the metrics tell you:**
+What the metrics tell you:
 
 | Metric | Normal | Warning | Action |
 |--------|--------|---------|--------|
@@ -374,7 +378,7 @@ ORDER BY avg_retries DESC;
 
 ### 2.3 Field-Level Timestamps for LWW
 
-Field-level Last-Write-Wins requires tracking **when each field was last modified**, not just the entity as a whole.
+Field-level Last-Write-Wins requires tracking when each field was last modified, not just the entity as a whole.
 
 #### Storage Format
 
@@ -607,24 +611,24 @@ function createSyncOperation(contact: Contact, changedFields: string[]): SyncOpe
 
 ### 3.0 Soft-Delete Semantics in Sync
 
-**Critical**: The existing `SoftDeleteMixin` pattern requires careful handling in sync operations.
+The existing `SoftDeleteMixin` pattern requires careful handling in sync operations.
 
 #### The Problem
 
 ```python
 # Default manager excludes deleted records
-Contact.objects.filter(updated_at__gt=cursor)  # ❌ Misses deletions!
+Contact.objects.filter(updated_at__gt=cursor)  # Misses deletions!
 
 # all_objects includes everything
-Contact.all_objects.filter(updated_at__gt=cursor)  # ✅ Includes deletions
+Contact.all_objects.filter(updated_at__gt=cursor)  # Includes deletions
 ```
 
 #### The Solution
 
-1. **Pull queries MUST use `.all_objects`** to include soft-deleted records
-2. **Existing `soft_delete()` already updates `updated_at`** (see `core/models.py:158`), so deletions appear in cursor-based queries
-3. **Return `operation: 'delete'`** for records where `deleted_at IS NOT NULL`
-4. **Tombstone retention**: Keep deleted records for 90 days before hard-delete (allows late-syncing clients to receive deletions)
+1. Pull queries must use `.all_objects` to include soft-deleted records
+2. Existing `soft_delete()` already updates `updated_at` (see `core/models.py:158`), so deletions appear in cursor-based queries
+3. Return `operation: 'delete'` for records where `deleted_at IS NOT NULL`
+4. Tombstone retention: Keep deleted records for 90 days before hard-delete (allows late-syncing clients to receive deletions)
 
 #### Implementation
 
@@ -734,8 +738,7 @@ async processPullResponse(response: SyncPullResponse): Promise<void> {
 #### Index Optimization
 
 ```sql
--- Updated index: include deleted_at for efficient tombstone queries
--- Note: NO partial index (WHERE deleted_at IS NULL) - we need ALL records
+-- Index for pull queries - no partial index, we need all records including deleted
 CREATE INDEX idx_syncable_pull ON {entity_table}
     (workspace_id, updated_at, id);
 
@@ -747,7 +750,7 @@ CREATE INDEX idx_syncable_tombstones ON {entity_table}
 
 ### 3.0.1 Cursor Ordering and Clock Skew
 
-**Problem**: With multiple Django instances (ECS tasks), clock skew can cause missed records.
+With multiple Django instances (ECS tasks), clock skew can cause missed records.
 
 ```
 Timeline (wall clock):  ─────────────────────────────────────────►
@@ -761,27 +764,27 @@ Client pulls with cursor "10:00:00.150"
 → Client permanently misses entity Y
 ```
 
-#### Critical: Server Timestamps vs Client Timestamps
+#### Server Timestamps vs Client Timestamps
 
-The cursor **MUST** use server-controlled values, never client-supplied timestamps:
+The cursor must use server-controlled values, never client-supplied timestamps:
 
 | Field | Source | Used For |
 |-------|--------|----------|
-| `updated_at` | Server (`auto_now=True`) | **Cursor** - ordering pull results |
-| `sync_version` | Server (incremented on save) | **Cursor** (alternative) - guaranteed ordering |
-| `client_timestamp` | Client | **Conflict resolution only** - LWW comparison |
+| `updated_at` | Server (`auto_now=True`) | Cursor - ordering pull results |
+| `sync_version` | Server (incremented on save) | Cursor (alternative) - guaranteed ordering |
+| `client_timestamp` | Client | Conflict resolution only (not for cursor) |
 
 ```python
 # In push handler:
-operation.client_timestamp  # ← Used for LWW conflict resolution
-entity.updated_at           # ← Set by server, used for cursor/pull ordering
+operation.client_timestamp  # Used for LWW conflict resolution
+entity.updated_at           # Set by server, used for cursor/pull ordering
 
-# These are DIFFERENT timestamps with DIFFERENT purposes:
+# These are different timestamps with different purposes:
 # - client_timestamp: "when did the user make this change?" (for LWW)
 # - updated_at: "when did the server persist this?" (for cursor)
 ```
 
-**Why this matters**: If the cursor used `client_timestamp`:
+Why this matters: If the cursor used `client_timestamp`:
 - Clients with wrong clocks could corrupt ordering
 - Malicious clients could manipulate sync order
 - Clock drift would cause missed records
@@ -794,7 +797,7 @@ entity.updated_at           # ← Set by server, used for cursor/pull ordering
 | Tiebreaker | `id` (ULID) | Deterministic ordering for same-timestamp records |
 | Clock skew mitigation | Overlap window | Catches records from slightly-behind server clocks |
 | High-consistency option | `sync_sequence_id` | Optional, database sequence for guaranteed ordering |
-| **NOT used for cursor** | `client_timestamp` | Only for LWW conflict resolution |
+| NOT used for cursor | `client_timestamp` | Only for LWW conflict resolution |
 
 #### Solution: Overlap Window
 
@@ -858,7 +861,7 @@ async processPullResponse(response: SyncPullResponse): Promise<void> {
 
 #### Optional: Monotonic Sequence for High-Consistency
 
-For use cases requiring **guaranteed global ordering** (e.g., financial transactions), add a database sequence:
+For use cases requiring guaranteed global ordering (e.g., financial transactions), add a database sequence:
 
 ```python
 # apps/sync/models.py
@@ -934,10 +937,10 @@ class SyncEngine {
 
 | Scenario | Recommended Cursor | Notes |
 |----------|-------------------|-------|
-| **Most B2B apps** | `updated_at` + overlap | Simple, handles 99.9% of cases |
-| **High-write frequency** | `updated_at` + overlap + periodic full sync | Safety net for edge cases |
-| **Financial/audit-critical** | `sync_sequence_id` | Guaranteed ordering, slight perf cost |
-| **Collaborative editing** | CRDT (no cursor needed) | Convergence is automatic |
+| Most B2B apps | `updated_at` + overlap | Simple, handles 99.9% of cases |
+| High-write frequency | `updated_at` + overlap + periodic full sync | Safety net for edge cases |
+| Financial/audit-critical | `sync_sequence_id` | Guaranteed ordering, slight perf cost |
+| Collaborative editing | CRDT (no cursor needed) | Convergence is automatic |
 
 ### 3.1 Push Endpoint (Client → Server)
 
@@ -997,24 +1000,24 @@ def sync_push(request: AuthenticatedHttpRequest, payload: SyncPushRequest):
 
 #### Security: Delegate to Existing Business Logic
 
-**The sync engine is a transport layer, not an authorization layer.**
+The sync engine is a transport layer, not an authorization layer.
 
-Authorization, validation, and business rules already exist in your service layer. The sync engine should delegate to these existing services rather than reimplementing them.
+Authorization, validation, and business rules already exist in your service layer. The sync engine delegates to these existing services rather than reimplementing them.
 
 ```
-WRONG: Sync engine with parallel auth system
+Don't do this: Sync engine with parallel auth system
 ┌─────────────────────────────────────────────────────┐
 │ sync_push()                                         │
 │   └── process_sync_operation()                      │
-│         └── can_modify_entity()  ← DUPLICATE AUTH!  │
-│               └── entity.save()  ← BYPASSES LOGIC!  │
+│         └── can_modify_entity()  ← duplicate auth!  │
+│               └── entity.save()  ← bypasses logic!  │
 └─────────────────────────────────────────────────────┘
 
-RIGHT: Sync engine delegates to existing services
+Do this: Sync engine delegates to existing services
 ┌─────────────────────────────────────────────────────┐
 │ sync_push()                                         │
 │   └── process_sync_operation()                      │
-│         └── ContactService.update()  ← EXISTING!    │
+│         └── ContactService.update()  ← existing!    │
 │               ├── authorization     (already there) │
 │               ├── validation        (already there) │
 │               ├── business rules    (already there) │
@@ -1022,14 +1025,14 @@ RIGHT: Sync engine delegates to existing services
 └─────────────────────────────────────────────────────┘
 ```
 
-**Sync engine responsibilities:**
+Sync engine responsibilities:
 - Idempotency (don't process same operation twice)
 - Batching (handle multiple operations efficiently)
 - Conflict resolution (LWW, field merge)
 - Cursor management (track sync progress)
 - Error aggregation (collect results for batch response)
 
-**Delegated to existing services:**
+Delegated to existing services:
 - Authorization (who can do what)
 - Validation (is the data valid)
 - Business rules (domain logic)
@@ -1115,7 +1118,7 @@ def process_sync_operation(
         return SyncResult(status='rejected', error_code='NOT_FOUND')
 ```
 
-**Service layer example (already exists in your app):**
+Service layer example (already exists in your app):
 
 ```python
 # apps/contacts/services.py
@@ -1150,7 +1153,7 @@ class ContactService:
         ...
 ```
 
-**Key insight**: The sync engine adds offline/batching capabilities to your existing API. It doesn't replace your business logic—it routes through it.
+The sync engine adds offline/batching capabilities to your existing API. It doesn't replace your business logic—it routes through it.
 
 ### 3.2 Pull Endpoint (Server → Client)
 
@@ -1208,11 +1211,11 @@ Based on [offline-first best practices](https://medium.com/@jusuftopic/offline-f
 
 | Use Case | Entity | Strategy | Rationale |
 |----------|--------|----------|-----------|
-| **Snowball CRM** | Contact | LWW by field | Simple, contacts rarely edited concurrently |
-| **Snowball CRM** | Meeting Note | Append-only + merge | Notes can be appended from multiple sessions |
-| **Toggl-like** | Time Entry | LWW with validation | Atomic updates, server validates no overlaps |
-| **Toggl-like** | Project/Tag | LWW by field | Metadata rarely conflicts |
-| **Generic B2B** | Configurable | Per-entity policy | Let app developers choose |
+| CRM CRM | Contact | LWW by field | Simple, contacts rarely edited concurrently |
+| CRM CRM | Meeting Note | Append-only + merge | Notes can be appended from multiple sessions |
+| Toggl-like | Time Entry | LWW with validation | Atomic updates, server validates no overlaps |
+| Toggl-like | Project/Tag | LWW by field | Metadata rarely conflicts |
+| Generic B2B | Configurable | Per-entity policy | Let app developers choose |
 
 ### 4.1 Last-Write-Wins (Field-Level)
 
@@ -1277,7 +1280,7 @@ def resolve_with_version_check(
 
 ### 4.3 CRDT for Rich Text (Future Enhancement)
 
-For collaborative notes in Snowball, consider [Yjs](https://yjs.dev/) on the client with server-side merge:
+For collaborative notes in CRM, consider [Yjs](https://yjs.dev/) on the client with server-side merge:
 
 ```python
 # Simplified CRDT storage for notes
@@ -1329,7 +1332,7 @@ class OperationQueue {
   private db: SQLiteDatabase;
 
   async enqueue(op: Omit<PendingOperation, 'status' | 'attempts' | 'createdAt'>): Promise<void> {
-    // MUST persist before returning to caller
+    // Persist before returning to caller
     await this.db.insert('pending_operations', {
       ...op,
       status: 'pending',
@@ -1358,7 +1361,7 @@ class OperationQueue {
 
 #### Exponential Backoff with Jitter
 
-**Problem**: When the server goes down, all clients retry at the same time (thundering herd).
+When the server goes down, all clients retry at the same time (thundering herd). This makes recovery harder.
 
 ```
 Without backoff:                    With backoff + jitter:
@@ -1366,11 +1369,11 @@ Without backoff:                    With backoff + jitter:
 │ 10:00:01 - 1000 retry      │     │ 10:00:01 - 50 retry        │
 │ 10:00:02 - 1000 retry      │     │ 10:00:02 - 80 retry        │
 │ 10:00:03 - 1000 retry      │     │ 10:00:03 - 120 retry       │
-│ Server crushed repeatedly  │     │ Load spread over time ✅   │
+│ Server crushed repeatedly  │     │ Load spread over time      │
 └────────────────────────────┘     └────────────────────────────┘
 ```
 
-**Solution**: Wait longer after each failure, with random variation.
+Solution: wait longer after each failure, with random variation.
 
 ```typescript
 // client/sync/RetryStrategy.ts
@@ -1420,7 +1423,7 @@ function calculateRetryDelay(attempt: number, config: RetryConfig = DEFAULT_RETR
 // With jitter (±50%): random between 4000ms and 12000ms
 ```
 
-**Retry logic in OperationQueue:**
+Retry logic in OperationQueue:
 
 ```typescript
 // client/sync/OperationQueue.ts
@@ -1486,7 +1489,7 @@ class OperationQueue {
 }
 ```
 
-**Retry delays example:**
+Retry delays example:
 
 | Attempt | Base Delay | With Jitter (±50%) |
 |---------|------------|-------------------|
@@ -1524,8 +1527,8 @@ class SyncEngine {
       }
     });
 
-    // Periodic sync - IMPORTANT: Always pull even if queue is empty
-    // Empty queue only means "no local changes", NOT "up-to-date with server"
+    // Periodic sync - always pull even if queue is empty
+    // Empty queue only means "no local changes", not "up-to-date with server"
     setInterval(() => this.triggerSync(), this.pullInterval);
   }
 
@@ -1567,19 +1570,19 @@ class SyncEngine {
 
 ## 6. Use Case Implementations
 
-### 6.1 Snowball (Field CRM)
+### 6.1 Field CRM
 
-**Entities to sync:**
+Entities to sync:
 - `Contact` - name, company, email, phone, notes, tags
 - `Interaction` - contact_id, type, content, occurred_at, location
 - `Tag` - name, color
 
-**Sync characteristics:**
+Sync characteristics:
 - Low write frequency (5-20 interactions/day)
 - Offline capture is primary use case
 - Notes may be long-form text
 
-**Recommended approach:**
+Recommended approach:
 ```python
 # apps/snowball/models.py
 
@@ -1617,17 +1620,17 @@ class Interaction(SyncableModel):
 
 ### 6.2 Toggl-like (Time Tracking)
 
-**Entities to sync:**
+Entities to sync:
 - `TimeEntry` - project_id, description, start_time, end_time, tags, billable
 - `Project` - name, color, client_id, billable_rate
 - `Client` - name
 
-**Sync characteristics:**
+Sync characteristics:
 - High write frequency (running timer updates every minute)
 - Field-level accuracy critical (duration, billable status)
 - Overlapping entries must be validated
 
-**Recommended approach:**
+Recommended approach:
 ```python
 # apps/timetracker/models.py
 
@@ -1661,7 +1664,7 @@ class TimeEntry(SyncableModel):
 
 ### 6.3 Generic B2B Platform
 
-**Design for extensibility:**
+Design for extensibility:
 ```python
 # apps/sync/registry.py
 
@@ -1740,28 +1743,28 @@ SYNC_RATE_LIMITS = {
 
 ### 7.4 Server-Side Mutations and Sync Stream
 
-**Critical**: Any server-side mutation that should propagate to clients **must** update the entity's `updated_at` timestamp to enter the sync stream.
+Any server-side mutation that should propagate to clients must update the entity's `updated_at` timestamp to enter the sync stream.
 
 #### Safe Patterns
 
 ```python
-# ✅ CORRECT: Model.save() updates updated_at automatically
+# Model.save() updates updated_at automatically
 def archive_old_contacts():
     """Background job: archive contacts not updated in 1 year."""
     cutoff = timezone.now() - timedelta(days=365)
     for contact in Contact.objects.filter(updated_at__lt=cutoff):
         contact.status = 'archived'
-        contact.save()  # ✅ updated_at updated, enters sync stream
+        contact.save()  # updated_at updated, enters sync stream
 
-# ✅ CORRECT: Explicit updated_at in bulk update
+# Explicit updated_at in bulk update
 def bulk_reassign_contacts(old_owner_id: int, new_owner_id: int):
     """Admin action: reassign all contacts."""
     Contact.objects.filter(owner_id=old_owner_id).update(
         owner_id=new_owner_id,
-        updated_at=timezone.now(),  # ✅ Explicit
+        updated_at=timezone.now(),  # Explicit
     )
 
-# ✅ CORRECT: Custom manager method that ensures sync visibility
+# Custom manager method that ensures sync visibility
 class SyncableManager(SoftDeleteAllManager):
     def bulk_update_for_sync(self, queryset, **updates):
         """Bulk update that ensures changes enter sync stream."""
@@ -1772,18 +1775,18 @@ class SyncableManager(SoftDeleteAllManager):
 #### Dangerous Patterns (Will Not Sync)
 
 ```python
-# ❌ WRONG: Direct update bypasses updated_at
+# Direct update bypasses updated_at
 Contact.objects.filter(status='pending').update(status='active')
-# Clients will NEVER see this change!
+# Clients will never see this change!
 
-# ❌ WRONG: Raw SQL without updated_at
+# Raw SQL without updated_at
 with connection.cursor() as cursor:
     cursor.execute("UPDATE contacts SET status = 'active' WHERE ...")
-# Clients will NEVER see this change!
+# Clients will never see this change!
 
-# ❌ WRONG: F() expressions without updated_at
+# F() expressions without updated_at
 Contact.objects.filter(id=1).update(view_count=F('view_count') + 1)
-# Clients will NEVER see this change!
+# Clients will never see this change!
 ```
 
 #### Checklist for Server-Side Mutations
@@ -1839,7 +1842,7 @@ After:  Mobile → API Gateway → Lambda → PostgreSQL
 
 ```sql
 -- Composite index for pull queries
--- IMPORTANT: No partial index - we need ALL records including soft-deleted
+-- No partial index - we need all records including soft-deleted
 CREATE INDEX idx_syncable_pull ON {entity_table}
     (workspace_id, updated_at, id);
 
@@ -1867,7 +1870,7 @@ CREATE TABLE sync_operations (
 6. Integrate with existing event outbox
 
 ### Phase 2: Use Case Implementation
-1. Define Snowball models (Contact, Interaction)
+1. Define CRM models (Contact, Interaction)
 2. Define TimeTracker models (TimeEntry, Project)
 3. Implement use-case-specific validation rules
 4. Build TypeScript/React Native sync client SDK
