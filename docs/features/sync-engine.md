@@ -1221,20 +1221,24 @@ Based on [offline-first best practices](https://medium.com/@jusuftopic/offline-f
 
 ```python
 def resolve_lww_field_level(
-    server_entity: SyncableModel,
+    server_entity: FieldLevelLWWMixin,
     client_data: dict,
     client_timestamp: datetime,
 ) -> tuple[dict, dict]:
     """
     Merge client changes with server state at field level.
     Returns (merged_data, conflict_fields).
+
+    Uses get_field_timestamp() from FieldLevelLWWMixin to get proper
+    datetime objects for comparison.
     """
     merged = {}
     conflicts = {}
 
     for field, client_value in client_data.items():
         server_value = getattr(server_entity, field, None)
-        server_field_ts = server_entity.field_timestamps.get(field)
+        # Use the mixin's helper method to get datetime (not raw ISO string)
+        server_field_ts = server_entity.get_field_timestamp(field)
 
         if server_field_ts is None or client_timestamp > server_field_ts:
             merged[field] = client_value
