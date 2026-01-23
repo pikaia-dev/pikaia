@@ -8,6 +8,7 @@ from ninja.errors import HttpError
 
 from apps.accounts.api import router as auth_router
 from apps.billing.api import router as billing_router
+from apps.devices.api import router as devices_router
 from apps.media.api import router as media_router
 from apps.passkeys.api import router as passkeys_router
 from apps.sms.api import router as sms_router
@@ -38,6 +39,10 @@ api = NinjaAPI(
             {
                 "name": "passkeys",
                 "description": "WebAuthn passkey authentication",
+            },
+            {
+                "name": "devices",
+                "description": "Mobile device linking and management",
             },
             {
                 "name": "webhooks",
@@ -83,6 +88,7 @@ api.add_router("/auth/passkeys", passkeys_router)
 api.add_router("/auth/phone", sms_router)
 api.add_router("/webhooks", webhooks_router)
 api.add_router("/hooks", hooks_router)
+api.add_router("/devices", devices_router)
 
 
 @api.get("/health", tags=["health"], operation_id="healthCheck", summary="Health check")
