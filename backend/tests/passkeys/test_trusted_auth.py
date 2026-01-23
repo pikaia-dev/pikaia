@@ -128,6 +128,7 @@ class TestTrustedAuthToken:
         settings.STYTCH_TRUSTED_AUTH_ISSUER = "test.example.com"
         settings.STYTCH_TRUSTED_AUTH_AUDIENCE = "project-test-123"
         settings.PASSKEY_JWT_PRIVATE_KEY = TEST_PRIVATE_KEY
+        settings.JWT_SIGNING_KEY_ID = "test-key-id"
 
         token = create_trusted_auth_token(
             email="test@example.com",
@@ -139,4 +140,4 @@ class TestTrustedAuthToken:
         # Decode header to check algorithm
         header = jwt.get_unverified_header(token)
         assert header["alg"] == "RS256"
-        assert header["kid"] == "passkey-auth-key-1"
+        assert header["kid"] == "test-key-id"
