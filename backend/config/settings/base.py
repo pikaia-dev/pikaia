@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     MOBILE_PROVISION_API_KEY: str = ""  # API key for mobile app user provisioning
 
     # Device linking
-    DEVICE_SESSION_EXPIRY_MINUTES: int = 480  # 8 hours default
+    DEVICE_SESSION_EXPIRY_MINUTES: int = 525600  # 1 year default
 
     # AWS SMS (End User Messaging)
     AWS_SMS_REGION: str = "us-east-1"  # AWS region for SMS service
