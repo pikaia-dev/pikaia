@@ -92,8 +92,11 @@ def complete_link(
     return CompleteLinkResponse(
         session_token=result.session_token,
         session_jwt=result.session_jwt,
+        session_expires_at=result.session_expires_at,
         device_id=result.device.id,
         user_id=result.device.user_id,
+        member_id=result.member_id,
+        organization_id=result.organization_id,
     )
 
 

@@ -169,7 +169,7 @@ class TestRelinkingEdgeCases:
     ) -> None:
         """Re-linking an active device to same user should update fields."""
         _configure_test_settings(settings)
-        mock_session.return_value = ("session_token", "session_jwt")
+        mock_session.return_value = ("session_token", "session_jwt", timezone.now())
         member = MemberFactory.create()
 
         # Create existing active device
@@ -214,7 +214,7 @@ class TestRelinkingEdgeCases:
     def test_revoked_device_relinked_gets_new_user(self, mock_session: MagicMock, settings) -> None:
         """Revoked device can be reassigned to different user."""
         _configure_test_settings(settings)
-        mock_session.return_value = ("session_token", "session_jwt")
+        mock_session.return_value = ("session_token", "session_jwt", timezone.now())
 
         user1 = UserFactory.create()
         member2 = MemberFactory.create()
