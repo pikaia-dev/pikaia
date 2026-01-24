@@ -31,7 +31,7 @@ class TestProcessSyncOperation:
         operation = SyncOperationIn(
             idempotency_key="create_001",
             entity_type="test_contact",
-            entity_id="tc_01HN8J1234567890ABCDEF01",
+            entity_id="018d8732-9a33-7d2a-8000-089903333333",
             intent="create",
             client_timestamp=timezone.now(),
             data={"name": "New Contact", "email": "new@example.com"},
@@ -48,7 +48,7 @@ class TestProcessSyncOperation:
         assert result.server_version == 1
 
         # Verify entity was created
-        contact = SyncTestContact.objects.get(id="tc_01HN8J1234567890ABCDEF01")
+        contact = SyncTestContact.objects.get(id="018d8732-9a33-7d2a-8000-089903333333")
         assert contact.name == "New Contact"
         assert contact.email == "new@example.com"
 
@@ -67,7 +67,7 @@ class TestProcessSyncOperation:
         operation = SyncOperationIn(
             idempotency_key="update_001",
             entity_type="test_contact",
-            entity_id=contact.id,
+            entity_id=str(contact.id),
             intent="update",
             client_timestamp=timezone.now(),
             data={"name": "Updated"},
@@ -96,7 +96,7 @@ class TestProcessSyncOperation:
         operation = SyncOperationIn(
             idempotency_key="delete_001",
             entity_type="test_contact",
-            entity_id=contact.id,
+            entity_id=str(contact.id),
             intent="delete",
             client_timestamp=timezone.now(),
             data={},
@@ -129,7 +129,7 @@ class TestProcessSyncOperation:
         operation = SyncOperationIn(
             idempotency_key="same_key",
             entity_type="test_contact",
-            entity_id="tc_01HN8J1234567890ABCDEF01",
+            entity_id="018d8732-9a33-7d2a-8000-089903333333",
             intent="create",
             client_timestamp=timezone.now(),
             data={"name": "First"},
@@ -185,7 +185,7 @@ class TestProcessSyncOperation:
         operation = SyncOperationIn(
             idempotency_key="update_missing",
             entity_type="test_contact",
-            entity_id="tc_nonexistent",
+            entity_id="018d8732-9a33-0000-0000-000000000001",
             intent="update",
             client_timestamp=timezone.now(),
             data={"name": "Updated"},
@@ -209,7 +209,7 @@ class TestProcessSyncOperation:
         operation = SyncOperationIn(
             idempotency_key="audit_001",
             entity_type="test_contact",
-            entity_id="tc_01HN8J1234567890ABCDEF01",
+            entity_id="018d8732-9a33-7d2a-8000-089903333333",
             intent="create",
             client_timestamp=timezone.now(),
             data={"name": "Audited"},
@@ -239,7 +239,7 @@ class TestProcessSyncOperation:
         operation = SyncOperationIn(
             idempotency_key="drift_001",
             entity_type="test_contact",
-            entity_id="tc_01HN8J1234567890ABCDEF01",
+            entity_id="018d8732-9a33-7d2a-8000-089903333333",
             intent="create",
             client_timestamp=client_ts,
             data={"name": "Test"},
@@ -265,7 +265,7 @@ class TestProcessSyncOperation:
         contact = test_contact_factory(
             organization=org,
             name="Deleted",
-            entity_id="tc_01HN8J1234567890RESTORE",
+            entity_id="018d8732-9a33-7d2a-8000-000000000002",
         )
         contact.soft_delete()
         assert contact.is_deleted
@@ -274,7 +274,7 @@ class TestProcessSyncOperation:
         operation = SyncOperationIn(
             idempotency_key="restore_001",
             entity_type="test_contact",
-            entity_id="tc_01HN8J1234567890RESTORE",
+            entity_id="018d8732-9a33-7d2a-8000-000000000002",
             intent="create",
             client_timestamp=timezone.now(),
             data={"name": "Restored"},
@@ -301,7 +301,7 @@ class TestProcessSyncOperation:
         operation = SyncOperationIn(
             idempotency_key="retry_001",
             entity_type="test_contact",
-            entity_id="tc_01HN8J1234567890ABCDEF01",
+            entity_id="018d8732-9a33-7d2a-8000-089903333333",
             intent="create",
             client_timestamp=timezone.now(),
             retry_count=3,
@@ -411,8 +411,8 @@ class TestFetchChangesForPull:
         assert len(changes) == 2
 
         operations = {c.entity_id: c.operation for c in changes}
-        assert operations[c1.id] == "upsert"
-        assert operations[c2.id] == "delete"
+        assert operations[str(c1.id)] == "upsert"
+        assert operations[str(c2.id)] == "delete"
 
     def test_delete_operation_has_no_data(self, sync_registry, test_contact_factory):
         """Deleted records should have null data."""
@@ -497,7 +497,7 @@ class TestFetchChangesForPull:
 
         # c2, c3 (original order), then c1 (updated last)
         ids = [c.entity_id for c in changes]
-        assert ids.index(c2.id) < ids.index(c3.id) < ids.index(c1.id)
+        assert ids.index(str(c2.id)) < ids.index(str(c3.id)) < ids.index(str(c1.id))
 
     def test_upsert_includes_full_data(self, sync_registry, test_contact_factory):
         """Upsert operations should include full entity data."""
@@ -522,7 +522,7 @@ class TestFetchChangesForPull:
         assert data["name"] == "Full Data"
         assert data["email"] == "full@example.com"
         assert data["phone"] == "555-1234"
-        assert data["id"] == contact.id
+        assert data["id"] == str(contact.id)
         assert data["sync_version"] == contact.sync_version
 
 

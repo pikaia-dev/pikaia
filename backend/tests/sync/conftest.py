@@ -7,7 +7,7 @@ Provides test model and registry setup.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import pytest
 from django.db import models
@@ -25,9 +25,8 @@ class SyncTestContact(FieldLevelLWWMixin, SyncableModel):
     Test-only syncable model for sync engine tests.
 
     This model is created dynamically in the test database.
+    Uses UUID primary keys like all SyncableModel subclasses.
     """
-
-    PREFIX: ClassVar[str] = "tc_"
 
     name = models.CharField(max_length=255)
     email = models.EmailField(blank=True, default="")
@@ -43,7 +42,7 @@ class SyncTestContact(FieldLevelLWWMixin, SyncableModel):
 def serialize_test_contact(contact: SyncTestContact) -> dict:
     """Serializer for test contact."""
     return {
-        "id": contact.id,
+        "id": str(contact.id),  # Convert UUID to string for JSON serialization
         "name": contact.name,
         "email": contact.email,
         "phone": contact.phone,
@@ -81,6 +80,7 @@ def sync_registry():
 @pytest.fixture
 def test_contact_factory(db):
     """Factory function for creating test contacts."""
+    from uuid import UUID
 
     def create(
         organization: Organization,
@@ -89,7 +89,7 @@ def test_contact_factory(db):
         email: str = "",
         phone: str = "",
         notes: str = "",
-        entity_id: str | None = None,
+        entity_id: UUID | None = None,
         field_timestamps: dict | None = None,
         deleted_at: datetime | None = None,
     ) -> SyncTestContact:

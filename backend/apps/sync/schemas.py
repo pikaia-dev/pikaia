@@ -16,7 +16,7 @@ class SyncOperationIn(Schema):
 
     idempotency_key: str = Field(..., min_length=1, max_length=64)
     entity_type: str = Field(..., min_length=1, max_length=64)
-    entity_id: str = Field(..., min_length=1, max_length=32)
+    entity_id: str = Field(..., min_length=1, max_length=36)
     intent: Literal["create", "update", "delete"]
     client_timestamp: datetime
     base_version: int | None = None  # For optimistic concurrency
