@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, ClassVar
 
 import pytest
-from django.db import connection, models
+from django.db import models
 
 from apps.sync.models import FieldLevelLWWMixin, SyncableModel
 from apps.sync.registry import SyncRegistry
@@ -53,15 +53,6 @@ def serialize_test_contact(contact: SyncTestContact) -> dict:
         "updated_at": contact.updated_at.isoformat(),
         "field_timestamps": contact.field_timestamps,
     }
-
-
-@pytest.fixture(scope="session")
-def django_db_setup(django_db_setup, django_db_blocker):
-    """Create test model table in the database."""
-    with django_db_blocker.unblock(), connection.schema_editor() as schema_editor:
-        # Check if table already exists
-        if SyncTestContact._meta.db_table not in connection.introspection.table_names():
-            schema_editor.create_model(SyncTestContact)
 
 
 @pytest.fixture

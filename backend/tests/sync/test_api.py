@@ -9,6 +9,7 @@ from django.test import RequestFactory
 from django.utils import timezone
 
 from apps.core.auth import AuthContext
+from apps.core.types import AuthenticatedHttpRequest
 from apps.sync.api import sync_pull, sync_push
 from apps.sync.models import SyncOperation
 from apps.sync.schemas import SyncOperationIn, SyncPullParams, SyncPushRequest
@@ -28,9 +29,9 @@ class TestSyncPushEndpoint:
         user = UserFactory.create()
         member = MemberFactory.create(user=user, organization=org)
 
-        request = request_factory.post("/api/v1/sync/push")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/sync/push"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         payload = SyncPushRequest(
@@ -62,9 +63,9 @@ class TestSyncPushEndpoint:
         user = UserFactory.create()
         member = MemberFactory.create(user=user, organization=org)
 
-        request = request_factory.post("/api/v1/sync/push")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/sync/push"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         payload = SyncPushRequest(
@@ -107,9 +108,9 @@ class TestSyncPushEndpoint:
             organization=org, name="Original", email="original@example.com"
         )
 
-        request = request_factory.post("/api/v1/sync/push")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/sync/push"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         payload = SyncPushRequest(
@@ -145,9 +146,9 @@ class TestSyncPushEndpoint:
 
         contact = test_contact_factory(organization=org, name="To Delete")
 
-        request = request_factory.post("/api/v1/sync/push")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/sync/push"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         payload = SyncPushRequest(
@@ -179,9 +180,9 @@ class TestSyncPushEndpoint:
         user = UserFactory.create()
         member = MemberFactory.create(user=user, organization=org)
 
-        request = request_factory.post("/api/v1/sync/push")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/sync/push"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         operation = SyncOperationIn(
@@ -212,9 +213,9 @@ class TestSyncPushEndpoint:
         user = UserFactory.create()
         member = MemberFactory.create(user=user, organization=org)
 
-        request = request_factory.post("/api/v1/sync/push")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/sync/push"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         payload = SyncPushRequest(
@@ -246,9 +247,9 @@ class TestSyncPushEndpoint:
         user = UserFactory.create()
         member = MemberFactory.create(user=user, organization=org)
 
-        request = request_factory.post("/api/v1/sync/push")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/sync/push"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         operations = [
@@ -279,9 +280,9 @@ class TestSyncPushEndpoint:
         user = UserFactory.create()
         member = MemberFactory.create(user=user, organization=org)
 
-        request = request_factory.post("/api/v1/sync/push")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/sync/push"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         payload = SyncPushRequest(
@@ -313,9 +314,9 @@ class TestSyncPushEndpoint:
         user = UserFactory.create()
         member = MemberFactory.create(user=user, organization=org)
 
-        request = request_factory.post("/api/v1/sync/push")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/sync/push"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         payload = SyncPushRequest(
@@ -365,9 +366,9 @@ class TestSyncPullEndpoint:
         test_contact_factory(organization=org, name="Contact 1")
         test_contact_factory(organization=org, name="Contact 2")
 
-        request = request_factory.get("/api/v1/sync/pull")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.get("/api/v1/sync/pull"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         params = SyncPullParams()
@@ -388,9 +389,9 @@ class TestSyncPullEndpoint:
         for i in range(5):
             test_contact_factory(organization=org, name=f"Contact {i}")
 
-        request = request_factory.get("/api/v1/sync/pull")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.get("/api/v1/sync/pull"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         # First page
@@ -419,9 +420,9 @@ class TestSyncPullEndpoint:
         contact = test_contact_factory(organization=org, name="Deleted")
         contact.soft_delete()
 
-        request = request_factory.get("/api/v1/sync/pull")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.get("/api/v1/sync/pull"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         params = SyncPullParams()
@@ -441,9 +442,9 @@ class TestSyncPullEndpoint:
 
         test_contact_factory(organization=org, name="Contact")
 
-        request = request_factory.get("/api/v1/sync/pull")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.get("/api/v1/sync/pull"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         # Filter for existing type
@@ -468,15 +469,16 @@ class TestSyncPullEndpoint:
         test_contact_factory(organization=org1, name="Org1")
         test_contact_factory(organization=org2, name="Org2")
 
-        request = request_factory.get("/api/v1/sync/pull")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org1)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.get("/api/v1/sync/pull"),
+            AuthContext(user=user, member=member, organization=org1),
         )
 
         params = SyncPullParams()
         response = sync_pull(request, params)
 
         assert len(response.changes) == 1
+        assert response.changes[0].data is not None
         assert response.changes[0].data["name"] == "Org1"
 
     def test_pull_invalid_cursor_returns_400(self, request_factory: RequestFactory, sync_registry):
@@ -487,9 +489,9 @@ class TestSyncPullEndpoint:
         user = UserFactory.create()
         member = MemberFactory.create(user=user, organization=org)
 
-        request = request_factory.get("/api/v1/sync/pull")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.get("/api/v1/sync/pull"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         params = SyncPullParams(since="invalid-cursor")
@@ -512,9 +514,9 @@ class TestSyncPullEndpoint:
         for i in range(15):
             test_contact_factory(organization=org, name=f"Contact {i}")
 
-        request = request_factory.get("/api/v1/sync/pull")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.get("/api/v1/sync/pull"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         # Request more than max
@@ -534,9 +536,9 @@ class TestSyncPullEndpoint:
 
         contact = test_contact_factory(organization=org, name="Test")
 
-        request = request_factory.get("/api/v1/sync/pull")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.get("/api/v1/sync/pull"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         params = SyncPullParams()
@@ -555,9 +557,9 @@ class TestSyncPullEndpoint:
 
         contact = test_contact_factory(organization=org, name="Test")
 
-        request = request_factory.get("/api/v1/sync/pull")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.get("/api/v1/sync/pull"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         params = SyncPullParams()
@@ -578,9 +580,9 @@ class TestSyncPullEndpoint:
         _contact = test_contact_factory(organization=org, name="Test")
 
         # Get initial cursor
-        request = request_factory.get("/api/v1/sync/pull")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.get("/api/v1/sync/pull"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         params1 = SyncPullParams()
@@ -607,9 +609,9 @@ class TestSyncRoundTrip:
         user = UserFactory.create()
         member = MemberFactory.create(user=user, organization=org)
 
-        request = request_factory.post("/api/v1/sync/push")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/sync/push"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         # Push create
@@ -650,9 +652,9 @@ class TestSyncRoundTrip:
 
         contact = test_contact_factory(organization=org, name="Original")
 
-        request = request_factory.post("/api/v1/sync/push")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/sync/push"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         # Push update
@@ -680,6 +682,7 @@ class TestSyncRoundTrip:
         pull_response = sync_pull(request, pull_params)
 
         assert len(pull_response.changes) == 1
+        assert pull_response.changes[0].data is not None
         assert pull_response.changes[0].data["name"] == "Updated Name"
 
     def test_delete_then_pull(
@@ -692,9 +695,9 @@ class TestSyncRoundTrip:
 
         contact = test_contact_factory(organization=org, name="To Delete")
 
-        request = request_factory.post("/api/v1/sync/push")
-        request = make_request_with_auth(
-            request, AuthContext(user=user, member=member, organization=org)
+        request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/sync/push"),
+            AuthContext(user=user, member=member, organization=org),
         )
 
         # Push delete

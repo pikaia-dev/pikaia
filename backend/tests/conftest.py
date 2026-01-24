@@ -26,12 +26,35 @@ from collections.abc import Callable
 from typing import Any, cast
 
 import pytest
+from django.db import connection
 from django.http import HttpRequest
 from django.test import Client, RequestFactory
 from django.test.client import WSGIRequest  # type: ignore[attr-defined]
 
 from apps.core.auth import AuthContext
 from apps.core.types import AuthenticatedHttpRequest
+
+
+@pytest.fixture(scope="session")
+def django_db_setup(django_db_setup, django_db_blocker):
+    """
+    Create and teardown test model tables in the database.
+
+    This extends pytest-django's django_db_setup to create tables for
+    test-only models like SyncTestContact that aren't managed by migrations.
+    """
+    from tests.sync.conftest import SyncTestContact
+
+    with django_db_blocker.unblock(), connection.schema_editor() as schema_editor:
+        if SyncTestContact._meta.db_table not in connection.introspection.table_names():
+            schema_editor.create_model(SyncTestContact)
+
+    yield
+
+    # Cleanup: drop the table at session end
+    with django_db_blocker.unblock(), connection.schema_editor() as schema_editor:
+        if SyncTestContact._meta.db_table in connection.introspection.table_names():
+            schema_editor.delete_model(SyncTestContact)
 
 
 class MockRequest(HttpRequest):

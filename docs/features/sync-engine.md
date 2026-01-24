@@ -403,7 +403,7 @@ class FieldLevelLWWMixin(models.Model):
         help_text="Per-field modification timestamps for LWW resolution",
     )
 
-    def update_field_timestamp(self, field: str, timestamp: datetime) -> None:
+    def set_field_timestamp(self, field: str, timestamp: datetime) -> None:
         """Update the timestamp for a single field."""
         self.field_timestamps[field] = timestamp.isoformat()
 
@@ -458,7 +458,7 @@ def apply_field_level_lww(
         # 2. Client timestamp is newer than server timestamp
         if server_ts is None or client_timestamp > server_ts:
             setattr(entity, field, client_value)
-            entity.update_field_timestamp(field, client_timestamp)
+            entity.set_field_timestamp(field, client_timestamp)
             applied[field] = client_value
         else:
             # Server wins - field was modified more recently

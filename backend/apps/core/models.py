@@ -4,13 +4,10 @@ Core models - shared base classes and utilities.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Self
 
 from django.db import models
 from django.utils import timezone
-
-if TYPE_CHECKING:
-    from django.db.models import QuerySet
 
 
 class ProcessedWebhook(models.Model):
@@ -73,11 +70,11 @@ class SoftDeleteQuerySet(models.QuerySet):
         """Permanently delete records. Use for GDPR 'right to be forgotten'."""
         return super().delete()
 
-    def alive(self) -> QuerySet:
+    def alive(self) -> Self:
         """Filter to only non-deleted records."""
         return self.filter(deleted_at__isnull=True)
 
-    def dead(self) -> QuerySet:
+    def dead(self) -> Self:
         """Filter to only soft-deleted records."""
         return self.filter(deleted_at__isnull=False)
 
