@@ -10,15 +10,14 @@ from django.core.management import call_command
 from django.utils import timezone
 
 from tests.accounts.factories import OrganizationFactory
+from tests.sync.conftest import SyncTestContact
 
 
 @pytest.mark.django_db
 class TestCleanupTombstones:
     """Tests for cleanup_tombstones command."""
 
-    def test_dry_run_shows_count_without_deleting(
-        self, sync_registry, test_contact_factory
-    ):
+    def test_dry_run_shows_count_without_deleting(self, sync_registry, test_contact_factory):
         """Dry run should show what would be deleted without deleting."""
         org = OrganizationFactory.create()
 
@@ -44,8 +43,6 @@ class TestCleanupTombstones:
 
     def test_deletes_old_tombstones(self, sync_registry, test_contact_factory):
         """Should hard-delete tombstones past retention period."""
-        from tests.sync.conftest import SyncTestContact
-
         org = OrganizationFactory.create()
 
         # Create old tombstone
@@ -69,8 +66,6 @@ class TestCleanupTombstones:
 
     def test_preserves_recent_tombstones(self, sync_registry, test_contact_factory):
         """Should not delete tombstones within retention period."""
-        from tests.sync.conftest import SyncTestContact
-
         org = OrganizationFactory.create()
 
         # Create recent tombstone
@@ -128,9 +123,7 @@ class TestCleanupTombstones:
 class TestBackfillFieldTimestamps:
     """Tests for backfill_field_timestamps command."""
 
-    def test_dry_run_shows_count_without_updating(
-        self, sync_registry, test_contact_factory
-    ):
+    def test_dry_run_shows_count_without_updating(self, sync_registry, test_contact_factory):
         """Dry run should show what would be updated without updating."""
         org = OrganizationFactory.create()
 
@@ -220,10 +213,3 @@ class TestBackfillFieldTimestamps:
         )
 
         assert "Unknown entity type" in err.getvalue()
-
-    def test_non_lww_entity_type_error(self, sync_registry):
-        """Should error for entity type that doesn't use LWW."""
-        # This test is tricky because we can't easily create a non-LWW model
-        # that's registered in the test registry. The code path is covered
-        # by the error message check in manual testing.
-        pass

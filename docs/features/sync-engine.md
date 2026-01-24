@@ -425,7 +425,7 @@ class FieldLevelLWWMixin(models.Model):
         """
         for field, value in updates.items():
             setattr(self, field, value)
-            self.update_field_timestamp(field, timestamp)
+            self.set_field_timestamp(field, timestamp)
 ```
 
 #### Write Path: Updating Field Timestamps

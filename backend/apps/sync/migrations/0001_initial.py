@@ -54,7 +54,7 @@ class Migration(migrations.Migration):
                 (
                     "drift_ms",
                     models.IntegerField(
-                        blank=True, help_text="client_timestamp - server_timestamp in ms", null=True
+                        blank=True, help_text="server_timestamp - client_timestamp in ms", null=True
                     ),
                 ),
                 (

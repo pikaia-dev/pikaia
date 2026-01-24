@@ -304,6 +304,7 @@ class SyncableModel(SoftDeleteMixin, TimestampedModel):
     Uses ULIDs for time-sortable, collision-free IDs that work offline.
 
     Subclasses must define PREFIX class attribute for ID generation.
+    For field-level LWW, also inherit from FieldLevelLWWMixin.
     """
     PREFIX: ClassVar[str] = ""  # Subclasses must override, e.g., "ct_" for contacts
 
@@ -319,10 +320,6 @@ class SyncableModel(SoftDeleteMixin, TimestampedModel):
     sync_version = models.PositiveBigIntegerField(default=0)  # Incremented on each save
     last_modified_by = models.ForeignKey('accounts.Member', null=True, on_delete=models.SET_NULL)
     device_id = models.CharField(max_length=64, null=True)  # Origin device
-
-    # Optional: per-field timestamps for field-level LWW
-    # Example: {"name": "2025-01-23T10:00:00Z", "phone": "2025-01-23T09:30:00Z"}
-    field_timestamps = models.JSONField(default=dict, blank=True)
 
     class Meta:
         abstract = True
@@ -340,6 +337,27 @@ class SyncableModel(SoftDeleteMixin, TimestampedModel):
         """Generate prefixed ULID, e.g., 'ct_01HN8J9K2M3N4P5Q6R7S8T9U'."""
         from ulid import ULID
         return f"{self.PREFIX}{ULID()}"
+
+
+class FieldLevelLWWMixin(models.Model):
+    """
+    Optional mixin for entities using field-level LWW conflict resolution.
+    Tracks per-field modification timestamps to enable granular merge.
+    """
+    class Meta:
+        abstract = True
+
+    # Per-field timestamps: {"name": "2025-01-23T10:00:00Z", "phone": "2025-01-23T09:30:00Z"}
+    field_timestamps = models.JSONField(default=dict, blank=True)
+
+    def get_field_timestamp(self, field: str) -> datetime | None:
+        """Get the timestamp for a field, or None if never set."""
+        ts = self.field_timestamps.get(field)
+        return datetime.fromisoformat(ts) if ts else None
+
+    def set_field_timestamp(self, field: str, timestamp: datetime) -> None:
+        """Update the timestamp for a single field."""
+        self.field_timestamps[field] = timestamp.isoformat()
 ```
 
 ### Client-Side (Conceptual)
