@@ -10,17 +10,12 @@ import {
 } from '@/components/ui/dialog'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { useWebhookDeliveries } from '@/features/webhooks/api/queries'
+import { formatDateTime } from '@/lib/format'
 
 interface WebhookDeliveriesDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   endpoint: WebhookEndpoint | null
-}
-
-function formatDate(dateString: string | null): string {
-  if (!dateString) return '—'
-  const date = new Date(dateString)
-  return date.toLocaleString()
 }
 
 function getStatusIcon(status: WebhookDelivery['status']) {
@@ -138,7 +133,7 @@ export function WebhookDeliveriesDialog({
                         {delivery.duration_ms ? `${String(delivery.duration_ms)}ms` : '—'}
                       </td>
                       <td className="p-3 text-muted-foreground">
-                        {formatDate(delivery.attempted_at)}
+                        {formatDateTime(delivery.attempted_at)}
                       </td>
                     </tr>
                   ))}
