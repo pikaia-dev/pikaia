@@ -10,7 +10,7 @@ This document defines the offline-first sync engine for mobile and desktop appli
 - [Sync Protocol](#sync-protocol)
 - [Conflict Resolution Strategies](#conflict-resolution-strategies)
 - [Client-Side Architecture](#client-side-architecture)
-- [Use Case Implementations](#use-case-implementations)
+- [Example Use Cases](#example-use-cases)
 - [Integration with Existing Infrastructure](#integration-with-existing-infrastructure)
 - [Scalability Considerations](#scalability-considerations)
 - [Full Re-Sync Triggers](#full-re-sync-triggers)
@@ -254,411 +254,66 @@ Use CRDTs for:
 
 ## Core Data Models
 
+> **Implementation**: See [`apps/sync/models.py`](../../backend/apps/sync/models.py)
+
 ### Syncable Entity Base
 
-```python
-# apps/sync/models.py
+Entities that participate in sync inherit from `SyncableModel`:
 
-from apps.core.models import (
-    SoftDeleteManager,
-    SoftDeleteAllManager,
-    SoftDeleteMixin,
-    TimestampedModel,
-)
+| Field | Purpose |
+|-------|---------|
+| `id` | ULID with entity-type prefix (e.g., `ct_01HN8J...`) |
+| `organization` | Tenant isolation |
+| `sync_version` | Lamport clock, increments on every save |
+| `last_modified_by` | Actor tracking |
+| `device_id` | Origin device for debugging |
 
-class SyncableModel(SoftDeleteMixin, TimestampedModel):
-    """
-    Base for all sync-enabled entities.
-
-    Inherits soft-delete behavior from SoftDeleteMixin.
-    IMPORTANT: SoftDeleteMixin MUST come before TimestampedModel in MRO
-    so that soft_delete() properly updates updated_at timestamp.
-
-    Manager usage:
-    - .objects: Excludes deleted records (for normal app queries)
-    - .all_objects: Includes deleted records (REQUIRED for sync pull)
-    """
-
-    # Managers - follow existing Pikaia pattern
-    objects = SoftDeleteManager()
-    all_objects = SoftDeleteAllManager()
-
-    class Meta:
-        abstract = True
-        indexes = [
-            # Critical for cursor-based pull queries (includes deleted)
-            models.Index(fields=['organization', 'updated_at', 'id']),
-        ]
-
-    # Use ULIDs for time-sortable, collision-free IDs
-    id = models.CharField(max_length=32, primary_key=True, editable=False)
-    organization = models.ForeignKey('organizations.Organization', on_delete=models.CASCADE)
-
-    # Sync metadata
-    sync_version = models.PositiveBigIntegerField(default=0)  # Lamport clock
-    last_modified_by = models.ForeignKey('accounts.Member', null=True, on_delete=models.SET_NULL)
-    device_id = models.CharField(max_length=64, null=True)  # Origin device
-
-    def save(self, *args, **kwargs):
-        if not self.id:
-            self.id = self._generate_prefixed_ulid()
-        self.sync_version += 1
-        super().save(*args, **kwargs)
-```
+Key behaviors:
+- Inherits `SoftDeleteMixin` for tombstone support
+- Uses `.all_objects` manager to include deleted records in sync queries
+- Indexed on `(organization, updated_at, id)` for efficient cursor-based pulls
 
 ### Sync Operation Log (Inbound)
 
-```python
-class SyncOperation(models.Model):
-    """Append-only log of all sync operations for audit and replay."""
+The `SyncOperation` model is an append-only log of all sync operations for audit and replay.
 
-    class Intent(models.TextChoices):
-        CREATE = 'create'
-        UPDATE = 'update'
-        DELETE = 'delete'
-
-    class Status(models.TextChoices):
-        PENDING = 'pending'    # Claimed but not yet processed
-        APPLIED = 'applied'
-        REJECTED = 'rejected'
-        CONFLICT = 'conflict'
-        DUPLICATE = 'duplicate'
-
-    # Idempotency
-    idempotency_key = models.CharField(max_length=64, unique=True, db_index=True)
-
-    # Context
-    organization = models.ForeignKey('organizations.Organization', on_delete=models.CASCADE)
-    actor = models.ForeignKey('accounts.Member', on_delete=models.SET_NULL, null=True)
-    device_id = models.CharField(max_length=64)
-
-    # Operation details
-    entity_type = models.CharField(max_length=64)
-    entity_id = models.CharField(max_length=32)
-    intent = models.CharField(max_length=16, choices=Intent.choices)
-
-    # Payload & timestamps
-    payload = models.JSONField()
-    client_timestamp = models.DateTimeField()
-    server_timestamp = models.DateTimeField(auto_now_add=True)
-
-    # Resolution
-    status = models.CharField(max_length=16, choices=Status.choices)
-    resolution_details = models.JSONField(null=True)  # Conflict info
-
-    # Observability metrics (per-operation, negligible overhead)
-    drift_ms = models.IntegerField(null=True, help_text="client_timestamp - server_timestamp in ms")
-    conflict_fields = models.JSONField(null=True, help_text="Fields that had conflicts (for field-level LWW)")
-    client_retry_count = models.PositiveSmallIntegerField(default=0, help_text="Times client retried this op")
-
-    class Meta:
-        indexes = [
-            models.Index(fields=['organization', 'server_timestamp']),
-            models.Index(fields=['entity_type', 'entity_id']),
-        ]
-```
+| Field | Purpose |
+|-------|---------|
+| `idempotency_key` | Unique key for duplicate detection |
+| `intent` | `create`, `update`, or `delete` |
+| `status` | `pending`, `applied`, `rejected`, `conflict`, `duplicate` |
+| `drift_ms` | Clock drift between client and server (observability) |
+| `conflict_fields` | Fields rejected by LWW (observability) |
 
 #### Observability: Per-Operation Metrics
 
-Since every push already writes to `SyncOperation`, we get per-operation metrics for free:
+Since every push writes to `SyncOperation`, we get per-operation metrics for free:
 
-| Metric | Field | What it tells you |
-|--------|-------|-------------------|
-| Drift | `drift_ms` | How far off are client clocks? |
-| Conflicts | `conflict_fields` | Which fields conflict most? |
-| Retries | `client_retry_count` | Network reliability issues? |
+| Metric | Field | What it tells you | Normal | Warning |
+|--------|-------|-------------------|--------|---------|
+| Drift | `drift_ms` | Client clock offset | < 1s | > 5s |
+| Conflicts | `conflict_fields` | Fields rejected by LWW | < 5% | > 20% |
+| Retries | `client_retry_count` | Network reliability | < 0.5 | > 2 |
 
-Setting metrics in the handler:
-
-```python
-def process_sync_operation(...) -> SyncResult:
-    # Calculate drift (negative = client ahead, positive = client behind)
-    drift_ms = int((timezone.now() - operation.client_timestamp).total_seconds() * 1000)
-
-    # Track conflicts from field-level LWW
-    conflict_fields = None
-    if using_field_level_lww:
-        applied, rejected = apply_field_level_lww(entity, operation.data, operation.client_timestamp)
-        if rejected:
-            conflict_fields = list(rejected.keys())
-
-    # Create the operation log with metrics
-    SyncOperation.objects.create(
-        idempotency_key=operation.idempotency_key,
-        # ... other fields ...
-        drift_ms=drift_ms,
-        conflict_fields=conflict_fields,
-        client_retry_count=operation.retry_count or 0,
-        status='applied' if not rejected else 'conflict',
-    )
-```
-
-Dashboard queries:
-
-```sql
--- Average drift by hour (are clocks drifting?)
-SELECT
-    DATE_TRUNC('hour', server_timestamp) AS hour,
-    AVG(drift_ms) AS avg_drift_ms,
-    PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY ABS(drift_ms)) AS p95_drift_ms
-FROM sync_operations
-WHERE server_timestamp > NOW() - INTERVAL '7 days'
-GROUP BY 1 ORDER BY 1;
-
--- Conflict rate by entity type (which entities conflict most?)
-SELECT
-    entity_type,
-    COUNT(*) AS total_ops,
-    SUM(CASE WHEN conflict_fields IS NOT NULL THEN 1 ELSE 0 END) AS conflicts,
-    ROUND(100.0 * SUM(CASE WHEN conflict_fields IS NOT NULL THEN 1 ELSE 0 END) / COUNT(*), 2) AS conflict_pct
-FROM sync_operations
-WHERE server_timestamp > NOW() - INTERVAL '7 days'
-GROUP BY 1 ORDER BY conflict_pct DESC;
-
--- Most conflicted fields (where should we improve UX?)
-SELECT
-    field_name,
-    COUNT(*) AS conflict_count
-FROM sync_operations,
-    LATERAL jsonb_array_elements_text(conflict_fields) AS field_name
-WHERE conflict_fields IS NOT NULL
-    AND server_timestamp > NOW() - INTERVAL '7 days'
-GROUP BY 1 ORDER BY 2 DESC;
-
--- Retry patterns (network issues by device/user?)
-SELECT
-    device_id,
-    AVG(client_retry_count) AS avg_retries,
-    MAX(client_retry_count) AS max_retries,
-    COUNT(*) AS total_ops
-FROM sync_operations
-WHERE server_timestamp > NOW() - INTERVAL '7 days'
-GROUP BY 1
-HAVING AVG(client_retry_count) > 1
-ORDER BY avg_retries DESC;
-```
-
-What the metrics tell you:
-
-| Metric | Normal | Warning | Action |
-|--------|--------|---------|--------|
-| `avg_drift_ms` | < 1000ms | > 5000ms | Client clocks off, warn user |
-| `conflict_pct` | < 5% | > 20% | UX issue - users editing same things |
-| `avg_retries` | < 0.5 | > 2 | Network issues, check connectivity |
+See [`apps/sync/services.py:process_sync_operation`](../../backend/apps/sync/services.py) for metric collection.
 
 ### Field-Level Timestamps for LWW
 
-Field-level Last-Write-Wins requires tracking when each field was last modified, not just the entity as a whole.
+> **Implementation**: See [`FieldLevelLWWMixin`](../../backend/apps/sync/models.py) and [`apply_field_level_lww`](../../backend/apps/sync/services.py)
 
-#### Storage Format
+Field-level LWW tracks when each field was last modified, enabling granular merge when different clients edit different fields.
 
-```python
-# apps/sync/models.py
-
-class FieldLevelLWWMixin(models.Model):
-    """
-    Mixin for entities using field-level LWW conflict resolution.
-
-    Tracks per-field modification timestamps to enable granular merge.
-    """
-
-    class Meta:
-        abstract = True
-
-    # JSON object mapping field names to ISO timestamps
-    # Example: {"name": "2025-01-23T10:00:00Z", "phone": "2025-01-23T09:30:00Z"}
-    field_timestamps = models.JSONField(
-        default=dict,
-        help_text="Per-field modification timestamps for LWW resolution",
-    )
-
-    def set_field_timestamp(self, field: str, timestamp: datetime) -> None:
-        """Update the timestamp for a single field."""
-        self.field_timestamps[field] = timestamp.isoformat()
-
-    def get_field_timestamp(self, field: str) -> datetime | None:
-        """Get the timestamp for a field, or None if never set."""
-        ts = self.field_timestamps.get(field)
-        if ts:
-            return datetime.fromisoformat(ts)
-        return None
-
-    def update_fields_with_timestamps(
-        self,
-        updates: dict,
-        timestamp: datetime,
-    ) -> None:
-        """
-        Update multiple fields and their timestamps atomically.
-        Call this instead of setting fields directly.
-        """
-        for field, value in updates.items():
-            setattr(self, field, value)
-            self.set_field_timestamp(field, timestamp)
+**Storage**: `field_timestamps` JSON field maps field names to ISO timestamps:
+```json
+{"name": "2025-01-23T10:00:00Z", "phone": "2025-01-23T09:30:00Z"}
 ```
 
-#### Write Path: Updating Field Timestamps
+**Resolution logic**:
+1. Client wins if server has no timestamp for the field (new/migrated)
+2. Client wins if `client_timestamp > server_field_timestamp`
+3. Otherwise server wins, field is added to `conflict_fields` for observability
 
-```python
-# apps/sync/services.py
-
-def apply_field_level_lww(
-    entity: FieldLevelLWWMixin,
-    client_data: dict,
-    client_timestamp: datetime,
-) -> tuple[dict, dict]:
-    """
-    Apply field-level LWW merge.
-
-    Returns:
-        (applied_fields, rejected_fields)
-        - applied_fields: {field: value} that were applied
-        - rejected_fields: {field: {client: v1, server: v2}} that were rejected
-    """
-    applied = {}
-    rejected = {}
-
-    for field, client_value in client_data.items():
-        server_value = getattr(entity, field, None)
-        server_ts = entity.get_field_timestamp(field)
-
-        # Client wins if:
-        # 1. Server has no timestamp for this field (new field or migration)
-        # 2. Client timestamp is newer than server timestamp
-        if server_ts is None or client_timestamp > server_ts:
-            setattr(entity, field, client_value)
-            entity.set_field_timestamp(field, client_timestamp)
-            applied[field] = client_value
-        else:
-            # Server wins - field was modified more recently
-            if client_value != server_value:
-                rejected[field] = {
-                    'client_value': client_value,
-                    'client_timestamp': client_timestamp.isoformat(),
-                    'server_value': server_value,
-                    'server_timestamp': server_ts.isoformat(),
-                }
-
-    if applied:
-        # Also update entity-level updated_at for sync stream
-        entity.save()
-
-    return applied, rejected
-```
-
-#### Migration Strategy for Existing Data
-
-For entities that exist before field-level LWW is implemented:
-
-```python
-# Option 1: Treat missing timestamps as "infinitely old"
-# Any incoming update wins. This is the default behavior above (server_ts is None → client wins)
-
-# Option 2: Backfill with entity's updated_at
-# apps/sync/management/commands/backfill_field_timestamps.py
-
-class Command(BaseCommand):
-    """Backfill field_timestamps for existing entities."""
-
-    help = "Initialize field_timestamps from entity updated_at for existing records"
-
-    def handle(self, *args, **options):
-        for model in SyncRegistry.get_lww_models():
-            # Get syncable fields (exclude id, timestamps, etc.)
-            syncable_fields = model.get_syncable_fields()
-
-            updated = 0
-            for entity in model.all_objects.filter(field_timestamps={}):
-                # Initialize all fields to entity's updated_at
-                entity.field_timestamps = {
-                    field: entity.updated_at.isoformat()
-                    for field in syncable_fields
-                }
-                entity.save(update_fields=['field_timestamps'])
-                updated += 1
-
-            self.stdout.write(f"{model.__name__}: backfilled {updated} records")
-```
-
-#### Defining Syncable Fields
-
-```python
-# apps/sync/models.py
-
-class FieldLevelLWWMixin(models.Model):
-    # ... existing code ...
-
-    # Fields to exclude from LWW tracking
-    LWW_EXCLUDED_FIELDS = {
-        'id', 'organization', 'organization_id',
-        'created_at', 'updated_at', 'deleted_at',
-        'sync_version', 'field_timestamps',
-        'last_modified_by', 'last_modified_by_id',
-        'device_id',
-    }
-
-    @classmethod
-    def get_syncable_fields(cls) -> list[str]:
-        """Return list of fields that participate in field-level LWW."""
-        return [
-            f.name for f in cls._meta.get_fields()
-            if f.concrete
-            and not f.primary_key
-            and f.name not in cls.LWW_EXCLUDED_FIELDS
-        ]
-```
-
-#### Client-Side: Sending Field Timestamps
-
-Clients should track when they modified each field locally:
-
-```swift
-// Models/Contact.swift
-
-@Model
-final class Contact {
-    var id: String
-    var name: String
-    var phone: String
-    var email: String
-
-    // Track local modification times per field
-    var fieldTimestamps: [String: Date] = [:]
-
-    func updateField(_ field: String, value: Any) {
-        switch field {
-        case "name": name = value as! String
-        case "phone": phone = value as! String
-        case "email": email = value as! String
-        default: break
-        }
-        fieldTimestamps[field] = Date()
-    }
-}
-
-// When creating sync operation, use the field's timestamp
-func createSyncOperation(contact: Contact, changedFields: [String]) -> SyncOperationDTO {
-    var data: [String: AnyCodable] = [:]
-  let latestTimestamp = new Date(0);
-
-  for (const field of changedFields) {
-    for field in changedFields {
-        data[field] = AnyCodable(contact.value(forKey: field))
-        if let fieldTs = contact.fieldTimestamps[field], fieldTs > latestTimestamp {
-            latestTimestamp = fieldTs
-        }
-    }
-
-    return SyncOperationDTO(
-        idempotencyKey: IDGenerator.generate(for: .contact),
-        entityType: "contact",
-        entityId: contact.id,
-        intent: "update",
-        data: data,
-        clientTimestamp: ISO8601DateFormatter().string(from: latestTimestamp)
-    )
-}
-```
+**Migration**: Run `python manage.py backfill_field_timestamps` to initialize existing records. By default, missing timestamps are treated as "infinitely old" (client always wins).
 
 #### When to Use Field-Level vs Entity-Level LWW
 
@@ -666,12 +321,14 @@ func createSyncOperation(contact: Contact, changedFields: [String]) -> SyncOpera
 |----------|----------------|
 | Simple entities (tags, labels) | Entity-level LWW (simpler) |
 | Entities with independent fields (contacts) | Field-level LWW |
-| Entities where fields are related (address fields) | Entity-level or grouped field LWW |
+| Entities where fields are related (address) | Entity-level or grouped |
 | High-conflict entities | Consider CRDT or manual resolution |
 
 ---
 
 ## Sync Protocol
+
+> **Implementation**: See [`apps/sync/api.py`](../../backend/apps/sync/api.py) and [`apps/sync/schemas.py`](../../backend/apps/sync/schemas.py)
 
 ### Overview
 
@@ -681,6 +338,29 @@ Two endpoints handle all sync operations:
 |----------|--------|---------|
 | `/api/v1/sync/push` | POST | Client sends local changes to server |
 | `/api/v1/sync/pull` | GET | Client fetches server changes |
+
+### Sync Cycle Sequence
+
+```
+Client                           Server
+  │                                 │
+  │──── POST /sync/push ───────────►│
+  │     {operations: [...]}         │
+  │                                 │ For each operation:
+  │                                 │ ├─ Check idempotency_key
+  │                                 │ ├─ Apply LWW resolution
+  │                                 │ └─ Log to SyncOperation
+  │◄──── {results: [...]} ──────────│
+  │                                 │
+  │──── GET /sync/pull?since=X ────►│
+  │                                 │ Query all_objects (includes deleted)
+  │                                 │ Filter by cursor
+  │◄──── {changes, cursor} ─────────│
+  │                                 │
+  │     [Apply changes locally]     │
+  │     [Persist new cursor]        │
+  │                                 │
+```
 
 ### Soft-Delete Semantics in Sync
 
@@ -705,85 +385,20 @@ Contact.all_objects.filter(updated_at__gt=cursor)  # Includes deletions
 
 #### Implementation
 
-```python
-# apps/sync/services.py
-
-def fetch_changes_for_pull(
-    organization: Organization,
-    entity_type: str,
-    since_timestamp: datetime | None,
-    since_id: str | None,
-    limit: int,
-) -> list[ChangeOut]:
-    """
-    Fetch changes including soft-deleted records.
-
-    IMPORTANT: Uses all_objects to include deletions.
-    """
-    model = SyncRegistry.get_model(entity_type)
-
-    # MUST use all_objects to include soft-deleted records
-    qs = model.all_objects.filter(organization=organization)
-
-    if since_timestamp:
-        # Cursor-based pagination: records updated after cursor
-        qs = qs.filter(
-            models.Q(updated_at__gt=since_timestamp) |
-            models.Q(updated_at=since_timestamp, id__gt=since_id)
-        )
-
-    qs = qs.order_by('updated_at', 'id')[:limit]
-
-    changes = []
-    for entity in qs:
-        changes.append(ChangeOut(
-            entity_type=entity_type,
-            entity_id=entity.id,
-            # Key: deleted records get operation='delete'
-            operation='delete' if entity.deleted_at else 'upsert',
-            # Deleted records: only send id, no data payload
-            data=serialize_entity(entity) if not entity.deleted_at else None,
-            version=entity.sync_version,
-            updated_at=entity.updated_at,
-        ))
-
-    return changes
-```
+See [`fetch_changes_for_pull`](../../backend/apps/sync/services.py) - key points:
+- Uses `all_objects` manager to include soft-deleted records
+- Deleted records return `operation: 'delete'` with no data payload
+- Orders by `(updated_at, id)` for stable cursor-based pagination
 
 #### Tombstone Cleanup
 
-```python
-# apps/sync/management/commands/cleanup_tombstones.py
+Run periodically to hard-delete old tombstones:
 
-class Command(BaseCommand):
-    """Hard-delete tombstones older than retention period."""
-
-    help = "Remove soft-deleted sync entities past retention period"
-
-    def add_arguments(self, parser):
-        parser.add_argument(
-            '--retention-days',
-            type=int,
-            default=90,
-            help='Days to retain tombstones (default: 90)',
-        )
-        parser.add_argument('--dry-run', action='store_true')
-
-    def handle(self, *args, **options):
-        cutoff = timezone.now() - timedelta(days=options['retention_days'])
-
-        for model in SyncRegistry.get_all_models():
-            tombstones = model.all_objects.filter(
-                deleted_at__isnull=False,
-                deleted_at__lt=cutoff,
-            )
-            count = tombstones.count()
-
-            if not options['dry_run']:
-                tombstones.hard_delete()
-
-            self.stdout.write(f"{model.__name__}: {count} tombstones {'would be' if options['dry_run'] else ''} removed")
+```bash
+python manage.py cleanup_tombstones --retention-days=90
 ```
+
+Retention period should exceed the longest expected client offline duration.
 
 #### Client Handling of Deletions
 
@@ -862,140 +477,20 @@ Why this matters: If the cursor used `client_timestamp`:
 
 #### Solution: Overlap Window
 
-Pull queries go back slightly from the cursor to catch clock-skewed records. Client idempotency handles duplicates.
+Pull queries go back slightly from the cursor (100ms) to catch clock-skewed records. Clients handle duplicates via version comparison - only apply if `change.version > local.version`.
 
-```python
-# apps/sync/services.py
+#### Optional: Monotonic Sequence
 
-# Clock skew tolerance: 100ms covers typical NTP drift
-CLOCK_SKEW_TOLERANCE = timedelta(milliseconds=100)
-
-def fetch_changes_for_pull(
-    organization: Organization,
-    entity_type: str,
-    since_timestamp: datetime | None,
-    since_id: str | None,
-    limit: int,
-) -> list[ChangeOut]:
-    """
-    Fetch changes with overlap window for clock skew tolerance.
-    """
-    model = SyncRegistry.get_model(entity_type)
-    qs = model.all_objects.filter(organization=organization)
-
-    if since_timestamp:
-        # Apply overlap window to catch clock-skewed records
-        # Client must handle duplicates idempotently
-        safe_since = since_timestamp - CLOCK_SKEW_TOLERANCE
-
-        qs = qs.filter(
-            models.Q(updated_at__gt=safe_since) |
-            models.Q(updated_at=safe_since, id__gt=since_id)
-        )
-
-    qs = qs.order_by('updated_at', 'id')[:limit]
-    return [serialize_change(entity) for entity in qs]
-```
-
-#### Client Idempotency for Overlap
-
-```swift
-// SyncEngine+Pull.swift
-
-func processPullResponse(_ response: SyncPullResponse, context: ModelContext) async throws {
-    for change in response.changes {
-        // Idempotent upsert - handles duplicates from overlap window
-        let existing = try fetchEntity(type: change.entityType, id: change.entityId, context: context)
-
-        if change.operation == "delete" {
-            try deleteEntity(type: change.entityType, id: change.entityId, context: context)
-        } else if existing == nil || existing!.version < change.version {
-            // Only apply if newer than local version
-            try upsertEntity(type: change.entityType, id: change.entityId, data: change.data, context: context)
-        }
-        // else: duplicate from overlap window, skip
-    }
-
-    try context.save()
-    await cursorManager.setCursor(response.cursor)
-}
-```
-
-#### Optional: Monotonic Sequence for High-Consistency
-
-For use cases requiring guaranteed global ordering (e.g., financial transactions), add a database sequence:
-
-```python
-# apps/sync/models.py
-
-class SyncableModel(SoftDeleteMixin, TimestampedModel):
-    # ... existing fields ...
-
-    # Optional: monotonic sequence for guaranteed ordering
-    # Use this as cursor instead of updated_at for high-consistency needs
-    sync_sequence_id = models.BigIntegerField(
-        null=True,
-        db_index=True,
-        help_text="Monotonic sequence ID from database, guarantees global ordering",
-    )
-
-    def save(self, *args, **kwargs):
-        if not self.id:
-            self.id = self._generate_prefixed_ulid()
-        self.sync_version += 1
-        super().save(*args, **kwargs)
-
-        # Assign sequence ID after save (requires raw SQL or trigger)
-        # This ensures ordering matches commit order, not save() call order
-```
+For high-consistency use cases (financial transactions), use a database sequence instead of `updated_at`:
 
 ```sql
--- Database sequence for guaranteed ordering
 CREATE SEQUENCE sync_global_seq;
-
--- Trigger to assign on insert/update (PostgreSQL)
-CREATE OR REPLACE FUNCTION assign_sync_sequence()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.sync_sequence_id := nextval('sync_global_seq');
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_sync_sequence
-    BEFORE INSERT OR UPDATE ON {entity_table}
-    FOR EACH ROW
-    EXECUTE FUNCTION assign_sync_sequence();
+-- Trigger assigns nextval on insert/update
 ```
 
-#### Periodic Full Sync Recommendation
+#### Periodic Full Sync
 
-Even with overlap windows, recommend periodic full syncs to catch edge cases:
-
-```swift
-// SyncEngine+FullSync.swift
-
-extension SyncEngine {
-    private static let fullSyncInterval: TimeInterval = 24 * 60 * 60  // 24 hours
-    private static let lastFullSyncKey = "sync_last_full_sync"
-
-    func triggerSync() async throws {
-        let lastFullSync = UserDefaults.standard.object(forKey: Self.lastFullSyncKey) as? Date
-        let needsFullSync = lastFullSync == nil ||
-            Date().timeIntervalSince(lastFullSync!) > Self.fullSyncInterval
-
-        if needsFullSync {
-            // Full sync: pull from beginning
-            await cursorManager.resetCursor()
-            try await pullWithRecovery()
-            UserDefaults.standard.set(Date(), forKey: Self.lastFullSyncKey)
-        } else {
-            // Incremental sync
-            try await pullWithRecovery()
-        }
-    }
-}
-```
+Even with overlap windows, clients should do a full resync every 24 hours as a safety net. See [Full Re-Sync Triggers](#full-re-sync-triggers).
 
 #### Summary: When to Use Which Approach
 
@@ -1008,61 +503,26 @@ extension SyncEngine {
 
 ### Push Endpoint (Client → Server)
 
-```python
-# apps/sync/api.py
+**Endpoint**: `POST /api/v1/sync/push`
 
-class SyncOperationIn(Schema):
-    idempotency_key: str  # Client-generated, survives retries
-    entity_type: str
-    entity_id: str
-    intent: Literal['create', 'update', 'delete']
-    client_timestamp: datetime
-    base_version: int | None = None  # For optimistic concurrency
+**Request fields**:
+| Field | Required | Description |
+|-------|----------|-------------|
+| `idempotency_key` | Yes | Client-generated unique key (survives retries) |
+| `entity_type` | Yes | Registered entity type (e.g., `contact`) |
+| `entity_id` | Yes | ULID of the entity |
+| `intent` | Yes | `create`, `update`, or `delete` |
+| `client_timestamp` | Yes | When the client made this change (for LWW) |
+| `data` | Yes | Entity data (PATCH semantics for updates) |
+| `base_version` | No | For optimistic concurrency checks |
 
-    # PATCH semantics for 'update' intent:
-    # - data contains ONLY changed fields
-    # - Omitted fields are NOT overwritten on server
-    # - For 'create': data is complete entity
-    # - For 'delete': data is ignored (can be empty {})
-    data: dict
-
-class SyncPushRequest(Schema):
-    operations: list[SyncOperationIn]  # Max 100 per batch
-
-class SyncResultOut(Schema):
-    idempotency_key: str
-    status: Literal['applied', 'rejected', 'conflict', 'duplicate']
-    server_timestamp: datetime
-    server_version: int | None = None
-    error_code: str | None = None
-    error_message: str | None = None  # Human-readable explanation
-    error_details: dict | None = None  # Structured validation errors (field -> messages)
-    conflict_data: dict | None = None  # Server state if conflict
-
-@router.post("/push", response=list[SyncResultOut])
-def sync_push(request: AuthenticatedHttpRequest, payload: SyncPushRequest):
-    results = []
-
-    for op in payload.operations:
-        result = process_sync_operation(
-            organization=request.organization,
-            actor=request.member,
-            operation=op,
-        )
-        results.append(result)
-
-        # Emit event for webhooks/integrations
-        if result.status == 'applied':
-            publish_event(
-                event_type=f"{op.entity_type}.synced",
-                aggregate=result.entity,
-                data=op.data,
-                actor=request.user,
-                organization_id=request.organization.id,
-            )
-
-    return results
-```
+**Response fields**:
+| Field | Description |
+|-------|-------------|
+| `status` | `applied`, `rejected`, `conflict`, or `duplicate` |
+| `server_timestamp` | When server processed the operation |
+| `error_code` | Error identifier (if rejected) |
+| `error_message` | Human-readable error (if rejected) |
 
 **Request:**
 
@@ -1161,49 +621,28 @@ Delegated to existing services:
 
 ### Pull Endpoint (Server → Client)
 
-```python
-class SyncPullRequest(Schema):
-    since: str | None = None  # Opaque cursor
-    entity_types: list[str] | None = None  # Filter
-    limit: int = Field(default=100, le=500)
+**Endpoint**: `GET /api/v1/sync/pull`
 
-class ChangeOut(Schema):
-    entity_type: str
-    entity_id: str
-    operation: Literal['upsert', 'delete']
-    data: dict | None
-    version: int
-    updated_at: datetime
+**Query parameters**:
+| Param | Default | Description |
+|-------|---------|-------------|
+| `since` | null | Opaque cursor from previous pull |
+| `entity_types` | all | Comma-separated filter |
+| `limit` | 100 | Max changes per response (max 500) |
 
-class SyncPullResponse(Schema):
-    changes: list[ChangeOut]
-    cursor: str  # Opaque, encodes timestamp + id
-    has_more: bool
+**Response fields**:
+| Field | Description |
+|-------|-------------|
+| `changes` | Array of entity changes |
+| `cursor` | Opaque cursor for next page |
+| `has_more` | Whether more pages exist |
+| `force_resync` | If true, client should do full resync |
 
-@router.get("/pull", response=SyncPullResponse)
-def sync_pull(request: AuthenticatedHttpRequest, params: Query[SyncPullRequest]):
-    cursor = parse_cursor(params.since)  # {timestamp, last_id}
-
-    # Query all syncable entities changed since cursor
-    changes = fetch_changes(
-        organization=request.organization,
-        since_timestamp=cursor.timestamp,
-        since_id=cursor.last_id,
-        entity_types=params.entity_types,
-        limit=params.limit + 1,  # +1 to detect has_more
-    )
-
-    has_more = len(changes) > params.limit
-    changes = changes[:params.limit]
-
-    next_cursor = encode_cursor(changes[-1]) if changes else params.since
-
-    return SyncPullResponse(
-        changes=changes,
-        cursor=next_cursor,
-        has_more=has_more,
-    )
-```
+Each change contains:
+- `entity_type`, `entity_id` - identifies the entity
+- `operation` - `upsert` or `delete`
+- `data` - entity data (null for deletes)
+- `version` - sync version for ordering
 
 **Request:**
 
@@ -1275,6 +714,36 @@ base64({timestamp}_{entity_id})
 
 ## Conflict Resolution Strategies
 
+> **Implementation**: See [`apply_field_level_lww`](../../backend/apps/sync/services.py)
+
+### Conflict Resolution Flow
+
+```
+                    ┌─────────────────┐
+                    │ Incoming Update │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┴──────────────┐
+              │    Has FieldLevelLWWMixin?  │
+              └──────────────┬──────────────┘
+                    ┌────────┴────────┐
+                    │                 │
+                   Yes                No
+                    │                 │
+         ┌──────────┴─────┐   ┌───────┴───────┐
+         │ For each field:│   │ Compare       │
+         │ client_ts >    │   │ entity        │
+         │ server_ts?     │   │ updated_at    │
+         └───────┬────────┘   └───────┬───────┘
+                 │                    │
+         ┌───────┴───────┐    ┌───────┴───────┐
+         │ Yes: Apply    │    │ Newer wins    │
+         │ No: Reject    │    │               │
+         │ (log to       │    │               │
+         │ conflict_fields)   │               │
+         └───────────────┘    └───────────────┘
+```
+
 ### Strategy Matrix by Use Case
 
 | Use Case | Entity | Strategy | Rationale |
@@ -1287,102 +756,18 @@ base64({timestamp}_{entity_id})
 
 ### Last-Write-Wins (Entity-Level)
 
-Default for simple entities:
-
-```python
-from datetime import datetime, timezone
-
-def normalize_to_utc(dt: datetime) -> datetime:
-    """Ensure datetime is UTC for safe comparison."""
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
-
-def apply_operation(op: SyncOperation, entity: SyncableModel):
-    """Apply operation using LWW based on server timestamp."""
-
-    # Normalize timestamps to UTC for safe comparison
-    entity_ts = normalize_to_utc(entity.updated_at)
-    op_ts = normalize_to_utc(op.server_timestamp)
-
-    if entity_ts > op_ts:
-        # Server already has newer data
-        return "skipped"
-
-    for field, value in op.payload.items():
-        setattr(entity, field, value)
-
-    entity.updated_at = op.server_timestamp
-    entity.save()
-    return "applied"
-```
+Default for simple entities. Compares `client_timestamp` against `entity.updated_at`. Newer wins entirely.
 
 ### Last-Write-Wins (Field-Level)
 
-For entities where different fields may be edited concurrently (e.g., contacts):
+For entities with independent fields (contacts, profiles). Each field is compared separately:
+- Client wins if server has no timestamp for the field
+- Client wins if `client_timestamp > server_field_timestamp`
+- Otherwise server wins, rejected field logged for observability
 
-```python
-def resolve_lww_field_level(
-    server_entity: FieldLevelLWWMixin,
-    client_data: dict,
-    client_timestamp: datetime,
-) -> tuple[dict, dict]:
-    """
-    Merge client changes with server state at field level.
-    Returns (merged_data, conflict_fields).
+### Optimistic Concurrency (Optional)
 
-    Uses get_field_timestamp() from FieldLevelLWWMixin to get proper
-    datetime objects for comparison.
-    """
-    merged = {}
-    conflicts = {}
-
-    for field, client_value in client_data.items():
-        server_value = getattr(server_entity, field, None)
-        # Use the mixin's helper method to get datetime (not raw ISO string)
-        server_field_ts = server_entity.get_field_timestamp(field)
-
-        if server_field_ts is None or client_timestamp > server_field_ts:
-            merged[field] = client_value
-        else:
-            merged[field] = server_value
-            if client_value != server_value:
-                conflicts[field] = {
-                    'client': client_value,
-                    'server': server_value,
-                }
-
-    return merged, conflicts
-```
-
-### Optimistic Concurrency with Version
-
-```python
-def resolve_with_version_check(
-    server_entity: SyncableModel,
-    client_data: dict,
-    base_version: int,
-) -> SyncResult:
-    """
-    Reject if server has advanced beyond client's base version.
-    """
-    if server_entity.sync_version != base_version:
-        return SyncResult(
-            status='conflict',
-            error_code='VERSION_MISMATCH',
-            conflict_data={
-                'server_version': server_entity.sync_version,
-                'server_state': serialize(server_entity),
-            },
-        )
-
-    # Apply update
-    for field, value in client_data.items():
-        setattr(server_entity, field, value)
-    server_entity.save()
-
-    return SyncResult(status='applied', server_version=server_entity.sync_version)
-```
+Pass `base_version` in the operation. Server rejects if `entity.sync_version != base_version`. Client must fetch latest state and retry.
 
 ### CRDT for Rich Text (Future Enhancement)
 
@@ -1442,164 +827,73 @@ class NoteContent(models.Model):
 └─────────────────────────────────────────────────┘
 ```
 
+### Operation Lifecycle
+
+```
+    ┌───────────┐     enqueue      ┌─────────┐
+    │  Created  │─────────────────►│ Pending │◄─────────┐
+    └───────────┘                  └────┬────┘          │
+                                        │ sync()       │
+                                        ▼              │
+                              ┌──────────────────┐     │
+                              │     Syncing      │     │
+                              └────────┬─────────┘     │
+                       ┌───────────────┼───────────────┤
+                       ▼               ▼               │
+                  ┌─────────┐    ┌──────────┐    ┌─────┴────┐
+                  │ Applied │    │ Retryable│    │  Failed  │
+                  │(removed)│    │  Error   │────│(permanent)│
+                  └─────────┘    └──────────┘    └──────────┘
+                                  (backoff)
+```
+
 ### Key Requirements
 
 1. **Persistent Operation Queue** - Operations must be persisted locally **before** showing success to the user
 2. **Client-Side ID Generation** - Use ULIDs for time-ordered, collision-resistant IDs
-3. **Exponential Backoff** - Retry transient failures with jitter (max 10 attempts over ~5 hours)
-4. **Network Awareness** - Pause sync when offline, trigger immediately when reconnecting
-5. **Partial Batch Handling** - Handle mixed success/failure in batch pushes independently
+3. **Exponential Backoff** - Retry transient failures with jitter (max 10 attempts)
+4. **Network Awareness** - Pause sync when offline, trigger on reconnect
+5. **Partial Batch Handling** - Handle mixed success/failure independently
 6. **Background Sync** - Continue syncing when app is backgrounded
 
-### Retry Delays
-
-| Attempt | Base Delay | With Jitter (±20%) |
-|---------|------------|-------------------|
-| 1 | 1s | 0.8s - 1.2s |
-| 2 | 2s | 1.6s - 2.4s |
-| 3 | 4s | 3.2s - 4.8s |
-| 4 | 8s | 6.4s - 9.6s |
-| 5 | 16s | 12.8s - 19.2s |
-| 6 | 32s | 25.6s - 38.4s |
-| 7 | 64s | 51.2s - 76.8s |
-| 8 | 128s | 102.4s - 153.6s |
-| 9 | 256s | 204.8s - 307.2s |
-| 10 | 300s (capped) | 240s - 360s |
-
-### Reliability Guarantees Summary
-
-| Scenario | Guarantee |
-|----------|-----------|
-| App crashes after user action | Operation persisted in SQLite, synced on restart |
-| Network fails mid-push | Retried with exponential backoff |
-| 3/10 operations rejected | Each handled independently |
-| Server returns 500 | Retried up to 10 times over ~5 hours |
-| Validation error (4xx) | Marked failed, user notified |
-| Cursor becomes invalid | Full re-sync triggered |
+See [iOS Client Implementation](./sync-client-ios.md) for retry delays, reliability guarantees, and full code examples.
 
 ---
 
-## Use Case Implementations
+## Example Use Cases
+
+> These are conceptual examples showing how to apply the sync engine to different domains.
 
 ### Field CRM
 
-Entities to sync:
-- `Contact` - name, company, email, phone, notes, tags
-- `Interaction` - contact_id, type, content, occurred_at, location
-- `Tag` - name, color
+| Entity | Strategy | Rationale |
+|--------|----------|-----------|
+| Contact | Field-level LWW | Different salespeople may update different fields |
+| Interaction | Append-only | Notes from multiple sessions should merge |
+| Tag | Entity-level LWW | Simple metadata, low conflict risk |
 
-Sync characteristics:
-- Low write frequency (5-20 interactions/day)
-- Offline capture is primary use case
-- Notes may be long-form text
-
-Recommended approach:
-```python
-# apps/crm/models.py
-
-class Contact(FieldLevelLWWMixin, SyncableModel):
-    """
-    Contact with field-level LWW conflict resolution.
-
-    Uses FieldLevelLWWMixin for per-field timestamps.
-    """
-    PREFIX = 'ct_'
-
-    name = models.CharField(max_length=255)
-    company = models.CharField(max_length=255, blank=True)
-    email = models.EmailField(blank=True)
-    phone = models.CharField(max_length=32, blank=True)
-
-    # field_timestamps inherited from FieldLevelLWWMixin
-
-    class Meta(SyncableModel.Meta):
-        conflict_strategy = 'lww_field'
-
-
-class Interaction(SyncableModel):
-    PREFIX = 'int_'
-
-    contact = models.ForeignKey(Contact, on_delete=models.CASCADE)
-    interaction_type = models.CharField(max_length=32)  # meeting, call, email, note
-    content = models.TextField()  # Could use CRDT for collaborative editing
-    occurred_at = models.DateTimeField()
-    location = models.JSONField(null=True)  # {lat, lng, name}
-
-    class Meta(SyncableModel.Meta):
-        conflict_strategy = 'append_only'  # Never overwrite, just add
-```
+**Characteristics**: Low write frequency (5-20/day), offline capture is primary use case.
 
 ### Time Tracking (Toggl-like)
 
-Entities to sync:
-- `TimeEntry` - project_id, description, start_time, end_time, tags, billable
-- `Project` - name, color, client_id, billable_rate
-- `Client` - name
+| Entity | Strategy | Rationale |
+|--------|----------|-----------|
+| TimeEntry | LWW + server validation | Validate no overlapping entries |
+| Project | Field-level LWW | Metadata rarely conflicts |
+| Client | Entity-level LWW | Simple reference data |
 
-Sync characteristics:
-- High write frequency (running timer updates every minute)
-- Field-level accuracy critical (duration, billable status)
-- Overlapping entries must be validated
+**Characteristics**: High write frequency (timer updates), field-level accuracy critical.
 
-Recommended approach:
+### Using the Registry
+
+Register entity types with their conflict strategies at app startup:
+
 ```python
-# apps/timetracker/models.py
-
-class TimeEntry(SyncableModel):
-    PREFIX = 'te_'
-
-    project = models.ForeignKey('Project', on_delete=models.SET_NULL, null=True)
-    description = models.CharField(max_length=500, blank=True)
-    start_time = models.DateTimeField()
-    end_time = models.DateTimeField(null=True)  # Null = running
-    tags = models.JSONField(default=list)
-    billable = models.BooleanField(default=False)
-
-    # Running timer state
-    is_running = models.BooleanField(default=False)
-
-    class Meta(SyncableModel.Meta):
-        conflict_strategy = 'lww_with_validation'
-
-    def validate_no_overlap(self):
-        """Server-side validation: no overlapping entries."""
-        overlapping = TimeEntry.objects.filter(
-            organization=self.organization,
-            start_time__lt=self.end_time,
-            end_time__gt=self.start_time,
-        ).exclude(id=self.id)
-
-        if overlapping.exists():
-            raise ValidationError('TIME_ENTRY_OVERLAP')
-```
-
-### Generic B2B Platform
-
-Design for extensibility:
-```python
-# apps/sync/registry.py
-
-class SyncRegistry:
-    """Registry of syncable entity types and their strategies."""
-
-    _entities: dict[str, type[SyncableModel]] = {}
-    _strategies: dict[str, ConflictStrategy] = {}
-
-    @classmethod
-    def register(cls, entity_type: str, model: type[SyncableModel], strategy: str = 'lww'):
-        cls._entities[entity_type] = model
-        cls._strategies[entity_type] = STRATEGIES[strategy]
-
-    @classmethod
-    def resolve_conflict(cls, entity_type: str, server: SyncableModel, client_data: dict) -> SyncResult:
-        strategy = cls._strategies.get(entity_type, STRATEGIES['lww'])
-        return strategy.resolve(server, client_data)
-
-# In app startup
 SyncRegistry.register('contact', Contact, 'lww_field')
-SyncRegistry.register('time_entry', TimeEntry, 'lww_with_validation')
-SyncRegistry.register('note', Note, 'crdt_text')
+SyncRegistry.register('time_entry', TimeEntry, 'lww')
 ```
+
+See [`apps/sync/registry.py`](../../backend/apps/sync/registry.py) for the full implementation.
 
 ---
 
@@ -1654,60 +948,28 @@ SYNC_RATE_LIMITS = {
 
 ### Server-Side Mutations and Sync Stream
 
-Any server-side mutation that should propagate to clients must update the entity's `updated_at` timestamp to enter the sync stream.
+Any server-side mutation that should propagate to clients **must** update `updated_at` to enter the sync stream.
 
 #### Safe Patterns
 
-```python
-# Model.save() updates updated_at automatically
-def archive_old_contacts():
-    """Background job: archive contacts not updated in 1 year."""
-    cutoff = timezone.now() - timedelta(days=365)
-    for contact in Contact.objects.filter(updated_at__lt=cutoff):
-        contact.status = 'archived'
-        contact.save()  # updated_at updated, enters sync stream
-
-# Explicit updated_at in bulk update
-def bulk_reassign_contacts(old_owner_id: int, new_owner_id: int):
-    """Admin action: reassign all contacts."""
-    Contact.objects.filter(owner_id=old_owner_id).update(
-        owner_id=new_owner_id,
-        updated_at=timezone.now(),  # Explicit
-    )
-
-# Custom manager method that ensures sync visibility
-class SyncableManager(SoftDeleteAllManager):
-    def bulk_update_for_sync(self, queryset, **updates):
-        """Bulk update that ensures changes enter sync stream."""
-        updates['updated_at'] = timezone.now()
-        return queryset.update(**updates)
-```
+- Use `.save()` (auto-updates `updated_at`)
+- Use `.update(..., updated_at=timezone.now())` for bulk updates
 
 #### Dangerous Patterns (Will Not Sync)
 
 ```python
-# Direct update bypasses updated_at
-Contact.objects.filter(status='pending').update(status='active')
-# Clients will never see this change!
-
-# Raw SQL without updated_at
-with connection.cursor() as cursor:
-    cursor.execute("UPDATE contacts SET status = 'active' WHERE ...")
-# Clients will never see this change!
-
-# F() expressions without updated_at
-Contact.objects.filter(id=1).update(view_count=F('view_count') + 1)
-# Clients will never see this change!
+# These bypass updated_at - clients will never see the change!
+Contact.objects.filter(...).update(status='active')  # Missing updated_at
+cursor.execute("UPDATE contacts SET ...")             # Raw SQL
 ```
 
-#### Checklist for Server-Side Mutations
+#### Checklist
 
 | Source | Action Required |
 |--------|-----------------|
 | Management commands | Use `.save()` or explicit `updated_at` |
-| Celery/background tasks | Use `.save()` or explicit `updated_at` |
-| Admin panel actions | Use `.save()` or explicit `updated_at` |
-| Webhook handlers | Use `.save()` or explicit `updated_at` |
+| Background tasks | Use `.save()` or explicit `updated_at` |
+| Admin panel | Use `.save()` or explicit `updated_at` |
 | Database triggers | Include `updated_at = NOW()` |
 | Data migrations | Include `updated_at` in UPDATE |
 
@@ -1769,7 +1031,7 @@ def sync_push(request):
 
 ## Full Re-Sync Triggers
 
-Sometimes the client needs to throw away its cursor and re-sync from scratch. This is called a "full re-sync" or "reset sync."
+Sometimes the client needs to throw away its cursor and re-sync from scratch.
 
 ### When to Trigger Full Re-Sync
 
@@ -1782,79 +1044,11 @@ Sometimes the client needs to throw away its cursor and re-sync from scratch. Th
 | Server forces it | Server | Set `force_resync: true` in pull response |
 | Corrupt local database | Client | Detect SQLite corruption, wipe and re-sync |
 
-### Client Implementation
-
-```swift
-extension SyncEngine {
-    private static let schemaVersion = 3  // Bump when entity schema changes
-    private static let schemaVersionKey = "sync_schema_version"
-
-    func initialize() async throws {
-        let storedVersion = UserDefaults.standard.integer(forKey: Self.schemaVersionKey)
-
-        if storedVersion != Self.schemaVersion {
-            // App was upgraded, schema may have changed
-            try await triggerFullResync(reason: "schema_upgrade")
-            UserDefaults.standard.set(Self.schemaVersion, forKey: Self.schemaVersionKey)
-        }
-    }
-
-    func triggerFullResync(reason: String) async throws {
-        // Clear cursor - next pull starts from beginning
-        await cursorManager.resetCursor()
-
-        // Clear local data
-        try await clearLocalData()
-
-        // Pull everything
-        try await pullWithRecovery()
-    }
-
-    func handlePullResponse(_ response: SyncPullResponse) async throws {
-        if response.forceResync == true {
-            try await triggerFullResync(reason: "server_requested")
-            return
-        }
-
-        // Normal processing...
-    }
-}
-```
-
 ### Server: Force Re-Sync Flag
 
-When the server needs all clients to re-sync (e.g., after a data migration):
+To force all clients to re-sync (e.g., after a data migration), set `force_resync_before` timestamp for the organization. The pull endpoint checks if the client's cursor is older and returns `force_resync: true`.
 
-```python
-# apps/sync/models.py
-
-class SyncConfig(models.Model):
-    """Per-organization sync configuration."""
-    organization = models.OneToOneField(Organization, on_delete=models.CASCADE)
-    force_resync_before = models.DateTimeField(null=True)
-
-# apps/sync/api.py
-
-@router.get("/pull", response=SyncPullResponse)
-def sync_pull(request: AuthenticatedHttpRequest, params: Query[SyncPullRequest]):
-    config = SyncConfig.objects.filter(organization=request.organization).first()
-
-    # If client's cursor is older than force_resync_before, tell them to re-sync
-    cursor_ts = parse_cursor(params.since).timestamp if params.since else None
-    force_resync = (
-        config and
-        config.force_resync_before and
-        cursor_ts and
-        cursor_ts < config.force_resync_before
-    )
-
-    return SyncPullResponse(
-        changes=changes,
-        cursor=next_cursor,
-        has_more=has_more,
-        force_resync=force_resync,
-    )
-```
+See [iOS Client Implementation](./sync-client-ios.md#full-re-sync-handling) for client-side handling.
 
 ---
 
@@ -1947,57 +1141,19 @@ What happens when an operation permanently fails (validation error, permission d
 ### Client-Side Dead Letter Queue
 
 Operations that fail with non-retryable errors go to a "dead letter" state:
+- `status` = failed
+- `nextRetryAt` = nil (no more retries)
+- `errorCode` and `lastError` populated for user display
 
-```swift
-// The SyncOperation model already supports failed state (see sync-client-ios.md)
-// Additional fields for dead letter tracking:
-
-extension SyncOperation {
-    var failedAt: Date?
-    var errorCode: String?
-    var userAcknowledged: Bool = false
-}
-
-extension OperationQueue {
-    func markPermanentlyFailed(
-        _ idempotencyKey: String,
-        errorCode: String,
-        errorMessage: String
-    ) async throws {
-        let context = ModelContext(modelContainer)
-        let predicate = #Predicate<SyncOperation> { $0.idempotencyKey == idempotencyKey }
-        var descriptor = FetchDescriptor(predicate: predicate)
-        descriptor.fetchLimit = 1
-
-        guard let operation = try context.fetch(descriptor).first else { return }
-
-        operation.status = .failed
-        operation.errorCode = errorCode
-        operation.lastError = errorMessage
-        operation.failedAt = Date()
-        operation.nextRetryAt = nil
-
-        try context.save()
-
-        // Notify UI to show error badge
-        await MainActor.run {
-            NotificationCenter.default.post(
-                name: .syncOperationFailed,
-                object: nil,
-                userInfo: ["idempotencyKey": idempotencyKey, "errorCode": errorCode]
-            )
-        }
-    }
-}
-```
+See [iOS Client Implementation](./sync-client-ios.md) for the full Swift implementation.
 
 ### User Resolution Options
 
-| Option | When to Use | Implementation |
-|--------|-------------|----------------|
-| Retry | User fixed the issue (e.g., restored permissions) | Move back to pending queue |
-| Discard | User accepts data loss | Delete from queue, revert local change |
-| Edit and retry | Validation error | Show edit UI, create new operation |
+| Option | When to Use |
+|--------|-------------|
+| Retry | User fixed the issue (e.g., restored permissions) |
+| Discard | User accepts data loss |
+| Edit and retry | Validation error - fix and resubmit |
 
 ### UI Considerations
 
@@ -2006,45 +1162,16 @@ extension OperationQueue {
 - Provide a "Sync Issues" screen listing failed operations
 - Auto-clear acknowledged failures after 30 days
 
-```swift
-// Example: Sync status indicator (SwiftUI)
-struct SyncStatusBadge: View {
-    @Environment(SyncEngine.self) private var syncEngine
-
-    var body: some View {
-        if syncEngine.failedOperationCount > 0 {
-            Button {
-                // Navigate to sync issues screen
-            } label: {
-                Text("\(syncEngine.failedOperationCount) sync issue\(syncEngine.failedOperationCount > 1 ? "s" : "")")
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.red)
-                    .foregroundStyle(.white)
-                    .clipShape(Capsule())
-            }
-        }
-    }
-}
-```
-
 ---
 
 ## Compression and Batching
 
 ### Response Compression
 
-Enable gzip for sync responses. This significantly reduces bandwidth on mobile:
+Enable gzip for sync responses (5-10x reduction for JSON payloads):
 
-```python
-# Django middleware
-MIDDLEWARE = [
-    "django.middleware.gzip.GZipMiddleware",
-    ...
-]
-
-# Or in nginx (preferred for production)
+```nginx
+# nginx (preferred for production)
 location /api/v1/sync/ {
     gzip on;
     gzip_types application/json;
@@ -2052,44 +1179,21 @@ location /api/v1/sync/ {
 }
 ```
 
-Typical compression ratios for JSON sync payloads: 5-10x reduction.
-
 ### Batch Size Limits
 
 | Limit | Value | Rationale |
 |-------|-------|-----------|
-| Max operations per push | 100 | Prevents request timeout, keeps transactions small |
+| Max operations per push | 100 | Prevents timeout, keeps transactions small |
 | Max changes per pull | 500 | Balances latency vs round-trips |
 | Max payload size | 1MB | Mobile-friendly, fits in memory |
 
-Why 100 operations per push:
-- Each operation may trigger validation, business logic, event emission
-- Database transactions should be short
-- If 1 operation fails, you only retry a small batch
-- Fits comfortably in a single HTTP request
-
-```swift
-actor SyncScheduler {
-    private let batchSize = 100
-
-    func pushPendingOperations() async throws {
-        let pending = try await queue.getPending()
-
-        // Process in batches
-        for startIndex in stride(from: 0, to: pending.count, by: batchSize) {
-            let endIndex = min(startIndex + batchSize, pending.count)
-            let batch = Array(pending[startIndex..<endIndex])
-            try await pushBatch(batch)
-        }
-    }
-}
-```
+Clients should split large queues into batches of 100 operations.
 
 ---
 
 ## Background Notifications
 
-Reduce polling by notifying clients when server has changes. This is optional—polling works fine for most cases.
+Reduce polling by notifying clients when server has changes. Optional—polling works fine for most cases.
 
 ### Options
 
@@ -2105,222 +1209,41 @@ Reduce polling by notifying clients when server has changes. This is optional—
 Server writes entity → OutboxEvent → EventBridge → Lambda → SNS → Mobile push → Client pulls
 ```
 
-The push notification is a "nudge"—it just tells the client "there's new data, go pull." It doesn't contain the actual data.
+The push notification is a "nudge"—it tells the client "there's new data, go pull." It doesn't contain the actual data (just `{"type": "sync_nudge"}`).
 
-```python
-# Lambda: Send silent push notification
-def notify_clients_to_sync(event, context):
-    organization_id = event["detail"]["organization_id"]
-
-    # Get device tokens for organization members
-    tokens = get_device_tokens_for_organization(organization_id)
-
-    for token in tokens:
-        sns.publish(
-            TargetArn=token.sns_endpoint_arn,
-            Message=json.dumps({"type": "sync_nudge"}),
-            MessageAttributes={
-                "AWS.SNS.MOBILE.APNS.PUSH_TYPE": {
-                    "DataType": "String",
-                    "StringValue": "background",  # Silent push
-                },
-            },
-        )
-```
-
-Client handles the nudge (iOS):
-
-```swift
-// AppDelegate.swift
-func application(
-    _ application: UIApplication,
-    didReceiveRemoteNotification userInfo: [AnyHashable: Any],
-    fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
-) {
-    guard let type = userInfo["type"] as? String, type == "sync_nudge" else {
-        completionHandler(.noData)
-        return
-    }
-
-    Task {
-        do {
-            try await SyncEngine.shared.sync()
-            completionHandler(.newData)
-        } catch {
-            completionHandler(.failed)
-        }
-    }
-}
-```
+See [iOS Client Implementation](./sync-client-ios.md#push-notification-nudge-handling) for client-side handling.
 
 ---
 
 ## Testing Strategy
 
-### Unit Tests (Server)
+### Server-Side Tests
 
-Test conflict resolution, cursor parsing, and operation processing in isolation:
+| Layer | What to Test | Location |
+|-------|--------------|----------|
+| Unit | Conflict resolution, cursor parsing, LWW logic | `tests/sync/test_services.py` |
+| Integration | Push/pull API cycle, idempotency, soft-delete handling | `tests/sync/test_api.py` |
 
-```python
-# tests/sync/test_conflict_resolution.py
-
-class TestFieldLevelLWW:
-    def test_client_wins_when_newer(self):
-        entity = ContactFactory(
-            name="Old Name",
-            field_timestamps={"name": "2025-01-01T10:00:00Z"}
-        )
-
-        applied, rejected = apply_field_level_lww(
-            entity=entity,
-            client_data={"name": "New Name"},
-            client_timestamp=datetime(2025, 1, 1, 11, 0, 0, tzinfo=UTC),
-        )
-
-        assert applied == {"name": "New Name"}
-        assert rejected == {}
-        assert entity.name == "New Name"
-
-    def test_server_wins_when_newer(self):
-        entity = ContactFactory(
-            name="Server Name",
-            field_timestamps={"name": "2025-01-01T12:00:00Z"}
-        )
-
-        applied, rejected = apply_field_level_lww(
-            entity=entity,
-            client_data={"name": "Client Name"},
-            client_timestamp=datetime(2025, 1, 1, 11, 0, 0, tzinfo=UTC),
-        )
-
-        assert applied == {}
-        assert "name" in rejected
-        assert entity.name == "Server Name"
-```
-
-### Integration Tests (Server)
-
-Test the full push/pull cycle:
-
-```python
-# tests/sync/test_api.py
-
-class TestSyncPushPull:
-    def test_push_then_pull_returns_changes(self, api_client, organization):
-        # Push a create operation
-        response = api_client.post("/api/v1/sync/push", json={
-            "operations": [{
-                "idempotency_key": "op_123",
-                "entity_type": "contact",
-                "entity_id": "ct_456",
-                "intent": "create",
-                "client_timestamp": "2025-01-01T10:00:00Z",
-                "data": {"name": "Alice", "email": "alice@example.com"}
-            }]
-        })
-        assert response.json()["results"][0]["status"] == "applied"
-
-        # Pull should return the created entity
-        response = api_client.get("/api/v1/sync/pull")
-        changes = response.json()["changes"]
-
-        assert len(changes) == 1
-        assert changes[0]["entity_id"] == "ct_456"
-        assert changes[0]["data"]["name"] == "Alice"
-```
+Key test cases:
+- Client wins when timestamp is newer
+- Server wins when timestamp is newer
+- Duplicate idempotency keys return `duplicate` status
+- Soft-deleted entities appear in pull with `operation: delete`
+- Cursor pagination works correctly
 
 ### Client-Side Tests
 
-Mock the server and test queue behavior, retry logic, and conflict handling:
+| Layer | What to Test |
+|-------|--------------|
+| Unit | Retry policy, backoff calculation, queue operations |
+| Integration | Mock server responses, partial batch failure handling |
+| E2E | Real server, multi-client sync scenarios |
 
-```swift
-// Tests/SyncTests/OperationQueueTests.swift
-
-final class OperationQueueTests: XCTestCase {
-    func testRetriesOnServerError() async throws {
-        let mockApi = MockSyncAPIClient()
-        mockApi.pushResults = [
-            .failure(SyncError(code: "SERVER_ERROR", message: "Internal error", statusCode: 500)),
-            .success([PushResult(idempotencyKey: "key1", status: .applied, errorCode: nil, errorMessage: nil)])
-        ]
-
-        let queue = OperationQueue(modelContainer: testContainer)
-        let engine = SyncEngine(operationQueue: queue, apiClient: mockApi, modelContainer: testContainer)
-
-        try await queue.enqueue(createTestOperation())
-
-        // First attempt fails
-        try? await engine.sync()
-        XCTAssertEqual(mockApi.pushCallCount, 1)
-
-        // Wait for retry delay
-        try await Task.sleep(for: .seconds(2))
-
-        // Second attempt succeeds
-        try await engine.sync()
-        XCTAssertEqual(mockApi.pushCallCount, 2)
-        let pending = try await queue.getPending()
-        XCTAssertTrue(pending.isEmpty)
-    }
-
-    func testDoesNotRetryValidationErrors() async throws {
-        let mockApi = MockSyncAPIClient()
-        mockApi.pushResults = [
-            .success([PushResult(
-                idempotencyKey: "key1",
-                status: .rejected,
-                errorCode: "VALIDATION_ERROR",
-                errorMessage: "Invalid data"
-            )])
-        ]
-
-        let queue = OperationQueue(modelContainer: testContainer)
-        let engine = SyncEngine(operationQueue: queue, apiClient: mockApi, modelContainer: testContainer)
-
-        try await queue.enqueue(createTestOperation())
-        try await engine.sync()
-
-        let failed = try await queue.getFailed()
-        XCTAssertEqual(failed.count, 1)
-        XCTAssertEqual(failed.first?.errorCode, "VALIDATION_ERROR")
-    }
-}
-```
-
-### End-to-End Tests
-
-Test the full flow with a real server (use in CI):
-
-```swift
-// Tests/SyncE2ETests/SyncE2ETests.swift
-
-final class SyncE2ETests: XCTestCase {
-    func testSyncsDataBetweenTwoClients() async throws {
-        // Client A creates a contact offline
-        let clientA = SyncEngine(
-            organizationId: organizationId,
-            deviceId: deviceIdA,
-            apiClient: realAPIClient
-        )
-        try await clientA.createContact(name: "Bob")
-
-        // Client A syncs
-        try await clientA.sync()
-
-        // Client B pulls
-        let clientB = SyncEngine(
-            organizationId: organizationId,
-            deviceId: deviceIdB,
-            apiClient: realAPIClient
-        )
-        try await clientB.sync()
-
-        // Client B should have the contact
-        let contacts = try await clientB.getAllContacts()
-        XCTAssertTrue(contacts.contains { $0.name == "Bob" })
-    }
-}
-```
+Key test cases:
+- Operations persist before showing success to user
+- Retries on 5xx errors with exponential backoff
+- No retry on validation errors (4xx)
+- Cursor invalid triggers full resync
 
 ---
 
