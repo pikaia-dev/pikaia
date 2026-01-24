@@ -79,8 +79,9 @@ def sync_push(request: HttpRequest, payload: SyncPushRequest) -> SyncPushRespons
                         organization_id=str(organization.id),
                     )
             except Exception as e:
-                # Don't fail the sync if event publishing fails
-                logger.warning(
+                # Don't fail the sync if event publishing fails, but log as error
+                # for alerting since this is an integration failure
+                logger.error(
                     "sync_event_publish_failed",
                     entity_type=op.entity_type,
                     entity_id=op.entity_id,

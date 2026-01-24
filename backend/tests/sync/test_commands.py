@@ -9,8 +9,10 @@ import pytest
 from django.core.management import call_command
 from django.utils import timezone
 
+from apps.sync.models import SyncOperation
 from tests.accounts.factories import OrganizationFactory
 from tests.sync.conftest import SyncTestContact
+from tests.sync.factories import SyncOperationFactory
 
 
 @pytest.mark.django_db
@@ -213,3 +215,122 @@ class TestBackfillFieldTimestamps:
         )
 
         assert "Unknown entity type" in err.getvalue()
+
+
+@pytest.mark.django_db
+class TestCleanupSyncOperations:
+    """Tests for cleanup_sync_operations command."""
+
+    def test_dry_run_shows_count_without_deleting(self):
+        """Dry run should show what would be deleted without deleting."""
+        # Create old sync operation
+        old_date = timezone.now() - timedelta(days=400)
+        op = SyncOperationFactory.create(status=SyncOperation.Status.APPLIED)
+        SyncOperation.objects.filter(id=op.id).update(server_timestamp=old_date)
+
+        out = StringIO()
+        call_command("cleanup_sync_operations", "--dry-run", stdout=out)
+
+        output = out.getvalue()
+        assert "DRY RUN" in output
+        assert "1" in output
+        assert "would be removed" in output
+
+        # Operation should still exist
+        assert SyncOperation.objects.filter(id=op.id).exists()
+
+    def test_deletes_old_operations(self):
+        """Should delete operations past retention period."""
+        old_date = timezone.now() - timedelta(days=400)
+        op = SyncOperationFactory.create(status=SyncOperation.Status.APPLIED)
+        SyncOperation.objects.filter(id=op.id).update(server_timestamp=old_date)
+
+        op_id = op.id
+
+        out = StringIO()
+        call_command("cleanup_sync_operations", "--retention-days=365", stdout=out)
+
+        output = out.getvalue()
+        assert "1 sync operations removed" in output
+
+        # Operation should be deleted
+        assert not SyncOperation.objects.filter(id=op_id).exists()
+
+    def test_preserves_recent_operations(self):
+        """Should not delete operations within retention period."""
+        op = SyncOperationFactory.create(status=SyncOperation.Status.APPLIED)
+
+        out = StringIO()
+        call_command("cleanup_sync_operations", "--retention-days=365", stdout=out)
+
+        output = out.getvalue()
+        assert "No sync operations to remove" in output
+
+        # Operation should still exist
+        assert SyncOperation.objects.filter(id=op.id).exists()
+
+    def test_filters_by_status(self):
+        """Should filter by status when specified."""
+        old_date = timezone.now() - timedelta(days=400)
+
+        op_applied = SyncOperationFactory.create(status=SyncOperation.Status.APPLIED)
+        op_rejected = SyncOperationFactory.create(status=SyncOperation.Status.REJECTED)
+
+        SyncOperation.objects.filter(id__in=[op_applied.id, op_rejected.id]).update(
+            server_timestamp=old_date
+        )
+
+        out = StringIO()
+        call_command(
+            "cleanup_sync_operations",
+            "--retention-days=365",
+            "--status=applied",
+            stdout=out,
+        )
+
+        output = out.getvalue()
+        assert "1 sync operations removed" in output
+
+        # Only applied should be deleted
+        assert not SyncOperation.objects.filter(id=op_applied.id).exists()
+        assert SyncOperation.objects.filter(id=op_rejected.id).exists()
+
+    def test_batch_deletion(self):
+        """Should delete in batches."""
+        old_date = timezone.now() - timedelta(days=400)
+
+        # Create multiple operations
+        ops = [SyncOperationFactory.create() for _ in range(5)]
+        SyncOperation.objects.filter(id__in=[op.id for op in ops]).update(server_timestamp=old_date)
+
+        out = StringIO()
+        call_command(
+            "cleanup_sync_operations",
+            "--retention-days=365",
+            "--batch-size=2",
+            stdout=out,
+        )
+
+        output = out.getvalue()
+        assert "5 sync operations removed" in output
+
+        # All should be deleted
+        assert SyncOperation.objects.filter(id__in=[op.id for op in ops]).count() == 0
+
+    def test_dry_run_shows_status_breakdown(self):
+        """Dry run should show breakdown by status."""
+        old_date = timezone.now() - timedelta(days=400)
+
+        SyncOperationFactory.create(status=SyncOperation.Status.APPLIED)
+        SyncOperationFactory.create(status=SyncOperation.Status.APPLIED)
+        SyncOperationFactory.create(status=SyncOperation.Status.REJECTED)
+
+        SyncOperation.objects.all().update(server_timestamp=old_date)
+
+        out = StringIO()
+        call_command("cleanup_sync_operations", "--dry-run", stdout=out)
+
+        output = out.getvalue()
+        assert "Breakdown by status" in output
+        assert "applied" in output
+        assert "rejected" in output
