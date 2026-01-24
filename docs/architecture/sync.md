@@ -34,8 +34,8 @@ The sync engine enables mobile and desktop apps to work offline while maintainin
 ┌─────────────────────────────────────────────────────────────────┐
 │                          CLIENTS                                 │
 ├─────────────────────┬─────────────────────┬─────────────────────┤
-│   Web (React)       │   Mobile (Native)   │   Desktop           │
-│                     │                     │   (Electron)        │
+│   Web (React)       │   Mobile (Native)   │   Desktop (Native)  │
+│                     │                     │                     │
 │   Always online     │   Offline-first     │   Offline-first     │
 │   Standard REST     │   Sync Engine       │   Sync Engine       │
 │   /api/v1/*         │   /api/v1/sync/*    │   /api/v1/sync/*    │
@@ -163,16 +163,16 @@ It does not mean:
 - Client state matches server state
 - No pull is needed
 
-```typescript
+```swift
 // Wrong assumption
-if (operationQueue.isEmpty()) {
-  console.log("Client is in sync"); // False!
+if await operationQueue.isEmpty {
+    print("Client is in sync")  // False!
 }
 
 // Correct understanding
-if (operationQueue.isEmpty()) {
-  console.log("No pending local changes");
-  // Still need to pull to get server changes
+if await operationQueue.isEmpty {
+    print("No pending local changes")
+    // Still need to pull to get server changes
 }
 ```
 
@@ -612,57 +612,51 @@ class FieldLevelLWWMixin(models.Model):
 
 Clients should track when they modified each field locally:
 
-```typescript
-// client/models/Contact.ts
+```swift
+// Models/Contact.swift
 
-interface FieldTimestamps {
-  [fieldName: string]: string; // ISO timestamp
-}
+@Model
+final class Contact {
+    var id: String
+    var name: String
+    var phone: String
+    var email: String
 
-interface Contact {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-  // ... other fields
+    // Track local modification times per field
+    var fieldTimestamps: [String: Date] = [:]
 
-  // Track local modification times
-  _fieldTimestamps: FieldTimestamps;
-}
-
-// When user edits a field
-function updateContactField(contact: Contact, field: string, value: any): Contact {
-  return {
-    ...contact,
-    [field]: value,
-    _fieldTimestamps: {
-      ...contact._fieldTimestamps,
-      [field]: new Date().toISOString(),
-    },
-  };
+    func updateField(_ field: String, value: Any) {
+        switch field {
+        case "name": name = value as! String
+        case "phone": phone = value as! String
+        case "email": email = value as! String
+        default: break
+        }
+        fieldTimestamps[field] = Date()
+    }
 }
 
 // When creating sync operation, use the field's timestamp
-function createSyncOperation(contact: Contact, changedFields: string[]): SyncOperation {
-  const data: Record<string, any> = {};
+func createSyncOperation(contact: Contact, changedFields: [String]) -> SyncOperationDTO {
+    var data: [String: AnyCodable] = [:]
   let latestTimestamp = new Date(0);
 
   for (const field of changedFields) {
-    data[field] = contact[field];
-    const fieldTs = new Date(contact._fieldTimestamps[field]);
-    if (fieldTs > latestTimestamp) {
-      latestTimestamp = fieldTs;
+    for field in changedFields {
+        data[field] = AnyCodable(contact.value(forKey: field))
+        if let fieldTs = contact.fieldTimestamps[field], fieldTs > latestTimestamp {
+            latestTimestamp = fieldTs
+        }
     }
-  }
 
-  return {
-    idempotencyKey: generateULID(),
-    entityType: 'contact',
-    entityId: contact.id,
-    intent: 'update',
-    clientTimestamp: latestTimestamp, // Use latest field timestamp
-    data,
-  };
+    return SyncOperationDTO(
+        idempotencyKey: IDGenerator.generate(for: .contact),
+        entityType: "contact",
+        entityId: contact.id,
+        intent: "update",
+        data: data,
+        clientTimestamp: ISO8601DateFormatter().string(from: latestTimestamp)
+    )
 }
 ```
 
@@ -793,38 +787,26 @@ class Command(BaseCommand):
 
 #### Client Handling of Deletions
 
-```typescript
-// client/sync/SyncEngine.ts
+```swift
+// SyncEngine+Pull.swift
 
-async processPullResponse(response: SyncPullResponse): Promise<void> {
-  for (const change of response.changes) {
-    if (change.operation === 'delete') {
-      // Remove from local database
-      await this.db.delete(change.entityType, change.entityId);
-      // Also remove any pending operations for this entity
-      await this.operationQueue.removeForEntity(change.entityType, change.entityId);
-    } else {
-      // Upsert: insert or update
-      await this.db.upsert(change.entityType, change.entityId, change.data);
+func processPullResponse(_ response: SyncPullResponse, context: ModelContext) async throws {
+    for change in response.changes {
+        if change.operation == "delete" {
+            // Remove from local database
+            try deleteEntity(type: change.entityType, id: change.entityId, context: context)
+            // Also remove any pending operations for this entity
+            try await operationQueue.removeForEntity(type: change.entityType, id: change.entityId)
+        } else {
+            // Upsert: insert or update
+            try upsertEntity(type: change.entityType, id: change.entityId, data: change.data, context: context)
+        }
     }
-  }
+    try context.save()
 
-  // Persist new cursor
-  await this.db.setCursor(response.cursor);
+    // Persist new cursor
+    await cursorManager.setCursor(response.cursor)
 }
-```
-
-#### Index Optimization
-
-```sql
--- Index for pull queries - no partial index, we need all records including deleted
-CREATE INDEX idx_syncable_pull ON {entity_table}
-    (organization_id, updated_at, id);
-
--- Separate index for tombstone cleanup
-CREATE INDEX idx_syncable_tombstones ON {entity_table}
-    (deleted_at)
-    WHERE deleted_at IS NOT NULL;
 ```
 
 ### Cursor Ordering and Clock Skew
@@ -917,24 +899,25 @@ def fetch_changes_for_pull(
 
 #### Client Idempotency for Overlap
 
-```typescript
-// client/sync/SyncEngine.ts
+```swift
+// SyncEngine+Pull.swift
 
-async processPullResponse(response: SyncPullResponse): Promise<void> {
-  for (const change of response.changes) {
-    // Idempotent upsert - handles duplicates from overlap window
-    const existing = await this.db.get(change.entityType, change.entityId);
+func processPullResponse(_ response: SyncPullResponse, context: ModelContext) async throws {
+    for change in response.changes {
+        // Idempotent upsert - handles duplicates from overlap window
+        let existing = try fetchEntity(type: change.entityType, id: change.entityId, context: context)
 
-    if (change.operation === 'delete') {
-      await this.db.delete(change.entityType, change.entityId);
-    } else if (!existing || existing.version < change.version) {
-      // Only apply if newer than local version
-      await this.db.upsert(change.entityType, change.entityId, change.data);
+        if change.operation == "delete" {
+            try deleteEntity(type: change.entityType, id: change.entityId, context: context)
+        } else if existing == nil || existing!.version < change.version {
+            // Only apply if newer than local version
+            try upsertEntity(type: change.entityType, id: change.entityId, data: change.data, context: context)
+        }
+        // else: duplicate from overlap window, skip
     }
-    // else: duplicate from overlap window, skip
-  }
 
-  await this.db.setCursor(response.cursor);
+    try context.save()
+    await cursorManager.setCursor(response.cursor)
 }
 ```
 
@@ -989,26 +972,28 @@ CREATE TRIGGER trg_sync_sequence
 
 Even with overlap windows, recommend periodic full syncs to catch edge cases:
 
-```typescript
-// client/sync/SyncEngine.ts
+```swift
+// SyncEngine+FullSync.swift
 
-class SyncEngine {
-  private lastFullSync: Date | null = null;
-  private FULL_SYNC_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+extension SyncEngine {
+    private static let fullSyncInterval: TimeInterval = 24 * 60 * 60  // 24 hours
+    private static let lastFullSyncKey = "sync_last_full_sync"
 
-  async triggerSync(): Promise<void> {
-    const needsFullSync = !this.lastFullSync ||
-      Date.now() - this.lastFullSync.getTime() > this.FULL_SYNC_INTERVAL;
+    func triggerSync() async throws {
+        let lastFullSync = UserDefaults.standard.object(forKey: Self.lastFullSyncKey) as? Date
+        let needsFullSync = lastFullSync == nil ||
+            Date().timeIntervalSince(lastFullSync!) > Self.fullSyncInterval
 
-    if (needsFullSync) {
-      // Full sync: pull from beginning
-      await this.pullChanges(null); // since=null
-      this.lastFullSync = new Date();
-    } else {
-      // Incremental sync
-      await this.pullChanges(this.lastCursor);
+        if needsFullSync {
+            // Full sync: pull from beginning
+            await cursorManager.resetCursor()
+            try await pullWithRecovery()
+            UserDefaults.standard.set(Date(), forKey: Self.lastFullSyncKey)
+        } else {
+            // Incremental sync
+            try await pullWithRecovery()
+        }
     }
-  }
 }
 ```
 
@@ -1251,7 +1236,7 @@ Authorization: Bearer <jwt>
       "updated_at": "2025-01-02T23:10:00Z"
     }
   ],
-  "cursor": "2025-01-02T23:10:00Z_te_01HN8J9K...",
+  "cursor": "MjAyNS0wMS0wMlQyMzoxMDowMFpfdGVfMDFIOEo5SzJNM040UDVRNlI4REVMRVRFRA==",  // base64({timestamp}_{last_entity_id})
   "has_more": false
 }
 ```
@@ -1266,16 +1251,20 @@ Authorization: Bearer <jwt>
 
 ### Cursor Design
 
-The cursor is an opaque token encoding position in the changeset:
+The cursor is an opaque base64-encoded token. Internally it encodes:
 
 ```
-{timestamp}_{entity_id}
+base64({timestamp}_{entity_id})
 ```
 
 **Why timestamp + ID?**
 - Timestamp alone is ambiguous (multiple changes per millisecond)
 - Combined value ensures stable ordering
-- Opaque to client—can change encoding without breaking clients
+
+**Why base64?**
+- Truly opaque to client—discourages parsing or constructing cursors
+- Can change internal format without breaking clients
+- URL-safe when using base64url variant
 
 **Monotonicity Guarantees:**
 
@@ -1432,15 +1421,16 @@ class NoteContent(models.Model):
 
 ## Client-Side Architecture
 
-### Recommended Architecture (Native Mobile)
+> **Platform-specific implementation guides:**
+> - [iOS (Swift)](./sync-client-ios.md) - SwiftUI, SwiftData, Swift Concurrency
+
+### Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────┐
 │                    UI Layer                      │
-│              (SwiftUI / Jetpack Compose)         │
 ├─────────────────────────────────────────────────┤
 │               State Management                   │
-│        (Combine / Kotlin Flow + local queries)   │
 ├─────────────────────────────────────────────────┤
 │                 Sync Engine                      │
 │     ┌─────────────┬─────────────┬────────────┐  │
@@ -1449,368 +1439,32 @@ class NoteContent(models.Model):
 │     └─────────────┴─────────────┴────────────┘  │
 ├─────────────────────────────────────────────────┤
 │               Local Database                     │
-│           (Core Data / Room)                     │
 └─────────────────────────────────────────────────┘
 ```
 
-### Client-Side ID Generation
+### Key Requirements
 
-Use **ULIDs** for time-ordered, collision-resistant IDs:
+1. **Persistent Operation Queue** - Operations must be persisted locally **before** showing success to the user
+2. **Client-Side ID Generation** - Use ULIDs for time-ordered, collision-resistant IDs
+3. **Exponential Backoff** - Retry transient failures with jitter (max 10 attempts over ~5 hours)
+4. **Network Awareness** - Pause sync when offline, trigger immediately when reconnecting
+5. **Partial Batch Handling** - Handle mixed success/failure in batch pushes independently
+6. **Background Sync** - Continue syncing when app is backgrounded
 
-```typescript
-// Using ULID for client-generated IDs
-import { ulid } from 'ulid';
+### Retry Delays
 
-const PREFIX_MAP = {
-  time_entry: 'te_',
-  project: 'prj_',
-  contact: 'ct_',
-};
-
-function generateId(entityType: string): string {
-  const prefix = PREFIX_MAP[entityType] || 'ent_';
-  return `${prefix}${ulid()}`;
-}
-```
-
-### Persistent Operation Queue
-
-Operations must be persisted to local storage **before** showing success to the user:
-
-```typescript
-// SQLite schema for operation queue
-CREATE TABLE sync_operations (
-  idempotency_key TEXT PRIMARY KEY,
-  entity_type TEXT NOT NULL,
-  entity_id TEXT NOT NULL,
-  intent TEXT NOT NULL,  -- create, update, delete
-  payload TEXT NOT NULL, -- JSON
-  created_at TEXT NOT NULL,
-  status TEXT DEFAULT 'pending',  -- pending, syncing, failed
-  attempts INTEGER DEFAULT 0,
-  last_error TEXT,
-  next_retry_at TEXT
-);
-
-CREATE INDEX idx_ops_status ON sync_operations(status, next_retry_at);
-```
-
-```typescript
-class PersistentOperationQueue {
-  private db: SQLiteDatabase;
-
-  async enqueue(operation: Operation): Promise<void> {
-    // Persist BEFORE returning to caller
-    await this.db.run(`
-      INSERT INTO sync_operations
-      (idempotency_key, entity_type, entity_id, intent, payload, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [
-      operation.idempotency_key,
-      operation.entity_type,
-      operation.entity_id,
-      operation.intent,
-      JSON.stringify(operation.data),
-      new Date().toISOString(),
-    ]);
-  }
-
-  async getPending(): Promise<Operation[]> {
-    return this.db.query(`
-      SELECT * FROM sync_operations
-      WHERE status = 'pending'
-         OR (status = 'failed' AND next_retry_at <= datetime('now'))
-      ORDER BY created_at
-      LIMIT 100
-    `);
-  }
-
-  async markSynced(idempotencyKey: string): Promise<void> {
-    await this.db.run(`
-      DELETE FROM sync_operations WHERE idempotency_key = ?
-    `, [idempotencyKey]);
-  }
-}
-```
-
-### Retry Logic with Exponential Backoff
-
-```typescript
-class SyncRetryPolicy {
-  private readonly MAX_ATTEMPTS = 10;
-  private readonly BASE_DELAY_MS = 1000;
-  private readonly MAX_DELAY_MS = 300000; // 5 minutes
-
-  calculateNextRetry(attempts: number): Date {
-    // Exponential backoff with jitter
-    const delay = Math.min(
-      this.BASE_DELAY_MS * Math.pow(2, attempts),
-      this.MAX_DELAY_MS
-    );
-    const jitter = delay * 0.2 * Math.random();
-
-    return new Date(Date.now() + delay + jitter);
-  }
-
-  shouldRetry(operation: Operation, error: SyncError): boolean {
-    if (operation.attempts >= this.MAX_ATTEMPTS) {
-      return false; // Move to failed permanently
-    }
-
-    // Retry on network/server errors, not validation errors
-    return error.isRetryable();
-  }
-}
-
-class SyncError {
-  constructor(
-    public readonly code: string,
-    public readonly message: string,
-    public readonly statusCode?: number
-  ) {}
-
-  isRetryable(): boolean {
-    // Network errors
-    if (!this.statusCode) return true;
-
-    // Server errors (5xx) are retryable
-    if (this.statusCode >= 500) return true;
-
-    // Rate limiting
-    if (this.statusCode === 429) return true;
-
-    // Client errors (4xx except 429) are NOT retryable
-    return false;
-  }
-}
-```
-
-Retry delays example:
-
-| Attempt | Base Delay | With Jitter (±50%) |
+| Attempt | Base Delay | With Jitter (±20%) |
 |---------|------------|-------------------|
-| 1 | 1s | 0.5s - 1.5s |
-| 2 | 2s | 1s - 3s |
-| 3 | 4s | 2s - 6s |
-| 4 | 8s | 4s - 12s |
-| 5 | 16s | 8s - 24s |
-| 6 | 32s | 16s - 48s |
-| 7 | 64s | 32s - 96s |
-| 8 | 128s | 64s - 192s |
-| 9 | 256s | 128s - 384s |
-| 10 | 300s (capped) | 150s - 450s |
-
-### Partial Batch Failure Handling
-
-A batch push may have mixed results—handle each operation independently:
-
-```typescript
-interface PushResult {
-  idempotency_key: string;
-  status: 'applied' | 'duplicate' | 'rejected';
-  error_code?: string;
-  error_message?: string;
-}
-
-async function handlePushResults(results: PushResult[]): Promise<void> {
-  for (const result of results) {
-    switch (result.status) {
-      case 'applied':
-      case 'duplicate':
-        // Success - remove from queue
-        await queue.markSynced(result.idempotency_key);
-        break;
-
-      case 'rejected':
-        if (isRetryableError(result.error_code)) {
-          // Transient error - schedule retry
-          await queue.scheduleRetry(result.idempotency_key);
-        } else {
-          // Permanent failure - mark as failed, notify user
-          await queue.markPermanentlyFailed(result.idempotency_key, result.error_message);
-          notifyUserOfFailure(result);
-        }
-        break;
-    }
-  }
-}
-
-function isRetryableError(code: string | undefined): boolean {
-  const permanentErrors = [
-    'PROJECT_ARCHIVED',
-    'ENTITY_NOT_FOUND',
-    'PERMISSION_DENIED',
-    'VALIDATION_ERROR',
-  ];
-  return !permanentErrors.includes(code || '');
-}
-```
-
-### Network State Detection
-
-```typescript
-import NetInfo from '@react-native-community/netinfo';
-
-class NetworkAwareSyncScheduler {
-  private isOnline = true;
-  private syncInProgress = false;
-
-  constructor() {
-    // Listen for connectivity changes
-    NetInfo.addEventListener(state => {
-      const wasOffline = !this.isOnline;
-      this.isOnline = state.isConnected && state.isInternetReachable;
-
-      // Trigger sync when coming back online
-      if (wasOffline && this.isOnline) {
-        this.scheduleSync(0); // Immediate sync
-      }
-    });
-  }
-
-  async scheduleSync(delayMs: number = 30000): Promise<void> {
-    if (!this.isOnline || this.syncInProgress) return;
-
-    await delay(delayMs);
-
-    if (!this.isOnline) return; // Re-check after delay
-
-    this.syncInProgress = true;
-    try {
-      await this.sync();
-    } finally {
-      this.syncInProgress = false;
-    }
-  }
-
-  private async sync(): Promise<void> {
-    try {
-      await this.pushPendingOperations();
-      await this.pullServerChanges();
-
-      // Schedule next sync
-      this.scheduleSync(30000);
-    } catch (error) {
-      if (error instanceof NetworkError) {
-        // Back off on network errors
-        this.scheduleSync(60000);
-      } else {
-        throw error;
-      }
-    }
-  }
-}
-```
-
-### Sync State Machine
-
-```typescript
-type SyncState =
-  | { status: 'idle' }
-  | { status: 'pushing', batchSize: number }
-  | { status: 'pulling', cursor: string | null }
-  | { status: 'error', error: Error, retryAt: Date };
-
-class SyncEngine {
-  private state: SyncState = { status: 'idle' };
-  private pullInterval = 30_000; // 30 seconds
-
-  async start(): Promise<void> {
-    // Listen for network changes
-    NetInfo.addEventListener(state => {
-      if (state.isConnected) {
-        this.triggerSync();
-      }
-    });
-
-    // Periodic sync - always pull even if queue is empty
-    // Empty queue only means "no local changes", not "up-to-date with server"
-    setInterval(() => this.triggerSync(), this.pullInterval);
-  }
-
-  async triggerSync(): Promise<void> {
-    if (this.state.status !== 'idle') return;
-
-    // Push first (client changes take priority)
-    await this.pushPendingOperations();
-
-    // ALWAYS pull after push, regardless of queue state
-    // Server may have changes from other clients, admin, background jobs, etc.
-    await this.pullChanges();
-  }
-
-  /**
-   * Check if client has pending local changes.
-   * WARNING: This does NOT indicate sync status with server.
-   */
-  hasPendingChanges(): boolean {
-    return !this.operationQueue.isEmpty();
-  }
-
-  /**
-   * Check if client is likely in sync with server.
-   * Note: This is a heuristic, not a guarantee.
-   */
-  isLikelySynced(): boolean {
-    return (
-      this.operationQueue.isEmpty() &&           // No pending local changes
-      this.state.status === 'idle' &&            // Not currently syncing
-      this.lastPullAt !== null &&                // Has pulled at least once
-      Date.now() - this.lastPullAt < 60_000      // Pulled within last minute
-    );
-  }
-}
-```
-
-### Pull Failure Recovery
-
-```typescript
-class SyncCursorManager {
-  private readonly CURSOR_KEY = 'sync_cursor';
-
-  async getCursor(): Promise<string | null> {
-    return AsyncStorage.getItem(this.CURSOR_KEY);
-  }
-
-  async setCursor(cursor: string): Promise<void> {
-    await AsyncStorage.setItem(this.CURSOR_KEY, cursor);
-  }
-
-  async resetCursor(): Promise<void> {
-    // Full re-sync from beginning
-    await AsyncStorage.removeItem(this.CURSOR_KEY);
-  }
-}
-
-async function pullWithRecovery(): Promise<void> {
-  const cursor = await cursorManager.getCursor();
-
-  try {
-    const { changes, cursor: newCursor, hasMore } = await api.pull(cursor);
-
-    // Apply changes in transaction
-    await db.transaction(async () => {
-      for (const change of changes) {
-        await applyChange(change);
-      }
-    });
-
-    // Only update cursor after successful apply
-    await cursorManager.setCursor(newCursor);
-
-  } catch (error) {
-    if (error instanceof CursorInvalidError) {
-      // Server says cursor is stale/invalid - full re-sync
-      console.warn('Cursor invalid, triggering full re-sync');
-      await cursorManager.resetCursor();
-      await clearLocalData();
-      await pullWithRecovery(); // Retry from beginning
-    } else {
-      throw error;
-    }
-  }
-}
-```
+| 1 | 1s | 0.8s - 1.2s |
+| 2 | 2s | 1.6s - 2.4s |
+| 3 | 4s | 3.2s - 4.8s |
+| 4 | 8s | 6.4s - 9.6s |
+| 5 | 16s | 12.8s - 19.2s |
+| 6 | 32s | 25.6s - 38.4s |
+| 7 | 64s | 51.2s - 76.8s |
+| 8 | 128s | 102.4s - 153.6s |
+| 9 | 256s | 204.8s - 307.2s |
+| 10 | 300s (capped) | 240s - 360s |
 
 ### Reliability Guarantees Summary
 
@@ -2092,39 +1746,12 @@ After:   Mobile → API Gateway → Lambda → PostgreSQL → EventBridge
 
 ### Database Optimizations
 
+For large deployments, consider partitioning the sync_operations table by month:
+
 ```sql
--- Composite index for pull queries
--- No partial index - we need all records including soft-deleted
-CREATE INDEX idx_syncable_pull ON {entity_table}
-    (organization_id, updated_at, id);
-
--- Index for tombstone cleanup job
-CREATE INDEX idx_syncable_tombstones ON {entity_table}
-    (deleted_at)
-    WHERE deleted_at IS NOT NULL;
-
--- Partition sync_operations by month for large deployments
 CREATE TABLE sync_operations (
     ...
 ) PARTITION BY RANGE (server_timestamp);
-```
-
-### Database Indexing
-
-Critical indexes for sync performance:
-
-```python
-class Meta:
-    indexes = [
-        # Pull query: changes since cursor
-        models.Index(fields=["organization", "updated_at"]),
-
-        # Idempotency check
-        models.Index(fields=["idempotency_key"]),
-
-        # Soft delete cleanup
-        models.Index(fields=["deleted_at"]),
-    ]
 ```
 
 ### Rate Limiting
@@ -2157,42 +1784,40 @@ Sometimes the client needs to throw away its cursor and re-sync from scratch. Th
 
 ### Client Implementation
 
-```typescript
-class SyncEngine {
-  private readonly SCHEMA_VERSION = 3; // Bump when entity schema changes
-  private readonly FULL_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+```swift
+extension SyncEngine {
+    private static let schemaVersion = 3  // Bump when entity schema changes
+    private static let schemaVersionKey = "sync_schema_version"
 
-  async initialize(): Promise<void> {
-    const storedVersion = await this.db.getSchemaVersion();
+    func initialize() async throws {
+        let storedVersion = UserDefaults.standard.integer(forKey: Self.schemaVersionKey)
 
-    if (storedVersion !== this.SCHEMA_VERSION) {
-      // App was upgraded, schema may have changed
-      await this.triggerFullResync('schema_upgrade');
-      await this.db.setSchemaVersion(this.SCHEMA_VERSION);
-    }
-  }
-
-  async triggerFullResync(reason: string): Promise<void> {
-    console.log(`Full re-sync triggered: ${reason}`);
-
-    // Clear cursor - next pull starts from beginning
-    await this.db.clearSyncCursor();
-
-    // Clear local data (or mark as stale)
-    await this.db.clearAllSyncableEntities();
-
-    // Pull everything
-    await this.pullChanges(null);
-  }
-
-  async handlePullResponse(response: SyncPullResponse): Promise<void> {
-    if (response.force_resync) {
-      await this.triggerFullResync('server_requested');
-      return;
+        if storedVersion != Self.schemaVersion {
+            // App was upgraded, schema may have changed
+            try await triggerFullResync(reason: "schema_upgrade")
+            UserDefaults.standard.set(Self.schemaVersion, forKey: Self.schemaVersionKey)
+        }
     }
 
-    // Normal processing...
-  }
+    func triggerFullResync(reason: String) async throws {
+        // Clear cursor - next pull starts from beginning
+        await cursorManager.resetCursor()
+
+        // Clear local data
+        try await clearLocalData()
+
+        // Pull everything
+        try await pullWithRecovery()
+    }
+
+    func handlePullResponse(_ response: SyncPullResponse) async throws {
+        if response.forceResync == true {
+            try await triggerFullResync(reason: "server_requested")
+            return
+        }
+
+        // Normal processing...
+    }
 }
 ```
 
@@ -2294,9 +1919,9 @@ Schema changes (adding/removing fields) happen with app releases. The approach i
 
 This avoids complex migration logic. The trade-off is that users re-download all data on upgrade, which is acceptable for most B2B apps with <100k entities per workspace.
 
-```typescript
+```swift
 // In your app's version constants
-const SYNC_SCHEMA_VERSION = 4; // Bump this when you add/remove/rename fields
+let syncSchemaVersion = 4  // Bump this when you add/remove/rename fields
 ```
 
 ### API Versioning
@@ -2323,32 +1948,46 @@ What happens when an operation permanently fails (validation error, permission d
 
 Operations that fail with non-retryable errors go to a "dead letter" state:
 
-```typescript
-interface FailedOperation extends PendingOperation {
-  failedAt: Date;
-  errorCode: string;
-  errorMessage: string;
-  userAcknowledged: boolean;
+```swift
+// The SyncOperation model already supports failed state (see sync-client-ios.md)
+// Additional fields for dead letter tracking:
+
+extension SyncOperation {
+    var failedAt: Date?
+    var errorCode: String?
+    var userAcknowledged: Bool = false
 }
 
-class OperationQueue {
-  async markPermanentlyFailed(
-    idempotencyKey: string,
-    errorCode: string,
-    errorMessage: string
-  ): Promise<void> {
-    await this.db.run(`
-      UPDATE pending_operations
-      SET status = 'failed',
-          errorCode = ?,
-          errorMessage = ?,
-          failedAt = datetime('now')
-      WHERE idempotencyKey = ?
-    `, [errorCode, errorMessage, idempotencyKey]);
+extension OperationQueue {
+    func markPermanentlyFailed(
+        _ idempotencyKey: String,
+        errorCode: String,
+        errorMessage: String
+    ) async throws {
+        let context = ModelContext(modelContainer)
+        let predicate = #Predicate<SyncOperation> { $0.idempotencyKey == idempotencyKey }
+        var descriptor = FetchDescriptor(predicate: predicate)
+        descriptor.fetchLimit = 1
 
-    // Notify UI to show error badge
-    this.eventEmitter.emit('operation_failed', { idempotencyKey, errorCode });
-  }
+        guard let operation = try context.fetch(descriptor).first else { return }
+
+        operation.status = .failed
+        operation.errorCode = errorCode
+        operation.lastError = errorMessage
+        operation.failedAt = Date()
+        operation.nextRetryAt = nil
+
+        try context.save()
+
+        // Notify UI to show error badge
+        await MainActor.run {
+            NotificationCenter.default.post(
+                name: .syncOperationFailed,
+                object: nil,
+                userInfo: ["idempotencyKey": idempotencyKey, "errorCode": errorCode]
+            )
+        }
+    }
 }
 ```
 
@@ -2367,18 +2006,26 @@ class OperationQueue {
 - Provide a "Sync Issues" screen listing failed operations
 - Auto-clear acknowledged failures after 30 days
 
-```typescript
-// Example: Sync status indicator
-function SyncStatusBadge() {
-  const failedCount = useSyncFailedCount();
+```swift
+// Example: Sync status indicator (SwiftUI)
+struct SyncStatusBadge: View {
+    @Environment(SyncEngine.self) private var syncEngine
 
-  if (failedCount === 0) return null;
-
-  return (
-    <Badge color="red" onClick={openSyncIssuesScreen}>
-      {failedCount} sync issue{failedCount > 1 ? 's' : ''}
-    </Badge>
-  );
+    var body: some View {
+        if syncEngine.failedOperationCount > 0 {
+            Button {
+                // Navigate to sync issues screen
+            } label: {
+                Text("\(syncEngine.failedOperationCount) sync issue\(syncEngine.failedOperationCount > 1 ? "s" : "")")
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.red)
+                    .foregroundStyle(.white)
+                    .clipShape(Capsule())
+            }
+        }
+    }
 }
 ```
 
@@ -2421,19 +2068,20 @@ Why 100 operations per push:
 - If 1 operation fails, you only retry a small batch
 - Fits comfortably in a single HTTP request
 
-```typescript
-class SyncScheduler {
-  private readonly BATCH_SIZE = 100;
+```swift
+actor SyncScheduler {
+    private let batchSize = 100
 
-  async pushPendingOperations(): Promise<void> {
-    const pending = await this.queue.getReadyOperations();
+    func pushPendingOperations() async throws {
+        let pending = try await queue.getPending()
 
-    // Process in batches
-    for (let i = 0; i < pending.length; i += this.BATCH_SIZE) {
-      const batch = pending.slice(i, i + this.BATCH_SIZE);
-      await this.pushBatch(batch);
+        // Process in batches
+        for startIndex in stride(from: 0, to: pending.count, by: batchSize) {
+            let endIndex = min(startIndex + batchSize, pending.count)
+            let batch = Array(pending[startIndex..<endIndex])
+            try await pushBatch(batch)
+        }
     }
-  }
 }
 ```
 
@@ -2480,15 +2128,29 @@ def notify_clients_to_sync(event, context):
         )
 ```
 
-Client handles the nudge:
+Client handles the nudge (iOS):
 
-```typescript
-// React Native
-messaging().setBackgroundMessageHandler(async (message) => {
-  if (message.data?.type === 'sync_nudge') {
-    await syncEngine.triggerSync();
-  }
-});
+```swift
+// AppDelegate.swift
+func application(
+    _ application: UIApplication,
+    didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+    fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+) {
+    guard let type = userInfo["type"] as? String, type == "sync_nudge" else {
+        completionHandler(.noData)
+        return
+    }
+
+    Task {
+        do {
+            try await SyncEngine.shared.sync()
+            completionHandler(.newData)
+        } catch {
+            completionHandler(.failed)
+        }
+    }
+}
 ```
 
 ---
@@ -2571,77 +2233,93 @@ class TestSyncPushPull:
 
 Mock the server and test queue behavior, retry logic, and conflict handling:
 
-```typescript
-// __tests__/sync/OperationQueue.test.ts
+```swift
+// Tests/SyncTests/OperationQueueTests.swift
 
-describe('OperationQueue', () => {
-  it('retries on server error', async () => {
-    const mockApi = {
-      push: jest.fn()
-        .mockRejectedValueOnce(new HttpError(500))
-        .mockResolvedValueOnce([{ status: 'applied' }])
-    };
+final class OperationQueueTests: XCTestCase {
+    func testRetriesOnServerError() async throws {
+        let mockApi = MockSyncAPIClient()
+        mockApi.pushResults = [
+            .failure(SyncError(code: "SERVER_ERROR", message: "Internal error", statusCode: 500)),
+            .success([PushResult(idempotencyKey: "key1", status: .applied, errorCode: nil, errorMessage: nil)])
+        ]
 
-    const queue = new OperationQueue(mockApi);
-    await queue.enqueue(createOperation);
+        let queue = OperationQueue(modelContainer: testContainer)
+        let engine = SyncEngine(operationQueue: queue, apiClient: mockApi, modelContainer: testContainer)
 
-    // First attempt fails
-    await queue.processQueue();
-    expect(mockApi.push).toHaveBeenCalledTimes(1);
+        try await queue.enqueue(createTestOperation())
 
-    // Wait for retry delay
-    jest.advanceTimersByTime(2000);
+        // First attempt fails
+        try? await engine.sync()
+        XCTAssertEqual(mockApi.pushCallCount, 1)
 
-    // Second attempt succeeds
-    await queue.processQueue();
-    expect(mockApi.push).toHaveBeenCalledTimes(2);
-    expect(await queue.getPending()).toHaveLength(0);
-  });
+        // Wait for retry delay
+        try await Task.sleep(for: .seconds(2))
 
-  it('does not retry validation errors', async () => {
-    const mockApi = {
-      push: jest.fn().mockResolvedValue([{
-        status: 'rejected',
-        error_code: 'VALIDATION_ERROR'
-      }])
-    };
+        // Second attempt succeeds
+        try await engine.sync()
+        XCTAssertEqual(mockApi.pushCallCount, 2)
+        let pending = try await queue.getPending()
+        XCTAssertTrue(pending.isEmpty)
+    }
 
-    const queue = new OperationQueue(mockApi);
-    await queue.enqueue(createOperation);
-    await queue.processQueue();
+    func testDoesNotRetryValidationErrors() async throws {
+        let mockApi = MockSyncAPIClient()
+        mockApi.pushResults = [
+            .success([PushResult(
+                idempotencyKey: "key1",
+                status: .rejected,
+                errorCode: "VALIDATION_ERROR",
+                errorMessage: "Invalid data"
+            )])
+        ]
 
-    const failed = await queue.getFailed();
-    expect(failed).toHaveLength(1);
-    expect(failed[0].errorCode).toBe('VALIDATION_ERROR');
-  });
-});
+        let queue = OperationQueue(modelContainer: testContainer)
+        let engine = SyncEngine(operationQueue: queue, apiClient: mockApi, modelContainer: testContainer)
+
+        try await queue.enqueue(createTestOperation())
+        try await engine.sync()
+
+        let failed = try await queue.getFailed()
+        XCTAssertEqual(failed.count, 1)
+        XCTAssertEqual(failed.first?.errorCode, "VALIDATION_ERROR")
+    }
+}
 ```
 
 ### End-to-End Tests
 
 Test the full flow with a real server (use in CI):
 
-```typescript
-// e2e/sync.test.ts
+```swift
+// Tests/SyncE2ETests/SyncE2ETests.swift
 
-describe('Sync E2E', () => {
-  it('syncs data between two clients', async () => {
-    // Client A creates a contact offline
-    const clientA = new SyncEngine(organizationId, deviceIdA);
-    await clientA.createContact({ name: 'Bob' });
+final class SyncE2ETests: XCTestCase {
+    func testSyncsDataBetweenTwoClients() async throws {
+        // Client A creates a contact offline
+        let clientA = SyncEngine(
+            organizationId: organizationId,
+            deviceId: deviceIdA,
+            apiClient: realAPIClient
+        )
+        try await clientA.createContact(name: "Bob")
 
-    // Client A syncs
-    await clientA.sync();
+        // Client A syncs
+        try await clientA.sync()
 
-    // Client B pulls
-    const clientB = new SyncEngine(organizationId, deviceIdB);
-    await clientB.sync();
+        // Client B pulls
+        let clientB = SyncEngine(
+            organizationId: organizationId,
+            deviceId: deviceIdB,
+            apiClient: realAPIClient
+        )
+        try await clientB.sync()
 
-    // Client B should have the contact
-    const contacts = await clientB.db.getAllContacts();
-    expect(contacts).toContainEqual(expect.objectContaining({ name: 'Bob' }));
-  });
-});
+        // Client B should have the contact
+        let contacts = try await clientB.getAllContacts()
+        XCTAssertTrue(contacts.contains { $0.name == "Bob" })
+    }
+}
 ```
 
 ---
