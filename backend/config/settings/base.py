@@ -121,6 +121,7 @@ INSTALLED_APPS = [
     "apps.webhooks",
     "apps.sms",
     "apps.devices",
+    "apps.sync",
 ]
 
 MIDDLEWARE = [
@@ -305,3 +306,10 @@ DEVICE_MAX_LINK_ATTEMPTS_PER_HOUR = 5  # Rate limit for initiating links (per us
 DEVICE_LINK_COMPLETE_MAX_ATTEMPTS_PER_HOUR = 20  # Rate limit for completing links (per IP)
 DEVICE_SESSION_EXPIRY_MINUTES = settings.DEVICE_SESSION_EXPIRY_MINUTES
 DEVICE_LINK_URL_SCHEME = "pikaia://device/link"  # Deep link URL for QR code
+
+# Sync engine
+SYNC_PUSH_MAX_BATCH_SIZE = 100  # Max operations per push request
+SYNC_PULL_DEFAULT_LIMIT = 100  # Default changes per pull request
+SYNC_PULL_MAX_LIMIT = 500  # Max changes per pull request
+SYNC_TOMBSTONE_RETENTION_DAYS = 90  # Days to keep soft-deleted records
+SYNC_CLOCK_SKEW_TOLERANCE_MS = 100  # Overlap window for cursor queries

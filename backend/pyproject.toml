@@ -23,6 +23,7 @@ dependencies = [
     "lxml>=5.0",
     "svix>=1.84.1",
     "structlog>=25.5",
+    "python-ulid>=3.0",
 ]
 
 [dependency-groups]
