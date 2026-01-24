@@ -108,18 +108,25 @@ class SyncableModel(SoftDeleteMixin, TimestampedModel):
     Uses native PostgreSQL UUIDs with UUIDv7 for time-ordered, collision-free
     IDs that work for offline-first clients. UUIDv7 embeds a Unix timestamp
     in the high bits, making IDs naturally sortable by creation time.
+
+    Index Strategy:
+    All syncable models need the SYNC_INDEXES for cursor-based pull queries.
+    Since Django doesn't merge Meta.indexes from parent classes, child models
+    should concatenate: `indexes = SyncableModel.SYNC_INDEXES + [...]`
     """
 
     # Managers - follow existing Pikaia pattern
     objects = SoftDeleteManager()
     all_objects = SoftDeleteAllManager()
 
+    # Index for cursor-based sync pull (organization, updated_at, id)
+    # Child models should include this: indexes = SyncableModel.SYNC_INDEXES + [...]
+    SYNC_INDEXES: ClassVar[list] = [
+        models.Index(fields=["organization", "updated_at", "id"]),
+    ]
+
     class Meta:
         abstract = True
-        indexes = [
-            # Critical for cursor-based pull queries (includes deleted)
-            models.Index(fields=["organization", "updated_at", "id"]),
-        ]
 
     # Use UUIDv7 for time-sortable, collision-free IDs
     id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
