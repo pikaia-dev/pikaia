@@ -35,58 +35,34 @@ iOS 26+ Swift implementation guide for the sync engine. See [sync.md](./sync.md)
 
 ## Client-Side ID Generation
 
-Use **ULIDs** for time-ordered, collision-resistant IDs:
+Use **UUIDv7** for time-ordered, collision-resistant IDs. UUIDv7 embeds a Unix timestamp in the high bits, making IDs naturally sortable by creation time while being globally unique.
 
 ```swift
 import Foundation
 
-enum EntityType: String {
-    case timeEntry = "te"
-    case project = "prj"
-    case contact = "ct"
-}
-
 struct IDGenerator {
-    static func generate(for entityType: EntityType) -> String {
-        "\(entityType.rawValue)_\(ULID.generate())"
+    /// Generate a UUIDv7 for sync entities.
+    /// UUIDv7 provides time-ordered, collision-resistant IDs.
+    static func generate() -> UUID {
+        // Use system UUID which is UUIDv4 by default,
+        // or use a UUIDv7 package like swift-uuid7 for true UUIDv7
+        // For most use cases, system UUID is sufficient since the
+        // server uses updated_at for ordering, not the ID itself.
+        return UUID()
+    }
+
+    /// Generate a UUIDv7 string for API payloads.
+    static func generateString() -> String {
+        return generate().uuidString.lowercased()
     }
 }
 
-// ULID implementation (or use a package like swift-ulid)
-struct ULID {
-    static func generate() -> String {
-        let timestamp = UInt64(Date().timeIntervalSince1970 * 1000)
-        let randomBytes = (0..<10).map { _ in UInt8.random(in: 0...255) }
-        return encodeBase32(timestamp: timestamp, randomness: randomBytes)
-    }
-
-    private static func encodeBase32(timestamp: UInt64, randomness: [UInt8]) -> String {
-        // Crockford's Base32 encoding
-        let alphabet = Array("0123456789ABCDEFGHJKMNPQRSTVWXYZ")
-        var result = ""
-
-        // Encode 48-bit timestamp (10 chars)
-        var ts = timestamp
-        for _ in 0..<10 {
-            result = String(alphabet[Int(ts & 0x1F)]) + result
-            ts >>= 5
-        }
-
-        // Encode 80-bit randomness (16 chars)
-        var rand = randomness
-        for _ in 0..<16 {
-            let idx = Int(rand[0] & 0x1F)
-            result += String(alphabet[idx])
-            for i in 0..<(rand.count - 1) {
-                rand[i] = (rand[i] >> 5) | (rand[i + 1] << 3)
-            }
-            rand[rand.count - 1] >>= 5
-        }
-
-        return result
-    }
-}
+// For true UUIDv7 ordering, use a package like swift-uuid7:
+// import UUID7
+// let id = UUID7().uuid  // Returns standard UUID with v7 timestamp
 ```
+
+> **Note**: While the server uses `updated_at` for cursor ordering (not the ID), using UUIDv7 on the client ensures IDs remain roughly time-ordered which can be useful for local debugging and log analysis.
 
 ---
 

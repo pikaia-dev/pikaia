@@ -116,7 +116,7 @@ The local database is the single source of truth for the client. The server is a
 |-----------|----------------|
 | **Local-first** | Client writes to local DB, UI reflects local state |
 | **Server as truth** | PostgreSQL is authoritative for queries |
-| **Client-generated IDs** | ULIDs for time-ordered uniqueness |
+| **Client-generated IDs** | UUIDv7 for time-ordered uniqueness |
 | **Intent over state** | Operations describe intent, not raw diffs |
 | **Idempotency** | Every operation has a unique key |
 | **At-least-once** | Assume duplicates, handle gracefully |
@@ -138,8 +138,7 @@ For `update` operations, `data` contains only the changed fields:
 ```python
 # Client sends only what changed
 {
-    "intent": "update",
-    "entity_id": "ct_01HN8J...",
+    "entity_id": "018d8732-9a33-7d2a-8000-089903333333",
     "data": {"phone": "+1-555-1234"}  # Only phone changed
 }
 
@@ -262,7 +261,7 @@ Entities that participate in sync inherit from `SyncableModel`:
 
 | Field | Purpose |
 |-------|---------|
-| `id` | ULID with entity-type prefix (e.g., `ct_01HN8J...`) |
+| `id` | UUIDv7 (e.g., `018d8732-9a33-7d2a-8000-...`) |
 | `organization` | Tenant isolation |
 | `sync_version` | Lamport clock, increments on every save |
 | `last_modified_by` | Actor tracking |
@@ -470,7 +469,7 @@ Why this matters: If the cursor used `client_timestamp`:
 | Aspect | Choice | Rationale |
 |--------|--------|-----------|
 | Primary cursor field | `updated_at` (server-set via `auto_now`) | Simple, server-controlled, works 99%+ with NTP |
-| Tiebreaker | `id` (ULID) | Deterministic ordering for same-timestamp records |
+| Tiebreaker | `id` (UUIDv7) | Deterministic ordering for same-timestamp records |
 | Clock skew mitigation | Overlap window | Catches records from slightly-behind server clocks |
 | High-consistency option | `sync_sequence_id` | Optional, database sequence for guaranteed ordering |
 | NOT used for cursor | `client_timestamp` | Only for LWW conflict resolution |
@@ -510,7 +509,7 @@ Even with overlap windows, clients should do a full resync every 24 hours as a s
 |-------|----------|-------------|
 | `idempotency_key` | Yes | Client-generated unique key (survives retries) |
 | `entity_type` | Yes | Registered entity type (e.g., `contact`) |
-| `entity_id` | Yes | ULID of the entity |
+| `entity_id` | Yes | UUIDv7 of the entity |
 | `intent` | Yes | `create`, `update`, or `delete` |
 | `client_timestamp` | Yes | When the client made this change (for LWW) |
 | `data` | Yes | Entity data (PATCH semantics for updates) |
@@ -535,7 +534,7 @@ Authorization: Bearer <jwt>
     {
       "idempotency_key": "op_01HN8J9K2M3N4P5Q6R7S8T9U0V",
       "entity_type": "time_entry",
-      "entity_id": "te_01HN8J9K2M3N4P5Q6R7S8T9U0V",
+      "entity_id": "018d8732-9a33-7d2a-8000-089903333333",
       "intent": "create",
       "client_timestamp": "2025-01-02T23:00:00Z",
       "data": {
@@ -850,7 +849,7 @@ class NoteContent(models.Model):
 ### Key Requirements
 
 1. **Persistent Operation Queue** - Operations must be persisted locally **before** showing success to the user
-2. **Client-Side ID Generation** - Use ULIDs for time-ordered, collision-resistant IDs
+2. **Client-Side ID Generation** - Use UUIDv7 for time-ordered, collision-resistant IDs
 3. **Exponential Backoff** - Retry transient failures with jitter (max 10 attempts)
 4. **Network Awareness** - Pause sync when offline, trigger on reconnect
 5. **Partial Batch Handling** - Handle mixed success/failure independently
@@ -1251,7 +1250,7 @@ Key test cases:
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| ID format | ULIDs | Time-sortable, collision-free, works offline |
+| ID format | UUIDv7 | Time-sortable, collision-free, works offline |
 | Cursor format | `{timestamp}_{id}` | Monotonic, resumable, stable ordering |
 | Default conflict strategy | LWW (field-level) | Simple, covers 90% of cases |
 | CRDT library | Yjs (if needed) | Mature, well-documented, TypeScript-native |

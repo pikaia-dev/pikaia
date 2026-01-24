@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, ClassVar
 
 from django.db import models
-from ulid import ULID
+from uuid6 import uuid7
 
 from apps.core.models import (
     SoftDeleteAllManager,
@@ -104,16 +104,15 @@ class SyncableModel(SoftDeleteMixin, TimestampedModel):
     - .objects: Excludes deleted records (for normal app queries)
     - .all_objects: Includes deleted records (REQUIRED for sync pull)
 
-    Subclasses must define:
-    - PREFIX: str class attribute for ULID prefixing (e.g., 'ct_' for contacts)
+    ID Strategy:
+    Uses native PostgreSQL UUIDs with UUIDv7 for time-ordered, collision-free
+    IDs that work for offline-first clients. UUIDv7 embeds a Unix timestamp
+    in the high bits, making IDs naturally sortable by creation time.
     """
 
     # Managers - follow existing Pikaia pattern
     objects = SoftDeleteManager()
     all_objects = SoftDeleteAllManager()
-
-    # Subclasses must define this prefix for their ULID IDs
-    PREFIX: ClassVar[str] = ""
 
     class Meta:
         abstract = True
@@ -122,8 +121,8 @@ class SyncableModel(SoftDeleteMixin, TimestampedModel):
             models.Index(fields=["organization", "updated_at", "id"]),
         ]
 
-    # Use ULIDs for time-sortable, collision-free IDs
-    id = models.CharField(max_length=32, primary_key=True, editable=False)
+    # Use UUIDv7 for time-sortable, collision-free IDs
+    id = models.UUIDField(primary_key=True, default=uuid7, editable=False)
 
     organization = models.ForeignKey(
         "organizations.Organization",
@@ -143,17 +142,9 @@ class SyncableModel(SoftDeleteMixin, TimestampedModel):
     device_id = models.CharField(max_length=64, null=True, blank=True)
 
     def save(self, *args, **kwargs):
-        """Generate prefixed ULID and increment sync version on save."""
-        if not self.id:
-            self.id = self._generate_prefixed_ulid()
+        """Increment sync version on save."""
         self.sync_version += 1
         super().save(*args, **kwargs)
-
-    def _generate_prefixed_ulid(self) -> str:
-        """Generate a prefixed ULID for this entity."""
-        if not self.PREFIX:
-            raise ValueError(f"{self.__class__.__name__} must define a PREFIX class attribute")
-        return f"{self.PREFIX}{ULID()}"
 
 
 class SyncOperation(models.Model):
@@ -194,7 +185,7 @@ class SyncOperation(models.Model):
 
     # Operation details
     entity_type = models.CharField(max_length=64)
-    entity_id = models.CharField(max_length=32)
+    entity_id = models.CharField(max_length=36)
     intent = models.CharField(max_length=16, choices=Intent.choices)
 
     # Payload & timestamps

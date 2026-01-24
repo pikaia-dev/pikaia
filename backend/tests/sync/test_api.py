@@ -40,7 +40,7 @@ class TestSyncPushEndpoint:
                 SyncOperationIn(
                     idempotency_key="push_create_001",
                     entity_type="test_contact",
-                    entity_id="tc_01HN8J1234567890ABCDEF01",
+                    entity_id="018d8732-9a33-7d2a-8000-089903333333",
                     intent="create",
                     client_timestamp=timezone.now(),
                     data={"name": "New Contact", "email": "new@example.com"},
@@ -74,7 +74,7 @@ class TestSyncPushEndpoint:
                 SyncOperationIn(
                     idempotency_key="batch_001",
                     entity_type="test_contact",
-                    entity_id="tc_batch_01",
+                    entity_id="018d8732-9a33-7d2a-8000-000000000005",
                     intent="create",
                     client_timestamp=timezone.now(),
                     data={"name": "Contact 1"},
@@ -82,7 +82,7 @@ class TestSyncPushEndpoint:
                 SyncOperationIn(
                     idempotency_key="batch_002",
                     entity_type="test_contact",
-                    entity_id="tc_batch_02",
+                    entity_id="018d8732-9a33-7d2a-8000-000000000006",
                     intent="create",
                     client_timestamp=timezone.now(),
                     data={"name": "Contact 2"},
@@ -119,7 +119,7 @@ class TestSyncPushEndpoint:
                 SyncOperationIn(
                     idempotency_key="push_update_001",
                     entity_type="test_contact",
-                    entity_id=contact.id,
+                    entity_id=str(contact.id),
                     intent="update",
                     client_timestamp=timezone.now(),
                     data={"name": "Updated"},
@@ -157,7 +157,7 @@ class TestSyncPushEndpoint:
                 SyncOperationIn(
                     idempotency_key="push_delete_001",
                     entity_type="test_contact",
-                    entity_id=contact.id,
+                    entity_id=str(contact.id),
                     intent="delete",
                     client_timestamp=timezone.now(),
                     data={},
@@ -188,7 +188,7 @@ class TestSyncPushEndpoint:
         operation = SyncOperationIn(
             idempotency_key="duplicate_key",
             entity_type="test_contact",
-            entity_id="tc_duplicate",
+            entity_id="018d8732-9a33-7d2a-8000-000000000004",
             intent="create",
             client_timestamp=timezone.now(),
             data={"name": "Test"},
@@ -256,7 +256,7 @@ class TestSyncPushEndpoint:
             SyncOperationIn(
                 idempotency_key=f"batch_{i}",
                 entity_type="test_contact",
-                entity_id=f"tc_{i}",
+                entity_id=f"018d8732-9a33-7d2a-8000-00000000000{i}",
                 intent="create",
                 client_timestamp=timezone.now(),
                 data={"name": f"Contact {i}"},
@@ -291,7 +291,7 @@ class TestSyncPushEndpoint:
                 SyncOperationIn(
                     idempotency_key="audit_key",
                     entity_type="test_contact",
-                    entity_id="tc_audit",
+                    entity_id="018d8732-9a33-7d2a-8000-000000000007",
                     intent="create",
                     client_timestamp=timezone.now(),
                     data={"name": "Audited"},
@@ -326,7 +326,7 @@ class TestSyncPushEndpoint:
                 SyncOperationIn(
                     idempotency_key="success_001",
                     entity_type="test_contact",
-                    entity_id="tc_success",
+                    entity_id="018d8732-9a33-7d2a-8000-000000000008",
                     intent="create",
                     client_timestamp=timezone.now(),
                     data={"name": "Success"},
@@ -335,7 +335,7 @@ class TestSyncPushEndpoint:
                 SyncOperationIn(
                     idempotency_key="fail_001",
                     entity_type="test_contact",
-                    entity_id="tc_nonexistent",
+                    entity_id="018d8732-9a33-0000-0000-000000000001",
                     intent="update",
                     client_timestamp=timezone.now(),
                     data={"name": "Fail"},
@@ -621,7 +621,7 @@ class TestSyncRoundTrip:
                 SyncOperationIn(
                     idempotency_key="roundtrip_create",
                     entity_type="test_contact",
-                    entity_id="tc_roundtrip",
+                    entity_id="018d8732-9a33-7d2a-8000-000000000003",
                     intent="create",
                     client_timestamp=timezone.now(),
                     data={"name": "Roundtrip Contact"},
@@ -639,7 +639,7 @@ class TestSyncRoundTrip:
         pull_response = sync_pull(request, pull_params)
 
         assert len(pull_response.changes) == 1
-        assert pull_response.changes[0].entity_id == "tc_roundtrip"
+        assert pull_response.changes[0].entity_id == "018d8732-9a33-7d2a-8000-000000000003"
         assert pull_response.changes[0].operation == "upsert"
 
     def test_update_then_pull(
@@ -664,7 +664,7 @@ class TestSyncRoundTrip:
                 SyncOperationIn(
                     idempotency_key="roundtrip_update",
                     entity_type="test_contact",
-                    entity_id=contact.id,
+                    entity_id=str(contact.id),
                     intent="update",
                     client_timestamp=timezone.now(),
                     data={"name": "Updated Name"},
@@ -707,7 +707,7 @@ class TestSyncRoundTrip:
                 SyncOperationIn(
                     idempotency_key="roundtrip_delete",
                     entity_type="test_contact",
-                    entity_id=contact.id,
+                    entity_id=str(contact.id),
                     intent="delete",
                     client_timestamp=timezone.now(),
                     data={},
@@ -723,6 +723,6 @@ class TestSyncRoundTrip:
         pull_response = sync_pull(request, pull_params)
 
         assert len(pull_response.changes) == 1
-        assert pull_response.changes[0].entity_id == contact.id
+        assert pull_response.changes[0].entity_id == str(contact.id)
         assert pull_response.changes[0].operation == "delete"
         assert pull_response.changes[0].data is None

@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import IntegrityError, models, transaction
@@ -417,7 +418,7 @@ def fetch_changes_for_pull(
         return [], since_cursor, False
 
     # Collect changes from all entity types
-    all_changes: list[tuple[datetime, str, str, SyncableModel]] = []
+    all_changes: list[tuple[datetime, UUID, str, SyncableModel]] = []
 
     for entity_type in types_to_query:
         model = SyncRegistry.get_model(entity_type)
@@ -450,10 +451,12 @@ def fetch_changes_for_pull(
     changes: list[ChangeOut] = []
     for _updated_at, entity_id, entity_type, entity in changes_to_return:
         is_deleted = entity.deleted_at is not None
+        # Convert UUID to string for JSON serialization
+        entity_id_str = str(entity_id)
 
         change = ChangeOut(
             entity_type=entity_type,
-            entity_id=entity_id,
+            entity_id=entity_id_str,
             operation="delete" if is_deleted else "upsert",
             data=_serialize_entity(entity_type, entity) if not is_deleted else None,
             version=entity.sync_version,
@@ -466,7 +469,8 @@ def fetch_changes_for_pull(
     next_cursor: str | None
     if changes_to_return:
         last_change = changes_to_return[-1]
-        next_cursor = encode_cursor(last_change[0], last_change[1])
+        # Convert UUID to string for cursor encoding
+        next_cursor = encode_cursor(last_change[0], str(last_change[1]))
     else:
         next_cursor = since_cursor  # Return input cursor if no new changes
 
@@ -508,6 +512,9 @@ def _serialize_entity(entity_type: str, entity: SyncableModel) -> dict:
                 # Handle datetime serialization
                 if isinstance(value, datetime):
                     result[field.name] = value.isoformat()
+                # Handle UUID serialization
+                elif isinstance(value, UUID):
+                    result[field.name] = str(value)
                 else:
                     result[field.name] = value
 
