@@ -11,9 +11,11 @@ import type {
   ConfirmSubscriptionRequest,
   ConfirmSubscriptionResponse,
   ConfirmUploadRequest,
+  DeviceListResponse,
   DirectoryUser,
   EmailUpdateResponse,
   ImageResponse,
+  InitiateLinkResponse,
   InviteMemberRequest,
   InviteMemberResponse,
   InvoiceListResponse,
@@ -185,6 +187,13 @@ export function useApi() {
 
       testWebhookEndpoint: (endpointId: string, data: WebhookTestRequest) =>
         api.post<WebhookTestResponse>(`/webhooks/endpoints/${endpointId}/test`, data),
+
+      // Devices
+      listDevices: () => api.get<DeviceListResponse>('/devices/'),
+
+      initiateDeviceLink: () => api.post<InitiateLinkResponse>('/devices/link/initiate'),
+
+      revokeDevice: (deviceId: number) => api.delete<void>(`/devices/${String(deviceId)}`),
     }),
     [api]
   )
