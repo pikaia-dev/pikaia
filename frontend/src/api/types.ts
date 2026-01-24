@@ -309,3 +309,24 @@ export interface WebhookTestResponse {
   response_snippet: string
   error_message: string
 }
+
+// Device types
+export interface DeviceResponse {
+  id: number
+  name: string
+  platform: string
+  os_version: string
+  app_version: string
+  created_at: string
+}
+
+export interface DeviceListResponse {
+  devices: DeviceResponse[]
+  count: number
+}
+
+export interface InitiateLinkResponse {
+  qr_url: string
+  expires_at: string
+  expires_in_seconds: number
+}
