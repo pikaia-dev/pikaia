@@ -213,7 +213,6 @@ class EventsStack(Stack):
             vpc=vpc,
             security_groups=[self.lambda_security_group],
             timeout_seconds=60,
-            reserved_concurrent_executions=5,  # Limit concurrency to prevent DB overload
             dead_letter_queue=self.dlq,
             environment={
                 "EVENT_BUS_NAME": self.event_bus.event_bus_name,
