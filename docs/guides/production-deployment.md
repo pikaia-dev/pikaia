@@ -30,23 +30,32 @@ The deployment creates:
 aws configure list --profile your-profile-name
 ```
 
-## Step 2: Bootstrap CDK (First Time Only)
+## Step 2: Set Up Infra Dependencies
 
 ```bash
 cd infra
+uv sync
+
+# Install Node.js dependencies for Lambda functions
+cd functions/image-transform && npm install && cd ../..
+```
+
+## Step 3: Bootstrap CDK (First Time Only)
+
+```bash
 AWS_PROFILE=your-profile npx cdk bootstrap
 ```
 
-## Step 3: Set Up Production Secrets
+## Step 4: Set Up Production Secrets
 
-### 3.1 Create the secrets file
+### 4.1 Create the secrets file
 
 ```bash
 # From project root
 cp .env.production.example .env.production
 ```
 
-### 3.2 Fill in your secrets
+### 4.2 Fill in your secrets
 
 Edit `.env.production` with real values:
 
@@ -57,7 +66,7 @@ Edit `.env.production` with real values:
 | `STYTCH_SECRET` | [Stytch Dashboard](https://stytch.com/dashboard) → API Keys |
 | `STRIPE_SECRET_KEY` | [Stripe Dashboard](https://dashboard.stripe.com/apikeys) |
 | `STRIPE_PRICE_ID` | [Stripe Dashboard](https://dashboard.stripe.com/products) → Your product → Price ID |
-| `STRIPE_WEBHOOK_SECRET` | See Step 5 below |
+| `STRIPE_WEBHOOK_SECRET` | See Step 8 below |
 | `RESEND_API_KEY` | [Resend Dashboard](https://resend.com/api-keys) |
 | `WEBAUTHN_RP_ID` | Your domain (e.g., `app.example.com`) |
 | `WEBAUTHN_RP_NAME` | Display name for passkey prompts |
@@ -68,13 +77,23 @@ Edit `.env.production` with real values:
 | `PASSKEY_JWT_PRIVATE_KEY` | RSA private key PEM (newlines escaped as `\n`) |
 | `CORS_ALLOWED_ORIGINS` | Frontend URL(s), comma-separated (e.g., `https://app.example.com`) |
 
-### 3.3 Push secrets to AWS
+### 4.3 Create AWS resources (ECR + Secrets Manager)
+
+```bash
+./scripts/bootstrap-infra.sh your-profile-name
+```
+
+This creates:
+- ECR repository (`pikaia-backend`) for Docker images
+- Secrets Manager secret (`pikaia/app-secrets`) as an empty placeholder
+
+### 4.4 Push secrets to AWS
 
 ```bash
 ./scripts/bootstrap-secrets.sh your-profile-name
 ```
 
-## Step 4: Build and Push Docker Image
+## Step 5: Build and Push Docker Image
 
 ```bash
 cd backend
@@ -91,11 +110,39 @@ docker tag pikaia-backend:latest YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
 docker push YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/pikaia-backend:latest
 ```
 
-## Step 5: Deploy Infrastructure
+## Step 6: Create SSL Certificate (ACM)
+
+Before deploying with HTTPS, create an SSL certificate in AWS Certificate Manager:
+
+```bash
+# Request certificate for your API domain
+aws acm request-certificate \
+  --domain-name api.yourdomain.com \
+  --validation-method DNS \
+  --profile your-profile \
+  --region us-east-1
+
+# Copy the certificate ARN from the output
+```
+
+Then add DNS validation records:
+1. Go to [ACM Console](https://console.aws.amazon.com/acm/home?region=us-east-1#/certificates/list)
+2. Click on your certificate → Copy the CNAME name and value
+3. Add as CNAME record in your DNS provider (DNS only, not proxied)
+4. Wait 5-10 minutes for validation
+
+## Step 7: Deploy Infrastructure
 
 ```bash
 cd infra
-AWS_PROFILE=your-profile npx cdk deploy --all --require-approval never
+
+# First deployment (HTTP only for testing)
+AWS_PROFILE=your-profile npx cdk deploy --all
+
+# Production deployment (with HTTPS)
+AWS_PROFILE=your-profile npx cdk deploy PikaiaApp \
+  --context certificate_arn=arn:aws:acm:us-east-1:YOUR_ACCOUNT:certificate/CERT_ID \
+  --context domain_name=api.yourdomain.com
 ```
 
 This will output your ALB URL, e.g.:
@@ -103,7 +150,7 @@ This will output your ALB URL, e.g.:
 PikaiaApp.LoadBalancerDNS = Pikaia-XXXXX.us-east-1.elb.amazonaws.com
 ```
 
-## Step 6: Configure Stripe Webhook
+## Step 8: Configure Stripe Webhook
 
 1. Go to [Stripe Dashboard → Webhooks](https://dashboard.stripe.com/webhooks)
 2. Click **"Add endpoint"**
@@ -126,22 +173,54 @@ PikaiaApp.LoadBalancerDNS = Pikaia-XXXXX.us-east-1.elb.amazonaws.com
 6. Click **"Reveal"** under Signing secret → copy `whsec_...`
 7. Add to `.env.production` and re-run `./scripts/bootstrap-secrets.sh`
 
-## Step 7: Run Database Migrations
+## Step 9: Run Database Migrations
+
+### Option A: One-off task (recommended)
+
+Run migrations as a standalone task:
 
 ```bash
-# Connect via ECS Exec (requires ECS Exec enabled)
-AWS_PROFILE=your-profile aws ecs execute-command \
-  --cluster YOUR_CLUSTER_NAME \
+# Get required IDs
+CLUSTER=$(aws ecs list-clusters --query 'clusterArns[0]' --output text --profile your-profile)
+TASK_DEF=$(aws ecs list-task-definitions --family-prefix PikaiaApp --query 'taskDefinitionArns[-1]' --output text --profile your-profile)
+SUBNET=$(aws ec2 describe-subnets --filters 'Name=tag:aws-cdk:subnet-type,Values=Public' --query 'Subnets[0].SubnetId' --output text --profile your-profile)
+SG=$(aws ec2 describe-security-groups --filters 'Name=group-name,Values=*EcsServiceSG*' --query 'SecurityGroups[0].GroupId' --output text --profile your-profile)
+
+# Run migrations
+aws ecs run-task \
+  --cluster $CLUSTER \
+  --task-definition $TASK_DEF \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={subnets=[$SUBNET],securityGroups=[$SG],assignPublicIp=ENABLED}" \
+  --overrides '{"containerOverrides":[{"name":"django","command":["python","manage.py","migrate"]}]}' \
+  --profile your-profile
+
+# Check logs after ~60 seconds
+aws logs tail PikaiaApp-PikaiaBackendTask* --since 5m --profile your-profile
+```
+
+### Option B: ECS Exec (interactive)
+
+```bash
+# Enable ECS Exec on the service (one-time)
+aws ecs update-service --cluster YOUR_CLUSTER --service YOUR_SERVICE --enable-execute-command --profile your-profile
+
+# Wait for new tasks, then connect
+aws ecs execute-command \
+  --cluster YOUR_CLUSTER \
   --task YOUR_TASK_ID \
   --container django \
   --interactive \
-  --command "/bin/bash"
+  --command "/bin/bash" \
+  --profile your-profile
 
 # Inside container:
 python manage.py migrate
 ```
 
-## Step 8: Force New Deployment (After Config Changes)
+> **Note**: ECS Exec requires the Session Manager plugin and can have connectivity issues. Option A is more reliable for one-off commands.
+
+## Step 10: Force New Deployment (After Config Changes)
 
 ```bash
 AWS_PROFILE=your-profile aws ecs update-service \
@@ -204,6 +283,62 @@ The repository includes GitHub Actions workflows for automatic deployment:
 | Secret | `VITE_STYTCH_PUBLIC_TOKEN` | Stytch public token (required) |
 | Var | `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (optional) |
 | Var | `VITE_GOOGLE_PLACES_API_KEY` | Google Places API key (optional) |
+
+### Setting Up AWS OIDC for GitHub Actions
+
+GitHub Actions uses OIDC to authenticate with AWS (no static credentials needed).
+
+**1. Create the OIDC provider (one-time per AWS account):**
+```bash
+aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com \
+  --client-id-list sts.amazonaws.com \
+  --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1 1c58a3a8518e8759bf075b76b750d4f2df264fcd \
+  --profile your-profile
+```
+
+**2. Create the IAM role with trust policy:**
+```bash
+# Create trust-policy.json (replace YOUR_ACCOUNT_ID and YOUR_ORG/YOUR_REPO)
+cat > /tmp/trust-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {
+      "Federated": "arn:aws:iam::YOUR_ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
+    },
+    "Action": "sts:AssumeRoleWithWebIdentity",
+    "Condition": {
+      "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
+      "StringLike": { "token.actions.githubusercontent.com:sub": "repo:YOUR_ORG/YOUR_REPO:*" }
+    }
+  }]
+}
+EOF
+
+aws iam create-role \
+  --role-name GitHubActionsDeployRole \
+  --assume-role-policy-document file:///tmp/trust-policy.json \
+  --profile your-profile
+```
+
+**3. Attach deployment permissions:**
+The role needs: S3 (frontend), CloudFront (invalidation), ECR (images), ECS (deployment).
+
+```bash
+# Attach managed policies or create custom policy
+aws iam attach-role-policy \
+  --role-name GitHubActionsDeployRole \
+  --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess \
+  --profile your-profile
+# Add more policies as needed for ECR, ECS, CloudFront
+```
+
+**4. Copy the role ARN for GitHub:**
+```
+arn:aws:iam::YOUR_ACCOUNT_ID:role/GitHubActionsDeployRole
+```
 
 
 ## Observability
