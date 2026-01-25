@@ -49,12 +49,14 @@ export function useGoogleOneTap(options: UseGoogleOneTapOptions = {}): UseGoogle
         discovery_redirect_url: redirectUrl ?? `${window.location.origin}/auth/callback`,
       })
 
+      // The SDK returns { success: true } when the prompt is displayed
+      // If it fails to display, an error is thrown instead
       setState((prev) => ({
         ...prev,
         isLoading: false,
-        didRender: result.isPromptDisplayed,
-        notRenderedReason: result.isPromptDisplayed ? null : (result.reason ?? 'Unknown reason'),
-        isAvailable: result.isPromptDisplayed,
+        didRender: result.success,
+        notRenderedReason: null,
+        isAvailable: result.success,
       }))
     } catch (err) {
       // One Tap not available (e.g., not configured, test environment)
