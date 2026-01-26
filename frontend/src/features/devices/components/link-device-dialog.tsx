@@ -28,11 +28,21 @@ export function LinkDeviceDialog({ open, onOpenChange }: LinkDeviceDialogProps) 
   const mutateRef = useRef(initiateMutation.mutate)
   mutateRef.current = initiateMutation.mutate
 
+  const startCountdown = (expiresInSeconds: number) => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+    }
+    setSecondsRemaining(expiresInSeconds)
+    intervalRef.current = setInterval(() => {
+      setSecondsRemaining((prev) => (prev > 0 ? prev - 1 : 0))
+    }, 1000)
+  }
+
   const generateQrCode = () => {
     mutateRef.current(undefined, {
       onSuccess: (data) => {
         setQrData({ url: data.qr_url, expiresAt: new Date(data.expires_at) })
-        setSecondsRemaining(data.expires_in_seconds)
+        startCountdown(data.expires_in_seconds)
       },
     })
   }
@@ -45,14 +55,9 @@ export function LinkDeviceDialog({ open, onOpenChange }: LinkDeviceDialogProps) 
     mutateRef.current(undefined, {
       onSuccess: (data) => {
         setQrData({ url: data.qr_url, expiresAt: new Date(data.expires_at) })
-        setSecondsRemaining(data.expires_in_seconds)
+        startCountdown(data.expires_in_seconds)
       },
     })
-
-    // Start countdown timer
-    intervalRef.current = setInterval(() => {
-      setSecondsRemaining((prev) => (prev > 0 ? prev - 1 : 0))
-    }, 1000)
 
     return () => {
       if (intervalRef.current) {
