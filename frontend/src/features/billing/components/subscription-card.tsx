@@ -3,6 +3,7 @@ import type { SubscriptionInfo } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useConfirmSubscription, useCreatePortalSession } from '@/features/billing/api/mutations'
+import { formatDateLong } from '@/lib/format'
 import { PaymentForm } from './payment-form'
 
 interface SubscriptionCardProps {
@@ -20,15 +21,6 @@ export function SubscriptionCard({ subscription, memberCount }: SubscriptionCard
   const confirmSubscriptionMutation = useConfirmSubscription()
 
   const isSubscribed = subscription && subscription.status !== 'none'
-
-  const formatDate = (isoDate: string | null) => {
-    if (!isoDate) return null
-    return new Date(isoDate).toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
-  }
 
   const handleUpgradeSuccess = (subscriptionId: string) => {
     setShowUpgradeForm(false)
@@ -101,8 +93,8 @@ export function SubscriptionCard({ subscription, memberCount }: SubscriptionCard
                     <>
                       {' · '}
                       {subscription.cancel_at_period_end
-                        ? `Cancels ${formatDate(subscription.current_period_end) ?? ''}`
-                        : `Renews ${formatDate(subscription.current_period_end) ?? ''}`}
+                        ? `Cancels ${formatDateLong(subscription.current_period_end)}`
+                        : `Renews ${formatDateLong(subscription.current_period_end)}`}
                     </>
                   )}
                 </p>

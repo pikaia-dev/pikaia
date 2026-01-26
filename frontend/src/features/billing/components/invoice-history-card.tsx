@@ -2,6 +2,7 @@ import type { Invoice } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
+import { formatDateLong } from '@/lib/format'
 
 interface InvoiceHistoryCardProps {
   invoices: Invoice[]
@@ -21,15 +22,6 @@ export function InvoiceHistoryCard({
   loadingMore,
   onLoadMore,
 }: InvoiceHistoryCardProps) {
-  const formatDate = (isoDate: string | null) => {
-    if (!isoDate) return null
-    return new Date(isoDate).toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -86,7 +78,7 @@ export function InvoiceHistoryCard({
                         }).format(invoice.amount_paid / 100)}
                       </td>
                       <td className="py-3 text-right text-muted-foreground">
-                        {formatDate(invoice.created)}
+                        {formatDateLong(invoice.created)}
                       </td>
                       <td className="py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
