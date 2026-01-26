@@ -16,6 +16,7 @@ import { ImageUploader } from '@/components/ui/image-uploader'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { PhoneNumberInput } from '@/components/ui/phone-number-input'
 import { useCurrentUser } from '@/features/auth/api/queries'
+import { DeviceList } from '@/features/devices/components/device-list'
 import {
   useSendPhoneOtp,
   useStartEmailUpdate,
@@ -330,6 +331,9 @@ export default function ProfileSettings() {
 
         {/* Passkey Settings */}
         <PasskeySettings />
+
+        {/* Linked Devices */}
+        <DeviceList />
       </div>
 
       {/* OTP Verification Dialog */}

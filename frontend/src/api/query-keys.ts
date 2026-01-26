@@ -33,4 +33,8 @@ export const queryKeys = {
     deliveries: (endpointId: string) =>
       [...queryKeys.webhooks.all, 'deliveries', endpointId] as const,
   },
+  devices: {
+    all: ['devices'] as const,
+    list: () => [...queryKeys.devices.all, 'list'] as const,
+  },
 } as const
