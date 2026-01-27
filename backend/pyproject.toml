@@ -24,6 +24,7 @@ dependencies = [
     "svix>=1.84.1",
     "structlog>=25.5",
     "uuid6>=2024.11.27",
+    "whitenoise>=6.8",
 ]
 
 [dependency-groups]
