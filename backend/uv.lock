@@ -1119,6 +1119,7 @@ dependencies = [
     { name = "svix" },
     { name = "uuid6" },
     { name = "webauthn" },
+    { name = "whitenoise" },
 ]
 
 [package.dev-dependencies]
@@ -1156,6 +1157,7 @@ requires-dist = [
     { name = "svix", specifier = ">=1.84.1" },
     { name = "uuid6", specifier = ">=2024.11.27" },
     { name = "webauthn", specifier = ">=2.0.0,<3.0.0" },
+    { name = "whitenoise", specifier = ">=6.8" },
 ]
 
 [package.metadata.requires-dev]
@@ -1896,6 +1898,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a4/f0/e1036df8842782a2947e5f41e76a4accb92e3dba972dba882321ebe15af0/webauthn-2.7.0.tar.gz", hash = "sha256:3c45c25e75a7d7d419220ccd10b8b899984de8012732e10d898f0a8f8c480575", size = 123770, upload-time = "2025-09-04T23:19:21.602Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/73/b1/3f380d02552f1d75d3db789f761a1ee0dafd6181ebc07dd4b9ded61225a4/webauthn-2.7.0-py3-none-any.whl", hash = "sha256:2ecfee7959b09ebeaaffee9f8982ecdbbdc369a11766d20d4bc0637b36e235b7", size = 71311, upload-time = "2025-09-04T23:19:20.269Z" },
+]
+
+[[package]]
+name = "whitenoise"
+version = "6.11.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/15/95/8c81ec6b6ebcbf8aca2de7603070ccf37dbb873b03f20708e0f7c1664bc6/whitenoise-6.11.0.tar.gz", hash = "sha256:0f5bfce6061ae6611cd9396a8231e088722e4fc67bc13a111be74c738d99375f", size = 26432, upload-time = "2025-09-18T09:16:10.995Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6c/e9/4366332f9295fe0647d7d3251ce18f5615fbcb12d02c79a26f8dba9221b3/whitenoise-6.11.0-py3-none-any.whl", hash = "sha256:b2aeb45950597236f53b5342b3121c5de69c8da0109362aee506ce88e022d258", size = 20197, upload-time = "2025-09-18T09:16:09.754Z" },
 ]
 
 [[package]]

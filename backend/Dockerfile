@@ -42,8 +42,10 @@ WORKDIR /home/appuser/app
 # Copy application code
 COPY --chown=appuser:appuser . .
 
-# Collect static files (if using whitenoise)
-RUN python manage.py collectstatic --noinput --settings=config.settings.production 2>/dev/null || true
+# Collect static files for Django admin (served by WhiteNoise)
+RUN DJANGO_SETTINGS_MODULE=config.settings.base \
+    SECRET_KEY=build-time-placeholder \
+    python manage.py collectstatic --noinput
 
 # Expose port
 EXPOSE 8000
