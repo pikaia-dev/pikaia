@@ -20,12 +20,7 @@ permissions:
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-  ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
-  ECS_SERVICE: ${{ vars.ECS_SERVICE }}
-  ECS_TASK_DEFINITION: ${{ vars.ECS_TASK_DEFINITION }}
-  ECS_SUBNETS: ${{ vars.ECS_SUBNETS }}
-  ECS_SECURITY_GROUPS: ${{ vars.ECS_SECURITY_GROUPS }}
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
 
 jobs:
   # Detect which paths changed to determine deployment strategy
@@ -64,6 +59,46 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
 
+      - name: Lookup infrastructure outputs
+        id: infra
+        run: |
+          set -euo pipefail
+
+          # Construct derived values
+          ECR_REPOSITORY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/pikaia-backend"
+          echo "ecr_repository=${ECR_REPOSITORY}" >> "$GITHUB_OUTPUT"
+
+          # Helper function to lookup CloudFormation outputs with validation
+          get_output() {
+            local stack=$1
+            local key=$2
+            local value
+            value=$(aws cloudformation describe-stacks \
+              --stack-name "$stack" \
+              --query "Stacks[0].Outputs[?OutputKey=='$key'].OutputValue" \
+              --output text 2>/dev/null || echo "")
+            if [[ -z "$value" ]]; then
+              echo "::error::Required CloudFormation output '$key' not found in stack '$stack'. Run CDK deploy first." >&2
+              return 1
+            fi
+            echo "$value"
+          }
+
+          # Lookup from PikaiaApp stack
+          ECS_CLUSTER=$(get_output "PikaiaApp" "ClusterName")
+          ECS_SERVICE=$(get_output "PikaiaApp" "ServiceName")
+          ECS_TASK_DEFINITION=$(get_output "PikaiaApp" "TaskDefinitionFamily")
+          ECS_SG=$(get_output "PikaiaApp" "EcsSecurityGroup")
+
+          echo "ecs_cluster=${ECS_CLUSTER}" >> "$GITHUB_OUTPUT"
+          echo "ecs_service=${ECS_SERVICE}" >> "$GITHUB_OUTPUT"
+          echo "ecs_task_definition=${ECS_TASK_DEFINITION}" >> "$GITHUB_OUTPUT"
+          echo "ecs_security_group=${ECS_SG}" >> "$GITHUB_OUTPUT"
+
+          # Lookup from PikaiaNetwork stack
+          PRIVATE_SUBNETS=$(get_output "PikaiaNetwork" "PrivateSubnets")
+          echo "ecs_subnets=${PRIVATE_SUBNETS}" >> "$GITHUB_OUTPUT"
+
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
@@ -71,6 +106,7 @@ jobs:
       - name: Build and push Docker image
         if: needs.changes.outputs.backend == 'true'
         env:
+          ECR_REPOSITORY: ${{ steps.infra.outputs.ecr_repository }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build -f backend/Dockerfile -t "${ECR_REPOSITORY}:${IMAGE_TAG}" -t "${ECR_REPOSITORY}:latest" backend/
@@ -106,14 +142,23 @@ jobs:
       - name: Install CDK and deploy infrastructure
         if: needs.changes.outputs.infra == 'true' || needs.changes.outputs.events == 'true'
         working-directory: infra
+        env:
+          # Optional CDK context for production deployments with custom domains:
+          #   --context certificate_arn=${{ vars.ACM_CERTIFICATE_ARN }}
+          #   --context domain_name=${{ vars.API_DOMAIN_NAME }}
+          #   --context app_domain=${{ vars.APP_DOMAIN_NAME }}
+          #   --context require_https=true
+          CDK_CONTEXT: >-
+            --context account=${{ env.AWS_ACCOUNT_ID }}
+            --context region=${{ env.AWS_REGION }}
         run: |
           npm install -g aws-cdk
           uv sync
           # Deploy PikaiaApp exclusively first to handle cross-stack export changes
           # (prevents "Cannot delete export" errors when moving resources between stacks)
-          uv run cdk deploy PikaiaApp --exclusively --require-approval never
+          uv run cdk deploy PikaiaApp --exclusively --require-approval never $CDK_CONTEXT
           # Then deploy all stacks including PikaiaNetwork
-          uv run cdk deploy PikaiaNetwork PikaiaMedia PikaiaApp PikaiaEvents PikaiaObservability --require-approval never
+          uv run cdk deploy PikaiaNetwork PikaiaMedia PikaiaApp PikaiaEvents PikaiaObservability --require-approval never $CDK_CONTEXT
 
       # Update ECS task definition when backend changes but not infra
       # (CDK deploy already handles this when infra changes)
@@ -121,9 +166,12 @@ jobs:
         if: needs.changes.outputs.backend == 'true' && needs.changes.outputs.infra != 'true'
         id: td
         env:
-          NEW_IMAGE: ${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
+          ECR_REPOSITORY: ${{ steps.infra.outputs.ecr_repository }}
+          ECS_TASK_DEFINITION: ${{ steps.infra.outputs.ecs_task_definition }}
         run: |
           set -euo pipefail
+
+          NEW_IMAGE="${ECR_REPOSITORY}:${{ github.sha }}"
 
           aws ecs describe-task-definition \
             --task-definition "${ECS_TASK_DEFINITION}" \
@@ -144,6 +192,9 @@ jobs:
 
       - name: Update ECS service (backend-only changes)
         if: needs.changes.outputs.backend == 'true' && needs.changes.outputs.infra != 'true'
+        env:
+          ECS_CLUSTER: ${{ steps.infra.outputs.ecs_cluster }}
+          ECS_SERVICE: ${{ steps.infra.outputs.ecs_service }}
         run: |
           aws ecs update-service \
             --cluster "${ECS_CLUSTER}" \
@@ -159,6 +210,9 @@ jobs:
       # Force new deployment after CDK to pick up changes
       - name: Force new deployment (infra/events changes)
         if: needs.changes.outputs.infra == 'true' || needs.changes.outputs.events == 'true'
+        env:
+          ECS_CLUSTER: ${{ steps.infra.outputs.ecs_cluster }}
+          ECS_SERVICE: ${{ steps.infra.outputs.ecs_service }}
         run: |
           aws ecs update-service \
             --cluster "${ECS_CLUSTER}" \
@@ -173,6 +227,9 @@ jobs:
       # Always run migrations
       - name: Get task definition for migrations
         id: get-td
+        env:
+          ECS_CLUSTER: ${{ steps.infra.outputs.ecs_cluster }}
+          ECS_SERVICE: ${{ steps.infra.outputs.ecs_service }}
         run: |
           TD_ARN=$(aws ecs describe-services \
             --cluster "${ECS_CLUSTER}" \
@@ -188,23 +245,31 @@ jobs:
           echo "migrateContainer=${MIGRATE_CONTAINER}" >> "$GITHUB_OUTPUT"
 
       - name: Create cache table
+        env:
+          ECS_CLUSTER: ${{ steps.infra.outputs.ecs_cluster }}
+          ECS_SUBNETS: ${{ steps.infra.outputs.ecs_subnets }}
+          ECS_SECURITY_GROUP: ${{ steps.infra.outputs.ecs_security_group }}
         run: |
           aws ecs run-task \
             --cluster "${ECS_CLUSTER}" \
             --launch-type FARGATE \
             --task-definition "${{ steps.get-td.outputs.taskDefinitionArn }}" \
-            --network-configuration "awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUPS}],assignPublicIp=DISABLED}" \
+            --network-configuration "awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUP}],assignPublicIp=DISABLED}" \
             --count 1 \
             --overrides "{\"containerOverrides\":[{\"name\":\"${{ steps.get-td.outputs.migrateContainer }}\",\"command\":[\"python\",\"manage.py\",\"createcachetable\"]}]}" \
             --output json > cache-table-run.json
 
       - name: Run Django migrations
+        env:
+          ECS_CLUSTER: ${{ steps.infra.outputs.ecs_cluster }}
+          ECS_SUBNETS: ${{ steps.infra.outputs.ecs_subnets }}
+          ECS_SECURITY_GROUP: ${{ steps.infra.outputs.ecs_security_group }}
         run: |
           aws ecs run-task \
             --cluster "${ECS_CLUSTER}" \
             --launch-type FARGATE \
             --task-definition "${{ steps.get-td.outputs.taskDefinitionArn }}" \
-            --network-configuration "awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUPS}],assignPublicIp=DISABLED}" \
+            --network-configuration "awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUP}],assignPublicIp=DISABLED}" \
             --count 1 \
             --overrides "{\"containerOverrides\":[{\"name\":\"${{ steps.get-td.outputs.migrateContainer }}\",\"command\":[\"python\",\"manage.py\",\"migrate\"]}]}" \
             --output json > migrations-run.json
