@@ -2,7 +2,7 @@
 Network stack - VPC, subnets, and security groups.
 """
 
-from aws_cdk import Stack
+from aws_cdk import CfnOutput, Stack
 from aws_cdk import aws_ec2 as ec2
 from constructs import Construct
 
@@ -31,4 +31,13 @@ class NetworkStack(Stack):
                     cidr_mask=24,
                 ),
             ],
+        )
+
+        # Outputs for CI/CD workflow lookups
+        private_subnet_ids = [subnet.subnet_id for subnet in self.vpc.private_subnets]
+        CfnOutput(
+            self,
+            "PrivateSubnets",
+            value=",".join(private_subnet_ids),
+            description="Comma-separated list of private subnet IDs",
         )

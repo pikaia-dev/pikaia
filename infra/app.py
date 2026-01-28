@@ -60,19 +60,23 @@ network = NetworkStack(app, "PikaiaNetwork", env=env)
 # =============================================================================
 
 # Configuration via cdk.json or --context flag:
-#   cors_origins: CORS allowed origins (default: ["*"] for dev, required for production)
+#   app_domain: App domain for CORS (e.g., "app.example.com") - constructs https:// origin
 #   enable_versioning: Enable S3 versioning for data recovery (default: false)
 #   require_https: Enforce HTTPS/certificate for production (default: false)
-# Example: cdk deploy PikaiaMedia --context cors_origins='["https://app.example.com"]'
-cors_origins = app.node.try_get_context("cors_origins") or ["*"]
+# Example: cdk deploy PikaiaMedia --context app_domain=app.example.com
+app_domain = app.node.try_get_context("app_domain")
+if app_domain:
+    cors_origins = [f"https://{app_domain}"]
+else:
+    cors_origins = ["*"]
 enable_versioning = app.node.try_get_context("enable_versioning") or False
 require_https = app.node.try_get_context("require_https") or False
 
 # Validate CORS configuration for production
 if require_https and cors_origins == ["*"]:
     raise ValueError(
-        "cors_origins must be explicitly set when require_https=true. "
-        "Pass --context cors_origins='[\"https://app.example.com\"]'"
+        "app_domain must be set when require_https=true. "
+        "Pass --context app_domain=app.example.com"
     )
 
 media = MediaStack(
