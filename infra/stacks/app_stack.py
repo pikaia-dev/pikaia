@@ -441,3 +441,32 @@ class AppStack(Stack):
             description="RDS Proxy endpoint for Lambda connections",
             export_name="PikaiaRdsProxyEndpoint",
         )
+
+        # Outputs for CI/CD workflow lookups
+        CfnOutput(
+            self,
+            "ClusterName",
+            value=self.cluster.cluster_name,
+            description="ECS cluster name",
+        )
+
+        CfnOutput(
+            self,
+            "ServiceName",
+            value=self.fargate_service.service.service_name,
+            description="ECS service name",
+        )
+
+        CfnOutput(
+            self,
+            "TaskDefinitionFamily",
+            value=task_definition.family,
+            description="ECS task definition family name",
+        )
+
+        CfnOutput(
+            self,
+            "EcsSecurityGroup",
+            value=self.fargate_service.service.connections.security_groups[0].security_group_id,
+            description="ECS service security group ID",
+        )
