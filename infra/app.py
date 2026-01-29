@@ -153,7 +153,6 @@ events_stack = EventsStack(
     database_secret=app_stack.database_secret,
     database_security_group=app_stack.database_security_group,
     rds_proxy_endpoint=app_stack.rds_proxy.endpoint,
-    event_bus_name="pikaia-events",
     env=env,
 )
 events_stack.add_dependency(app_stack)

@@ -79,6 +79,11 @@ class ObservabilityStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        # Resource naming from CDK context (allows customization without code changes)
+        resource_prefix = self.node.try_get_context("resource_prefix") or "pikaia"
+        alarm_topic_name = self.node.try_get_context("alarm_topic_name") or f"{resource_prefix}-alarms"
+        dashboard_name = self.node.try_get_context("dashboard_name") or f"{resource_prefix}-operations"
+
         # =================================================================
         # SNS Topic for Alarms
         # =================================================================
@@ -86,8 +91,8 @@ class ObservabilityStack(Stack):
         self.alarm_topic = sns.Topic(
             self,
             "AlarmTopic",
-            topic_name="pikaia-alarms",
-            display_name="Pikaia Infrastructure Alarms",
+            topic_name=alarm_topic_name,
+            display_name=f"{resource_prefix.title()} Infrastructure Alarms",
         )
 
         if alarm_email:
@@ -265,7 +270,7 @@ class ObservabilityStack(Stack):
         error_rate_alarm = cloudwatch.Alarm(
             self,
             "HighErrorRateAlarm",
-            alarm_name="pikaia-high-error-rate",
+            alarm_name=f"{resource_prefix}-high-error-rate",
             alarm_description="API 5xx error rate exceeds 5% of requests",
             metric=cloudwatch.MathExpression(
                 expression="(elb5xx + target5xx) / requests * 100",
@@ -288,7 +293,7 @@ class ObservabilityStack(Stack):
         latency_alarm = cloudwatch.Alarm(
             self,
             "HighLatencyAlarm",
-            alarm_name="pikaia-high-latency",
+            alarm_name=f"{resource_prefix}-high-latency",
             alarm_description="API p99 latency exceeds 2 seconds",
             metric=target_response_time,
             threshold=2,
@@ -303,7 +308,7 @@ class ObservabilityStack(Stack):
         unhealthy_alarm = cloudwatch.Alarm(
             self,
             "UnhealthyHostsAlarm",
-            alarm_name="pikaia-unhealthy-hosts",
+            alarm_name=f"{resource_prefix}-unhealthy-hosts",
             alarm_description="No healthy ECS tasks behind load balancer",
             metric=healthy_host_count,
             threshold=1,
@@ -318,7 +323,7 @@ class ObservabilityStack(Stack):
         ecs_cpu_alarm = cloudwatch.Alarm(
             self,
             "EcsHighCpuAlarm",
-            alarm_name="pikaia-ecs-high-cpu",
+            alarm_name=f"{resource_prefix}-ecs-high-cpu",
             alarm_description="ECS service CPU utilization exceeds 85%",
             metric=ecs_cpu,
             threshold=85,
@@ -333,7 +338,7 @@ class ObservabilityStack(Stack):
         ecs_memory_alarm = cloudwatch.Alarm(
             self,
             "EcsHighMemoryAlarm",
-            alarm_name="pikaia-ecs-high-memory",
+            alarm_name=f"{resource_prefix}-ecs-high-memory",
             alarm_description="ECS service memory utilization exceeds 85%",
             metric=ecs_memory,
             threshold=85,
@@ -348,7 +353,7 @@ class ObservabilityStack(Stack):
         db_cpu_alarm = cloudwatch.Alarm(
             self,
             "DbHighCpuAlarm",
-            alarm_name="pikaia-db-high-cpu",
+            alarm_name=f"{resource_prefix}-db-high-cpu",
             alarm_description="Aurora database CPU exceeds 80%",
             metric=db_cpu,
             threshold=80,
@@ -364,7 +369,7 @@ class ObservabilityStack(Stack):
         db_connections_alarm = cloudwatch.Alarm(
             self,
             "DbHighConnectionsAlarm",
-            alarm_name="pikaia-db-high-connections",
+            alarm_name=f"{resource_prefix}-db-high-connections",
             alarm_description="Database connections exceeding threshold (>500)",
             metric=db_connections,
             threshold=500,
@@ -382,7 +387,7 @@ class ObservabilityStack(Stack):
             publisher_error_alarm = cloudwatch.Alarm(
                 self,
                 "PublisherLambdaErrorAlarm",
-                alarm_name="pikaia-event-publisher-errors",
+                alarm_name=f"{resource_prefix}-event-publisher-errors",
                 alarm_description="Event publisher Lambda has errors",
                 metric=lambda_metrics["publisher"]["errors"],
                 threshold=1,
@@ -397,7 +402,7 @@ class ObservabilityStack(Stack):
             publisher_throttle_alarm = cloudwatch.Alarm(
                 self,
                 "PublisherLambdaThrottleAlarm",
-                alarm_name="pikaia-event-publisher-throttles",
+                alarm_name=f"{resource_prefix}-event-publisher-throttles",
                 alarm_description="Event publisher Lambda is being throttled",
                 metric=lambda_metrics["publisher"]["throttles"],
                 threshold=1,
@@ -413,7 +418,7 @@ class ObservabilityStack(Stack):
             audit_error_alarm = cloudwatch.Alarm(
                 self,
                 "AuditLambdaErrorAlarm",
-                alarm_name="pikaia-audit-consumer-errors",
+                alarm_name=f"{resource_prefix}-audit-consumer-errors",
                 alarm_description="Audit consumer Lambda has errors",
                 metric=lambda_metrics["audit"]["errors"],
                 threshold=1,
@@ -431,7 +436,7 @@ class ObservabilityStack(Stack):
             eventbridge_alarm = cloudwatch.Alarm(
                 self,
                 "EventBridgeFailedInvocationsAlarm",
-                alarm_name="pikaia-eventbridge-failed-invocations",
+                alarm_name=f"{resource_prefix}-eventbridge-failed-invocations",
                 alarm_description="EventBridge rule invocations are failing",
                 metric=eventbridge_failed_invocations,
                 threshold=1,
@@ -449,7 +454,7 @@ class ObservabilityStack(Stack):
         dashboard = cloudwatch.Dashboard(
             self,
             "PikaiaDashboard",
-            dashboard_name="pikaia-operations",
+            dashboard_name=dashboard_name,
         )
 
         # Row 1: API Overview
@@ -626,7 +631,7 @@ class ObservabilityStack(Stack):
         CfnOutput(
             self,
             "DashboardUrl",
-            value=f"https://{self.region}.console.aws.amazon.com/cloudwatch/home?region={self.region}#dashboards:name=pikaia-operations",
+            value=f"https://{self.region}.console.aws.amazon.com/cloudwatch/home?region={self.region}#dashboards:name={dashboard_name}",
             description="CloudWatch Dashboard URL",
         )
 

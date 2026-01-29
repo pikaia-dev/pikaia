@@ -22,9 +22,10 @@ set -euo pipefail
 AWS_PROFILE="${1:-pikaia}"
 export AWS_PROFILE
 
-# Resource names
-ECR_REPO_NAME="pikaia-backend"
-SECRETS_NAME="pikaia/app-secrets"
+# Resource names (can be overridden via environment variables)
+RESOURCE_PREFIX="${RESOURCE_PREFIX:-pikaia}"
+ECR_REPO_NAME="${ECR_REPO_NAME:-${RESOURCE_PREFIX}-backend}"
+SECRETS_NAME="${SECRETS_NAME:-${RESOURCE_PREFIX}/app-secrets}"
 
 # Colors for output
 RED='\033[0;31m'

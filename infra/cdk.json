@@ -21,6 +21,16 @@
   "context": {
     "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
     "@aws-cdk/core:checkSecretUsage": true,
-    "@aws-cdk/core:target-partitions": ["aws"]
+    "@aws-cdk/core:target-partitions": ["aws"],
+
+    "resource_prefix": "pikaia",
+    "ecr_repository_name": "pikaia-backend",
+    "secrets_path": "pikaia/app-secrets",
+    "database_name": "pikaia",
+    "event_bus_name": "pikaia-events",
+    "alarm_topic_name": "pikaia-alarms",
+    "dashboard_name": "pikaia-operations",
+    "frontend_bucket_prefix": "pikaia-frontend",
+    "log_stream_prefix": "pikaia-backend"
   }
 }

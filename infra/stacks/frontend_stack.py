@@ -58,11 +58,15 @@ class FrontendStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        # Resource naming from CDK context (allows customization without code changes)
+        frontend_bucket_prefix = self.node.try_get_context("frontend_bucket_prefix") or "pikaia-frontend"
+        resource_prefix = self.node.try_get_context("resource_prefix") or "pikaia"
+
         # S3 bucket for frontend static files
         self.frontend_bucket = s3.Bucket(
             self,
             "FrontendBucket",
-            bucket_name=f"pikaia-frontend-{self.account}-{self.region}",
+            bucket_name=f"{frontend_bucket_prefix}-{self.account}-{self.region}",
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
@@ -104,7 +108,7 @@ class FrontendStack(Stack):
         self.distribution = cloudfront.Distribution(
             self,
             "FrontendDistribution",
-            comment="Pikaia SaaS Frontend",
+            comment=f"{resource_prefix.title()} SaaS Frontend",
             domain_names=domain_names,
             certificate=certificate,
             default_behavior=cloudfront.BehaviorOptions(

@@ -80,6 +80,12 @@ class AppStack(Stack):
 
         self.vpc = vpc
 
+        # Resource naming from CDK context (allows customization without code changes)
+        ecr_repository_name = self.node.try_get_context("ecr_repository_name") or "pikaia-backend"
+        secrets_path = self.node.try_get_context("secrets_path") or "pikaia/app-secrets"
+        database_name = self.node.try_get_context("database_name") or "pikaia"
+        log_stream_prefix = self.node.try_get_context("log_stream_prefix") or "pikaia-backend"
+
         # =================================================================
         # Database
         # =================================================================
@@ -107,7 +113,7 @@ class AppStack(Stack):
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             security_groups=[self.database_security_group],
-            default_database_name="pikaia",
+            default_database_name=database_name,
             removal_policy=RemovalPolicy.SNAPSHOT,  # Take snapshot on delete
             deletion_protection=True,  # Prevent accidental deletion
             backup=rds.BackupProps(retention=Duration.days(7)),
@@ -145,7 +151,7 @@ class AppStack(Stack):
         self.app_secrets = secretsmanager.Secret.from_secret_name_v2(
             self,
             "AppSecrets",
-            secret_name="pikaia/app-secrets",
+            secret_name=secrets_path,
         )
 
         # =================================================================
@@ -167,7 +173,7 @@ class AppStack(Stack):
         self.ecr_repository = ecr.Repository.from_repository_name(
             self,
             "PikaiaBackendRepo",
-            repository_name="pikaia-backend",
+            repository_name=ecr_repository_name,
         )
 
         # =================================================================
@@ -213,7 +219,7 @@ class AppStack(Stack):
             "django",
             image=ecs.ContainerImage.from_ecr_repository(self.ecr_repository, "latest"),
             logging=ecs.LogDrivers.aws_logs(
-                stream_prefix="pikaia-backend",
+                stream_prefix=log_stream_prefix,
                 log_retention=logs.RetentionDays.ONE_MONTH,
             ),
             environment=container_env,

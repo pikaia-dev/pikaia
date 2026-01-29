@@ -56,6 +56,7 @@ class Settings(BaseSettings):
 
     # WebAuthn / Passkeys
     WEBAUTHN_RP_ID: str = "localhost"
+    WEBAUTHN_RP_NAME: str = "Pikaia"
     WEBAUTHN_ORIGIN: str = "http://localhost:5173"
 
     # Stytch Trusted Auth Token (for passkey -> Stytch session)
@@ -69,6 +70,10 @@ class Settings(BaseSettings):
 
     # Device linking
     DEVICE_SESSION_EXPIRY_MINUTES: int = 525600  # 1 year default
+    DEVICE_LINK_URL_SCHEME: str = "pikaia://device/link"  # Deep link URL for QR code
+
+    # Application branding (used for Stripe metadata, etc.)
+    APP_SLUG: str = "pikaia"
 
     # Proxy SSL detection header name (depends on architecture)
     # - "CloudFront-Forwarded-Proto" when API routes through CloudFront
@@ -288,7 +293,7 @@ EVENT_BUS_NAME = settings.EVENT_BUS_NAME
 
 # WebAuthn / Passkeys
 WEBAUTHN_RP_ID = settings.WEBAUTHN_RP_ID
-WEBAUTHN_RP_NAME = "Pikaia"
+WEBAUTHN_RP_NAME = settings.WEBAUTHN_RP_NAME
 WEBAUTHN_ORIGIN = settings.WEBAUTHN_ORIGIN
 
 # Stytch Trusted Auth Token (for passkey -> Stytch session)
@@ -312,7 +317,10 @@ DEVICE_LINK_TOKEN_EXPIRY_SECONDS = 300  # 5 minutes
 DEVICE_MAX_LINK_ATTEMPTS_PER_HOUR = 5  # Rate limit for initiating links (per user)
 DEVICE_LINK_COMPLETE_MAX_ATTEMPTS_PER_HOUR = 20  # Rate limit for completing links (per IP)
 DEVICE_SESSION_EXPIRY_MINUTES = settings.DEVICE_SESSION_EXPIRY_MINUTES
-DEVICE_LINK_URL_SCHEME = "pikaia://device/link"  # Deep link URL for QR code
+DEVICE_LINK_URL_SCHEME = settings.DEVICE_LINK_URL_SCHEME
+
+# Application branding
+APP_SLUG = settings.APP_SLUG
 
 # Sync engine
 SYNC_PUSH_MAX_BATCH_SIZE = 100  # Max operations per push request
