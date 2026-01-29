@@ -8,6 +8,10 @@ This stack deploys the frontend with:
   - ALB origin for /api/* routes
   - SPA routing (404 → index.html)
   - Optional custom domain with ACM certificate
+
+Supports two modes:
+- Standalone: Pass alb object directly
+- Shared: Pass alb_dns_name string (for shared ALB from shared infrastructure)
 """
 
 from aws_cdk import (
@@ -51,12 +55,18 @@ class FrontendStack(Stack):
         scope: Construct,
         construct_id: str,
         *,
-        alb: elbv2.IApplicationLoadBalancer,
+        alb: elbv2.IApplicationLoadBalancer | None = None,
+        alb_dns_name: str | None = None,
         domain_name: str | None = None,
         certificate_arn: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        # Determine ALB DNS name from either source
+        api_dns = alb_dns_name or (alb.load_balancer_dns_name if alb else None)
+        if not api_dns:
+            raise ValueError("Either alb or alb_dns_name must be provided")
 
         # Resource naming from CDK context (allows customization without code changes)
         frontend_bucket_prefix = self.node.try_get_context("frontend_bucket_prefix") or "pikaia-frontend"
@@ -89,7 +99,7 @@ class FrontendStack(Stack):
         # ALB origin for API routes
         # Use HTTP to ALB, but add custom headers so Django knows original was HTTPS
         alb_origin = origins.HttpOrigin(
-            alb.load_balancer_dns_name,
+            api_dns,
             protocol_policy=cloudfront.OriginProtocolPolicy.HTTP_ONLY,
             http_port=80,
             custom_headers={

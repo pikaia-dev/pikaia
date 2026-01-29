@@ -6,6 +6,11 @@ This stack deploys the Django backend with:
 - ECS Fargate for containerized Django app
 - Application Load Balancer with HTTPS
 - Secrets Manager for sensitive configuration
+
+Supports two modes:
+- Standalone: Creates all resources (database, ALB, ECS)
+- Shared: Uses shared VPC/ALB/database, creates only ECS service + target group
+  Activated by passing shared_* parameters from InfraResolver
 """
 
 from aws_cdk import (
@@ -60,6 +65,11 @@ class AppStack(Stack):
     - Application Load Balancer with HTTPS
     - Secrets Manager for database credentials and API keys
     - CloudWatch logs and monitoring
+
+    Shared Mode:
+    - Uses existing VPC, ALB, and database from shared infrastructure
+    - Creates only ECS service, target group, and listener rule
+    - Requires domain_name for host-based routing
     """
 
     def __init__(
@@ -74,71 +84,100 @@ class AppStack(Stack):
         domain_name: str | None = None,
         min_capacity: int = 2,
         max_capacity: int = 10,
+        # Shared mode parameters
+        shared_alb: elbv2.IApplicationLoadBalancer | None = None,
+        shared_https_listener: elbv2.IApplicationListener | None = None,
+        shared_database_security_group: ec2.ISecurityGroup | None = None,
+        shared_rds_proxy_endpoint: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         self.vpc = vpc
+        self._is_shared_mode = shared_alb is not None
 
         # Resource naming from CDK context (allows customization without code changes)
+        resource_prefix = self.node.try_get_context("resource_prefix") or "pikaia"
         ecr_repository_name = self.node.try_get_context("ecr_repository_name") or "pikaia-backend"
         secrets_path = self.node.try_get_context("secrets_path") or "pikaia/app-secrets"
         database_name = self.node.try_get_context("database_name") or "pikaia"
         log_stream_prefix = self.node.try_get_context("log_stream_prefix") or "pikaia-backend"
 
+        # Shared mode: use project-specific database secret path
+        database_secret_path = self.node.try_get_context("database_secret_path") or f"{resource_prefix}/database-credentials"
+
+        # ALB listener rule priority for shared mode (must be unique per project)
+        alb_rule_priority = self.node.try_get_context("alb_rule_priority") or 100
+
         # =================================================================
         # Database
         # =================================================================
 
-        # Database security group - created here to avoid cyclic dependencies
-        # between stacks. Shared with EventsStack via parameter.
-        self.database_security_group = ec2.SecurityGroup(
-            self,
-            "DatabaseSG",
-            vpc=vpc,
-            description="Security group for Aurora PostgreSQL",
-            allow_all_outbound=False,
-        )
+        if self._is_shared_mode:
+            # Shared mode: use existing database from shared infrastructure
+            # Import project-specific database secret (created by shared-infra admin)
+            self.database_secret = secretsmanager.Secret.from_secret_name_v2(
+                self,
+                "DatabaseSecret",
+                secret_name=database_secret_path,
+            )
+            self.database_security_group = shared_database_security_group
+            self.rds_proxy_endpoint = shared_rds_proxy_endpoint
+            # No database or RDS proxy objects in shared mode
+            self.database = None
+            self.rds_proxy = None
+        else:
+            # Standalone mode: create all database resources
+            # Database security group - created here to avoid cyclic dependencies
+            # between stacks. Shared with EventsStack via parameter.
+            self.database_security_group = ec2.SecurityGroup(
+                self,
+                "DatabaseSG",
+                vpc=vpc,
+                description="Security group for Aurora PostgreSQL",
+                allow_all_outbound=False,
+            )
 
-        # Aurora Serverless v2 cluster
-        self.database = rds.DatabaseCluster(
-            self,
-            "PikaiaDatabase",
-            engine=rds.DatabaseClusterEngine.aurora_postgres(
-                version=rds.AuroraPostgresEngineVersion.VER_16_4,
-            ),
-            serverless_v2_min_capacity=0.5,  # 0.5 ACU minimum (cost optimization)
-            serverless_v2_max_capacity=4,  # 4 ACU maximum (adjust based on load)
-            writer=rds.ClusterInstance.serverless_v2("writer"),
-            vpc=vpc,
-            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
-            security_groups=[self.database_security_group],
-            default_database_name=database_name,
-            removal_policy=RemovalPolicy.SNAPSHOT,  # Take snapshot on delete
-            deletion_protection=True,  # Prevent accidental deletion
-            backup=rds.BackupProps(retention=Duration.days(7)),
-            storage_encrypted=True,
-            cloudwatch_logs_exports=["postgresql"],
-        )
+            # Aurora Serverless v2 cluster
+            self.database = rds.DatabaseCluster(
+                self,
+                "PikaiaDatabase",
+                engine=rds.DatabaseClusterEngine.aurora_postgres(
+                    version=rds.AuroraPostgresEngineVersion.VER_16_4,
+                ),
+                serverless_v2_min_capacity=0.5,  # 0.5 ACU minimum (cost optimization)
+                serverless_v2_max_capacity=4,  # 4 ACU maximum (adjust based on load)
+                writer=rds.ClusterInstance.serverless_v2("writer"),
+                vpc=vpc,
+                vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+                security_groups=[self.database_security_group],
+                default_database_name=database_name,
+                removal_policy=RemovalPolicy.SNAPSHOT,  # Take snapshot on delete
+                deletion_protection=True,  # Prevent accidental deletion
+                backup=rds.BackupProps(retention=Duration.days(7)),
+                storage_encrypted=True,
+                cloudwatch_logs_exports=["postgresql"],
+            )
 
-        # Export database secret for other stacks
-        self.database_secret = self.database.secret
+            # Export database secret for other stacks
+            self.database_secret = self.database.secret
 
-        # RDS Proxy for Lambda connections (connection pooling)
-        # This is required for Lambda functions to efficiently connect to Aurora
-        self.rds_proxy = rds.DatabaseProxy(
-            self,
-            "PikaiaRdsProxy",
-            proxy_target=rds.ProxyTarget.from_cluster(self.database),
-            secrets=[self.database.secret],
-            vpc=vpc,
-            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
-            security_groups=[self.database_security_group],
-            require_tls=True,
-            idle_client_timeout=Duration.minutes(5),
-            max_connections_percent=90,
-            max_idle_connections_percent=10,
-        )
+            # RDS Proxy for Lambda connections (connection pooling)
+            # This is required for Lambda functions to efficiently connect to Aurora
+            self.rds_proxy = rds.DatabaseProxy(
+                self,
+                "PikaiaRdsProxy",
+                proxy_target=rds.ProxyTarget.from_cluster(self.database),
+                secrets=[self.database.secret],
+                vpc=vpc,
+                vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+                security_groups=[self.database_security_group],
+                require_tls=True,
+                idle_client_timeout=Duration.minutes(5),
+                max_connections_percent=90,
+                max_idle_connections_percent=10,
+            )
+            self.rds_proxy_endpoint = self.rds_proxy.endpoint
 
         # =================================================================
         # Application Secrets
@@ -346,34 +385,130 @@ class AppStack(Stack):
             description="Allow ECS to connect to Aurora",
         )
 
-        # ALB configuration
-        if certificate_arn:
-            certificate = acm.Certificate.from_certificate_arn(self, "Certificate", certificate_arn)
-            listener_protocol = elbv2.ApplicationProtocol.HTTPS
+        # =================================================================
+        # ALB & Fargate Service (mode-dependent)
+        # =================================================================
+
+        if self._is_shared_mode:
+            # Shared mode: create target group and listener rule on shared ALB
+            if not domain_name:
+                raise ValueError("domain_name is required in shared mode for host-based routing")
+
+            # Create target group for this project
+            self.target_group = elbv2.ApplicationTargetGroup(
+                self,
+                "TargetGroup",
+                target_group_name=f"{resource_prefix}-tg",
+                vpc=vpc,
+                port=8000,
+                protocol=elbv2.ApplicationProtocol.HTTP,
+                target_type=elbv2.TargetType.IP,
+                health_check=elbv2.HealthCheck(
+                    path="/api/v1/health",
+                    healthy_http_codes="200",
+                    interval=Duration.seconds(30),
+                    timeout=Duration.seconds(5),
+                ),
+            )
+
+            # Create ECS service (without ALB pattern)
+            self.ecs_service = ecs.FargateService(
+                self,
+                "Service",
+                cluster=self.cluster,
+                task_definition=task_definition,
+                desired_count=min_capacity,
+                security_groups=[ecs_security_group],
+                assign_public_ip=False,
+                vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+                health_check_grace_period=Duration.seconds(120),
+                min_healthy_percent=100,
+                max_healthy_percent=200,
+            )
+
+            # Enable ECS Exec
+            self.ecs_service.node.default_child.enable_execute_command = True
+
+            # Register service with target group
+            self.ecs_service.attach_to_application_target_group(self.target_group)
+
+            # Add listener rule for host-based routing
+            elbv2.ApplicationListenerRule(
+                self,
+                "HostRoutingRule",
+                listener=shared_https_listener,
+                priority=alb_rule_priority,
+                conditions=[
+                    elbv2.ListenerCondition.host_headers([domain_name]),
+                ],
+                target_groups=[self.target_group],
+            )
+
+            # Allow shared ALB to reach ECS tasks
+            ecs_security_group.add_ingress_rule(
+                peer=ec2.Peer.security_group_id(shared_alb.connections.security_groups[0].security_group_id),
+                connection=ec2.Port.tcp(8000),
+                description="Allow shared ALB to reach ECS",
+            )
+
+            # Store shared ALB reference
+            self.alb = shared_alb
+
+            # Auto-scaling
+            scaling = self.ecs_service.auto_scale_task_count(
+                min_capacity=min_capacity,
+                max_capacity=max_capacity,
+            )
+
         else:
-            certificate = None
-            listener_protocol = elbv2.ApplicationProtocol.HTTP
+            # Standalone mode: create full ALB with ApplicationLoadBalancedFargateService
+            if certificate_arn:
+                certificate = acm.Certificate.from_certificate_arn(self, "Certificate", certificate_arn)
+                listener_protocol = elbv2.ApplicationProtocol.HTTPS
+            else:
+                certificate = None
+                listener_protocol = elbv2.ApplicationProtocol.HTTP
 
-        # Fargate service with ALB
-        self.fargate_service = ecs_patterns.ApplicationLoadBalancedFargateService(
-            self,
-            "PikaiaBackendService",
-            cluster=self.cluster,
-            task_definition=task_definition,
-            desired_count=min_capacity,
-            security_groups=[ecs_security_group],
-            assign_public_ip=False,
-            task_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
-            certificate=certificate,
-            protocol=listener_protocol,
-            redirect_http=certificate is not None,
-            health_check_grace_period=Duration.seconds(120),
-            min_healthy_percent=100,  # Keep all tasks running during deployment
-            max_healthy_percent=200,  # Allow 2x tasks during rolling update
-        )
+            self.fargate_service = ecs_patterns.ApplicationLoadBalancedFargateService(
+                self,
+                "PikaiaBackendService",
+                cluster=self.cluster,
+                task_definition=task_definition,
+                desired_count=min_capacity,
+                security_groups=[ecs_security_group],
+                assign_public_ip=False,
+                task_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+                certificate=certificate,
+                protocol=listener_protocol,
+                redirect_http=certificate is not None,
+                health_check_grace_period=Duration.seconds(120),
+                min_healthy_percent=100,
+                max_healthy_percent=200,
+            )
 
-        # Enable ECS Exec for debugging and running migrations
-        self.fargate_service.service.node.default_child.enable_execute_command = True
+            # Enable ECS Exec for debugging and running migrations
+            self.fargate_service.service.node.default_child.enable_execute_command = True
+
+            # Store references
+            self.alb = self.fargate_service.load_balancer
+            self.target_group = self.fargate_service.target_group
+            self.ecs_service = self.fargate_service.service
+
+            # Health check configuration
+            self.target_group.configure_health_check(
+                path="/api/v1/health",
+                healthy_http_codes="200",
+                interval=Duration.seconds(30),
+                timeout=Duration.seconds(5),
+            )
+
+            # Auto-scaling
+            scaling = self.ecs_service.auto_scale_task_count(
+                min_capacity=min_capacity,
+                max_capacity=max_capacity,
+            )
+
+        # ECS Exec permissions (both modes)
         task_definition.task_role.add_to_policy(
             iam.PolicyStatement(
                 actions=[
@@ -386,12 +521,7 @@ class AppStack(Stack):
             )
         )
 
-        # Auto-scaling
-        scaling = self.fargate_service.service.auto_scale_task_count(
-            min_capacity=min_capacity,
-            max_capacity=max_capacity,
-        )
-
+        # Auto-scaling policies (both modes)
         scaling.scale_on_cpu_utilization(
             "CpuScaling",
             target_utilization_percent=70,
@@ -406,18 +536,6 @@ class AppStack(Stack):
             scale_out_cooldown=Duration.seconds(60),
         )
 
-        # Expose ALB and target group for frontend and observability stacks
-        self.alb = self.fargate_service.load_balancer
-        self.target_group = self.fargate_service.target_group
-
-        # Health check configuration
-        self.fargate_service.target_group.configure_health_check(
-            path="/api/v1/health",
-            healthy_http_codes="200",
-            interval=Duration.seconds(30),
-            timeout=Duration.seconds(5),
-        )
-
         # =================================================================
         # Outputs
         # =================================================================
@@ -425,25 +543,35 @@ class AppStack(Stack):
         CfnOutput(
             self,
             "LoadBalancerDNS",
-            value=self.fargate_service.load_balancer.load_balancer_dns_name,
+            value=self.alb.load_balancer_dns_name,
             description="Application Load Balancer DNS name",
-            export_name="PikaiaApiDns",
+            export_name=f"{resource_prefix.title()}ApiDns",
         )
 
-        CfnOutput(
-            self,
-            "DatabaseEndpoint",
-            value=self.database.cluster_endpoint.hostname,
-            description="Aurora cluster endpoint",
-            export_name="PikaiaDatabaseEndpoint",
-        )
+        # Database outputs (standalone mode only)
+        if not self._is_shared_mode:
+            CfnOutput(
+                self,
+                "DatabaseEndpoint",
+                value=self.database.cluster_endpoint.hostname,
+                description="Aurora cluster endpoint",
+                export_name=f"{resource_prefix.title()}DatabaseEndpoint",
+            )
+
+            CfnOutput(
+                self,
+                "RdsProxyEndpoint",
+                value=self.rds_proxy.endpoint,
+                description="RDS Proxy endpoint for Lambda connections",
+                export_name=f"{resource_prefix.title()}RdsProxyEndpoint",
+            )
 
         CfnOutput(
             self,
             "DatabaseSecretArn",
             value=self.database_secret.secret_arn,
             description="Database credentials secret ARN",
-            export_name="PikaiaDatabaseSecretArn",
+            export_name=f"{resource_prefix.title()}DatabaseSecretArn",
         )
 
         CfnOutput(
@@ -451,7 +579,7 @@ class AppStack(Stack):
             "AppSecretsArn",
             value=self.app_secrets.secret_arn,
             description="Application secrets ARN (update with API keys)",
-            export_name="PikaiaAppSecretsArn",
+            export_name=f"{resource_prefix.title()}AppSecretsArn",
         )
 
         CfnOutput(
@@ -459,15 +587,7 @@ class AppStack(Stack):
             "EcrRepositoryUri",
             value=self.ecr_repository.repository_uri,
             description="ECR repository URI for Docker images",
-            export_name="PikaiaBackendEcrUri",
-        )
-
-        CfnOutput(
-            self,
-            "RdsProxyEndpoint",
-            value=self.rds_proxy.endpoint,
-            description="RDS Proxy endpoint for Lambda connections",
-            export_name="PikaiaRdsProxyEndpoint",
+            export_name=f"{resource_prefix.title()}BackendEcrUri",
         )
 
         # Outputs for CI/CD workflow lookups
@@ -481,7 +601,7 @@ class AppStack(Stack):
         CfnOutput(
             self,
             "ServiceName",
-            value=self.fargate_service.service.service_name,
+            value=self.ecs_service.service_name,
             description="ECS service name",
         )
 
@@ -495,6 +615,6 @@ class AppStack(Stack):
         CfnOutput(
             self,
             "EcsSecurityGroup",
-            value=self.fargate_service.service.connections.security_groups[0].security_group_id,
+            value=self.ecs_service.connections.security_groups[0].security_group_id,
             description="ECS service security group ID",
         )
