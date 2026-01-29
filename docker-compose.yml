@@ -10,18 +10,18 @@
 #   - LocalStack: http://localhost:4566
 #   - Mailpit UI: http://localhost:8025
 
-name: pikaia
+name: ${COMPOSE_PROJECT_NAME:-pikaia}
 
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: pikaia-postgres
+    container_name: ${COMPOSE_PROJECT_NAME:-pikaia}-postgres
     ports:
       - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: pikaia
+      POSTGRES_DB: ${POSTGRES_DB:-pikaia}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -32,7 +32,7 @@ services:
 
   localstack:
     image: localstack/localstack:latest
-    container_name: pikaia-localstack
+    container_name: ${COMPOSE_PROJECT_NAME:-pikaia}-localstack
     ports:
       - "4566:4566"  # LocalStack Gateway (all AWS services)
     environment:
@@ -50,7 +50,7 @@ services:
   # Init container to create S3 bucket and EventBridge event bus
   localstack-init:
     image: amazon/aws-cli:latest
-    container_name: pikaia-localstack-init
+    container_name: ${COMPOSE_PROJECT_NAME:-pikaia}-localstack-init
     depends_on:
       localstack:
         condition: service_healthy
@@ -58,18 +58,19 @@ services:
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       AWS_DEFAULT_REGION: us-east-1
+      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-pikaia}
     entrypoint: >
       /bin/sh -c "
       echo 'Creating S3 bucket...';
-      aws --endpoint-url=http://localstack:4566 s3 mb s3://pikaia-media || true;
+      aws --endpoint-url=http://localstack:4566 s3 mb s3://$${COMPOSE_PROJECT_NAME}-media || true;
       echo 'Creating EventBridge event bus...';
-      aws --endpoint-url=http://localstack:4566 events create-event-bus --name pikaia-events || true;
+      aws --endpoint-url=http://localstack:4566 events create-event-bus --name $${COMPOSE_PROJECT_NAME}-events || true;
       echo 'LocalStack initialization complete';
       "
 
   mailpit:
     image: axllent/mailpit:latest
-    container_name: pikaia-mailpit
+    container_name: ${COMPOSE_PROJECT_NAME:-pikaia}-mailpit
     ports:
       - "1025:1025"  # SMTP
       - "8025:8025"  # Web UI

@@ -22,6 +22,10 @@ ENV_FILE="$PROJECT_ROOT/.env.production"
 AWS_PROFILE="${1:-pikaia}"
 export AWS_PROFILE
 
+# Resource names (can be overridden via environment variables)
+RESOURCE_PREFIX="${RESOURCE_PREFIX:-pikaia}"
+SECRET_NAME="${SECRET_NAME:-${RESOURCE_PREFIX}/app-secrets}"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -140,7 +144,6 @@ SECRET_JSON=$(jq -n \
 )
 
 # Update secrets
-SECRET_NAME="pikaia/app-secrets"
 echo_info "Updating secret: $SECRET_NAME"
 
 VERSION_ID=$(aws secretsmanager put-secret-value \

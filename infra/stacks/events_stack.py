@@ -156,7 +156,7 @@ class EventsStack(Stack):
         database_secret: secretsmanager.ISecret,
         database_security_group: ec2.ISecurityGroup,
         rds_proxy_endpoint: str,
-        event_bus_name: str = "pikaia-events",
+        event_bus_name: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -164,6 +164,16 @@ class EventsStack(Stack):
         self.vpc = vpc
         self.database_secret = database_secret
         self.rds_proxy_endpoint = rds_proxy_endpoint
+
+        # Resource naming from CDK context (allows customization without code changes)
+        resource_prefix = self.node.try_get_context("resource_prefix") or "pikaia"
+        event_bus_name = event_bus_name or self.node.try_get_context("event_bus_name") or "pikaia-events"
+        publisher_dlq_name = f"{resource_prefix}-events-publisher-dlq"
+        publisher_lambda_name = f"{resource_prefix}-event-publisher"
+        publisher_schedule_name = f"{resource_prefix}-event-publisher-schedule"
+        audit_dlq_name = f"{resource_prefix}-audit-dlq"
+        audit_lambda_name = f"{resource_prefix}-audit-consumer"
+        audit_rule_name = f"{resource_prefix}-audit-event-rule"
 
         # EventBridge bus for domain events
         self.event_bus = events.EventBus(
@@ -176,7 +186,7 @@ class EventsStack(Stack):
         self.dlq = sqs.Queue(
             self,
             "EventPublisherDLQ",
-            queue_name="pikaia-events-publisher-dlq",
+            queue_name=publisher_dlq_name,
             retention_period=Duration.days(14),
             removal_policy=RemovalPolicy.RETAIN,
         )
@@ -207,7 +217,7 @@ class EventsStack(Stack):
         self.publisher_lambda = _create_python_lambda(
             self,
             "EventPublisher",
-            function_name="pikaia-event-publisher",
+            function_name=publisher_lambda_name,
             handler="handler.handler",
             code_path=FUNCTIONS_DIR / "event-publisher",
             vpc=vpc,
@@ -235,7 +245,7 @@ class EventsStack(Stack):
         events.Rule(
             self,
             "EventPublisherSchedule",
-            rule_name="pikaia-event-publisher-schedule",
+            rule_name=publisher_schedule_name,
             schedule=events.Schedule.rate(Duration.minutes(1)),
             targets=[events_targets.LambdaFunction(self.publisher_lambda)],
             description="Fallback polling for event publisher",
@@ -249,7 +259,7 @@ class EventsStack(Stack):
         self.audit_dlq = sqs.Queue(
             self,
             "AuditDLQ",
-            queue_name="pikaia-audit-dlq",
+            queue_name=audit_dlq_name,
             retention_period=Duration.days(14),  # Retain for investigation
             removal_policy=RemovalPolicy.RETAIN,
         )
@@ -279,7 +289,7 @@ class EventsStack(Stack):
         self.audit_lambda = _create_python_lambda(
             self,
             "AuditConsumer",
-            function_name="pikaia-audit-consumer",
+            function_name=audit_lambda_name,
             handler="handler.handler",
             code_path=FUNCTIONS_DIR / "audit-consumer",
             vpc=vpc,
@@ -300,7 +310,7 @@ class EventsStack(Stack):
         events.Rule(
             self,
             "AuditEventRule",
-            rule_name="pikaia-audit-event-rule",
+            rule_name=audit_rule_name,
             event_bus=self.event_bus,
             event_pattern=events.EventPattern(
                 detail_type=AUDIT_EVENT_TYPES,
