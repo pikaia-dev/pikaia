@@ -143,14 +143,15 @@ jobs:
         if: needs.changes.outputs.infra == 'true' || needs.changes.outputs.events == 'true'
         working-directory: infra
         env:
-          # Optional CDK context for production deployments with custom domains:
-          #   --context certificate_arn=${{ vars.ACM_CERTIFICATE_ARN }}
-          #   --context domain_name=${{ vars.API_DOMAIN_NAME }}
-          #   --context app_domain=${{ vars.APP_DOMAIN_NAME }}
-          #   --context require_https=true
+          # Build CDK context from environment variables
+          # Required: AVAILABILITY_ZONES prevents CDK AZ lookups that cause subnet replacement
+          # Optional: CERTIFICATE_ARN and APP_DOMAIN_NAME for HTTPS deployments
           CDK_CONTEXT: >-
             --context account=${{ env.AWS_ACCOUNT_ID }}
             --context region=${{ env.AWS_REGION }}
+            --context availability_zones=${{ vars.AVAILABILITY_ZONES }}
+            ${{ vars.CERTIFICATE_ARN && format('--context certificate_arn={0}', vars.CERTIFICATE_ARN) || '' }}
+            ${{ vars.APP_DOMAIN_NAME && format('--context app_domain={0}', vars.APP_DOMAIN_NAME) || '' }}
         run: |
           npm install -g aws-cdk
           uv sync

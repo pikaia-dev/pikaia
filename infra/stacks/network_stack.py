@@ -13,11 +13,19 @@ class NetworkStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        # Get explicit AZs from context if provided (for CI/CD consistency)
+        # Pass via: --context availability_zones=us-east-1a,us-east-1b
+        az_context = self.node.try_get_context("availability_zones")
+        availability_zones = az_context.split(",") if az_context else None
+
         # VPC with public and private subnets
+        # If availability_zones is provided, use those explicitly to avoid
+        # CDK lookup caching issues in CI/CD environments
         self.vpc = ec2.Vpc(
             self,
             "PikaiaVpc",
-            max_azs=2,
+            max_azs=2 if not availability_zones else None,
+            availability_zones=availability_zones,
             nat_gateways=1,  # Cost optimization: single NAT for dev
             subnet_configuration=[
                 ec2.SubnetConfiguration(

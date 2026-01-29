@@ -223,6 +223,7 @@ emails/build/
 
 # CDK
 infra/cdk.out/
+infra/cdk.context.json
 
 # IDE
 .idea/
