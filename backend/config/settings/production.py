@@ -113,7 +113,9 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")  # ALB standard header
+# Convert header name to Django's HTTP_ prefixed format (e.g. X-Forwarded-Proto -> HTTP_X_FORWARDED_PROTO)
+_ssl_header = settings.PROXY_SSL_HEADER.upper().replace("-", "_")
+SECURE_PROXY_SSL_HEADER = (f"HTTP_{_ssl_header}", "https")
 
 # Additional security headers (OWASP recommendations)
 SECURE_CONTENT_TYPE_NOSNIFF = True  # Prevent MIME-type sniffing

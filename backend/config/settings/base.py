@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     # Device linking
     DEVICE_SESSION_EXPIRY_MINUTES: int = 525600  # 1 year default
 
+    # Proxy SSL detection header name (depends on architecture)
+    # - "CloudFront-Forwarded-Proto" when API routes through CloudFront
+    # - "X-Forwarded-Proto" when API goes directly to ALB
+    PROXY_SSL_HEADER: str = "CloudFront-Forwarded-Proto"
+
     # AWS SMS (End User Messaging)
     AWS_SMS_REGION: str = "us-east-1"  # AWS region for SMS service
     AWS_SMS_ORIGINATION_IDENTITY: str = ""  # Phone number or sender ID

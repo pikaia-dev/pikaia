@@ -180,9 +180,14 @@ class AppStack(Stack):
         )
 
         # Build environment variables including S3 config if media bucket is provided
+        # Use wildcard for ALLOWED_HOSTS since ALB already restricts traffic
+        # (ALB health checks use ALB DNS as Host header, which we don't know at deploy time)
+        allowed_hosts = "*"
         container_env = {
             "DJANGO_SETTINGS_MODULE": "config.settings.production",
-            "ALLOWED_HOSTS": domain_name or "*",
+            "ALLOWED_HOSTS": allowed_hosts,
+            # API goes directly to ALB (not through CloudFront), so use standard header
+            "PROXY_SSL_HEADER": "X-Forwarded-Proto",
         }
         if media_bucket:
             container_env.update(
