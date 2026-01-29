@@ -23,6 +23,7 @@
     "@aws-cdk/core:checkSecretUsage": true,
     "@aws-cdk/core:target-partitions": ["aws"],
 
+    "_comment_resource_naming": "Resource naming - customize for different deployments",
     "resource_prefix": "pikaia",
     "ecr_repository_name": "pikaia-backend",
     "secrets_path": "pikaia/app-secrets",
@@ -31,6 +32,12 @@
     "alarm_topic_name": "pikaia-alarms",
     "dashboard_name": "pikaia-operations",
     "frontend_bucket_prefix": "pikaia-frontend",
-    "log_stream_prefix": "pikaia-backend"
+    "log_stream_prefix": "pikaia-backend",
+
+    "_comment_shared_mode": "Shared infrastructure mode - set shared_infra_prefix to enable",
+    "_comment_shared_mode_example": "cdk deploy --all --context shared_infra_prefix=/shared-infra/prod --context domain_name=api.example.com --context alb_rule_priority=100",
+    "_shared_infra_prefix": "SSM parameter prefix for shared infrastructure (e.g., /shared-infra/prod)",
+    "_alb_rule_priority": "Unique ALB listener rule priority for this project (100-999, must not conflict with other projects)",
+    "_database_secret_path": "Path to project-specific database credentials secret (default: {resource_prefix}/database-credentials)"
   }
 }

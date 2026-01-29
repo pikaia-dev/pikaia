@@ -1,5 +1,9 @@
 """
 Network stack - VPC, subnets, and security groups.
+
+Supports two modes:
+- Standalone: Creates VPC, subnets, and NAT gateway
+- Shared: Uses existing VPC from shared infrastructure (pass shared_vpc parameter)
 """
 
 from aws_cdk import CfnOutput, Stack
@@ -10,8 +14,20 @@ from constructs import Construct
 class NetworkStack(Stack):
     """Creates the foundational VPC and networking components."""
 
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        *,
+        shared_vpc: ec2.IVpc | None = None,
+        **kwargs,
+    ) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        # Shared mode: use provided VPC without creating resources
+        if shared_vpc:
+            self.vpc = shared_vpc
+            return
 
         # Get explicit AZs from context if provided (for CI/CD consistency)
         # Pass via: --context availability_zones=us-east-1a,us-east-1b
