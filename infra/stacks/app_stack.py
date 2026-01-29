@@ -33,6 +33,9 @@ from aws_cdk import (
     aws_elasticloadbalancingv2 as elbv2,
 )
 from aws_cdk import (
+    aws_iam as iam,
+)
+from aws_cdk import (
     aws_logs as logs,
 )
 from aws_cdk import (
@@ -361,6 +364,20 @@ class AppStack(Stack):
             health_check_grace_period=Duration.seconds(120),
             min_healthy_percent=100,  # Keep all tasks running during deployment
             max_healthy_percent=200,  # Allow 2x tasks during rolling update
+        )
+
+        # Enable ECS Exec for debugging and running migrations
+        self.fargate_service.service.node.default_child.enable_execute_command = True
+        task_definition.task_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "ssmmessages:CreateControlChannel",
+                    "ssmmessages:CreateDataChannel",
+                    "ssmmessages:OpenControlChannel",
+                    "ssmmessages:OpenDataChannel",
+                ],
+                resources=["*"],
+            )
         )
 
         # Auto-scaling
