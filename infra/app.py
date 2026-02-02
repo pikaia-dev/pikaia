@@ -10,6 +10,10 @@ Stacks:
 - PikaiaEvents: EventBridge bus, publisher Lambda, DLQ
 - PikaiaObservability: CloudWatch dashboards and alarms
 
+Modes:
+- Standalone (default): Creates all infrastructure
+- Shared: Uses VPC, ALB, and database from shared infrastructure via SSM
+
 Usage:
     # Synth (validate)
     cdk synth --all
@@ -28,6 +32,12 @@ Usage:
 
     # Deploy with alarm notifications
     cdk deploy PikaiaObservability --context alarm_email=ops@example.com
+
+    # Deploy in SHARED MODE (uses shared VPC, ALB, database from SSM)
+    cdk deploy --all \\
+        --context shared_infra_prefix=/shared-infra/prod \\
+        --context domain_name=api.pikaia.dev \\
+        --context alb_rule_priority=100
 """
 
 import aws_cdk as cdk
@@ -35,6 +45,7 @@ import aws_cdk as cdk
 from stacks.app_stack import AppStack
 from stacks.events_stack import EventsStack
 from stacks.frontend_stack import FrontendStack
+from stacks.infra_resolver import InfraResolver
 from stacks.media_stack import MediaStack
 from stacks.network_stack import NetworkStack
 from stacks.observability_stack import ObservabilityStack
@@ -49,10 +60,26 @@ env = cdk.Environment(
 )
 
 # =============================================================================
+# Shared Infrastructure Detection
+# =============================================================================
+# If shared_infra_prefix is set, use shared VPC/ALB/database from SSM parameters
+# Otherwise, create all resources in standalone mode
+
+shared_infra_prefix = app.node.try_get_context("shared_infra_prefix")
+resolver = InfraResolver(app, shared_infra_prefix)
+
+# =============================================================================
 # Foundation: Network + Security Groups
 # =============================================================================
 
-network = NetworkStack(app, "PikaiaNetwork", env=env)
+if resolver.is_shared_mode:
+    # Shared mode: look up VPC from SSM parameters
+    # NetworkStack is still created but just wraps the shared VPC
+    shared_vpc = resolver.lookup_vpc(app)
+    network = NetworkStack(app, "PikaiaNetwork", shared_vpc=shared_vpc, env=env)
+else:
+    # Standalone mode: create VPC and networking
+    network = NetworkStack(app, "PikaiaNetwork", env=env)
 
 # =============================================================================
 # Media: S3 + CloudFront + Image Transformation
@@ -109,18 +136,39 @@ if require_https and not certificate_arn:
         "For production deployments, always use HTTPS."
     )
 
-app_stack = AppStack(
-    app,
-    "PikaiaApp",
-    vpc=network.vpc,
-    media_bucket=media.bucket,
-    media_cdn_domain=media.distribution.distribution_domain_name,
-    domain_name=domain_name,
-    certificate_arn=certificate_arn,
-    min_capacity=2,
-    max_capacity=10,
-    env=env,
-)
+if resolver.is_shared_mode:
+    # Shared mode: pass shared infrastructure resources
+    shared_config = resolver.get_shared_config()
+    app_stack = AppStack(
+        app,
+        "PikaiaApp",
+        vpc=network.vpc,
+        media_bucket=media.bucket,
+        media_cdn_domain=media.distribution.distribution_domain_name,
+        domain_name=domain_name,
+        # Shared infrastructure resources
+        shared_alb=resolver.lookup_alb(app),
+        shared_https_listener=resolver.lookup_https_listener(app),
+        shared_database_security_group=resolver.lookup_database_security_group(app),
+        shared_rds_proxy_endpoint=shared_config.rds_proxy_endpoint if shared_config else None,
+        min_capacity=2,
+        max_capacity=10,
+        env=env,
+    )
+else:
+    # Standalone mode: create all resources
+    app_stack = AppStack(
+        app,
+        "PikaiaApp",
+        vpc=network.vpc,
+        media_bucket=media.bucket,
+        media_cdn_domain=media.distribution.distribution_domain_name,
+        domain_name=domain_name,
+        certificate_arn=certificate_arn,
+        min_capacity=2,
+        max_capacity=10,
+        env=env,
+    )
 app_stack.add_dependency(network)
 app_stack.add_dependency(media)
 
@@ -132,27 +180,42 @@ app_stack.add_dependency(media)
 frontend_domain = app.node.try_get_context("frontend_domain")
 frontend_certificate_arn = app.node.try_get_context("frontend_certificate_arn")
 
-frontend = FrontendStack(
-    app,
-    "PikaiaFrontend",
-    alb=app_stack.alb,
-    domain_name=frontend_domain,
-    certificate_arn=frontend_certificate_arn,
-    env=env,
-)
+if resolver.is_shared_mode:
+    # Shared mode: pass ALB DNS name directly
+    shared_config = resolver.get_shared_config()
+    frontend = FrontendStack(
+        app,
+        "PikaiaFrontend",
+        alb_dns_name=shared_config.alb_dns_name if shared_config else None,
+        domain_name=frontend_domain,
+        certificate_arn=frontend_certificate_arn,
+        env=env,
+    )
+else:
+    # Standalone mode: pass ALB object
+    frontend = FrontendStack(
+        app,
+        "PikaiaFrontend",
+        alb=app_stack.alb,
+        domain_name=frontend_domain,
+        certificate_arn=frontend_certificate_arn,
+        env=env,
+    )
 frontend.add_dependency(app_stack)
 
 # =============================================================================
 # Events: EventBridge + Publisher Lambda + DLQ
 # =============================================================================
 
+# Events stack works in both modes - it uses the database secret and security group
+# which are available from app_stack in both standalone and shared modes
 events_stack = EventsStack(
     app,
     "PikaiaEvents",
     vpc=network.vpc,
     database_secret=app_stack.database_secret,
     database_security_group=app_stack.database_security_group,
-    rds_proxy_endpoint=app_stack.rds_proxy.endpoint,
+    rds_proxy_endpoint=app_stack.rds_proxy_endpoint,
     env=env,
 )
 events_stack.add_dependency(app_stack)
@@ -164,14 +227,15 @@ events_stack.add_dependency(app_stack)
 # Optional: Email for alarm notifications
 alarm_email = app.node.try_get_context("alarm_email")
 
+# Observability stack - database is optional (None in shared mode)
 observability = ObservabilityStack(
     app,
     "PikaiaObservability",
     alb=app_stack.alb,
     target_group=app_stack.target_group,
     ecs_cluster=app_stack.cluster,
-    ecs_service=app_stack.fargate_service.service,
-    database=app_stack.database,
+    ecs_service=app_stack.ecs_service,
+    database=app_stack.database,  # None in shared mode
     event_bus=events_stack.event_bus,
     publisher_lambda=events_stack.publisher_lambda,
     audit_lambda=events_stack.audit_lambda,

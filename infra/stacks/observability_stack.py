@@ -69,8 +69,8 @@ class ObservabilityStack(Stack):
         alb: elbv2.IApplicationLoadBalancer,
         target_group: elbv2.IApplicationTargetGroup,
         ecs_cluster: ecs.ICluster,
-        ecs_service: ecs.FargateService,
-        database: rds.DatabaseCluster,
+        ecs_service: ecs.FargateService | ecs.IService,
+        database: rds.DatabaseCluster | None = None,
         event_bus: events.IEventBus | None = None,
         publisher_lambda: lambda_.IFunction | None = None,
         audit_lambda: lambda_.IFunction | None = None,
@@ -189,56 +189,63 @@ class ObservabilityStack(Stack):
             period=Duration.minutes(1),
         )
 
-        # Database metrics
-        db_connections = cloudwatch.Metric(
-            namespace="AWS/RDS",
-            metric_name="DatabaseConnections",
-            dimensions_map={
-                "DBClusterIdentifier": database.cluster_identifier,
-            },
-            statistic="Average",
-            period=Duration.minutes(1),
-        )
+        # Database metrics (optional - only if database is provided)
+        db_connections = None
+        db_cpu = None
+        db_serverless_capacity = None
+        db_read_latency = None
+        db_write_latency = None
 
-        db_cpu = cloudwatch.Metric(
-            namespace="AWS/RDS",
-            metric_name="CPUUtilization",
-            dimensions_map={
-                "DBClusterIdentifier": database.cluster_identifier,
-            },
-            statistic="Average",
-            period=Duration.minutes(1),
-        )
+        if database:
+            db_connections = cloudwatch.Metric(
+                namespace="AWS/RDS",
+                metric_name="DatabaseConnections",
+                dimensions_map={
+                    "DBClusterIdentifier": database.cluster_identifier,
+                },
+                statistic="Average",
+                period=Duration.minutes(1),
+            )
 
-        db_serverless_capacity = cloudwatch.Metric(
-            namespace="AWS/RDS",
-            metric_name="ServerlessDatabaseCapacity",
-            dimensions_map={
-                "DBClusterIdentifier": database.cluster_identifier,
-            },
-            statistic="Average",
-            period=Duration.minutes(1),
-        )
+            db_cpu = cloudwatch.Metric(
+                namespace="AWS/RDS",
+                metric_name="CPUUtilization",
+                dimensions_map={
+                    "DBClusterIdentifier": database.cluster_identifier,
+                },
+                statistic="Average",
+                period=Duration.minutes(1),
+            )
 
-        db_read_latency = cloudwatch.Metric(
-            namespace="AWS/RDS",
-            metric_name="ReadLatency",
-            dimensions_map={
-                "DBClusterIdentifier": database.cluster_identifier,
-            },
-            statistic="Average",
-            period=Duration.minutes(1),
-        )
+            db_serverless_capacity = cloudwatch.Metric(
+                namespace="AWS/RDS",
+                metric_name="ServerlessDatabaseCapacity",
+                dimensions_map={
+                    "DBClusterIdentifier": database.cluster_identifier,
+                },
+                statistic="Average",
+                period=Duration.minutes(1),
+            )
 
-        db_write_latency = cloudwatch.Metric(
-            namespace="AWS/RDS",
-            metric_name="WriteLatency",
-            dimensions_map={
-                "DBClusterIdentifier": database.cluster_identifier,
-            },
-            statistic="Average",
-            period=Duration.minutes(1),
-        )
+            db_read_latency = cloudwatch.Metric(
+                namespace="AWS/RDS",
+                metric_name="ReadLatency",
+                dimensions_map={
+                    "DBClusterIdentifier": database.cluster_identifier,
+                },
+                statistic="Average",
+                period=Duration.minutes(1),
+            )
+
+            db_write_latency = cloudwatch.Metric(
+                namespace="AWS/RDS",
+                metric_name="WriteLatency",
+                dimensions_map={
+                    "DBClusterIdentifier": database.cluster_identifier,
+                },
+                statistic="Average",
+                period=Duration.minutes(1),
+            )
 
         # Lambda metrics (optional - only if event stack is deployed)
         lambda_metrics: dict[str, dict[str, cloudwatch.Metric]] = {}
@@ -349,36 +356,41 @@ class ObservabilityStack(Stack):
         ecs_memory_alarm.add_alarm_action(alarm_action)
         ecs_memory_alarm.add_ok_action(alarm_action)
 
-        # High database CPU (>80%)
-        db_cpu_alarm = cloudwatch.Alarm(
-            self,
-            "DbHighCpuAlarm",
-            alarm_name=f"{resource_prefix}-db-high-cpu",
-            alarm_description="Aurora database CPU exceeds 80%",
-            metric=db_cpu,
-            threshold=80,
-            evaluation_periods=3,
-            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
-        )
-        db_cpu_alarm.add_alarm_action(alarm_action)
-        db_cpu_alarm.add_ok_action(alarm_action)
+        # Database alarms (optional - only if database is provided)
+        db_cpu_alarm = None
+        db_connections_alarm = None
 
-        # High database connections (approaching limit)
-        # Aurora Serverless v2 has ~2000 connections per ACU
-        db_connections_alarm = cloudwatch.Alarm(
-            self,
-            "DbHighConnectionsAlarm",
-            alarm_name=f"{resource_prefix}-db-high-connections",
-            alarm_description="Database connections exceeding threshold (>500)",
-            metric=db_connections,
-            threshold=500,
-            evaluation_periods=2,
-            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
-        )
-        db_connections_alarm.add_alarm_action(alarm_action)
-        db_connections_alarm.add_ok_action(alarm_action)
+        if database and db_cpu and db_connections:
+            # High database CPU (>80%)
+            db_cpu_alarm = cloudwatch.Alarm(
+                self,
+                "DbHighCpuAlarm",
+                alarm_name=f"{resource_prefix}-db-high-cpu",
+                alarm_description="Aurora database CPU exceeds 80%",
+                metric=db_cpu,
+                threshold=80,
+                evaluation_periods=3,
+                comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+                treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+            )
+            db_cpu_alarm.add_alarm_action(alarm_action)
+            db_cpu_alarm.add_ok_action(alarm_action)
+
+            # High database connections (approaching limit)
+            # Aurora Serverless v2 has ~2000 connections per ACU
+            db_connections_alarm = cloudwatch.Alarm(
+                self,
+                "DbHighConnectionsAlarm",
+                alarm_name=f"{resource_prefix}-db-high-connections",
+                alarm_description="Database connections exceeding threshold (>500)",
+                metric=db_connections,
+                threshold=500,
+                evaluation_periods=2,
+                comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+                treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+            )
+            db_connections_alarm.add_alarm_action(alarm_action)
+            db_connections_alarm.add_ok_action(alarm_action)
 
         # Lambda alarms (optional)
         lambda_alarms: list[cloudwatch.Alarm] = []
@@ -519,42 +531,43 @@ class ObservabilityStack(Stack):
             ),
         )
 
-        # Row 3: Database
-        dashboard.add_widgets(
-            cloudwatch.GraphWidget(
-                title="Database Connections",
-                left=[db_connections],
-                width=6,
-                height=6,
-            ),
-            cloudwatch.GraphWidget(
-                title="Database CPU",
-                left=[db_cpu],
-                left_y_axis=cloudwatch.YAxisProps(
-                    label="Percent",
-                    min=0,
-                    max=100,
+        # Row 3: Database (if database is provided)
+        if database and db_connections and db_cpu and db_serverless_capacity:
+            dashboard.add_widgets(
+                cloudwatch.GraphWidget(
+                    title="Database Connections",
+                    left=[db_connections],
+                    width=6,
+                    height=6,
                 ),
-                width=6,
-                height=6,
-            ),
-            cloudwatch.GraphWidget(
-                title="Aurora Serverless Capacity (ACU)",
-                left=[db_serverless_capacity],
-                width=6,
-                height=6,
-            ),
-            cloudwatch.GraphWidget(
-                title="Database Latency",
-                left=[db_read_latency, db_write_latency],
-                left_y_axis=cloudwatch.YAxisProps(
-                    label="Seconds",
-                    min=0,
+                cloudwatch.GraphWidget(
+                    title="Database CPU",
+                    left=[db_cpu],
+                    left_y_axis=cloudwatch.YAxisProps(
+                        label="Percent",
+                        min=0,
+                        max=100,
+                    ),
+                    width=6,
+                    height=6,
                 ),
-                width=6,
-                height=6,
-            ),
-        )
+                cloudwatch.GraphWidget(
+                    title="Aurora Serverless Capacity (ACU)",
+                    left=[db_serverless_capacity],
+                    width=6,
+                    height=6,
+                ),
+                cloudwatch.GraphWidget(
+                    title="Database Latency",
+                    left=[db_read_latency, db_write_latency],
+                    left_y_axis=cloudwatch.YAxisProps(
+                        label="Seconds",
+                        min=0,
+                    ),
+                    width=6,
+                    height=6,
+                ),
+            )
 
         # Row 4: Lambda & Events (if configured)
         if lambda_metrics or eventbridge_failed_invocations:
@@ -608,9 +621,12 @@ class ObservabilityStack(Stack):
             unhealthy_alarm,
             ecs_cpu_alarm,
             ecs_memory_alarm,
-            db_cpu_alarm,
-            db_connections_alarm,
         ]
+        # Add database alarms if available
+        if db_cpu_alarm:
+            all_alarms.append(db_cpu_alarm)
+        if db_connections_alarm:
+            all_alarms.append(db_connections_alarm)
         all_alarms.extend(lambda_alarms)
         if eventbridge_alarm:
             all_alarms.append(eventbridge_alarm)
