@@ -76,6 +76,7 @@ OPTIONAL_VARS=(
     "WEBAUTHN_RP_ID"
     "WEBAUTHN_ORIGIN"
     "CORS_ALLOWED_ORIGINS"
+    "MOBILE_PROVISION_API_KEY"
 )
 
 # Validate all required vars are set
@@ -124,6 +125,7 @@ SECRET_JSON=$(jq -n \
     --arg webauthn_name "${WEBAUTHN_RP_NAME:-Pikaia}" \
     --arg webauthn_origin "${WEBAUTHN_ORIGIN:-}" \
     --arg cors_origins "${CORS_ALLOWED_ORIGINS:-}" \
+    --arg mobile_provision_key "${MOBILE_PROVISION_API_KEY:-}" \
     '{
         DJANGO_SECRET_KEY: $django_secret,
         STYTCH_PROJECT_ID: $stytch_project,
@@ -139,7 +141,8 @@ SECRET_JSON=$(jq -n \
         WEBAUTHN_RP_ID: $webauthn_rp,
         WEBAUTHN_RP_NAME: $webauthn_name,
         WEBAUTHN_ORIGIN: $webauthn_origin,
-        CORS_ALLOWED_ORIGINS: $cors_origins
+        CORS_ALLOWED_ORIGINS: $cors_origins,
+        MOBILE_PROVISION_API_KEY: $mobile_provision_key
     }'
 )
 
