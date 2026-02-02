@@ -16,12 +16,15 @@ Coding standards for contributors and AI agents.
 
 | Type        | Convention      | Example                 |
 | ----------- | --------------- | ----------------------- |
-| Files       | snake_case      | `user_service.py`       |
+| Python files | snake_case     | `user_service.py`       |
+| Frontend files | kebab-case  | `use-auth-callback.ts`  |
 | Classes     | PascalCase      | `UserService`           |
 | Functions   | snake_case      | `get_user_by_id`        |
 | Constants   | SCREAMING_SNAKE | `MAX_RETRY_COUNT`       |
 | URLs        | kebab-case      | `/api/v1/user-profiles` |
 | Unused vars | \_prefix        | `_unused_fixture`       |
+
+> See [frontend coding standards](./frontend/coding-standards.md) for frontend-specific conventions.
 
 ## Testing
 

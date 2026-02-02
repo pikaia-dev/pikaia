@@ -349,7 +349,7 @@ The `PikaiaObservability` stack deploys CloudWatch dashboards and alarms automat
 AWS_PROFILE=your-profile npx cdk deploy PikaiaObservability --context alarm_email=ops@example.com
 ```
 
-See [Observability Guide](../observability.md) for:
+See [Observability Guide](../operations/observability.md) for:
 - Structured logging configuration and field conventions
 - CloudWatch Logs Insights queries
 - Dashboard and alarm customization

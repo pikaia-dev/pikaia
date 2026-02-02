@@ -54,7 +54,7 @@ refactor(api): extract pagination logic
 
 ## Code Style
 
-See [rules.md](./RULES.md) for detailed coding standards.
+See [.agent/rules/](./.agent/rules/) for detailed coding standards.
 
 ## AI Agent Configuration
 

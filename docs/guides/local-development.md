@@ -170,7 +170,7 @@ logger.info("user_created", user_id="123", email="alice@example.com")
 
 All logs automatically include request context (trace ID, user, organization) bound by middleware.
 
-See [Observability Guide](../observability.md) for:
+See [Observability Guide](../operations/observability.md) for:
 - Field naming conventions (Datadog-compatible)
 - Event vs audit log vs structured logging
 - CloudWatch Logs Insights queries
