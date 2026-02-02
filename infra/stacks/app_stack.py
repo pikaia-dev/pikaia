@@ -347,6 +347,10 @@ class AppStack(Stack):
                     self.app_secrets,
                     field="PASSKEY_JWT_PRIVATE_KEY",
                 ),
+                "MOBILE_PROVISION_API_KEY": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="MOBILE_PROVISION_API_KEY",
+                ),
             },
             health_check=ecs.HealthCheck(
                 command=["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"],
