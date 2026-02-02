@@ -63,6 +63,9 @@ class MediaStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        # Resource naming from CDK context
+        resource_prefix = self.node.try_get_context("resource_prefix") or "pikaia"
+
         # S3 bucket for media files (private, accessed via CloudFront)
         self.bucket = s3.Bucket(
             self,
@@ -144,7 +147,7 @@ class MediaStack(Stack):
             self,
             "MediaDistribution",
             default_behavior=default_behavior_config,
-            comment="Pikaia Media CDN with image transformation",
+            comment=f"{resource_prefix.title()} Media CDN with image transformation",
             price_class=cloudfront.PriceClass.PRICE_CLASS_100,  # US, Canada, Europe
         )
 
@@ -154,7 +157,7 @@ class MediaStack(Stack):
             "BucketName",
             value=self.bucket.bucket_name,
             description="S3 bucket name for media storage",
-            export_name="PikaiaMediaBucketName",
+            export_name=f"{resource_prefix.title()}MediaBucketName",
         )
 
         CfnOutput(
@@ -162,7 +165,7 @@ class MediaStack(Stack):
             "DistributionDomainName",
             value=self.distribution.distribution_domain_name,
             description="CloudFront distribution domain name",
-            export_name="PikaiaMediaCdnDomain",
+            export_name=f"{resource_prefix.title()}MediaCdnDomain",
         )
 
         CfnOutput(
@@ -170,7 +173,7 @@ class MediaStack(Stack):
             "ImageTransformUrl",
             value=f"https://{self.distribution.distribution_domain_name}",
             description="Base URL for image transformation (set as IMAGE_TRANSFORM_URL)",
-            export_name="PikaiaImageTransformUrl",
+            export_name=f"{resource_prefix.title()}ImageTransformUrl",
         )
 
     def _create_origin_request_lambda(self) -> lambda_.Function:

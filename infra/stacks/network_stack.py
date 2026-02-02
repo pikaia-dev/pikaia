@@ -39,7 +39,7 @@ class NetworkStack(Stack):
         # CDK lookup caching issues in CI/CD environments
         self.vpc = ec2.Vpc(
             self,
-            "PikaiaVpc",
+            "Vpc",
             max_azs=2 if not availability_zones else None,
             availability_zones=availability_zones,
             nat_gateways=1,  # Cost optimization: single NAT for dev

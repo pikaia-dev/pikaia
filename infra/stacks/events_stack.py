@@ -178,7 +178,7 @@ class EventsStack(Stack):
         # EventBridge bus for domain events
         self.event_bus = events.EventBus(
             self,
-            "PikaiaEventBus",
+            "EventBus",
             event_bus_name=event_bus_name,
         )
 
@@ -331,7 +331,7 @@ class EventsStack(Stack):
             "EventBusName",
             value=self.event_bus.event_bus_name,
             description="EventBridge bus name for domain events",
-            export_name="PikaiaEventBusName",
+            export_name=f"{resource_prefix.title()}EventBusName",
         )
 
         CfnOutput(
@@ -339,7 +339,7 @@ class EventsStack(Stack):
             "EventBusArn",
             value=self.event_bus.event_bus_arn,
             description="EventBridge bus ARN",
-            export_name="PikaiaEventBusArn",
+            export_name=f"{resource_prefix.title()}EventBusArn",
         )
 
         CfnOutput(
@@ -347,7 +347,7 @@ class EventsStack(Stack):
             "DLQUrl",
             value=self.dlq.queue_url,
             description="Dead Letter Queue URL for failed events",
-            export_name="PikaiaEventsDLQUrl",
+            export_name=f"{resource_prefix.title()}EventsDLQUrl",
         )
 
         CfnOutput(
@@ -355,7 +355,7 @@ class EventsStack(Stack):
             "AuditDLQUrl",
             value=self.audit_dlq.queue_url,
             description="Dead Letter Queue URL for failed audit events",
-            export_name="PikaiaAuditDLQUrl",
+            export_name=f"{resource_prefix.title()}AuditDLQUrl",
         )
 
         CfnOutput(
@@ -363,7 +363,7 @@ class EventsStack(Stack):
             "AuditLambdaArn",
             value=self.audit_lambda.function_arn,
             description="Audit consumer Lambda ARN",
-            export_name="PikaiaAuditConsumerArn",
+            export_name=f"{resource_prefix.title()}AuditConsumerArn",
         )
 
         CfnOutput(
@@ -371,5 +371,5 @@ class EventsStack(Stack):
             "PublisherLambdaArn",
             value=self.publisher_lambda.function_arn,
             description="Event publisher Lambda ARN",
-            export_name="PikaiaEventPublisherArn",
+            export_name=f"{resource_prefix.title()}EventPublisherArn",
         )

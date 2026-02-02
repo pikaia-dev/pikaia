@@ -141,7 +141,7 @@ class AppStack(Stack):
             # Aurora Serverless v2 cluster
             self.database = rds.DatabaseCluster(
                 self,
-                "PikaiaDatabase",
+                "Database",
                 engine=rds.DatabaseClusterEngine.aurora_postgres(
                     version=rds.AuroraPostgresEngineVersion.VER_16_4,
                 ),
@@ -166,7 +166,7 @@ class AppStack(Stack):
             # This is required for Lambda functions to efficiently connect to Aurora
             self.rds_proxy = rds.DatabaseProxy(
                 self,
-                "PikaiaRdsProxy",
+                "RdsProxy",
                 proxy_target=rds.ProxyTarget.from_cluster(self.database),
                 secrets=[self.database.secret],
                 vpc=vpc,
@@ -199,19 +199,18 @@ class AppStack(Stack):
 
         self.cluster = ecs.Cluster(
             self,
-            "PikaiaCluster",
+            "Cluster",
             vpc=vpc,
             container_insights_v2=ecs.ContainerInsights.ENABLED,
         )
 
         # ECR repository for Django app - PREREQUISITE: Repository must exist
         # Using from_repository_name to handle retained repositories from previous deployments.
-        # The repository should be created via `aws ecr create-repository --repository-name pikaia-backend`
-        # or by running scripts/bootstrap-infra.sh before first deployment.
+        # The repository should be created via bootstrap-infra.sh before first deployment.
         # If the repository doesn't exist, deployment will fail with image pull errors.
         self.ecr_repository = ecr.Repository.from_repository_name(
             self,
-            "PikaiaBackendRepo",
+            "BackendRepo",
             repository_name=ecr_repository_name,
         )
 
@@ -222,7 +221,7 @@ class AppStack(Stack):
         # Task definition
         task_definition = ecs.FargateTaskDefinition(
             self,
-            "PikaiaBackendTask",
+            "BackendTask",
             cpu=512,
             memory_limit_mib=1024,
         )
@@ -471,7 +470,7 @@ class AppStack(Stack):
 
             self.fargate_service = ecs_patterns.ApplicationLoadBalancedFargateService(
                 self,
-                "PikaiaBackendService",
+                "BackendService",
                 cluster=self.cluster,
                 task_definition=task_definition,
                 desired_count=min_capacity,

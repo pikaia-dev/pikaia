@@ -465,7 +465,7 @@ class ObservabilityStack(Stack):
 
         dashboard = cloudwatch.Dashboard(
             self,
-            "PikaiaDashboard",
+            "Dashboard",
             dashboard_name=dashboard_name,
         )
 
@@ -656,7 +656,7 @@ class ObservabilityStack(Stack):
             "AlarmTopicArn",
             value=self.alarm_topic.topic_arn,
             description="SNS Topic ARN for alarm notifications",
-            export_name="PikaiaAlarmTopicArn",
+            export_name=f"{resource_prefix.title()}AlarmTopicArn",
         )
 
     def _create_lambda_metrics(
