@@ -192,11 +192,12 @@ if resolver.is_shared_mode:
         env=env,
     )
 else:
-    # Standalone mode: pass ALB object
+    # Standalone mode: pass ALB object and API domain for HTTPS origin
     frontend = FrontendStack(
         app,
         "PikaiaFrontend",
         alb=app_stack.alb,
+        api_domain=domain_name,  # Use API domain for HTTPS connection to ALB
         domain_name=frontend_domain,
         certificate_arn=frontend_certificate_arn,
         env=env,
