@@ -1,9 +1,9 @@
 """
-WAF stack - AWS WAF WebACLs for ALB and CloudFront protection.
+WAF stacks - AWS WAF WebACLs for ALB and CloudFront protection.
 
-This stack creates two WebACLs:
-- Regional WebACL (REGIONAL scope) for the Application Load Balancer
-- CloudFront WebACL (CLOUDFRONT scope) for CloudFront distributions
+Two separate stacks because AWS WAF requires different scopes and regions:
+- WafRegionalStack: REGIONAL scope WebACL for ALB (deployed in the ALB's region)
+- WafCloudFrontStack: CLOUDFRONT scope WebACL (must be deployed in us-east-1)
 
 Both use AWS Managed Rule Groups:
 - AWSManagedRulesCommonRuleSet: Core rule set with broad protection
@@ -57,17 +57,14 @@ def _build_managed_rules() -> list[wafv2.CfnWebACL.RuleProperty]:
     ]
 
 
-class WafStack(Stack):
+class WafRegionalStack(Stack):
     """
-    Creates AWS WAF WebACLs for ALB and CloudFront protection.
+    Creates a REGIONAL scope AWS WAF WebACL for ALB protection.
 
-    Two WebACLs are created because AWS WAF requires different scopes:
-    - REGIONAL scope for ALB (deployed in the stack's region)
-    - CLOUDFRONT scope for CloudFront distributions (must be us-east-1)
-
-    In standalone mode, the regional WebACL is associated with the ALB
-    directly via CfnWebACLAssociation. In shared mode, the ALB is managed
-    externally and WAF should be configured there.
+    Deploy in the same region as the ALB. In standalone mode, the WebACL
+    is associated with the ALB via CfnWebACLAssociation in AppStack.
+    In shared mode, the ALB is managed externally and WAF should be
+    configured there.
     """
 
     def __init__(
@@ -81,11 +78,7 @@ class WafStack(Stack):
         resource_prefix = self.node.try_get_context("resource_prefix") or "pikaia"
         rules = _build_managed_rules()
 
-        # =================================================================
-        # Regional WebACL (for ALB)
-        # =================================================================
-
-        self.regional_web_acl = wafv2.CfnWebACL(
+        self.web_acl = wafv2.CfnWebACL(
             self,
             "RegionalWebAcl",
             name=f"{resource_prefix}-regional-waf",
@@ -99,11 +92,35 @@ class WafStack(Stack):
             ),
         )
 
-        # =================================================================
-        # CloudFront WebACL (scope must be CLOUDFRONT / us-east-1)
-        # =================================================================
+        CfnOutput(
+            self,
+            "WebAclArn",
+            value=self.web_acl.attr_arn,
+            description="Regional WAF WebACL ARN (for ALB association)",
+        )
 
-        self.cloudfront_web_acl = wafv2.CfnWebACL(
+
+class WafCloudFrontStack(Stack):
+    """
+    Creates a CLOUDFRONT scope AWS WAF WebACL for CloudFront distributions.
+
+    This stack MUST be deployed in us-east-1 because AWS WAF requires
+    CLOUDFRONT scope WebACLs to be in us-east-1, regardless of where
+    the application stacks are deployed.
+    """
+
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        **kwargs,
+    ) -> None:
+        super().__init__(scope, construct_id, **kwargs)
+
+        resource_prefix = self.node.try_get_context("resource_prefix") or "pikaia"
+        rules = _build_managed_rules()
+
+        self.web_acl = wafv2.CfnWebACL(
             self,
             "CloudFrontWebAcl",
             name=f"{resource_prefix}-cloudfront-waf",
@@ -117,20 +134,9 @@ class WafStack(Stack):
             ),
         )
 
-        # =================================================================
-        # Outputs
-        # =================================================================
-
         CfnOutput(
             self,
-            "RegionalWebAclArn",
-            value=self.regional_web_acl.attr_arn,
-            description="Regional WAF WebACL ARN (for ALB association)",
-        )
-
-        CfnOutput(
-            self,
-            "CloudFrontWebAclArn",
-            value=self.cloudfront_web_acl.attr_arn,
+            "WebAclArn",
+            value=self.web_acl.attr_arn,
             description="CloudFront WAF WebACL ARN (for CloudFront distributions)",
         )
