@@ -2,16 +2,7 @@ import { MoreHorizontal, Plus, Smartphone } from 'lucide-react'
 import { useState } from 'react'
 
 import type { DeviceResponse } from '@/api/types'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -24,6 +15,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { useRevokeDevice } from '@/features/devices/api/mutations'
 import { useDevices } from '@/features/devices/api/queries'
 import { LinkDeviceDialog } from '@/features/devices/components/link-device-dialog'
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog'
 import { formatDateShort } from '@/lib/format'
 
 function formatPlatform(platform: string): string {
@@ -83,15 +75,12 @@ export function DeviceList() {
   const { data, isLoading, error } = useDevices()
   const revokeMutation = useRevokeDevice()
   const [linkDialogOpen, setLinkDialogOpen] = useState(false)
-  const [deviceToRemove, setDeviceToRemove] = useState<DeviceResponse | null>(null)
 
-  const handleRemoveConfirm = () => {
-    if (deviceToRemove) {
-      revokeMutation.mutate(deviceToRemove.id, {
-        onSettled: () => setDeviceToRemove(null),
-      })
-    }
-  }
+  const removeDialog = useConfirmDialog<DeviceResponse>((device) => {
+    revokeMutation.mutate(device.id, {
+      onSettled: () => removeDialog.reset(),
+    })
+  })
 
   if (isLoading) {
     return (
@@ -149,7 +138,7 @@ export function DeviceList() {
             <>
               <div className="divide-y">
                 {devices.map((device) => (
-                  <DeviceItem key={device.id} device={device} onRemove={setDeviceToRemove} />
+                  <DeviceItem key={device.id} device={device} onRemove={removeDialog.openDialog} />
                 ))}
               </div>
               <div className="pt-4 border-t mt-4">
@@ -165,30 +154,21 @@ export function DeviceList() {
 
       <LinkDeviceDialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen} />
 
-      <AlertDialog
-        open={!!deviceToRemove}
-        onOpenChange={(open) => !open && setDeviceToRemove(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove device?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will sign out {deviceToRemove?.name} and prevent it from syncing. You can re-link
-              it later by scanning a new QR code.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleRemoveConfirm}
-              disabled={revokeMutation.isPending}
-              className="bg-destructive text-white hover:bg-destructive/90"
-            >
-              {revokeMutation.isPending ? 'Removing...' : 'Remove'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={removeDialog.open}
+        onOpenChange={removeDialog.onOpenChange}
+        onConfirm={removeDialog.onConfirm}
+        title="Remove device?"
+        description={
+          <>
+            This will sign out {removeDialog.item?.name} and prevent it from syncing. You can
+            re-link it later by scanning a new QR code.
+          </>
+        }
+        confirmLabel={revokeMutation.isPending ? 'Removing...' : 'Remove'}
+        variant="destructive"
+        disabled={revokeMutation.isPending}
+      />
     </>
   )
 }
