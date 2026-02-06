@@ -109,6 +109,7 @@ export default function BillingSettings() {
   }
 
   const saveBilling = async (section: 'delivery' | 'address') => {
+    if (updateBillingMutation.isPending) return
     const setSaving = section === 'delivery' ? setSavingDelivery : setSavingAddress
     setSaving(true)
     try {
