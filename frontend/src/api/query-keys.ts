@@ -37,4 +37,8 @@ export const queryKeys = {
     all: ['devices'] as const,
     list: () => [...queryKeys.devices.all, 'list'] as const,
   },
+  passkeys: {
+    all: ['passkeys'] as const,
+    list: () => [...queryKeys.passkeys.all, 'list'] as const,
+  },
 } as const

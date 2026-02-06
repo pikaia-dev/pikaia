@@ -3,6 +3,7 @@ import { Users } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import type { DirectoryUser } from '@/api/types'
+import { SettingsPageLayout } from '@/components/settings-page-layout'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,7 +17,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmailAutocomplete } from '@/components/ui/email-autocomplete'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import {
   Select,
   SelectContent,
@@ -125,29 +125,14 @@ export default function MembersSettings() {
     })
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <LoadingSpinner size="sm" />
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-destructive">Failed to load members</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Members</h1>
-        <p className="text-muted-foreground">Manage your organization members</p>
-      </div>
-
+    <SettingsPageLayout
+      title="Members"
+      description="Manage your organization members"
+      maxWidth=""
+      isLoading={isLoading}
+      error={error}
+    >
       {/* Invite Form */}
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-start justify-between">
@@ -264,6 +249,6 @@ export default function MembersSettings() {
         onInvite={handleBulkInvite}
         isLoading={bulkInviteMutation.isPending}
       />
-    </div>
+    </SettingsPageLayout>
   )
 }

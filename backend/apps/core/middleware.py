@@ -4,7 +4,6 @@ Core middleware.
 
 import time
 from collections.abc import Callable
-from typing import cast
 from uuid import UUID, uuid4
 
 from django.http import HttpRequest, HttpResponse
@@ -12,25 +11,13 @@ from stytch.core.response_base import StytchError
 
 from apps.core.auth import AuthContext
 from apps.core.logging import bind_contextvars, clear_contextvars, get_logger
+from apps.core.utils import get_client_ip
 from apps.events.services import set_correlation_id
 
 logger = get_logger(__name__)
 
 # Truncate user-agent to avoid bloating event payloads
 MAX_USER_AGENT_LENGTH = 512
-
-
-def get_client_ip(request: HttpRequest) -> str | None:
-    """
-    Extract client IP from X-Forwarded-For or REMOTE_ADDR.
-
-    Handles the case where X-Forwarded-For contains multiple IPs
-    (from proxy chain) by taking the first (original client).
-    """
-    x_forwarded_for: str | None = request.META.get("HTTP_X_FORWARDED_FOR")
-    if x_forwarded_for:
-        return x_forwarded_for.split(",")[0].strip()
-    return cast(str | None, request.META.get("REMOTE_ADDR"))
 
 
 class CorrelationIdMiddleware:

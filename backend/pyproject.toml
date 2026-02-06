@@ -25,6 +25,7 @@ dependencies = [
     "structlog>=25.5",
     "uuid6>=2024.11.27",
     "whitenoise>=6.8",
+    "httpx>=0.28",
 ]
 
 [dependency-groups]
