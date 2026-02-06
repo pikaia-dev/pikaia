@@ -28,12 +28,12 @@ Organizations can configure webhook endpoints to receive HTTP POST requests when
    - API: CRUD for endpoints, delivery logs, test sends
    - Event catalog: Single source of truth for available events
 
-2. **EventBridge Consumer Lambda** (`infra/functions/webhook-dispatcher/`)
+2. **EventBridge Consumer Lambda** (Planned: `infra/functions/webhook-dispatcher/`)
    - Triggered by EventBridge rules for webhook-eligible events
    - Looks up subscribed endpoints per organization
    - Dispatches HTTP requests with signatures
 
-3. **CDK Infrastructure** (`infra/stacks/webhooks_stack.py`)
+3. **CDK Infrastructure** (Planned: `infra/stacks/webhooks_stack.py`)
    - Lambda function with DLQ
    - EventBridge rules
    - CloudWatch alarms
