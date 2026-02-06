@@ -80,16 +80,12 @@ describe('createOrganization', () => {
         }),
     })
 
-    await expect(createOrganization('ist_123', 'My Org', 'my-org')).rejects.toThrow(
-      'Organization slug already exists'
-    )
-
-    try {
-      await createOrganization('ist_123', 'My Org', 'my-org')
-    } catch (error) {
-      expect(error).toBeInstanceOf(ApiResponseError)
-      expect((error as ApiResponseError).status).toBe(409)
-    }
+    const promise = createOrganization('ist_123', 'My Org', 'my-org')
+    await expect(promise).rejects.toBeInstanceOf(ApiResponseError)
+    await expect(promise).rejects.toMatchObject({
+      message: 'Organization slug already exists',
+      status: 409,
+    })
   })
 
   it('throws default error when response has no detail', async () => {
