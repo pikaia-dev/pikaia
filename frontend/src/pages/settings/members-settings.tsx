@@ -1,17 +1,8 @@
 import { Users } from 'lucide-react'
 import { useState } from 'react'
 import type { DirectoryUser } from '@/api/types'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { SettingsPageLayout } from '@/components/settings-page-layout'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmailAutocomplete } from '@/components/ui/email-autocomplete'
@@ -31,6 +22,7 @@ import {
 import { useMembers } from '@/features/members/api/queries'
 import { BulkInviteDialog } from '@/features/members/components/bulk-invite-dialog'
 import { MembersTable } from '@/features/members/components/members-table'
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog'
 
 export default function MembersSettings() {
   const { data: membersData, isLoading, error } = useMembers()
@@ -47,12 +39,12 @@ export default function MembersSettings() {
   // Bulk invite dialog state
   const [bulkInviteOpen, setBulkInviteOpen] = useState(false)
 
-  // Delete confirmation dialog state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [memberToDelete, setMemberToDelete] = useState<{
-    id: number
-    email: string
-  } | null>(null)
+  // Delete confirmation dialog
+  const deleteDialog = useConfirmDialog<{ id: number; email: string }>((member) => {
+    deleteMutation.mutate(member.id, {
+      onSettled: () => deleteDialog.reset(),
+    })
+  })
 
   const members = membersData?.members ?? []
 
@@ -106,19 +98,7 @@ export default function MembersSettings() {
   }
 
   const openDeleteDialog = (memberId: number, email: string) => {
-    setMemberToDelete({ id: memberId, email })
-    setDeleteDialogOpen(true)
-  }
-
-  const handleDeleteConfirm = () => {
-    if (!memberToDelete) return
-
-    deleteMutation.mutate(memberToDelete.id, {
-      onSettled: () => {
-        setDeleteDialogOpen(false)
-        setMemberToDelete(null)
-      },
-    })
+    deleteDialog.openDialog({ id: memberId, email })
   }
 
   return (
@@ -206,26 +186,20 @@ export default function MembersSettings() {
       <MembersTable members={members} onRoleChange={handleRoleChange} onRemove={openDeleteDialog} />
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove member</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove <strong>{memberToDelete?.email}</strong> from this
-              organization? They will lose access immediately.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleteDialog.open}
+        onOpenChange={deleteDialog.onOpenChange}
+        onConfirm={deleteDialog.onConfirm}
+        title="Remove member"
+        description={
+          <>
+            Are you sure you want to remove <strong>{deleteDialog.item?.email}</strong> from this
+            organization? They will lose access immediately.
+          </>
+        }
+        confirmLabel="Remove"
+        variant="destructive"
+      />
 
       {/* Bulk Invite Dialog */}
       <BulkInviteDialog
