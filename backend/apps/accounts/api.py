@@ -455,6 +455,7 @@ def update_profile(request: AuthenticatedHttpRequest, payload: UpdateProfileRequ
     user.save(update_fields=["name", "updated_at"])
 
     # Sync name to Stytch
+    sync_warning = None
     try:
         client = get_stytch_client()
         client.organizations.members.update(
@@ -463,8 +464,17 @@ def update_profile(request: AuthenticatedHttpRequest, payload: UpdateProfileRequ
             name=payload.name,
         )
     except StytchError as e:
-        logger.warning("Failed to sync name to Stytch: %s", e.details.error_message)
-        # Don't fail the request - local update succeeded
+        logger.warning(
+            "Failed to sync name to Stytch: %s (org=%s, member=%s)",
+            e.details.error_message,
+            org.stytch_org_id,
+            member.stytch_member_id,
+            exc_info=True,
+        )
+        sync_warning = (
+            "Changes saved locally but failed to sync to Stytch. "
+            "Please retry or contact support if the issue persists."
+        )
 
     # Emit user.profile_updated event
     publish_event(
@@ -478,7 +488,10 @@ def update_profile(request: AuthenticatedHttpRequest, payload: UpdateProfileRequ
         organization_id=str(org.id),
     )
 
-    return UserInfo.from_model(user)
+    response = UserInfo.from_model(user)
+    if sync_warning:
+        response.sync_warning = sync_warning
+    return response
 
 
 # --- Phone Verification ---
@@ -719,6 +732,7 @@ def update_organization(
     org.save(update_fields=update_fields)
 
     # Sync to Stytch
+    sync_warning = None
     try:
         client = get_stytch_client()
         stytch_update_kwargs: dict[str, str] = {
@@ -730,8 +744,16 @@ def update_organization(
         # Stytch SDK has complex overloaded types; we only use simple string params
         client.organizations.update(**stytch_update_kwargs)  # type: ignore[arg-type]
     except StytchError as e:
-        logger.warning("Failed to sync org to Stytch: %s", e.details.error_message)
-        # Don't fail the request - local update succeeded
+        logger.warning(
+            "Failed to sync org to Stytch: %s (org=%s)",
+            e.details.error_message,
+            org.stytch_org_id,
+            exc_info=True,
+        )
+        sync_warning = (
+            "Changes saved locally but failed to sync to Stytch. "
+            "Please retry or contact support if the issue persists."
+        )
 
     # Emit organization.updated event
     publish_event(
@@ -744,7 +766,10 @@ def update_organization(
         actor=request.auth.user,
     )
 
-    return get_organization(request)
+    response = get_organization(request)
+    if sync_warning:
+        response.sync_warning = sync_warning
+    return response
 
 
 @router.patch(
@@ -802,12 +827,22 @@ def update_billing(
     org.save(update_fields=update_fields)
 
     # Sync billing info to Stripe
+    sync_warning = None
     if org.stripe_customer_id:
         try:
             sync_billing_to_stripe(org)
         except Exception as e:
-            logger.warning("Failed to sync billing to Stripe: %s", e)
-            # Don't fail the request - local update succeeded
+            logger.warning(
+                "Failed to sync billing to Stripe: %s (org=%s, stripe_customer=%s)",
+                e,
+                org.stytch_org_id,
+                org.stripe_customer_id,
+                exc_info=True,
+            )
+            sync_warning = (
+                "Changes saved locally but failed to sync to Stripe. "
+                "Please retry or contact support if the issue persists."
+            )
 
     # Emit organization.billing_updated event
     publish_event(
@@ -822,7 +857,10 @@ def update_billing(
         actor=request.auth.user,
     )
 
-    return get_organization(request)
+    response = get_organization(request)
+    if sync_warning:
+        response.sync_warning = sync_warning
+    return response
 
 
 # --- Member Management (Admin Only) ---
