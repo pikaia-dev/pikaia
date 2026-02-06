@@ -72,7 +72,7 @@ function RootErrorBoundary() {
   let message = 'An unexpected error occurred. Please try again.'
   if (isRouteErrorResponse(error)) {
     message = error.statusText || `${String(error.status)} error`
-  } else if (error instanceof Error) {
+  } else if (import.meta.env.DEV && error instanceof Error) {
     message = error.message
   }
 
@@ -187,7 +187,6 @@ const routes: AppRouteConfig[] = [
             lazy: () => import('@/pages/settings/integrations-settings'),
             fallback: SettingsFallback,
           },
-          { path: '*', lazy: () => import('@/pages/not-found') },
         ],
       },
 
