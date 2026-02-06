@@ -324,7 +324,7 @@ def provision_mobile_user_endpoint(
             logger.warning("Organization slug conflict: %s", e.details.error_message)
             raise HttpError(409, "Organization slug already in use. Try a different one.") from None
         logger.warning("Mobile provisioning failed: %s", e.details.error_message)
-        raise HttpError(400, f"Provisioning failed: {e.details.error_message}") from None
+        raise HttpError(400, "Provisioning failed. Please try again.") from None
 
     # Emit appropriate event
     if payload.organization_id:
@@ -519,9 +519,7 @@ def send_phone_otp(
         )
     except StytchError as e:
         logger.warning("Failed to send phone OTP: %s", e.details.error_message)
-        raise HttpError(
-            400, e.details.error_message or "Failed to send verification code"
-        ) from None
+        raise HttpError(400, "Failed to send verification code.") from None
 
 
 @router.post(
@@ -591,19 +589,21 @@ def verify_phone_otp(request: AuthenticatedHttpRequest, payload: VerifyPhoneOtpR
         return UserInfo.from_model(user)
 
     except StytchError as e:
-        error_msg = e.details.error_message or "Verification failed"
-        if "invalid" in error_msg.lower() or "expired" in error_msg.lower():
-            raise HttpError(400, "Invalid or expired verification code") from None
-        if "immutable" in error_msg.lower():
+        error_msg = _get_stytch_error_message(e)
+        if "invalid" in error_msg or "expired" in error_msg:
+            logger.warning("Phone OTP verification failed (invalid/expired): %s", e.details.error_message)
+            raise HttpError(400, "Invalid or expired verification code.") from None
+        if "immutable" in error_msg:
             # Sessions created via passkey (trusted auth) are immutable and can't
             # have MFA factors added. User needs to re-authenticate via magic link.
+            logger.warning("Phone OTP verification failed (immutable session): %s", e.details.error_message)
             raise HttpError(
                 400,
                 "Phone verification is not available for passkey sessions. "
                 "Please log out and sign in with email to update your phone number.",
             ) from None
-        logger.warning("Phone OTP verification failed: %s", error_msg)
-        raise HttpError(400, error_msg) from None
+        logger.warning("Phone OTP verification failed: %s", e.details.error_message)
+        raise HttpError(400, "Verification failed. Please try again.") from None
 
 
 # --- Email Update ---
@@ -644,9 +644,8 @@ def start_email_update(
             message=f"Verification email sent to {payload.new_email}. Check your inbox to complete the change.",
         )
     except StytchError as e:
-        error_msg = e.details.error_message or "Failed to initiate email update"
-        logger.warning("Failed to start email update: %s", error_msg)
-        raise HttpError(400, error_msg) from None
+        logger.warning("Failed to start email update: %s", e.details.error_message)
+        raise HttpError(400, "Failed to initiate email update. Please try again.") from None
 
 
 # --- Organization Settings (Admin Only) ---
@@ -902,7 +901,7 @@ def invite_member_endpoint(
         )
     except StytchError as e:
         logger.warning("Failed to invite member: %s", e.details.error_message)
-        raise HttpError(400, f"Failed to invite member: {e.details.error_message}") from e
+        raise HttpError(400, "Failed to invite member. Please try again.") from e
 
     if invite_sent is True:
         message = f"Invitation sent to {payload.email}"
@@ -1081,7 +1080,7 @@ def update_member_role_endpoint(
         update_member_role(target_member, payload.role)
     except StytchError as e:
         logger.warning("Failed to update member role: %s", e.details.error_message)
-        raise HttpError(400, f"Failed to update role: {e.details.error_message}") from e
+        raise HttpError(400, "Failed to update role. Please try again.") from e
 
     # Emit member.role_changed event
     publish_event(
@@ -1139,8 +1138,8 @@ def delete_member_endpoint(request: AuthenticatedHttpRequest, member_id: str) ->
     try:
         soft_delete_member(target_member)
     except StytchError as e:
-        logger.warning("Failed to delete member: %s", e.details.error_message)
-        raise HttpError(400, f"Failed to remove member: {e.details.error_message}") from e
+        logger.warning("Failed to remove member: %s", e.details.error_message)
+        raise HttpError(400, "Failed to remove member. Please try again.") from e
 
     # Emit member.removed event
     publish_event(
