@@ -1027,6 +1027,40 @@ class MockInviteResponse:
     member: MockStytchMemberForInvite
 
 
+@dataclass
+class MockStytchMemberForSearch:
+    """Mock Stytch member returned from search."""
+
+    member_id: str
+    status: str = "active"
+
+
+@dataclass
+class MockStytchSearchResult:
+    """Mock Stytch search result with pagination metadata."""
+
+    members: list[MockStytchMemberForSearch]
+    total_count: int = 0
+    next_cursor: str | None = None
+
+
+def _build_stytch_search_mock(
+    members: list,
+    org_stytch_id: str,
+) -> MagicMock:
+    """Build a mock Stytch client that returns the given members from search."""
+    mock_client = MagicMock()
+    stytch_members = [
+        MockStytchMemberForSearch(member_id=m.stytch_member_id, status="active") for m in members
+    ]
+    mock_client.organizations.members.search.return_value = MockStytchSearchResult(
+        members=stytch_members,
+        total_count=len(stytch_members),
+        next_cursor=None,
+    )
+    return mock_client
+
+
 @pytest.mark.django_db
 class TestListMembers:
     """Tests for list_members endpoint."""
@@ -1037,14 +1071,17 @@ class TestListMembers:
         admin_user = UserFactory.create(email="admin@example.com", name="Admin")
         admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
         member_user = UserFactory.create(email="member@example.com", name="Member")
-        MemberFactory.create(user=member_user, organization=org, role="member")
+        regular_member = MemberFactory.create(user=member_user, organization=org, role="member")
+
+        mock_client = _build_stytch_search_mock([admin_member, regular_member], org.stytch_org_id)
 
         request = request_factory.get("/api/v1/auth/organization/members")
         request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
-        result = list_members(request)  # type: ignore[arg-type]
+        with patch("apps.accounts.api.get_stytch_client", return_value=mock_client):
+            result = list_members(request)  # type: ignore[arg-type]
 
         assert len(result.members) == 2
         assert result.total == 2
@@ -1076,110 +1113,176 @@ class TestListMembers:
             list_members(request)  # type: ignore[arg-type]  # Testing unauthenticated
 
     def test_returns_total_count(self, request_factory: RequestFactory) -> None:
-        """Response should include total count of members."""
+        """Response should include total count from Stytch."""
         org = OrganizationFactory.create()
         admin_user = UserFactory.create(email="admin@example.com")
         admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
+        all_members = [admin_member]
         for i in range(5):
-            MemberFactory.create(
+            m = MemberFactory.create(
                 user=UserFactory.create(email=f"member{i}@example.com"),
                 organization=org,
                 role="member",
             )
+            all_members.append(m)
+
+        mock_client = _build_stytch_search_mock(all_members, org.stytch_org_id)
 
         request = request_factory.get("/api/v1/auth/organization/members")
         request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
-        result = list_members(request)  # type: ignore[arg-type]
+        with patch("apps.accounts.api.get_stytch_client", return_value=mock_client):
+            result = list_members(request)  # type: ignore[arg-type]
 
         assert result.total == 6  # admin + 5 members
         assert len(result.members) == 6
-        assert result.offset == 0
-        assert result.limit is None
+        assert result.has_more is False
+        assert result.next_cursor is None
 
     def test_pagination_with_limit(self, request_factory: RequestFactory) -> None:
-        """Should return only the requested number of members."""
+        """Should return only the requested number of members via Stytch cursor pagination."""
         org = OrganizationFactory.create()
         admin_user = UserFactory.create(email="admin@example.com")
         admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
+        all_members = [admin_member]
         for i in range(5):
-            MemberFactory.create(
+            m = MemberFactory.create(
                 user=UserFactory.create(email=f"member{i}@example.com"),
                 organization=org,
                 role="member",
             )
+            all_members.append(m)
+
+        # Simulate Stytch returning only first 3 members with a next_cursor
+        first_page = all_members[:3]
+        mock_client = MagicMock()
+        stytch_members = [
+            MockStytchMemberForSearch(member_id=m.stytch_member_id, status="active")
+            for m in first_page
+        ]
+        mock_client.organizations.members.search.return_value = MockStytchSearchResult(
+            members=stytch_members,
+            total_count=6,
+            next_cursor="cursor_page2",
+        )
 
         request = request_factory.get("/api/v1/auth/organization/members?limit=3")
         request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
-        result = list_members(
-            request,  # type: ignore[arg-type]
-            limit=3,
-        )
+        with patch("apps.accounts.api.get_stytch_client", return_value=mock_client):
+            result = list_members(
+                request,  # type: ignore[arg-type]
+                limit=3,
+            )
 
         assert result.total == 6
         assert len(result.members) == 3
-        assert result.offset == 0
-        assert result.limit == 3
+        assert result.has_more is True
+        assert result.next_cursor == "cursor_page2"
 
-    def test_pagination_with_offset(self, request_factory: RequestFactory) -> None:
-        """Should skip the requested number of members."""
+    def test_pagination_with_cursor(self, request_factory: RequestFactory) -> None:
+        """Should pass cursor to Stytch for subsequent pages."""
         org = OrganizationFactory.create()
         admin_user = UserFactory.create(email="admin@example.com")
         admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
+        all_members = [admin_member]
         for i in range(5):
-            MemberFactory.create(
+            m = MemberFactory.create(
                 user=UserFactory.create(email=f"member{i}@example.com"),
                 organization=org,
                 role="member",
             )
+            all_members.append(m)
 
-        request = request_factory.get("/api/v1/auth/organization/members?offset=4")
+        # Simulate Stytch returning second page (last 3 members, no next_cursor)
+        second_page = all_members[3:]
+        mock_client = MagicMock()
+        stytch_members = [
+            MockStytchMemberForSearch(member_id=m.stytch_member_id, status="active")
+            for m in second_page
+        ]
+        mock_client.organizations.members.search.return_value = MockStytchSearchResult(
+            members=stytch_members,
+            total_count=6,
+            next_cursor=None,
+        )
+
+        request = request_factory.get(
+            "/api/v1/auth/organization/members?cursor=cursor_page2&limit=3"
+        )
         request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
-        result = list_members(
-            request,  # type: ignore[arg-type]
-            offset=4,
-        )
+        with patch("apps.accounts.api.get_stytch_client", return_value=mock_client):
+            result = list_members(
+                request,  # type: ignore[arg-type]
+                cursor="cursor_page2",
+                limit=3,
+            )
 
         assert result.total == 6
-        assert len(result.members) == 2  # 6 - 4 = 2 remaining
-        assert result.offset == 4
-        assert result.limit is None
+        assert len(result.members) == 3
+        assert result.has_more is False
+        assert result.next_cursor is None
 
-    def test_pagination_with_offset_and_limit(self, request_factory: RequestFactory) -> None:
-        """Should skip and limit as requested."""
+        # Verify cursor was passed to Stytch
+        call_kwargs = mock_client.organizations.members.search.call_args[1]
+        assert call_kwargs["cursor"] == "cursor_page2"
+
+    def test_stytch_failure_falls_back_to_local_db(self, request_factory: RequestFactory) -> None:
+        """If Stytch search fails, should fall back to local DB members."""
         org = OrganizationFactory.create()
         admin_user = UserFactory.create(email="admin@example.com")
         admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
-        for i in range(10):
-            MemberFactory.create(
-                user=UserFactory.create(email=f"member{i}@example.com"),
-                organization=org,
-                role="member",
-            )
+        member_user = UserFactory.create(email="member@example.com")
+        MemberFactory.create(user=member_user, organization=org, role="member")
 
-        request = request_factory.get("/api/v1/auth/organization/members?offset=2&limit=3")
+        mock_client = MagicMock()
+        mock_client.organizations.members.search.side_effect = Exception("Stytch unavailable")
+
+        request = request_factory.get("/api/v1/auth/organization/members")
         request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
-        result = list_members(
-            request,  # type: ignore[arg-type]
-            offset=2,
-            limit=3,
+        with patch("apps.accounts.api.get_stytch_client", return_value=mock_client):
+            result = list_members(request)  # type: ignore[arg-type]
+
+        assert len(result.members) == 2
+        assert result.total == 2
+        assert result.has_more is False
+        assert result.next_cursor is None
+        # All members default to 'active' status when Stytch is unavailable
+        assert all(m.status == "active" for m in result.members)
+
+    def test_limit_clamped_to_max(self, request_factory: RequestFactory) -> None:
+        """Limit should be clamped to 100 maximum."""
+        org = OrganizationFactory.create()
+        admin_user = UserFactory.create(email="admin@example.com")
+        admin_member = MemberFactory.create(user=admin_user, organization=org, role="admin")
+
+        mock_client = _build_stytch_search_mock([admin_member], org.stytch_org_id)
+
+        request = request_factory.get("/api/v1/auth/organization/members?limit=200")
+        request = make_request_with_auth(  # type: ignore[assignment]
+            request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
-        assert result.total == 11  # admin + 10 members
-        assert len(result.members) == 3
-        assert result.offset == 2
-        assert result.limit == 3
+        with patch("apps.accounts.api.get_stytch_client", return_value=mock_client):
+            result = list_members(
+                request,  # type: ignore[arg-type]
+                limit=200,
+            )
+
+        # Verify the clamped limit was passed to Stytch
+        call_kwargs = mock_client.organizations.members.search.call_args[1]
+        assert call_kwargs["limit"] == 100
+        assert len(result.members) == 1
 
 
 @pytest.mark.django_db
@@ -1557,7 +1660,7 @@ class TestDeleteMember:
         assert exc_info.value.status_code == 403
 
     def test_deleted_member_excluded_from_list(self, request_factory: RequestFactory) -> None:
-        """Soft-deleted members should not appear in list."""
+        """Soft-deleted members should not appear in list even if Stytch returns them."""
         from django.utils import timezone
 
         org = OrganizationFactory.create()
@@ -1570,12 +1673,25 @@ class TestDeleteMember:
         deleted_member.deleted_at = timezone.now()
         deleted_member.save()
 
+        # Stytch still returns the deleted member (it doesn't know about our soft-delete)
+        mock_client = MagicMock()
+        stytch_members = [
+            MockStytchMemberForSearch(member_id=admin_member.stytch_member_id, status="active"),
+            MockStytchMemberForSearch(member_id=deleted_member.stytch_member_id, status="active"),
+        ]
+        mock_client.organizations.members.search.return_value = MockStytchSearchResult(
+            members=stytch_members,
+            total_count=2,
+            next_cursor=None,
+        )
+
         request = request_factory.get("/api/v1/auth/organization/members")
         request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=admin_user, member=admin_member, organization=org)
         )
 
-        result = list_members(request)  # type: ignore[arg-type]
+        with patch("apps.accounts.api.get_stytch_client", return_value=mock_client):
+            result = list_members(request)  # type: ignore[arg-type]
 
         assert len(result.members) == 1
         assert result.members[0].email == "admin@example.com"

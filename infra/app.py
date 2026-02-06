@@ -4,6 +4,8 @@ AWS CDK app entry point for Pikaia infrastructure.
 
 Stacks:
 - PikaiaNetwork: VPC, subnets, NAT gateway, database security group
+- PikaiaWafRegional: AWS WAF WebACL for ALB (deployed in ALB region)
+- PikaiaWafCloudFront: AWS WAF WebACL for CloudFront (always us-east-1)
 - PikaiaApp: Aurora PostgreSQL, ECS Fargate, ALB, Secrets Manager
 - PikaiaFrontend: S3 + CloudFront for React SPA with API routing
 - PikaiaMedia: S3 bucket, CloudFront CDN, image transformation Lambda
@@ -50,6 +52,7 @@ from stacks.media_stack import MediaStack
 from stacks.network_stack import NetworkStack
 from stacks.observability_stack import ObservabilityStack
 from stacks.validation import add_validation_aspects
+from stacks.waf_stack import WafCloudFrontStack, WafRegionalStack
 
 app = cdk.App()
 
@@ -82,6 +85,24 @@ else:
     network = NetworkStack(app, "PikaiaNetwork", env=env)
 
 # =============================================================================
+# WAF: AWS WAF WebACLs for ALB and CloudFront
+# Must be created before AppStack and FrontendStack/MediaStack
+# =============================================================================
+# Two separate stacks because AWS WAF scopes require different regions:
+# - Regional WAF (REGIONAL scope): deployed in the ALB's region
+# - CloudFront WAF (CLOUDFRONT scope): must always be in us-east-1
+
+waf_regional = WafRegionalStack(app, "PikaiaWafRegional", env=env)
+
+cloudfront_waf_env = cdk.Environment(account=env.account, region="us-east-1")
+waf_cloudfront = WafCloudFrontStack(
+    app,
+    "PikaiaWafCloudFront",
+    env=cloudfront_waf_env,
+    cross_region_references=True,
+)
+
+# =============================================================================
 # Media: S3 + CloudFront + Image Transformation
 # Must be created before AppStack so we can pass the bucket
 # =============================================================================
@@ -111,8 +132,11 @@ media = MediaStack(
     cors_allowed_origins=cors_origins,
     enable_versioning=enable_versioning,
     enable_image_transformation=True,
+    web_acl_id=waf_cloudfront.web_acl.attr_arn,
     env=env,
+    cross_region_references=True,
 )
+media.add_dependency(waf_cloudfront)
 
 # =============================================================================
 # Application: Database + ECS + ALB
@@ -137,6 +161,7 @@ if require_https and not certificate_arn:
 
 if resolver.is_shared_mode:
     # Shared mode: pass shared infrastructure resources
+    # WAF is not associated with ALB in shared mode (ALB managed externally)
     shared_config = resolver.get_shared_config()
     app_stack = AppStack(
         app,
@@ -164,12 +189,14 @@ else:
         media_cdn_domain=media.distribution.distribution_domain_name,
         domain_name=domain_name,
         certificate_arn=certificate_arn,
+        waf_acl_arn=waf_regional.web_acl.attr_arn,
         min_capacity=2,
         max_capacity=10,
         env=env,
     )
 app_stack.add_dependency(network)
 app_stack.add_dependency(media)
+app_stack.add_dependency(waf_regional)
 
 # =============================================================================
 # Frontend: S3 + CloudFront for React SPA
@@ -189,7 +216,9 @@ if resolver.is_shared_mode:
         api_domain=domain_name,  # Use API domain for HTTPS connection to ALB
         domain_name=frontend_domain,
         certificate_arn=frontend_certificate_arn,
+        web_acl_id=waf_cloudfront.web_acl.attr_arn,
         env=env,
+        cross_region_references=True,
     )
 else:
     # Standalone mode: pass ALB object and API domain for HTTPS origin
@@ -200,9 +229,12 @@ else:
         api_domain=domain_name,  # Use API domain for HTTPS connection to ALB
         domain_name=frontend_domain,
         certificate_arn=frontend_certificate_arn,
+        web_acl_id=waf_cloudfront.web_acl.attr_arn,
         env=env,
+        cross_region_references=True,
     )
 frontend.add_dependency(app_stack)
+frontend.add_dependency(waf_cloudfront)
 
 # =============================================================================
 # Events: EventBridge + Publisher Lambda + DLQ

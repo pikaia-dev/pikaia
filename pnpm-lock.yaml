@@ -128,6 +128,9 @@ importers:
       react-easy-crop:
         specifier: ^5.5.6
         version: 5.5.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      react-error-boundary:
+        specifier: ^6.1.0
+        version: 6.1.0(react@19.2.3)
       react-hook-form:
         specifier: ^7.70.0
         version: 7.70.0(react@19.2.3)
@@ -2587,6 +2590,11 @@ packages:
     resolution: {integrity: sha512-uVvtKcea0kd+QRwH5/Cw/znnijIge+Jog0IFagi0JiZgQ/GrDQ/qD98AwGVV1vM3hGbSugOvmcMayamFc4Zz1g==}
     engines: {node: '>=20.0.0'}
     hasBin: true
+
+  react-error-boundary@6.1.0:
+    resolution: {integrity: sha512-02k9WQ/mUhdbXir0tC1NiMesGzRPaCsJEWU/4bcFrbY1YMZOtHShtZP6zw0SJrBWA/31H0KT9/FgdL8+sPKgHA==}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0
 
   react-hook-form@7.70.0:
     resolution: {integrity: sha512-COOMajS4FI3Wuwrs3GPpi/Jeef/5W1DRR84Yl5/ShlT3dKVFUfoGiEZ/QE6Uw8P4T2/CLJdcTVYKvWBMQTEpvw==}
@@ -5212,6 +5220,10 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
+
+  react-error-boundary@6.1.0(react@19.2.3):
+    dependencies:
+      react: 19.2.3
 
   react-hook-form@7.70.0(react@19.2.3):
     dependencies:

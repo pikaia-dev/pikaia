@@ -1,5 +1,7 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Users } from 'lucide-react'
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
 import type { DirectoryUser } from '@/api/types'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { SettingsPageLayout } from '@/components/settings-page-layout'
@@ -22,6 +24,8 @@ import {
 import { useMembers } from '@/features/members/api/queries'
 import { BulkInviteDialog } from '@/features/members/components/bulk-invite-dialog'
 import { MembersTable } from '@/features/members/components/members-table'
+import type { InviteMemberFormData } from '@/features/members/forms/schema'
+import { inviteMemberSchema } from '@/features/members/forms/schema'
 import { useConfirmDialog } from '@/hooks/use-confirm-dialog'
 
 export default function MembersSettings() {
@@ -31,10 +35,15 @@ export default function MembersSettings() {
   const updateRoleMutation = useUpdateMemberRole()
   const deleteMutation = useDeleteMember()
 
-  // Invite form state
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteName, setInviteName] = useState('')
-  const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member')
+  // Invite form (useForm + zodResolver)
+  const inviteForm = useForm<InviteMemberFormData>({
+    resolver: zodResolver(inviteMemberSchema),
+    defaultValues: {
+      email: '',
+      name: '',
+      role: 'member',
+    },
+  })
 
   // Bulk invite dialog state
   const [bulkInviteOpen, setBulkInviteOpen] = useState(false)
@@ -48,27 +57,22 @@ export default function MembersSettings() {
 
   const members = membersData?.members ?? []
 
-  const handleInvite = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!inviteEmail) return
-
+  const handleInvite = inviteForm.handleSubmit((data) => {
     inviteMutation.mutate(
-      { email: inviteEmail, name: inviteName, role: inviteRole },
+      { email: data.email, name: data.name, role: data.role },
       {
         onSuccess: () => {
-          setInviteEmail('')
-          setInviteName('')
-          setInviteRole('member')
+          inviteForm.reset()
         },
       }
     )
-  }
+  })
 
   // Handle directory user selection
   const handleDirectoryUserSelect = (user: DirectoryUser) => {
-    setInviteEmail(user.email)
+    inviteForm.setValue('email', user.email, { shouldValidate: true })
     if (user.name) {
-      setInviteName(user.name)
+      inviteForm.setValue('name', user.name, { shouldValidate: true })
     }
   }
 
@@ -135,35 +139,46 @@ export default function MembersSettings() {
               </label>
               <EmailAutocomplete
                 id="email"
-                value={inviteEmail}
-                onChange={setInviteEmail}
+                value={inviteForm.watch('email')}
+                onChange={(value) => {
+                  inviteForm.setValue('email', value, { shouldValidate: true })
+                }}
                 onSelect={handleDirectoryUserSelect}
                 placeholder="user@example.com"
               />
+              {inviteForm.formState.errors.email && (
+                <p className="text-xs text-destructive mt-1">
+                  {inviteForm.formState.errors.email.message}
+                </p>
+              )}
             </div>
             <div className="w-40">
               <label htmlFor="name" className="block text-sm font-medium mb-1">
                 Name (optional)
               </label>
               <input
+                {...inviteForm.register('name')}
                 id="name"
                 type="text"
-                value={inviteName}
-                onChange={(e) => {
-                  setInviteName(e.target.value)
-                }}
                 placeholder="Jane Doe"
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
+              {inviteForm.formState.errors.name && (
+                <p className="text-xs text-destructive mt-1">
+                  {inviteForm.formState.errors.name.message}
+                </p>
+              )}
             </div>
             <div className="w-32">
               <label htmlFor="role" className="block text-sm font-medium mb-1">
                 Role
               </label>
               <Select
-                value={inviteRole}
+                value={inviteForm.watch('role')}
                 onValueChange={(value) => {
-                  setInviteRole(value as 'admin' | 'member')
+                  inviteForm.setValue('role', value as 'admin' | 'member', {
+                    shouldValidate: true,
+                  })
                 }}
               >
                 <SelectTrigger className="w-full">
@@ -175,7 +190,7 @@ export default function MembersSettings() {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" disabled={inviteMutation.isPending || !inviteEmail}>
+            <Button type="submit" disabled={inviteMutation.isPending || !inviteForm.watch('email')}>
               {inviteMutation.isPending ? 'Sending...' : 'Send Invite'}
             </Button>
           </form>
