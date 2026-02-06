@@ -404,17 +404,22 @@ def stripe_webhook(request):
     return HttpResponse(status=200)
 ```
 
-### Stytch Webhooks (Future)
+### Stytch Webhooks
 
-For real-time auth events:
+Implemented in `apps/accounts/webhooks.py` for real-time auth event synchronization.
+Stytch uses Svix for webhook delivery; signatures are verified via the `svix` Python SDK.
 
-```python
-@router.post("/webhooks/stytch")
-def stytch_webhook(request):
-    # Verify signature using Stytch SDK
-    # Handle: member.created, member.deleted, organization.updated
-    ...
-```
+**Handled events:**
+
+| Event | Action |
+|-------|--------|
+| `*.member.create` | Create member in local DB if missing (reconciliation) |
+| `*.member.update` | Sync role changes and status updates |
+| `*.member.delete` | Soft delete local member |
+| `*.organization.update` | Sync name, slug, and logo changes |
+| `*.organization.delete` | Soft delete organization and all its members |
+
+**Endpoint:** `POST /webhooks/stytch/` (configured in `config/urls.py`)
 
 ### Inbound Webhook Best Practices
 

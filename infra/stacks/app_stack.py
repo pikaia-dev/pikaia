@@ -16,6 +16,7 @@ Supports two modes:
 from aws_cdk import (
     CfnOutput,
     Duration,
+    Fn,
     RemovalPolicy,
     Stack,
 )
@@ -52,6 +53,9 @@ from aws_cdk import (
 from aws_cdk import (
     aws_secretsmanager as secretsmanager,
 )
+from aws_cdk import (
+    aws_wafv2 as wafv2,
+)
 from constructs import Construct
 
 
@@ -84,6 +88,8 @@ class AppStack(Stack):
         domain_name: str | None = None,
         min_capacity: int = 2,
         max_capacity: int = 10,
+        # WAF
+        waf_acl_arn: str | None = None,
         # Shared mode parameters
         shared_alb: elbv2.IApplicationLoadBalancer | None = None,
         shared_https_listener: elbv2.IApplicationListener | None = None,
@@ -104,7 +110,10 @@ class AppStack(Stack):
         log_stream_prefix = self.node.try_get_context("log_stream_prefix") or "pikaia-backend"
 
         # Shared mode: use project-specific database secret path
-        database_secret_path = self.node.try_get_context("database_secret_path") or f"{resource_prefix}/database-credentials"
+        database_secret_path = (
+            self.node.try_get_context("database_secret_path")
+            or f"{resource_prefix}/database-credentials"
+        )
 
         # ALB listener rule priority for shared mode (must be unique per project)
         alb_rule_priority = self.node.try_get_context("alb_rule_priority") or 100
@@ -227,12 +236,9 @@ class AppStack(Stack):
         )
 
         # Build environment variables including S3 config if media bucket is provided
-        # Use wildcard for ALLOWED_HOSTS since ALB already restricts traffic
-        # (ALB health checks use ALB DNS as Host header, which we don't know at deploy time)
-        allowed_hosts = "*"
+        # ALLOWED_HOSTS is set after ALB creation so we can reference its DNS name
         container_env = {
             "DJANGO_SETTINGS_MODULE": "config.settings.production",
-            "ALLOWED_HOSTS": allowed_hosts,
             # API goes directly to ALB (not through CloudFront), so use standard header
             "PROXY_SSL_HEADER": "X-Forwarded-Proto",
         }
@@ -296,6 +302,10 @@ class AppStack(Stack):
                     self.app_secrets,
                     field="STYTCH_SECRET",
                 ),
+                "STYTCH_WEBHOOK_SECRET": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="STYTCH_WEBHOOK_SECRET",
+                ),
                 "STRIPE_SECRET_KEY": ecs.Secret.from_secrets_manager(
                     self.app_secrets,
                     field="STRIPE_SECRET_KEY",
@@ -352,7 +362,7 @@ class AppStack(Stack):
                 ),
             },
             health_check=ecs.HealthCheck(
-                command=["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"],
+                command=["CMD-SHELL", "curl -f http://localhost:8000/api/v1/health || exit 1"],
                 interval=Duration.seconds(30),
                 timeout=Duration.seconds(5),
                 retries=3,
@@ -449,7 +459,9 @@ class AppStack(Stack):
 
             # Allow shared ALB to reach ECS tasks
             ecs_security_group.add_ingress_rule(
-                peer=ec2.Peer.security_group_id(shared_alb.connections.security_groups[0].security_group_id),
+                peer=ec2.Peer.security_group_id(
+                    shared_alb.connections.security_groups[0].security_group_id
+                ),
                 connection=ec2.Port.tcp(8000),
                 description="Allow shared ALB to reach ECS",
             )
@@ -466,7 +478,9 @@ class AppStack(Stack):
         else:
             # Standalone mode: create full ALB with ApplicationLoadBalancedFargateService
             if certificate_arn:
-                certificate = acm.Certificate.from_certificate_arn(self, "Certificate", certificate_arn)
+                certificate = acm.Certificate.from_certificate_arn(
+                    self, "Certificate", certificate_arn
+                )
                 listener_protocol = elbv2.ApplicationProtocol.HTTPS
             else:
                 certificate = None
@@ -512,6 +526,41 @@ class AppStack(Stack):
                 min_capacity=min_capacity,
                 max_capacity=max_capacity,
             )
+
+        # =================================================================
+        # WAF Association (standalone mode only)
+        # =================================================================
+        # In shared mode the ALB is managed externally and WAF should be
+        # configured in the shared infrastructure stack.
+
+        if waf_acl_arn and not self._is_shared_mode:
+            wafv2.CfnWebACLAssociation(
+                self,
+                "AlbWafAssociation",
+                resource_arn=self.alb.load_balancer_arn,
+                web_acl_arn=waf_acl_arn,
+            )
+
+        # =================================================================
+        # ALLOWED_HOSTS (both modes, after ALB is available)
+        # =================================================================
+
+        # Build explicit ALLOWED_HOSTS: API domain (if provided) and
+        # localhost (for container health checks).
+        # In dedicated mode, also include the ALB DNS for ALB health checks.
+        # In shared mode, self.alb is an imported resource so we avoid
+        # referencing load_balancer_dns_name which may not resolve.
+        allowed_hosts_parts = ["localhost"]
+        if domain_name:
+            allowed_hosts_parts.append(domain_name)
+        if not self._is_shared_mode:
+            allowed_hosts = Fn.join(
+                ",",
+                [*allowed_hosts_parts, self.alb.load_balancer_dns_name],
+            )
+        else:
+            allowed_hosts = ",".join(allowed_hosts_parts)
+        container.add_environment("ALLOWED_HOSTS", allowed_hosts)
 
         # ECS Exec permissions (both modes)
         task_definition.task_role.add_to_policy(

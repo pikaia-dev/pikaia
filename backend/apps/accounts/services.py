@@ -16,6 +16,24 @@ from apps.organizations.models import Organization
 logger = get_logger(__name__)
 
 
+def _parse_stytch_role(roles: list) -> str:
+    """Determine the local role from a list of Stytch role objects.
+
+    Handles both SDK objects (with ``role_id`` attribute) and plain dicts
+    (from webhook payloads).  Returns ``"admin"`` if any role matches
+    ``StytchRoles.ADMIN``, otherwise ``"member"``.
+    """
+    for r in roles:
+        role_id: str | None = None
+        if isinstance(r, dict):
+            role_id = r.get("role_id")
+        else:
+            role_id = getattr(r, "role_id", None)
+        if role_id == StytchRoles.ADMIN:
+            return "admin"
+    return "member"
+
+
 def get_or_create_user_from_stytch(
     email: str,
     name: str = "",
@@ -154,17 +172,8 @@ def sync_session_to_local(
         )
 
         # Determine role from Stytch RBAC
-        # member.roles is an array of role objects with role_id field
-        # e.g. [{"role_id": "stytch_admin", "sources": [...]}, ...]
-        # See StytchRoles for valid role IDs
         roles = getattr(stytch_member, "roles", []) or []
-        role_ids = [
-            getattr(r, "role_id", None) or r.get("role_id")
-            if hasattr(r, "get")
-            else getattr(r, "role_id", None)
-            for r in roles
-        ]
-        role = "admin" if StytchRoles.ADMIN in role_ids else "member"
+        role = _parse_stytch_role(roles)
 
         # Sync member
         member = get_or_create_member_from_stytch(
@@ -432,7 +441,11 @@ def _sync_subscription_quantity_safe(organization: Organization) -> None:
 
         sync_subscription_quantity(organization)
     except Exception:
-        logger.warning("billing_subscription_quantity_sync_failed", org_id=str(organization.id))
+        logger.warning(
+            "billing_subscription_quantity_sync_failed",
+            org_id=str(organization.id),
+            exc_info=True,
+        )
 
 
 def sync_logo_to_stytch(organization: Organization) -> None:
@@ -489,14 +502,11 @@ def bulk_invite_members(
     Raises:
         ValueError: If members_data exceeds MAX_BULK_INVITE_SIZE
     """
-    import logging
-
     from stytch.core.response_base import StytchError
 
     if len(members_data) > MAX_BULK_INVITE_SIZE:
         raise ValueError(f"Bulk invite limited to {MAX_BULK_INVITE_SIZE} members")
 
-    logger = logging.getLogger(__name__)
     results = []
     succeeded = 0
     failed = 0
@@ -582,9 +592,9 @@ def bulk_invite_members(
         except StytchError as e:
             error_msg = e.details.error_message if e.details else str(e)
             logger.warning(
-                "Bulk invite failed for %s: %s",
-                email,
-                error_msg,
+                "bulk_invite_member_failed",
+                email=email,
+                error=error_msg,
             )
             results.append(
                 {
@@ -597,7 +607,7 @@ def bulk_invite_members(
             failed += 1
 
         except Exception as e:
-            logger.exception("Unexpected error inviting %s", email)
+            logger.exception("bulk_invite_member_unexpected_error", email=email)
             results.append(
                 {
                     "email": email,

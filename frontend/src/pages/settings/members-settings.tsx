@@ -1,20 +1,13 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Users } from 'lucide-react'
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
 import type { DirectoryUser } from '@/api/types'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { SettingsPageLayout } from '@/components/settings-page-layout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmailAutocomplete } from '@/components/ui/email-autocomplete'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import {
   Select,
   SelectContent,
@@ -31,6 +24,9 @@ import {
 import { useMembers } from '@/features/members/api/queries'
 import { BulkInviteDialog } from '@/features/members/components/bulk-invite-dialog'
 import { MembersTable } from '@/features/members/components/members-table'
+import type { InviteMemberFormData } from '@/features/members/forms/schema'
+import { inviteMemberSchema } from '@/features/members/forms/schema'
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog'
 
 export default function MembersSettings() {
   const { data: membersData, isLoading, error } = useMembers()
@@ -39,44 +35,44 @@ export default function MembersSettings() {
   const updateRoleMutation = useUpdateMemberRole()
   const deleteMutation = useDeleteMember()
 
-  // Invite form state
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteName, setInviteName] = useState('')
-  const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member')
+  // Invite form (useForm + zodResolver)
+  const inviteForm = useForm<InviteMemberFormData>({
+    resolver: zodResolver(inviteMemberSchema),
+    defaultValues: {
+      email: '',
+      name: '',
+      role: 'member',
+    },
+  })
 
   // Bulk invite dialog state
   const [bulkInviteOpen, setBulkInviteOpen] = useState(false)
 
-  // Delete confirmation dialog state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [memberToDelete, setMemberToDelete] = useState<{
-    id: number
-    email: string
-  } | null>(null)
+  // Delete confirmation dialog
+  const deleteDialog = useConfirmDialog<{ id: number; email: string }>((member) => {
+    deleteMutation.mutate(member.id, {
+      onSettled: () => deleteDialog.reset(),
+    })
+  })
 
   const members = membersData?.members ?? []
 
-  const handleInvite = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!inviteEmail) return
-
+  const handleInvite = inviteForm.handleSubmit((data) => {
     inviteMutation.mutate(
-      { email: inviteEmail, name: inviteName, role: inviteRole },
+      { email: data.email, name: data.name, role: data.role },
       {
         onSuccess: () => {
-          setInviteEmail('')
-          setInviteName('')
-          setInviteRole('member')
+          inviteForm.reset()
         },
       }
     )
-  }
+  })
 
   // Handle directory user selection
   const handleDirectoryUserSelect = (user: DirectoryUser) => {
-    setInviteEmail(user.email)
+    inviteForm.setValue('email', user.email, { shouldValidate: true })
     if (user.name) {
-      setInviteName(user.name)
+      inviteForm.setValue('name', user.name, { shouldValidate: true })
     }
   }
 
@@ -106,44 +102,17 @@ export default function MembersSettings() {
   }
 
   const openDeleteDialog = (memberId: number, email: string) => {
-    setMemberToDelete({ id: memberId, email })
-    setDeleteDialogOpen(true)
-  }
-
-  const handleDeleteConfirm = () => {
-    if (!memberToDelete) return
-
-    deleteMutation.mutate(memberToDelete.id, {
-      onSettled: () => {
-        setDeleteDialogOpen(false)
-        setMemberToDelete(null)
-      },
-    })
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <LoadingSpinner size="sm" />
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-destructive">Failed to load members</p>
-      </div>
-    )
+    deleteDialog.openDialog({ id: memberId, email })
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Members</h1>
-        <p className="text-muted-foreground">Manage your organization members</p>
-      </div>
-
+    <SettingsPageLayout
+      title="Members"
+      description="Manage your organization members"
+      maxWidth=""
+      isLoading={isLoading}
+      error={error}
+    >
       {/* Invite Form */}
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-start justify-between">
@@ -170,35 +139,46 @@ export default function MembersSettings() {
               </label>
               <EmailAutocomplete
                 id="email"
-                value={inviteEmail}
-                onChange={setInviteEmail}
+                value={inviteForm.watch('email')}
+                onChange={(value) => {
+                  inviteForm.setValue('email', value, { shouldValidate: true })
+                }}
                 onSelect={handleDirectoryUserSelect}
                 placeholder="user@example.com"
               />
+              {inviteForm.formState.errors.email && (
+                <p className="text-xs text-destructive mt-1">
+                  {inviteForm.formState.errors.email.message}
+                </p>
+              )}
             </div>
             <div className="w-40">
               <label htmlFor="name" className="block text-sm font-medium mb-1">
                 Name (optional)
               </label>
               <input
+                {...inviteForm.register('name')}
                 id="name"
                 type="text"
-                value={inviteName}
-                onChange={(e) => {
-                  setInviteName(e.target.value)
-                }}
                 placeholder="Jane Doe"
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
+              {inviteForm.formState.errors.name && (
+                <p className="text-xs text-destructive mt-1">
+                  {inviteForm.formState.errors.name.message}
+                </p>
+              )}
             </div>
             <div className="w-32">
               <label htmlFor="role" className="block text-sm font-medium mb-1">
                 Role
               </label>
               <Select
-                value={inviteRole}
+                value={inviteForm.watch('role')}
                 onValueChange={(value) => {
-                  setInviteRole(value as 'admin' | 'member')
+                  inviteForm.setValue('role', value as 'admin' | 'member', {
+                    shouldValidate: true,
+                  })
                 }}
               >
                 <SelectTrigger className="w-full">
@@ -210,7 +190,7 @@ export default function MembersSettings() {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" disabled={inviteMutation.isPending || !inviteEmail}>
+            <Button type="submit" disabled={inviteMutation.isPending || !inviteForm.watch('email')}>
               {inviteMutation.isPending ? 'Sending...' : 'Send Invite'}
             </Button>
           </form>
@@ -221,26 +201,20 @@ export default function MembersSettings() {
       <MembersTable members={members} onRoleChange={handleRoleChange} onRemove={openDeleteDialog} />
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove member</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove <strong>{memberToDelete?.email}</strong> from this
-              organization? They will lose access immediately.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleteDialog.open}
+        onOpenChange={deleteDialog.onOpenChange}
+        onConfirm={deleteDialog.onConfirm}
+        title="Remove member"
+        description={
+          <>
+            Are you sure you want to remove <strong>{deleteDialog.item?.email}</strong> from this
+            organization? They will lose access immediately.
+          </>
+        }
+        confirmLabel="Remove"
+        variant="destructive"
+      />
 
       {/* Bulk Invite Dialog */}
       <BulkInviteDialog
@@ -249,6 +223,6 @@ export default function MembersSettings() {
         onInvite={handleBulkInvite}
         isLoading={bulkInviteMutation.isPending}
       />
-    </div>
+    </SettingsPageLayout>
   )
 }

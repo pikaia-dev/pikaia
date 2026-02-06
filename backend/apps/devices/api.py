@@ -11,6 +11,7 @@ from ninja import Router
 from ninja.errors import HttpError
 
 from apps.core.security import BearerAuth, get_auth_context
+from apps.core.utils import get_client_ip
 from apps.devices.exceptions import (
     DeviceAlreadyLinkedError,
     RateLimitError,
@@ -65,17 +66,9 @@ def initiate_link(request: HttpRequest) -> InitiateLinkResponse:
     )
 
 
-def _get_client_ip(request: HttpRequest) -> str:
-    """Extract client IP from request, handling proxies."""
-    x_forwarded_for: str | None = request.META.get("HTTP_X_FORWARDED_FOR")
-    if x_forwarded_for:
-        return x_forwarded_for.split(",")[0].strip()
-    return str(request.META.get("REMOTE_ADDR", "unknown"))
-
-
 def _check_complete_rate_limit(request: HttpRequest) -> None:
     """Check rate limit for link completion attempts by IP."""
-    client_ip = _get_client_ip(request)
+    client_ip = get_client_ip(request, default="unknown")
     cache_key = f"device_link_complete:{client_ip}"
 
     attempts = cache.get(cache_key, 0)

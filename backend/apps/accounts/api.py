@@ -9,6 +9,7 @@ Handles Stytch B2B authentication flows:
 """
 
 import contextlib
+import secrets
 
 from django.http import HttpRequest
 from ninja import Router
@@ -54,7 +55,6 @@ from apps.accounts.schemas import (
 from apps.accounts.services import (
     bulk_invite_members,
     invite_member,
-    list_organization_members,
     provision_mobile_user,
     soft_delete_member,
     sync_session_to_local,
@@ -303,7 +303,7 @@ def provision_mobile_user_endpoint(
         logger.error("MOBILE_PROVISION_API_KEY not configured")
         raise HttpError(401, "Mobile provisioning not configured")
 
-    if not api_key or api_key != expected_key:
+    if not api_key or not secrets.compare_digest(api_key, expected_key):
         raise HttpError(401, "Invalid or missing API key")
 
     try:
@@ -323,7 +323,7 @@ def provision_mobile_user_endpoint(
             logger.warning("Organization slug conflict: %s", e.details.error_message)
             raise HttpError(409, "Organization slug already in use. Try a different one.") from None
         logger.warning("Mobile provisioning failed: %s", e.details.error_message)
-        raise HttpError(400, f"Provisioning failed: {e.details.error_message}") from None
+        raise HttpError(400, "Provisioning failed. Please try again.") from None
 
     # Emit appropriate event
     if payload.organization_id:
@@ -411,13 +411,7 @@ def get_current_user(request: AuthenticatedHttpRequest) -> MeResponse:
     user, member, org = get_auth_context(request)
 
     return MeResponse(
-        user=UserInfo(
-            id=user.id,
-            email=user.email,
-            name=user.name,
-            avatar_url=user.avatar_url,
-            phone_number=user.phone_number,
-        ),
+        user=UserInfo.from_model(user),
         member=MemberInfo(
             id=member.id,
             stytch_member_id=member.stytch_member_id,
@@ -461,6 +455,7 @@ def update_profile(request: AuthenticatedHttpRequest, payload: UpdateProfileRequ
     user.save(update_fields=["name", "updated_at"])
 
     # Sync name to Stytch
+    sync_warning = None
     try:
         client = get_stytch_client()
         client.organizations.members.update(
@@ -469,8 +464,17 @@ def update_profile(request: AuthenticatedHttpRequest, payload: UpdateProfileRequ
             name=payload.name,
         )
     except StytchError as e:
-        logger.warning("Failed to sync name to Stytch: %s", e.details.error_message)
-        # Don't fail the request - local update succeeded
+        logger.warning(
+            "Failed to sync name to Stytch: %s (org=%s, member=%s)",
+            e.details.error_message,
+            org.stytch_org_id,
+            member.stytch_member_id,
+            exc_info=True,
+        )
+        sync_warning = (
+            "Changes saved locally but failed to sync to Stytch. "
+            "Please retry or contact support if the issue persists."
+        )
 
     # Emit user.profile_updated event
     publish_event(
@@ -484,13 +488,10 @@ def update_profile(request: AuthenticatedHttpRequest, payload: UpdateProfileRequ
         organization_id=str(org.id),
     )
 
-    return UserInfo(
-        id=user.id,
-        email=user.email,
-        name=user.name,
-        avatar_url=user.avatar_url,
-        phone_number=user.phone_number,
-    )
+    response = UserInfo.from_model(user)
+    if sync_warning:
+        response.sync_warning = sync_warning
+    return response
 
 
 # --- Phone Verification ---
@@ -530,9 +531,7 @@ def send_phone_otp(
         )
     except StytchError as e:
         logger.warning("Failed to send phone OTP: %s", e.details.error_message)
-        raise HttpError(
-            400, e.details.error_message or "Failed to send verification code"
-        ) from None
+        raise HttpError(400, "Failed to send verification code.") from None
 
 
 @router.post(
@@ -599,28 +598,28 @@ def verify_phone_otp(request: AuthenticatedHttpRequest, payload: VerifyPhoneOtpR
             organization_id=str(org.id),
         )
 
-        return UserInfo(
-            id=user.id,
-            email=user.email,
-            name=user.name,
-            avatar_url=user.avatar_url,
-            phone_number=user.phone_number,
-        )
+        return UserInfo.from_model(user)
 
     except StytchError as e:
-        error_msg = e.details.error_message or "Verification failed"
-        if "invalid" in error_msg.lower() or "expired" in error_msg.lower():
-            raise HttpError(400, "Invalid or expired verification code") from None
-        if "immutable" in error_msg.lower():
+        error_msg = _get_stytch_error_message(e)
+        if "invalid" in error_msg or "expired" in error_msg:
+            logger.warning(
+                "Phone OTP verification failed (invalid/expired): %s", e.details.error_message
+            )
+            raise HttpError(400, "Invalid or expired verification code.") from None
+        if "immutable" in error_msg:
             # Sessions created via passkey (trusted auth) are immutable and can't
             # have MFA factors added. User needs to re-authenticate via magic link.
+            logger.warning(
+                "Phone OTP verification failed (immutable session): %s", e.details.error_message
+            )
             raise HttpError(
                 400,
                 "Phone verification is not available for passkey sessions. "
                 "Please log out and sign in with email to update your phone number.",
             ) from None
-        logger.warning("Phone OTP verification failed: %s", error_msg)
-        raise HttpError(400, error_msg) from None
+        logger.warning("Phone OTP verification failed: %s", e.details.error_message)
+        raise HttpError(400, "Verification failed. Please try again.") from None
 
 
 # --- Email Update ---
@@ -661,9 +660,8 @@ def start_email_update(
             message=f"Verification email sent to {payload.new_email}. Check your inbox to complete the change.",
         )
     except StytchError as e:
-        error_msg = e.details.error_message or "Failed to initiate email update"
-        logger.warning("Failed to start email update: %s", error_msg)
-        raise HttpError(400, error_msg) from None
+        logger.warning("Failed to start email update: %s", e.details.error_message)
+        raise HttpError(400, "Failed to initiate email update. Please try again.") from None
 
 
 # --- Organization Settings (Admin Only) ---
@@ -734,6 +732,7 @@ def update_organization(
     org.save(update_fields=update_fields)
 
     # Sync to Stytch
+    sync_warning = None
     try:
         client = get_stytch_client()
         stytch_update_kwargs: dict[str, str] = {
@@ -745,8 +744,16 @@ def update_organization(
         # Stytch SDK has complex overloaded types; we only use simple string params
         client.organizations.update(**stytch_update_kwargs)  # type: ignore[arg-type]
     except StytchError as e:
-        logger.warning("Failed to sync org to Stytch: %s", e.details.error_message)
-        # Don't fail the request - local update succeeded
+        logger.warning(
+            "Failed to sync org to Stytch: %s (org=%s)",
+            e.details.error_message,
+            org.stytch_org_id,
+            exc_info=True,
+        )
+        sync_warning = (
+            "Changes saved locally but failed to sync to Stytch. "
+            "Please retry or contact support if the issue persists."
+        )
 
     # Emit organization.updated event
     publish_event(
@@ -759,7 +766,10 @@ def update_organization(
         actor=request.auth.user,
     )
 
-    return get_organization(request)
+    response = get_organization(request)
+    if sync_warning:
+        response.sync_warning = sync_warning
+    return response
 
 
 @router.patch(
@@ -787,6 +797,15 @@ def update_billing(
     org.billing_name = payload.billing_name
     org.vat_id = payload.vat_id
 
+    update_fields = [
+        "use_billing_email",
+        "billing_name",
+        "vat_id",
+        "updated_at",
+    ]
+    if payload.billing_email is not None:
+        update_fields.append("billing_email")
+
     if payload.address:
         org.billing_address_line1 = payload.address.line1
         org.billing_address_line2 = payload.address.line2
@@ -794,16 +813,36 @@ def update_billing(
         org.billing_state = payload.address.state
         org.billing_postal_code = payload.address.postal_code
         org.billing_country = payload.address.country
+        update_fields.extend(
+            [
+                "billing_address_line1",
+                "billing_address_line2",
+                "billing_city",
+                "billing_state",
+                "billing_postal_code",
+                "billing_country",
+            ]
+        )
 
-    org.save()
+    org.save(update_fields=update_fields)
 
     # Sync billing info to Stripe
+    sync_warning = None
     if org.stripe_customer_id:
         try:
             sync_billing_to_stripe(org)
         except Exception as e:
-            logger.warning("Failed to sync billing to Stripe: %s", e)
-            # Don't fail the request - local update succeeded
+            logger.warning(
+                "Failed to sync billing to Stripe: %s (org=%s, stripe_customer=%s)",
+                e,
+                org.stytch_org_id,
+                org.stripe_customer_id,
+                exc_info=True,
+            )
+            sync_warning = (
+                "Changes saved locally but failed to sync to Stripe. "
+                "Please retry or contact support if the issue persists."
+            )
 
     # Emit organization.billing_updated event
     publish_event(
@@ -818,7 +857,10 @@ def update_billing(
         actor=request.auth.user,
     )
 
-    return get_organization(request)
+    response = get_organization(request)
+    if sync_warning:
+        response.sync_warning = sync_warning
+    return response
 
 
 # --- Member Management (Admin Only) ---
@@ -834,52 +876,119 @@ def update_billing(
 @require_admin
 def list_members(
     request: AuthenticatedHttpRequest,
-    offset: int = 0,
-    limit: int | None = None,
+    cursor: str | None = None,
+    limit: int = 20,
 ) -> MemberListResponse:
     """
-    List active members of the current organization with optional pagination.
+    List active members of the current organization with cursor-based pagination.
 
-    Admin only.
+    Admin only. Uses Stytch's server-side pagination to avoid fetching all members.
 
     Args:
-        offset: Number of records to skip (default 0)
-        limit: Maximum records to return (default None = all)
+        cursor: Pagination cursor from a previous response (null for first page)
+        limit: Maximum records to return per page (default 20, max 100)
     """
     _, _, org = get_auth_context(request)
-    members, total = list_organization_members(org, offset=offset, limit=limit)
 
-    # Fetch member statuses from Stytch
+    # Clamp limit to a reasonable range
+    limit = max(1, min(limit, 100))
+
+    # Fetch paginated members from Stytch with cursor-based pagination
     stytch = get_stytch_client()
-    stytch_statuses: dict[str, str] = {}
+    stytch_members_data: list[dict[str, str]] = []
+    next_cursor: str | None = None
+    total = 0
+
     try:
-        search_result = stytch.organizations.members.search(
-            organization_ids=[org.stytch_org_id],
-            query={"operator": "AND", "operands": []},
-        )
+        search_kwargs: dict = {
+            "organization_ids": [org.stytch_org_id],
+            "query": {"operator": "AND", "operands": []},
+            "limit": limit,
+        }
+        if cursor:
+            search_kwargs["cursor"] = cursor
+
+        search_result = stytch.organizations.members.search(**search_kwargs)
+
         for stytch_member in search_result.members:
-            stytch_statuses[stytch_member.member_id] = stytch_member.status
+            stytch_members_data.append(
+                {
+                    "member_id": stytch_member.member_id,
+                    "status": stytch_member.status,
+                }
+            )
+
+        # Extract pagination metadata from Stytch response
+        total = getattr(search_result, "total_count", 0) or 0
+        next_cursor = getattr(search_result, "next_cursor", None) or None
     except Exception:
-        # If Stytch call fails, log and default to 'active'
-        logger.warning("stytch_member_status_fetch_failed", org_id=org.id)
+        logger.warning("stytch_member_search_failed", org_id=org.id)
+
+    # Build a lookup of Stytch member statuses
+    stytch_statuses: dict[str, str] = {m["member_id"]: m["status"] for m in stytch_members_data}
+    stytch_member_ids = [m["member_id"] for m in stytch_members_data]
+
+    # Fetch local member records for the Stytch members in this page
+    local_members = (
+        Member.objects.filter(
+            organization=org,
+            stytch_member_id__in=stytch_member_ids,
+            deleted_at__isnull=True,
+        )
+        .select_related("user")
+        .order_by("created_at")
+    )
+
+    # Build a lookup by stytch_member_id to preserve Stytch's page order
+    local_by_stytch_id = {m.stytch_member_id: m for m in local_members}
+
+    # If no Stytch results (e.g., Stytch call failed), fall back to local DB
+    if not stytch_members_data:
+        local_fallback = (
+            Member.objects.filter(organization=org, deleted_at__isnull=True)
+            .select_related("user")
+            .order_by("created_at")
+        )
+        total = local_fallback.count()
+        paginated_fallback = local_fallback[:limit]
+        has_more = total > limit
+        return MemberListResponse(
+            members=[
+                MemberListItem(
+                    id=m.id,
+                    stytch_member_id=m.stytch_member_id,
+                    email=m.user.email,
+                    name=m.user.name,
+                    role=m.role,
+                    is_admin=m.is_admin,
+                    status="active",
+                    created_at=m.created_at.isoformat(),
+                )
+                for m in paginated_fallback
+            ],
+            total=total,
+            next_cursor=None,
+            has_more=has_more,
+        )
 
     return MemberListResponse(
         members=[
             MemberListItem(
-                id=m.id,
-                stytch_member_id=m.stytch_member_id,
-                email=m.user.email,
-                name=m.user.name,
-                role=m.role,
-                is_admin=m.is_admin,
-                status=stytch_statuses.get(m.stytch_member_id, "active"),
-                created_at=m.created_at.isoformat(),
+                id=local_by_stytch_id[sid].id,
+                stytch_member_id=sid,
+                email=local_by_stytch_id[sid].user.email,
+                name=local_by_stytch_id[sid].user.name,
+                role=local_by_stytch_id[sid].role,
+                is_admin=local_by_stytch_id[sid].is_admin,
+                status=stytch_statuses.get(sid, "active"),
+                created_at=local_by_stytch_id[sid].created_at.isoformat(),
             )
-            for m in members
+            for sid in stytch_member_ids
+            if sid in local_by_stytch_id
         ],
         total=total,
-        offset=offset,
-        limit=limit,
+        next_cursor=next_cursor,
+        has_more=next_cursor is not None,
     )
 
 
@@ -919,7 +1028,7 @@ def invite_member_endpoint(
         )
     except StytchError as e:
         logger.warning("Failed to invite member: %s", e.details.error_message)
-        raise HttpError(400, f"Failed to invite member: {e.details.error_message}") from e
+        raise HttpError(400, "Failed to invite member. Please try again.") from e
 
     if invite_sent is True:
         message = f"Invitation sent to {payload.email}"
@@ -1098,7 +1207,7 @@ def update_member_role_endpoint(
         update_member_role(target_member, payload.role)
     except StytchError as e:
         logger.warning("Failed to update member role: %s", e.details.error_message)
-        raise HttpError(400, f"Failed to update role: {e.details.error_message}") from e
+        raise HttpError(400, "Failed to update role. Please try again.") from e
 
     # Emit member.role_changed event
     publish_event(
@@ -1156,8 +1265,8 @@ def delete_member_endpoint(request: AuthenticatedHttpRequest, member_id: str) ->
     try:
         soft_delete_member(target_member)
     except StytchError as e:
-        logger.warning("Failed to delete member: %s", e.details.error_message)
-        raise HttpError(400, f"Failed to remove member: {e.details.error_message}") from e
+        logger.warning("Failed to remove member: %s", e.details.error_message)
+        raise HttpError(400, "Failed to remove member. Please try again.") from e
 
     # Emit member.removed event
     publish_event(
