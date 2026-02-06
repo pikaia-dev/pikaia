@@ -72,7 +72,7 @@ jobs:
             --cache-control "max-age=0,no-cache,no-store,must-revalidate"
 
           # Copy any JSON files (like manifest) with short cache
-          find frontend/dist -name "*.json" -exec aws s3 cp {} "s3://${FRONTEND_BUCKET}/{}" \
+          cd frontend/dist && find . -name "*.json" -exec aws s3 cp {} "s3://${FRONTEND_BUCKET}/{}" \
             --cache-control "max-age=0,no-cache" \;
 
       - name: Invalidate CloudFront cache

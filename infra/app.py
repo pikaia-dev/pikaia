@@ -272,6 +272,8 @@ observability = ObservabilityStack(
     event_bus=events_stack.event_bus,
     publisher_lambda=events_stack.publisher_lambda,
     audit_lambda=events_stack.audit_lambda,
+    publisher_dlq=events_stack.dlq,
+    audit_dlq=events_stack.audit_dlq,
     alarm_email=alarm_email,
     env=env,
 )

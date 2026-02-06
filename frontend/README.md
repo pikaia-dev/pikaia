@@ -15,13 +15,8 @@ pnpm build        # Production build
 
 ## API Types
 
-TypeScript types are generated from the backend's OpenAPI spec:
-
-```bash
-pnpm generate-types   # Requires backend running at localhost:8000
-```
-
-> Run this after any backend API changes to regenerate `src/generated/api-types.ts`.
+TypeScript types are manually maintained in `src/api/types.ts` to match the Django Ninja API schemas.
+Update that file when backend API contracts change.
 
 ## Structure
 
@@ -32,7 +27,6 @@ src/
 ├── api/                  # API layer (client, types, hooks)
 ├── components/ui/        # shadcn-ui components
 ├── features/             # Feature modules (auth, billing, members, etc.)
-├── generated/            # Auto-generated API types (excluded from linting)
 ├── hooks/                # Shared React hooks
 ├── layouts/              # Page layouts
 ├── lib/                  # Utilities, env config, constants
