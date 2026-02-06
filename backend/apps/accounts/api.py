@@ -9,6 +9,7 @@ Handles Stytch B2B authentication flows:
 """
 
 import contextlib
+import secrets
 
 from django.http import HttpRequest
 from ninja import Router
@@ -303,7 +304,7 @@ def provision_mobile_user_endpoint(
         logger.error("MOBILE_PROVISION_API_KEY not configured")
         raise HttpError(401, "Mobile provisioning not configured")
 
-    if not api_key or api_key != expected_key:
+    if not api_key or not secrets.compare_digest(api_key, expected_key):
         raise HttpError(401, "Invalid or missing API key")
 
     try:
