@@ -54,7 +54,6 @@ from apps.accounts.schemas import (
 from apps.accounts.services import (
     bulk_invite_members,
     invite_member,
-    list_organization_members,
     provision_mobile_user,
     soft_delete_member,
     sync_session_to_local,
@@ -834,52 +833,114 @@ def update_billing(
 @require_admin
 def list_members(
     request: AuthenticatedHttpRequest,
-    offset: int = 0,
-    limit: int | None = None,
+    cursor: str | None = None,
+    limit: int = 20,
 ) -> MemberListResponse:
     """
-    List active members of the current organization with optional pagination.
+    List active members of the current organization with cursor-based pagination.
 
-    Admin only.
+    Admin only. Uses Stytch's server-side pagination to avoid fetching all members.
 
     Args:
-        offset: Number of records to skip (default 0)
-        limit: Maximum records to return (default None = all)
+        cursor: Pagination cursor from a previous response (null for first page)
+        limit: Maximum records to return per page (default 20, max 100)
     """
     _, _, org = get_auth_context(request)
-    members, total = list_organization_members(org, offset=offset, limit=limit)
 
-    # Fetch member statuses from Stytch
+    # Clamp limit to a reasonable range
+    limit = max(1, min(limit, 100))
+
+    # Fetch paginated members from Stytch with cursor-based pagination
     stytch = get_stytch_client()
-    stytch_statuses: dict[str, str] = {}
+    stytch_members_data: list[dict[str, str]] = []
+    next_cursor: str | None = None
+    total = 0
+
     try:
-        search_result = stytch.organizations.members.search(
-            organization_ids=[org.stytch_org_id],
-            query={"operator": "AND", "operands": []},
-        )
+        search_kwargs: dict = {
+            "organization_ids": [org.stytch_org_id],
+            "query": {"operator": "AND", "operands": []},
+            "limit": limit,
+        }
+        if cursor:
+            search_kwargs["cursor"] = cursor
+
+        search_result = stytch.organizations.members.search(**search_kwargs)
+
         for stytch_member in search_result.members:
-            stytch_statuses[stytch_member.member_id] = stytch_member.status
+            stytch_members_data.append(
+                {
+                    "member_id": stytch_member.member_id,
+                    "status": stytch_member.status,
+                }
+            )
+
+        # Extract pagination metadata from Stytch response
+        total = getattr(search_result, "total_count", 0) or 0
+        next_cursor = getattr(search_result, "next_cursor", None) or None
     except Exception:
-        # If Stytch call fails, log and default to 'active'
-        logger.warning("stytch_member_status_fetch_failed", org_id=org.id)
+        logger.warning("stytch_member_search_failed", org_id=org.id)
+
+    # Build a lookup of Stytch member statuses
+    stytch_statuses: dict[str, str] = {m["member_id"]: m["status"] for m in stytch_members_data}
+    stytch_member_ids = [m["member_id"] for m in stytch_members_data]
+
+    # Fetch local member records for the Stytch members in this page
+    local_members = (
+        Member.objects.filter(
+            organization=org,
+            stytch_member_id__in=stytch_member_ids,
+        )
+        .select_related("user")
+        .order_by("created_at")
+    )
+
+    # Build a lookup by stytch_member_id to preserve Stytch's page order
+    local_by_stytch_id = {m.stytch_member_id: m for m in local_members}
+
+    # If no Stytch results (e.g., Stytch call failed), fall back to local DB
+    if not stytch_members_data:
+        local_fallback = (
+            Member.objects.filter(organization=org).select_related("user").order_by("created_at")
+        )
+        total = local_fallback.count()
+        return MemberListResponse(
+            members=[
+                MemberListItem(
+                    id=m.id,
+                    stytch_member_id=m.stytch_member_id,
+                    email=m.user.email,
+                    name=m.user.name,
+                    role=m.role,
+                    is_admin=m.is_admin,
+                    status="active",
+                    created_at=m.created_at.isoformat(),
+                )
+                for m in local_fallback
+            ],
+            total=total,
+            next_cursor=None,
+            has_more=False,
+        )
 
     return MemberListResponse(
         members=[
             MemberListItem(
-                id=m.id,
-                stytch_member_id=m.stytch_member_id,
-                email=m.user.email,
-                name=m.user.name,
-                role=m.role,
-                is_admin=m.is_admin,
-                status=stytch_statuses.get(m.stytch_member_id, "active"),
-                created_at=m.created_at.isoformat(),
+                id=local_by_stytch_id[sid].id,
+                stytch_member_id=sid,
+                email=local_by_stytch_id[sid].user.email,
+                name=local_by_stytch_id[sid].user.name,
+                role=local_by_stytch_id[sid].role,
+                is_admin=local_by_stytch_id[sid].is_admin,
+                status=stytch_statuses.get(sid, "active"),
+                created_at=local_by_stytch_id[sid].created_at.isoformat(),
             )
-            for m in members
+            for sid in stytch_member_ids
+            if sid in local_by_stytch_id
         ],
         total=total,
-        offset=offset,
-        limit=limit,
+        next_cursor=next_cursor,
+        has_more=next_cursor is not None,
     )
 
 
