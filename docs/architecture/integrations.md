@@ -411,13 +411,15 @@ Stytch uses Svix for webhook delivery; signatures are verified via the `svix` Py
 
 **Handled events:**
 
-| Event | Action |
-|-------|--------|
-| `*.member.create` | Create member in local DB if missing (reconciliation) |
-| `*.member.update` | Sync role changes and status updates |
-| `*.member.delete` | Soft delete local member |
-| `*.organization.update` | Sync name, slug, and logo changes |
-| `*.organization.delete` | Soft delete organization and all its members |
+Stytch event payloads include `object_type` and `action` fields. The webhook handler dispatches based on these fields (e.g., `object_type="member"` + `action="CREATE"`), not the full Svix event type string.
+
+| object_type | action | Handler |
+|-------------|--------|---------|
+| `member` | `CREATE` | Create member in local DB if missing (reconciliation) |
+| `member` | `UPDATE` | Sync role changes and status updates |
+| `member` | `DELETE` | Soft delete local member |
+| `organization` | `UPDATE` | Sync name, slug, and logo changes |
+| `organization` | `DELETE` | Soft delete organization and all its members |
 
 **Endpoint:** `POST /webhooks/stytch/` (configured in `config/urls.py`)
 

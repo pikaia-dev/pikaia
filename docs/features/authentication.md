@@ -105,19 +105,21 @@ fetch("/api/v1/...", {
 
 Stytch webhooks provide real-time synchronization when changes occur outside authentication:
 
-| Event | Action |
-|-------|--------|
-| `*.member.create` | Create member in local DB if missing (reconciliation) |
-| `*.member.update` | Sync role changes, status updates |
-| `*.member.delete` | Soft delete local member |
-| `*.organization.update` | Sync name, slug, logo changes |
-| `*.organization.delete` | Soft delete organization and all its members |
+The handler dispatches on the `object_type` and `action` fields in the Stytch event payload:
+
+| object_type | action | Handler |
+|-------------|--------|---------|
+| `member` | `CREATE` | Create member in local DB if missing (reconciliation) |
+| `member` | `UPDATE` | Sync role changes, status updates |
+| `member` | `DELETE` | Soft delete local member |
+| `organization` | `UPDATE` | Sync name, slug, logo changes |
+| `organization` | `DELETE` | Soft delete organization and all its members |
 
 ### Setup
 
 1. Configure webhook endpoint in Stytch Dashboard: `https://yourapp.com/webhooks/stytch/`
 2. Copy the signing secret to `STYTCH_WEBHOOK_SECRET` environment variable
-3. Enable events: `member.create`, `member.update`, `member.delete`, `organization.update`, `organization.delete`
+3. Subscribe to member and organization events in the Stytch webhook configuration
 
 > **Note:** Webhooks use Svix for delivery with automatic retries and signature verification.
 

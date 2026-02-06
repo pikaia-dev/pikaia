@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createOrganization, isConflictError } from '@/features/auth/utils/org-api'
+import {
+  ApiResponseError,
+  createOrganization,
+  isConflictError,
+} from '@/features/auth/utils/org-api'
 
 // Mock the env module
 vi.mock('@/lib/env', () => ({
@@ -66,18 +70,22 @@ describe('createOrganization', () => {
     })
   })
 
-  it('throws error with detail message on failure', async () => {
+  it('throws ApiResponseError with detail message and status on failure', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
+      status: 409,
       json: () =>
         Promise.resolve({
           detail: 'Organization slug already exists',
         }),
     })
 
-    await expect(createOrganization('ist_123', 'My Org', 'my-org')).rejects.toThrow(
-      'Organization slug already exists'
-    )
+    const promise = createOrganization('ist_123', 'My Org', 'my-org')
+    await expect(promise).rejects.toBeInstanceOf(ApiResponseError)
+    await expect(promise).rejects.toMatchObject({
+      message: 'Organization slug already exists',
+      status: 409,
+    })
   })
 
   it('throws default error when response has no detail', async () => {
@@ -104,25 +112,22 @@ describe('createOrganization', () => {
 })
 
 describe('isConflictError', () => {
-  it('returns true for slug conflict errors', () => {
-    expect(isConflictError(new Error('Organization slug already exists'))).toBe(true)
-    expect(isConflictError(new Error('This slug is taken'))).toBe(true)
+  it('returns true for ApiResponseError with status 409', () => {
+    expect(isConflictError(new ApiResponseError('Organization slug already exists', 409))).toBe(
+      true
+    )
+    expect(isConflictError(new ApiResponseError('Name already in use', 409))).toBe(true)
   })
 
-  it('returns true for name conflict errors', () => {
-    expect(isConflictError(new Error('Organization name already exists'))).toBe(true)
-    expect(isConflictError(new Error('This name is in use'))).toBe(true)
+  it('returns false for ApiResponseError with non-409 status', () => {
+    expect(isConflictError(new ApiResponseError('Not found', 404))).toBe(false)
+    expect(isConflictError(new ApiResponseError('Server error', 500))).toBe(false)
+    expect(isConflictError(new ApiResponseError('Unauthorized', 401))).toBe(false)
   })
 
-  it("returns true for generic 'use' conflict errors", () => {
-    expect(isConflictError(new Error('Cannot use this identifier'))).toBe(true)
-    expect(isConflictError(new Error('Already in use'))).toBe(true)
-  })
-
-  it('returns false for non-conflict errors', () => {
+  it('returns false for plain Error objects', () => {
+    expect(isConflictError(new Error('Organization slug already exists'))).toBe(false)
     expect(isConflictError(new Error('Network error'))).toBe(false)
-    expect(isConflictError(new Error('Unauthorized'))).toBe(false)
-    expect(isConflictError(new Error('Server error'))).toBe(false)
   })
 
   it('returns false for non-Error objects', () => {
@@ -130,11 +135,5 @@ describe('isConflictError', () => {
     expect(isConflictError({ message: 'slug error' })).toBe(false)
     expect(isConflictError(null)).toBe(false)
     expect(isConflictError(undefined)).toBe(false)
-  })
-
-  it('is case-insensitive', () => {
-    expect(isConflictError(new Error('SLUG already exists'))).toBe(true)
-    expect(isConflictError(new Error('NAME conflict'))).toBe(true)
-    expect(isConflictError(new Error('In USE'))).toBe(true)
   })
 })

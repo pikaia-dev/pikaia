@@ -530,7 +530,7 @@ def send_phone_otp(
             message=f"Verification code sent to {payload.phone_number}",
         )
     except StytchError as e:
-        logger.warning("Failed to send phone OTP: %s", e.details.error_message)
+        logger.warning("Failed to send phone OTP: %r", e, exc_info=True)
         raise HttpError(400, "Failed to send verification code.") from None
 
 
@@ -794,17 +794,19 @@ def update_billing(
     org.use_billing_email = payload.use_billing_email
     if payload.billing_email is not None:
         org.billing_email = payload.billing_email
+    elif not payload.use_billing_email:
+        # Clear stale billing email when disabling the feature
+        org.billing_email = ""
     org.billing_name = payload.billing_name
     org.vat_id = payload.vat_id
 
     update_fields = [
         "use_billing_email",
+        "billing_email",
         "billing_name",
         "vat_id",
         "updated_at",
     ]
-    if payload.billing_email is not None:
-        update_fields.append("billing_email")
 
     if payload.address:
         org.billing_address_line1 = payload.address.line1

@@ -16,7 +16,7 @@ from apps.organizations.models import Organization
 logger = get_logger(__name__)
 
 
-def _parse_stytch_role(roles: list) -> str:
+def parse_stytch_role(roles: list) -> str:
     """Determine the local role from a list of Stytch role objects.
 
     Handles both SDK objects (with ``role_id`` attribute) and plain dicts
@@ -173,7 +173,7 @@ def sync_session_to_local(
 
         # Determine role from Stytch RBAC
         roles = getattr(stytch_member, "roles", []) or []
-        role = _parse_stytch_role(roles)
+        role = parse_stytch_role(roles)
 
         # Sync member
         member = get_or_create_member_from_stytch(

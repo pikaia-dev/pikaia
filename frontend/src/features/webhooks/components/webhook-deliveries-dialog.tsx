@@ -27,6 +27,8 @@ function getStatusIcon(status: WebhookDelivery['status']) {
       return <AlertTriangle className="h-4 w-4 text-red-600" />
     case 'pending':
       return <Clock className="h-4 w-4 text-amber-600" />
+    default:
+      return null
   }
 }
 
@@ -50,6 +52,8 @@ function getStatusBadge(delivery: WebhookDelivery) {
           Retry #{delivery.attempt_number}
         </StatusBadge>
       )
+    default:
+      return <StatusBadge variant="neutral">{String(delivery.status)}</StatusBadge>
   }
 }
 

@@ -18,7 +18,7 @@ export function useBlobUrls() {
   const addUrl = useCallback((key: string, blobUrl: string) => {
     setUrls((prev) => {
       // Revoke old URL for this key if it exists and differs
-      if (prev[key] && prev[key] !== blobUrl) {
+      if (prev[key] && prev[key] !== blobUrl && prev[key].startsWith('blob:')) {
         URL.revokeObjectURL(prev[key])
       }
       return { ...prev, [key]: blobUrl }
@@ -27,8 +27,10 @@ export function useBlobUrls() {
 
   const clearAll = useCallback(() => {
     setUrls((prev) => {
-      for (const blobUrl of Object.values(prev)) {
-        URL.revokeObjectURL(blobUrl)
+      for (const url of Object.values(prev)) {
+        if (url.startsWith('blob:')) {
+          URL.revokeObjectURL(url)
+        }
       }
       return {}
     })
@@ -41,8 +43,10 @@ export function useBlobUrls() {
   // Revoke all blob URLs on unmount
   useEffect(() => {
     return () => {
-      for (const blobUrl of Object.values(urlsRef.current)) {
-        URL.revokeObjectURL(blobUrl)
+      for (const url of Object.values(urlsRef.current)) {
+        if (url.startsWith('blob:')) {
+          URL.revokeObjectURL(url)
+        }
       }
     }
   }, [])
