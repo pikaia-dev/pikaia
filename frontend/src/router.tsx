@@ -141,8 +141,18 @@ function ProtectedRoute({ children }: { children?: React.ReactNode }) {
 }
 
 function AdminRoute({ children }: { children?: React.ReactNode }) {
-  const { member } = useStytchMember()
-  const roles = member?.roles || []
+  const { member, isInitialized } = useStytchMember()
+
+  // Wait for Stytch member data to load before checking roles
+  if (!isInitialized || !member) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
+  const roles = member.roles || []
   const isAdmin = roles.some((r: { role_id?: string }) => r.role_id === STYTCH_ROLES.ADMIN)
 
   if (!isAdmin) {

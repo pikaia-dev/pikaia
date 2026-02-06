@@ -485,7 +485,7 @@ class ObservabilityStack(Stack):
                     statistic="Maximum",
                 ),
                 threshold=0,
-                evaluation_periods=1,
+                evaluation_periods=2,
                 comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
                 treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
             )
@@ -506,7 +506,7 @@ class ObservabilityStack(Stack):
                     statistic="Maximum",
                 ),
                 threshold=0,
-                evaluation_periods=1,
+                evaluation_periods=2,
                 comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
                 treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
             )

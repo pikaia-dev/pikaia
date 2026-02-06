@@ -17,9 +17,9 @@ from svix.webhooks import Webhook, WebhookVerificationError
 
 from apps.accounts.models import Member
 from apps.accounts.services import (
-    _parse_stytch_role,
     get_or_create_member_from_stytch,
     get_or_create_user_from_stytch,
+    parse_stytch_role,
 )
 from apps.core.logging import get_logger
 from apps.core.webhooks import mark_webhook_processed
@@ -68,7 +68,7 @@ def handle_member_created(data: dict) -> None:
         return
 
     # Determine role from Stytch RBAC
-    role = _parse_stytch_role(member_data.get("roles", []))
+    role = parse_stytch_role(member_data.get("roles", []))
 
     # Get or create user and member
     logger.info(
@@ -121,7 +121,7 @@ def handle_member_updated(data: dict) -> None:
         return
 
     # Update role from Stytch RBAC
-    new_role = _parse_stytch_role(member_data.get("roles", []))
+    new_role = parse_stytch_role(member_data.get("roles", []))
 
     # Update member fields
     update_fields: list[str] = []
