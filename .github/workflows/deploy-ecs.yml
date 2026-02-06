@@ -277,7 +277,7 @@ jobs:
             --query 'tasks[0].containers[0].exitCode' \
             --output text)
 
-          if [ -z "$EXIT_CODE" ] || [ "$EXIT_CODE" = "None" ]; then
+          if [ -z "$EXIT_CODE" ] || [ "$EXIT_CODE" = "None" ] || [ "$EXIT_CODE" = "null" ]; then
             echo "::error::Create cache table task did not complete properly (no exit code)"
             exit 1
           fi
@@ -319,7 +319,7 @@ jobs:
             --query 'tasks[0].containers[0].exitCode' \
             --output text)
 
-          if [ -z "$EXIT_CODE" ] || [ "$EXIT_CODE" = "None" ]; then
+          if [ -z "$EXIT_CODE" ] || [ "$EXIT_CODE" = "None" ] || [ "$EXIT_CODE" = "null" ]; then
             echo "::error::Django migration task did not complete properly (no exit code)"
             exit 1
           fi
