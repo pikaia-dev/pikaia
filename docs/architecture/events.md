@@ -109,6 +109,7 @@ The following events are currently integrated into the codebase:
 | Event Type | Aggregate | Trigger Location |
 |------------|-----------|------------------|
 | `organization.created` | Organization | `accounts/api.py` - create_organization |
+| `organization.deleted` | Organization | `accounts/webhooks.py` - handle_organization_deleted |
 | `member.invited` | Member | `accounts/api.py` - invite_member_endpoint |
 | `member.joined` | Member | `accounts/api.py` - exchange_session |
 | `member.removed` | Member | `accounts/api.py` + `accounts/webhooks.py` |
@@ -208,21 +209,7 @@ def handle_time_entry_created(event: dict):
 
 ### Documentation
 
-Event schemas are documented in `/docs/events/` with one file per event type:
-
-```
-docs/events/
-├── time_entry.created.md
-├── time_entry.submitted.md
-├── user.phone_number_changed.md
-└── ...
-```
-
-Each file contains:
-- Overview and purpose
-- Schema versions with field tables
-- Breaking changes log
-- Example payloads
+> **Planned:** Per-event schema documentation will be added in `/docs/events/` with one file per event type (e.g., `time_entry.created.md`). Each file will contain overview, schema versions, breaking changes log, and example payloads.
 
 ---
 
@@ -656,14 +643,14 @@ pipe = pipes.CfnPipe(
 
 ### In-Repo JSON Schemas
 
-Store schemas in `/schemas/events/` and validate on publish:
-
-```
-schemas/events/
-├── time_entry.created.v1.json
-├── time_entry.approved.v1.json
-└── public.time_entry.created.v1.json
-```
+> **Planned:** JSON schemas will be stored in `/schemas/events/` and validated on publish. Example structure:
+>
+> ```
+> schemas/events/
+> ├── time_entry.created.v1.json
+> ├── time_entry.approved.v1.json
+> └── public.time_entry.created.v1.json
+> ```
 
 ### Example Schema
 
@@ -723,16 +710,15 @@ def publish_event(event: dict):
 
 ### Enforcing Additive Changes
 
-CI check to prevent breaking schema changes:
-
-```bash
-# .github/workflows/schema-check.yml
-- name: Check schema compatibility
-  run: |
-    python scripts/check_schema_compatibility.py \
-      --old origin/main:schemas/events/ \
-      --new schemas/events/
-```
+> **Planned:** A CI check will be added to prevent breaking schema changes. Example workflow (`.github/workflows/schema-check.yml`):
+>
+> ```bash
+> - name: Check schema compatibility
+>   run: |
+>     python scripts/check_schema_compatibility.py \
+>       --old origin/main:schemas/events/ \
+>       --new schemas/events/
+> ```
 
 ---
 
