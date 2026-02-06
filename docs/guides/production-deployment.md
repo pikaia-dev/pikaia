@@ -156,11 +156,11 @@ PikaiaApp.LoadBalancerDNS = Pikaia-XXXXX.us-east-1.elb.amazonaws.com
 2. Click **"Add endpoint"**
 3. Enter your endpoint URL:
    ```
-   https://your-domain.com/api/v1/billing/webhooks/stripe/
+   https://your-domain.com/webhooks/stripe/
    ```
    Or for testing (HTTP):
    ```
-   http://YOUR_ALB_URL/api/v1/billing/webhooks/stripe/
+   http://YOUR_ALB_URL/webhooks/stripe/
    ```
 4. Select events:
    - `checkout.session.completed`
