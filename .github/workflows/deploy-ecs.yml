@@ -251,14 +251,31 @@ jobs:
           ECS_SUBNETS: ${{ steps.infra.outputs.ecs_subnets }}
           ECS_SECURITY_GROUP: ${{ steps.infra.outputs.ecs_security_group }}
         run: |
-          aws ecs run-task \
+          set -euo pipefail
+
+          TASK_ARN=$(aws ecs run-task \
             --cluster "${ECS_CLUSTER}" \
             --launch-type FARGATE \
             --task-definition "${{ steps.get-td.outputs.taskDefinitionArn }}" \
             --network-configuration "awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUP}],assignPublicIp=DISABLED}" \
             --count 1 \
             --overrides "{\"containerOverrides\":[{\"name\":\"${{ steps.get-td.outputs.migrateContainer }}\",\"command\":[\"python\",\"manage.py\",\"createcachetable\"]}]}" \
-            --output json > cache-table-run.json
+            --query 'tasks[0].taskArn' \
+            --output text)
+
+          echo "Waiting for cache table task to complete: ${TASK_ARN}"
+          aws ecs wait tasks-stopped --cluster "${ECS_CLUSTER}" --tasks "${TASK_ARN}"
+
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster "${ECS_CLUSTER}" \
+            --tasks "${TASK_ARN}" \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)
+
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "::error::Create cache table task failed with exit code ${EXIT_CODE}"
+            exit 1
+          fi
 
       - name: Run Django migrations
         env:
@@ -266,11 +283,28 @@ jobs:
           ECS_SUBNETS: ${{ steps.infra.outputs.ecs_subnets }}
           ECS_SECURITY_GROUP: ${{ steps.infra.outputs.ecs_security_group }}
         run: |
-          aws ecs run-task \
+          set -euo pipefail
+
+          TASK_ARN=$(aws ecs run-task \
             --cluster "${ECS_CLUSTER}" \
             --launch-type FARGATE \
             --task-definition "${{ steps.get-td.outputs.taskDefinitionArn }}" \
             --network-configuration "awsvpcConfiguration={subnets=[${ECS_SUBNETS}],securityGroups=[${ECS_SECURITY_GROUP}],assignPublicIp=DISABLED}" \
             --count 1 \
             --overrides "{\"containerOverrides\":[{\"name\":\"${{ steps.get-td.outputs.migrateContainer }}\",\"command\":[\"python\",\"manage.py\",\"migrate\"]}]}" \
-            --output json > migrations-run.json
+            --query 'tasks[0].taskArn' \
+            --output text)
+
+          echo "Waiting for migration task to complete: ${TASK_ARN}"
+          aws ecs wait tasks-stopped --cluster "${ECS_CLUSTER}" --tasks "${TASK_ARN}"
+
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster "${ECS_CLUSTER}" \
+            --tasks "${TASK_ARN}" \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)
+
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "::error::Django migration task failed with exit code ${EXIT_CODE}"
+            exit 1
+          fi
