@@ -24,7 +24,7 @@ Coding standards for contributors and AI agents.
 | URLs        | kebab-case      | `/api/v1/user-profiles` |
 | Unused vars | \_prefix        | `_unused_fixture`       |
 
-> See [frontend coding standards](./frontend/coding-standards.md) for frontend-specific conventions.
+> See [frontend coding standards](../frontend/coding-standards.md) for frontend-specific conventions.
 
 ## Testing
 
