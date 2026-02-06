@@ -3,13 +3,16 @@ import { useEffect, useState } from 'react'
 import {
   type ActionFunction,
   createBrowserRouter,
+  isRouteErrorResponse,
   type LoaderFunction,
   Navigate,
   Outlet,
   type RouteObject,
   type ShouldRevalidateFunction,
+  useRouteError,
 } from 'react-router-dom'
 
+import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { SettingsSkeleton } from '@/components/ui/skeleton'
 import AppLayout from '@/layouts/app-layout'
@@ -59,6 +62,29 @@ function GlobalFallback() {
 
 function SettingsFallback() {
   return <SettingsSkeleton />
+}
+
+// ============ Route Error Boundary ============
+
+function RootErrorBoundary() {
+  const error = useRouteError()
+
+  let message = 'An unexpected error occurred. Please try again.'
+  if (isRouteErrorResponse(error)) {
+    message = error.statusText || `${String(error.status)} error`
+  } else if (error instanceof Error) {
+    message = error.message
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="text-center space-y-4 max-w-md px-4">
+        <h1 className="text-4xl font-bold">Something went wrong</h1>
+        <p className="text-muted-foreground">{message}</p>
+        <Button onClick={() => window.location.replace('/')}>Try again</Button>
+      </div>
+    </div>
+  )
 }
 
 // ============ Guards ============
@@ -116,53 +142,58 @@ function ProtectedRoute({ children }: { children?: React.ReactNode }) {
 // ============ Routes Config ============
 
 const routes: AppRouteConfig[] = [
-  // Public routes
-  { path: '/login', lazy: () => import('@/pages/login') },
-  { path: '/auth/callback', lazy: () => import('@/pages/auth-callback') },
-
-  // Protected routes
   {
-    guards: [ProtectedRoute],
-    layout: AppLayout,
+    errorElement: <RootErrorBoundary />,
     children: [
-      { path: '/', redirectTo: '/dashboard' },
-      { path: '/dashboard', lazy: () => import('@/pages/dashboard') },
-      { path: '/settings', redirectTo: '/settings/profile' },
+      // Public routes
+      { path: '/login', lazy: () => import('@/pages/login') },
+      { path: '/auth/callback', lazy: () => import('@/pages/auth-callback') },
+
+      // Protected routes
       {
-        path: '/settings/profile',
-        lazy: () => import('@/pages/settings/profile-settings'),
-        fallback: SettingsFallback,
+        guards: [ProtectedRoute],
+        layout: AppLayout,
+        children: [
+          { path: '/', redirectTo: '/dashboard' },
+          { path: '/dashboard', lazy: () => import('@/pages/dashboard') },
+          { path: '/settings', redirectTo: '/settings/profile' },
+          {
+            path: '/settings/profile',
+            lazy: () => import('@/pages/settings/profile-settings'),
+            fallback: SettingsFallback,
+          },
+          {
+            path: '/settings/organization',
+            lazy: () => import('@/pages/settings/organization-settings'),
+            fallback: SettingsFallback,
+          },
+          {
+            path: '/settings/members',
+            lazy: () => import('@/pages/settings/members-settings'),
+            fallback: SettingsFallback,
+          },
+          {
+            path: '/settings/billing',
+            lazy: () => import('@/pages/settings/billing-settings'),
+            fallback: SettingsFallback,
+          },
+          {
+            path: '/settings/security',
+            lazy: () => import('@/pages/settings/security-settings'),
+            fallback: SettingsFallback,
+          },
+          {
+            path: '/settings/integrations',
+            lazy: () => import('@/pages/settings/integrations-settings'),
+            fallback: SettingsFallback,
+          },
+          { path: '*', lazy: () => import('@/pages/not-found') },
+        ],
       },
-      {
-        path: '/settings/organization',
-        lazy: () => import('@/pages/settings/organization-settings'),
-        fallback: SettingsFallback,
-      },
-      {
-        path: '/settings/members',
-        lazy: () => import('@/pages/settings/members-settings'),
-        fallback: SettingsFallback,
-      },
-      {
-        path: '/settings/billing',
-        lazy: () => import('@/pages/settings/billing-settings'),
-        fallback: SettingsFallback,
-      },
-      {
-        path: '/settings/security',
-        lazy: () => import('@/pages/settings/security-settings'),
-        fallback: SettingsFallback,
-      },
-      {
-        path: '/settings/integrations',
-        lazy: () => import('@/pages/settings/integrations-settings'),
-        fallback: SettingsFallback,
-      },
+
       { path: '*', lazy: () => import('@/pages/not-found') },
     ],
   },
-
-  { path: '*', lazy: () => import('@/pages/not-found') },
 ]
 
 // ============ Route Builder ============
