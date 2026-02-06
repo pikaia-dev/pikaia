@@ -152,9 +152,9 @@ SECRET_JSON=$(jq -n \
 # Update secrets
 echo_info "Updating secret: $SECRET_NAME"
 
-VERSION_ID=$(aws secretsmanager put-secret-value \
+VERSION_ID=$(printf '%s' "$SECRET_JSON" | aws secretsmanager put-secret-value \
     --secret-id "$SECRET_NAME" \
-    --secret-string "$SECRET_JSON" \
+    --secret-string file:///dev/stdin \
     --query 'VersionId' \
     --output text)
 
