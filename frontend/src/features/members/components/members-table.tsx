@@ -1,4 +1,5 @@
 import type { MemberListItem } from '@/api/types'
+import { StatusBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -49,13 +50,9 @@ export function MembersTable({ members, onRoleChange, onRemove }: MembersTablePr
                   <td className="p-3 text-muted-foreground">{member.name || '—'}</td>
                   <td className="p-3">
                     {member.status === 'invited' ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                        Pending
-                      </span>
+                      <StatusBadge variant="warning">Pending</StatusBadge>
                     ) : (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                        Active
-                      </span>
+                      <StatusBadge variant="success">Active</StatusBadge>
                     )}
                   </td>
                   <td className="p-3">

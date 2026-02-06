@@ -11,6 +11,17 @@ interface ApiErrorResponse {
   detail?: string
 }
 
+/** Error subclass that carries the HTTP status code from the response. */
+export class ApiResponseError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiResponseError'
+    this.status = status
+  }
+}
+
 /**
  * Creates an organization via the backend API.
  */
@@ -34,17 +45,15 @@ export async function createOrganization(
     const errorBody = (await res.json().catch(() => ({
       detail: 'Failed to create organization',
     }))) as ApiErrorResponse
-    throw new Error(errorBody.detail ?? 'Failed to create organization')
+    throw new ApiResponseError(errorBody.detail ?? 'Failed to create organization', res.status)
   }
 
   return res.json() as Promise<CreateOrgResponse>
 }
 
 /**
- * Checks if an error is a name/slug conflict that can be retried.
+ * Checks if an error is a name/slug conflict (HTTP 409) that can be retried.
  */
 export function isConflictError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false
-  const message = error.message.toLowerCase()
-  return message.includes('slug') || message.includes('name') || message.includes('use')
+  return error instanceof ApiResponseError && error.status === 409
 }

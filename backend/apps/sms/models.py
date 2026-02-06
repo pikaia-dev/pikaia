@@ -39,7 +39,7 @@ class OTPVerification(models.Model):
     )
 
     # OTP details
-    code = models.CharField(max_length=10, help_text="The OTP code")
+    code_hash = models.CharField(max_length=64, help_text="SHA-256 hash of the OTP code")
     purpose = models.CharField(
         max_length=20,
         choices=Purpose.choices,

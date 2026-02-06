@@ -1,5 +1,8 @@
 /**
  * API response types matching backend schemas.
+ *
+ * These types are manually maintained to match the Django Ninja API schemas.
+ * Update this file when backend API contracts change.
  */
 
 // User & Auth types
