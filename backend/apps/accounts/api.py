@@ -479,7 +479,7 @@ def update_profile(request: AuthenticatedHttpRequest, payload: UpdateProfileRequ
         )
         sync_warning = (
             "Changes saved locally but failed to sync to Stytch. "
-            "Changes will be synchronized automatically."
+            "Please retry or contact support if the issue persists."
         )
 
     # Emit user.profile_updated event
@@ -765,7 +765,7 @@ def update_organization(
         )
         sync_warning = (
             "Changes saved locally but failed to sync to Stytch. "
-            "Changes will be synchronized automatically."
+            "Please retry or contact support if the issue persists."
         )
 
     # Emit organization.updated event
@@ -835,7 +835,7 @@ def update_billing(
             )
             sync_warning = (
                 "Changes saved locally but failed to sync to Stripe. "
-                "Changes will be synchronized automatically."
+                "Please retry or contact support if the issue persists."
             )
 
     # Emit organization.billing_updated event
