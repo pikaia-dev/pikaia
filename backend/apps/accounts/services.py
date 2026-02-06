@@ -16,6 +16,24 @@ from apps.organizations.models import Organization
 logger = get_logger(__name__)
 
 
+def _parse_stytch_role(roles: list) -> str:
+    """Determine the local role from a list of Stytch role objects.
+
+    Handles both SDK objects (with ``role_id`` attribute) and plain dicts
+    (from webhook payloads).  Returns ``"admin"`` if any role matches
+    ``StytchRoles.ADMIN``, otherwise ``"member"``.
+    """
+    for r in roles:
+        role_id: str | None = None
+        if isinstance(r, dict):
+            role_id = r.get("role_id")
+        else:
+            role_id = getattr(r, "role_id", None)
+        if role_id == StytchRoles.ADMIN:
+            return "admin"
+    return "member"
+
+
 def get_or_create_user_from_stytch(
     email: str,
     name: str = "",
@@ -154,17 +172,8 @@ def sync_session_to_local(
         )
 
         # Determine role from Stytch RBAC
-        # member.roles is an array of role objects with role_id field
-        # e.g. [{"role_id": "stytch_admin", "sources": [...]}, ...]
-        # See StytchRoles for valid role IDs
         roles = getattr(stytch_member, "roles", []) or []
-        role_ids = [
-            getattr(r, "role_id", None) or r.get("role_id")
-            if hasattr(r, "get")
-            else getattr(r, "role_id", None)
-            for r in roles
-        ]
-        role = "admin" if StytchRoles.ADMIN in role_ids else "member"
+        role = _parse_stytch_role(roles)
 
         # Sync member
         member = get_or_create_member_from_stytch(
