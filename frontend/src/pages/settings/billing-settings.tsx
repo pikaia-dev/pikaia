@@ -108,9 +108,9 @@ export default function BillingSettings() {
     }
   }
 
-  const handleDeliverySubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSavingDelivery(true)
+  const saveBilling = async (section: 'delivery' | 'address') => {
+    const setSaving = section === 'delivery' ? setSavingDelivery : setSavingAddress
+    setSaving(true)
     try {
       await updateBillingMutation.mutateAsync({
         use_billing_email: currentUseBillingEmail,
@@ -119,38 +119,33 @@ export default function BillingSettings() {
         address: currentAddress,
         vat_id: currentVatId,
       })
-      toast.success('Invoice delivery settings saved')
-      // Reset edit state
-      setUseBillingEmail(null)
-      setBillingEmail(null)
+      toast.success(
+        section === 'delivery' ? 'Invoice delivery settings saved' : 'Billing address saved'
+      )
+      // Reset edit state for the relevant section
+      if (section === 'delivery') {
+        setUseBillingEmail(null)
+        setBillingEmail(null)
+      } else {
+        setBillingName(null)
+        setAddress(null)
+        setVatId(null)
+      }
     } catch {
       // Error already handled by mutation
     } finally {
-      setSavingDelivery(false)
+      setSaving(false)
     }
+  }
+
+  const handleDeliverySubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await saveBilling('delivery')
   }
 
   const handleAddressSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSavingAddress(true)
-    try {
-      await updateBillingMutation.mutateAsync({
-        use_billing_email: currentUseBillingEmail,
-        billing_email: currentUseBillingEmail ? currentBillingEmail : undefined,
-        billing_name: currentBillingName,
-        address: currentAddress,
-        vat_id: currentVatId,
-      })
-      toast.success('Billing address saved')
-      // Reset edit state
-      setBillingName(null)
-      setAddress(null)
-      setVatId(null)
-    } catch {
-      // Error already handled by mutation
-    } finally {
-      setSavingAddress(false)
-    }
+    await saveBilling('address')
   }
 
   const updateAddress = (field: keyof BillingAddress, value: string) => {
