@@ -263,6 +263,10 @@ class UserInfo(BaseModel):
     name: str = Field(..., description="User's display name")
     avatar_url: str = Field("", description="URL to user's avatar image")
     phone_number: str = Field("", description="Phone number in E.164 format")
+    sync_warning: str | None = Field(
+        default=None,
+        description="Warning message if external sync failed (changes saved locally)",
+    )
 
 
 class MeResponse(BaseModel):
@@ -481,6 +485,10 @@ class OrganizationDetailResponse(BaseModel):
     slug: str = Field(..., description="URL-safe identifier")
     logo_url: str = Field("", description="URL to organization logo image")
     billing: BillingInfoResponse = Field(..., description="Billing information")
+    sync_warning: str | None = Field(
+        default=None,
+        description="Warning message if external sync failed (changes saved locally)",
+    )
 
 
 # --- Member Management Schemas ---

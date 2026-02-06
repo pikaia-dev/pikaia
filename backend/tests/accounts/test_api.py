@@ -573,7 +573,7 @@ class TestUpdateProfile:
         mock_client.organizations.members.update.assert_called_once()
 
     def test_stytch_sync_failure_doesnt_fail_request(self, request_factory: RequestFactory) -> None:
-        """Should succeed even if Stytch sync fails."""
+        """Should succeed even if Stytch sync fails, and include sync_warning."""
         from stytch.core.response_base import StytchError, StytchErrorDetails
 
         user = UserFactory.create(name="Old Name")
@@ -605,6 +605,31 @@ class TestUpdateProfile:
         assert result.name == "New Name"
         user.refresh_from_db()
         assert user.name == "New Name"
+        # Warning should be surfaced in the response
+        assert result.sync_warning is not None
+        assert "failed to sync to stytch" in result.sync_warning.lower()
+
+    def test_success_has_no_sync_warning(self, request_factory: RequestFactory) -> None:
+        """Should not include sync_warning when Stytch sync succeeds."""
+        user = UserFactory.create(name="Old Name")
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
+
+        request = request_factory.patch("/api/v1/auth/me/profile")
+        request = make_request_with_auth(  # type: ignore[assignment]
+            request, AuthContext(user=user, member=member, organization=org)
+        )
+
+        payload = UpdateProfileRequest(name="New Name")
+
+        with patch("apps.accounts.api.get_stytch_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_get_client.return_value = mock_client
+
+            result = update_profile(request, payload)  # type: ignore[arg-type]
+
+        assert result.name == "New Name"
+        assert result.sync_warning is None
 
     def test_unauthenticated(self, request_factory: RequestFactory) -> None:
         """Should error when not authenticated."""
@@ -835,6 +860,45 @@ class TestUpdateOrganization:
         call_kwargs = mock_client.organizations.update.call_args[1]
         assert call_kwargs["organization_slug"] == "new-slug"
 
+    def test_stytch_sync_failure_returns_sync_warning(
+        self, request_factory: RequestFactory
+    ) -> None:
+        """Should succeed with sync_warning when Stytch sync fails."""
+        from stytch.core.response_base import StytchError, StytchErrorDetails
+
+        org = OrganizationFactory.create(name="Old Name")
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="admin")
+
+        request = request_factory.patch("/api/v1/auth/organization")
+        request = make_request_with_auth(  # type: ignore[assignment]
+            request, AuthContext(user=user, member=member, organization=org)
+        )
+
+        payload = UpdateOrganizationRequest(name="New Name")
+
+        with patch("apps.accounts.api.get_stytch_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.organizations.update.side_effect = StytchError(
+                StytchErrorDetails(
+                    error_type="api_error",
+                    error_message="Stytch API error",
+                    status_code=500,
+                    request_id="req-456",
+                )
+            )
+            mock_get_client.return_value = mock_client
+
+            result = update_organization(request, payload)  # type: ignore[arg-type]
+
+        # Local update should succeed
+        assert result.name == "New Name"
+        org.refresh_from_db()
+        assert org.name == "New Name"
+        # Warning should be surfaced in the response
+        assert result.sync_warning is not None
+        assert "failed to sync to stytch" in result.sync_warning.lower()
+
     def test_slug_is_normalized(self, request_factory: RequestFactory) -> None:
         """Slugs with invalid characters should be normalized, not rejected."""
         # Spaces, uppercase, and special chars get normalized
@@ -885,6 +949,36 @@ class TestUpdateBilling:
         org.refresh_from_db()
         assert org.billing_email == "new-billing@example.com"
         assert org.billing_address_line1 == "456 New St"
+
+    def test_stripe_sync_failure_returns_sync_warning(
+        self, request_factory: RequestFactory
+    ) -> None:
+        """Should succeed with sync_warning when Stripe sync fails."""
+        org = OrganizationFactory.create(stripe_customer_id="cus_test123")
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="admin")
+
+        request = request_factory.patch("/api/v1/auth/organization/billing")
+        request = make_request_with_auth(  # type: ignore[assignment]
+            request, AuthContext(user=user, member=member, organization=org)
+        )
+
+        payload = UpdateBillingRequest(
+            billing_name="New Corp Inc.",
+            vat_id="DE999888777",
+        )
+
+        with patch("apps.accounts.api.sync_billing_to_stripe") as mock_sync:
+            mock_sync.side_effect = Exception("Stripe API error")
+            result = update_billing(request, payload)  # type: ignore[arg-type]
+
+        # Local update should succeed
+        assert result.billing.billing_name == "New Corp Inc."
+        org.refresh_from_db()
+        assert org.billing_name == "New Corp Inc."
+        # Warning should be surfaced in the response
+        assert result.sync_warning is not None
+        assert "failed to sync to stripe" in result.sync_warning.lower()
 
     def test_non_admin_rejected(self, request_factory: RequestFactory) -> None:
         """Non-admin should be rejected with 403."""
