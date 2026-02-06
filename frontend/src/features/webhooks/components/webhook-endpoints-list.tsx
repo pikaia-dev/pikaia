@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import type { WebhookEndpoint, WebhookEventType } from '@/api/types'
+import { StatusBadge } from '@/components/status-badge'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -104,41 +105,36 @@ export function WebhookEndpointsList({
   const getStatusBadge = (endpoint: WebhookEndpoint) => {
     if (!endpoint.active) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-          <Pause className="h-3 w-3" />
+        <StatusBadge variant="neutral" icon={<Pause className="h-3 w-3" />}>
           Disabled
-        </span>
+        </StatusBadge>
       )
     }
     if (endpoint.consecutive_failures >= 5) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
-          <AlertTriangle className="h-3 w-3" />
+        <StatusBadge variant="danger" icon={<AlertTriangle className="h-3 w-3" />}>
           Failing
-        </span>
+        </StatusBadge>
       )
     }
     if (endpoint.last_delivery_status === 'success') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-          <Check className="h-3 w-3" />
+        <StatusBadge variant="success" icon={<Check className="h-3 w-3" />}>
           Active
-        </span>
+        </StatusBadge>
       )
     }
     if (endpoint.last_delivery_status === 'failure') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-          <AlertTriangle className="h-3 w-3" />
+        <StatusBadge variant="warning" icon={<AlertTriangle className="h-3 w-3" />}>
           Warning
-        </span>
+        </StatusBadge>
       )
     }
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-        <Clock className="h-3 w-3" />
+      <StatusBadge variant="neutral" icon={<Clock className="h-3 w-3" />}>
         No deliveries
-      </span>
+      </StatusBadge>
     )
   }
 

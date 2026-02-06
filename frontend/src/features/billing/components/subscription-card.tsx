@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { SubscriptionInfo } from '@/api/types'
+import { StatusBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useConfirmSubscription, useCreatePortalSession } from '@/features/billing/api/mutations'
@@ -69,14 +70,14 @@ export function SubscriptionCard({ subscription, memberCount }: SubscriptionCard
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-medium">Pro Plan</span>
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                  <StatusBadge
+                    variant={
                       subscription.status === 'active'
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        ? 'success'
                         : subscription.status === 'past_due'
-                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                          : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-                    }`}
+                          ? 'warning'
+                          : 'neutral'
+                    }
                   >
                     {subscription.status === 'active'
                       ? 'Active'
@@ -85,7 +86,7 @@ export function SubscriptionCard({ subscription, memberCount }: SubscriptionCard
                         : subscription.status === 'trialing'
                           ? 'Trial'
                           : subscription.status}
-                  </span>
+                  </StatusBadge>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
                   {subscription.quantity} {subscription.quantity === 1 ? 'seat' : 'seats'}
