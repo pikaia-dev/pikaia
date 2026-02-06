@@ -1,6 +1,8 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
-import type { BillingAddress, Invoice } from '@/api/types'
+import type { Invoice } from '@/api/types'
 import { AddressAutocomplete } from '@/components/ui/address-autocomplete'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,6 +12,11 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { useInvoices, useSubscription } from '@/features/billing/api/queries'
 import { InvoiceHistoryCard } from '@/features/billing/components/invoice-history-card'
 import { SubscriptionCard } from '@/features/billing/components/subscription-card'
+import type {
+  BillingAddressFormData,
+  InvoiceDeliveryFormData,
+} from '@/features/billing/forms/schema'
+import { billingAddressSchema, invoiceDeliverySchema } from '@/features/billing/forms/schema'
 import { useUpdateBilling } from '@/features/organization/api/mutations'
 import { useOrganization } from '@/features/organization/api/queries'
 import {
@@ -35,12 +42,30 @@ export default function BillingSettings() {
   // Mutations
   const updateBillingMutation = useUpdateBilling()
 
-  // Form state (editable fields)
-  const [useBillingEmail, setUseBillingEmail] = useState<boolean | null>(null)
-  const [billingEmail, setBillingEmail] = useState<string | null>(null)
-  const [billingName, setBillingName] = useState<string | null>(null)
-  const [address, setAddress] = useState<BillingAddress | null>(null)
-  const [vatId, setVatId] = useState<string | null>(null)
+  // Invoice delivery form (useForm + zodResolver)
+  const deliveryForm = useForm<InvoiceDeliveryFormData>({
+    resolver: zodResolver(invoiceDeliverySchema),
+    defaultValues: {
+      use_billing_email: false,
+      billing_email: '',
+    },
+  })
+
+  // Billing address form (useForm + zodResolver)
+  const addressForm = useForm<BillingAddressFormData>({
+    resolver: zodResolver(billingAddressSchema),
+    defaultValues: {
+      billing_name: '',
+      line1: '',
+      line2: '',
+      city: '',
+      state: '',
+      postal_code: '',
+      country: DEFAULT_COUNTRY,
+      vat_id: '',
+    },
+  })
+
   const [savingDelivery, setSavingDelivery] = useState(false)
   const [savingAddress, setSavingAddress] = useState(false)
 
@@ -49,19 +74,39 @@ export default function BillingSettings() {
   const [invoicesHasMore, setInvoicesHasMore] = useState(false)
   const [loadingMoreInvoices, setLoadingMoreInvoices] = useState(false)
 
-  // Derived values from server data or edited values
-  const currentUseBillingEmail = useBillingEmail ?? organization?.billing.use_billing_email ?? false
-  const currentBillingEmail = billingEmail ?? organization?.billing.billing_email ?? ''
-  const currentBillingName = billingName ?? organization?.billing.billing_name ?? ''
-  const currentAddress = address ?? {
-    line1: organization?.billing.address.line1 ?? '',
-    line2: organization?.billing.address.line2 ?? '',
-    city: organization?.billing.address.city ?? '',
-    state: organization?.billing.address.state ?? '',
-    postal_code: organization?.billing.address.postal_code ?? '',
-    country: organization?.billing.address.country || DEFAULT_COUNTRY,
+  // Derived values from form state
+  const currentUseBillingEmail = deliveryForm.watch('use_billing_email')
+  const currentBillingEmail = deliveryForm.watch('billing_email') ?? ''
+  const currentBillingName = addressForm.watch('billing_name') ?? ''
+  const currentAddress = {
+    line1: addressForm.watch('line1') ?? '',
+    line2: addressForm.watch('line2') ?? '',
+    city: addressForm.watch('city') ?? '',
+    state: addressForm.watch('state') ?? '',
+    postal_code: addressForm.watch('postal_code') ?? '',
+    country: addressForm.watch('country') || DEFAULT_COUNTRY,
   }
-  const currentVatId = vatId ?? organization?.billing.vat_id ?? ''
+  const currentVatId = addressForm.watch('vat_id') ?? ''
+
+  // Sync forms with server data when it loads
+  useEffect(() => {
+    if (organization) {
+      deliveryForm.reset({
+        use_billing_email: organization.billing.use_billing_email,
+        billing_email: organization.billing.billing_email ?? '',
+      })
+      addressForm.reset({
+        billing_name: organization.billing.billing_name ?? '',
+        line1: organization.billing.address.line1 ?? '',
+        line2: organization.billing.address.line2 ?? '',
+        city: organization.billing.address.city ?? '',
+        state: organization.billing.address.state ?? '',
+        postal_code: organization.billing.address.postal_code ?? '',
+        country: organization.billing.address.country || DEFAULT_COUNTRY,
+        vat_id: organization.billing.vat_id ?? '',
+      })
+    }
+  }, [organization, deliveryForm.reset, addressForm.reset])
 
   // Update invoices pagination state when data changes
   useEffect(() => {
@@ -108,63 +153,57 @@ export default function BillingSettings() {
     }
   }
 
-  const handleDeliverySubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleDeliverySubmit = deliveryForm.handleSubmit(async (data) => {
     setSavingDelivery(true)
     try {
       await updateBillingMutation.mutateAsync({
-        use_billing_email: currentUseBillingEmail,
-        billing_email: currentUseBillingEmail ? currentBillingEmail : undefined,
+        use_billing_email: data.use_billing_email,
+        billing_email: data.use_billing_email ? data.billing_email : undefined,
         billing_name: currentBillingName,
         address: currentAddress,
         vat_id: currentVatId,
       })
       toast.success('Invoice delivery settings saved')
-      // Reset edit state
-      setUseBillingEmail(null)
-      setBillingEmail(null)
     } catch {
       // Error already handled by mutation
     } finally {
       setSavingDelivery(false)
     }
-  }
+  })
 
-  const handleAddressSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleAddressSubmit = addressForm.handleSubmit(async (data) => {
     setSavingAddress(true)
     try {
       await updateBillingMutation.mutateAsync({
         use_billing_email: currentUseBillingEmail,
         billing_email: currentUseBillingEmail ? currentBillingEmail : undefined,
-        billing_name: currentBillingName,
-        address: currentAddress,
-        vat_id: currentVatId,
+        billing_name: data.billing_name,
+        address: {
+          line1: data.line1 ?? '',
+          line2: data.line2 ?? '',
+          city: data.city ?? '',
+          state: data.state ?? '',
+          postal_code: data.postal_code ?? '',
+          country: data.country || DEFAULT_COUNTRY,
+        },
+        vat_id: data.vat_id,
       })
       toast.success('Billing address saved')
-      // Reset edit state
-      setBillingName(null)
-      setAddress(null)
-      setVatId(null)
     } catch {
       // Error already handled by mutation
     } finally {
       setSavingAddress(false)
     }
-  }
+  })
 
-  const updateAddress = (field: keyof BillingAddress, value: string) => {
+  const updateAddress = (field: keyof BillingAddressFormData, value: string) => {
     const previousCountry = currentAddress.country
-    setAddress((prev) => ({
-      ...(prev ?? currentAddress),
-      [field]: value,
-    }))
+    addressForm.setValue(field, value, { shouldValidate: true })
 
     // When country changes, update VAT prefix if EU country
     if (field === 'country') {
-      setVatId((currentVat) =>
-        updateVatIdForCountryChange(currentVat ?? currentVatId, previousCountry, value)
-      )
+      const updatedVatId = updateVatIdForCountryChange(currentVatId, previousCountry, value)
+      addressForm.setValue('vat_id', updatedVatId, { shouldValidate: true })
     }
   }
 
@@ -172,23 +211,23 @@ export default function BillingSettings() {
   const handleAddressSelect = useCallback(
     (parsed: ParsedAddress) => {
       const previousCountry = currentAddress.country
+      const countryCode = parsed.country_code.toUpperCase()
+
       // Update address fields from parsed Google Places result
-      setAddress({
-        line1: parsed.street_address || parsed.formatted_address,
-        line2: '', // User can fill manually if needed
-        city: parsed.city,
-        state: parsed.state,
-        postal_code: parsed.postal_code,
-        country: parsed.country_code.toUpperCase(),
+      addressForm.setValue('line1', parsed.street_address || parsed.formatted_address, {
+        shouldValidate: true,
       })
+      addressForm.setValue('line2', '', { shouldValidate: true })
+      addressForm.setValue('city', parsed.city, { shouldValidate: true })
+      addressForm.setValue('state', parsed.state, { shouldValidate: true })
+      addressForm.setValue('postal_code', parsed.postal_code, { shouldValidate: true })
+      addressForm.setValue('country', countryCode, { shouldValidate: true })
 
       // Trigger VAT prefix update for the new country
-      const countryCode = parsed.country_code.toUpperCase()
-      setVatId((currentVat) =>
-        updateVatIdForCountryChange(currentVat ?? currentVatId, previousCountry, countryCode)
-      )
+      const updatedVatId = updateVatIdForCountryChange(currentVatId, previousCountry, countryCode)
+      addressForm.setValue('vat_id', updatedVatId, { shouldValidate: true })
     },
-    [currentAddress.country, currentVatId]
+    [currentAddress.country, currentVatId, addressForm.setValue]
   )
 
   // Get current VAT prefix based on country
@@ -232,7 +271,7 @@ export default function BillingSettings() {
                   checked={currentUseBillingEmail}
                   onCheckedChange={async (checked) => {
                     const isChecked = checked === true
-                    setUseBillingEmail(isChecked)
+                    deliveryForm.setValue('use_billing_email', isChecked)
                     if (!isChecked) {
                       // Auto-save when unchecking since the form is hidden
                       setSavingDelivery(true)
@@ -244,11 +283,13 @@ export default function BillingSettings() {
                           vat_id: currentVatId,
                         })
                         toast.success('Invoice delivery settings saved')
-                        setUseBillingEmail(null)
-                        setBillingEmail(null)
+                        deliveryForm.reset({
+                          use_billing_email: false,
+                          billing_email: '',
+                        })
                       } catch {
                         // Revert on failure
-                        setUseBillingEmail(true)
+                        deliveryForm.setValue('use_billing_email', true)
                       } finally {
                         setSavingDelivery(false)
                       }
@@ -277,16 +318,17 @@ export default function BillingSettings() {
                     </label>
                     <input
                       ref={billingEmailRef}
+                      {...deliveryForm.register('billing_email')}
                       id="billingEmail"
                       type="email"
-                      value={currentBillingEmail}
-                      onChange={(e) => {
-                        setBillingEmail(e.target.value)
-                      }}
                       className="w-full max-w-sm px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                       placeholder="billing@company.com"
-                      required
                     />
+                    {deliveryForm.formState.errors.billing_email && (
+                      <p className="text-xs text-destructive mt-1">
+                        {deliveryForm.formState.errors.billing_email.message}
+                      </p>
+                    )}
                   </div>
                   <div className="pl-7">
                     <Button type="submit" disabled={savingDelivery}>
@@ -312,15 +354,17 @@ export default function BillingSettings() {
                   Legal / company name
                 </label>
                 <input
+                  {...addressForm.register('billing_name')}
                   id="billingName"
                   type="text"
-                  value={currentBillingName}
-                  onChange={(e) => {
-                    setBillingName(e.target.value)
-                  }}
                   className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   placeholder="Acme Corporation Inc."
                 />
+                {addressForm.formState.errors.billing_name && (
+                  <p className="text-xs text-destructive mt-1">
+                    {addressForm.formState.errors.billing_name.message}
+                  </p>
+                )}
               </div>
 
               {/* Street Address with autocomplete */}
@@ -348,15 +392,17 @@ export default function BillingSettings() {
                   Address Line 2
                 </label>
                 <input
+                  {...addressForm.register('line2')}
                   id="line2"
                   type="text"
-                  value={currentAddress.line2}
-                  onChange={(e) => {
-                    updateAddress('line2', e.target.value)
-                  }}
                   className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   placeholder="Apt, Suite, Floor (optional)"
                 />
+                {addressForm.formState.errors.line2 && (
+                  <p className="text-xs text-destructive mt-1">
+                    {addressForm.formState.errors.line2.message}
+                  </p>
+                )}
               </div>
 
               <div className="grid gap-4 sm:grid-cols-3">
@@ -365,14 +411,16 @@ export default function BillingSettings() {
                     City
                   </label>
                   <input
+                    {...addressForm.register('city')}
                     id="city"
                     type="text"
-                    value={currentAddress.city}
-                    onChange={(e) => {
-                      updateAddress('city', e.target.value)
-                    }}
                     className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
+                  {addressForm.formState.errors.city && (
+                    <p className="text-xs text-destructive mt-1">
+                      {addressForm.formState.errors.city.message}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -380,14 +428,16 @@ export default function BillingSettings() {
                     {getStateLabel(currentAddress.country)}
                   </label>
                   <input
+                    {...addressForm.register('state')}
                     id="state"
                     type="text"
-                    value={currentAddress.state}
-                    onChange={(e) => {
-                      updateAddress('state', e.target.value)
-                    }}
                     className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
+                  {addressForm.formState.errors.state && (
+                    <p className="text-xs text-destructive mt-1">
+                      {addressForm.formState.errors.state.message}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -395,14 +445,16 @@ export default function BillingSettings() {
                     {getPostalCodeLabel(currentAddress.country)}
                   </label>
                   <input
+                    {...addressForm.register('postal_code')}
                     id="postalCode"
                     type="text"
-                    value={currentAddress.postal_code}
-                    onChange={(e) => {
-                      updateAddress('postal_code', e.target.value)
-                    }}
                     className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
+                  {addressForm.formState.errors.postal_code && (
+                    <p className="text-xs text-destructive mt-1">
+                      {addressForm.formState.errors.postal_code.message}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -439,7 +491,9 @@ export default function BillingSettings() {
                               : currentVatId
                           }
                           onChange={(e) => {
-                            setVatId(currentVatPrefix + e.target.value)
+                            addressForm.setValue('vat_id', currentVatPrefix + e.target.value, {
+                              shouldValidate: true,
+                            })
                           }}
                           className="flex-1 px-3 py-2 border border-border rounded-r-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                           placeholder="123456789"
@@ -447,15 +501,17 @@ export default function BillingSettings() {
                       </div>
                     ) : (
                       <input
+                        {...addressForm.register('vat_id')}
                         id="vatId"
                         type="text"
-                        value={currentVatId}
-                        onChange={(e) => {
-                          setVatId(e.target.value)
-                        }}
                         className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                         placeholder="Enter VAT ID"
                       />
+                    )}
+                    {addressForm.formState.errors.vat_id && (
+                      <p className="text-xs text-destructive mt-1">
+                        {addressForm.formState.errors.vat_id.message}
+                      </p>
                     )}
                     <p className="text-xs text-muted-foreground mt-1">
                       {currentVatPrefix ? 'EU VAT number for tax exemption' : 'VAT ID (optional)'}
