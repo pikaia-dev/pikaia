@@ -4,6 +4,7 @@ AWS CDK app entry point for Pikaia infrastructure.
 
 Stacks:
 - PikaiaNetwork: VPC, subnets, NAT gateway, database security group
+- PikaiaWaf: AWS WAF WebACLs for ALB and CloudFront protection
 - PikaiaApp: Aurora PostgreSQL, ECS Fargate, ALB, Secrets Manager
 - PikaiaFrontend: S3 + CloudFront for React SPA with API routing
 - PikaiaMedia: S3 bucket, CloudFront CDN, image transformation Lambda
@@ -50,6 +51,7 @@ from stacks.media_stack import MediaStack
 from stacks.network_stack import NetworkStack
 from stacks.observability_stack import ObservabilityStack
 from stacks.validation import add_validation_aspects
+from stacks.waf_stack import WafStack
 
 app = cdk.App()
 
@@ -82,6 +84,16 @@ else:
     network = NetworkStack(app, "PikaiaNetwork", env=env)
 
 # =============================================================================
+# WAF: AWS WAF WebACLs for ALB and CloudFront
+# Must be created before AppStack and FrontendStack/MediaStack
+# =============================================================================
+# CloudFront scope WebACLs must be in us-east-1. The regional WebACL must be in
+# the same region as the ALB. We deploy the WAF stack in us-east-1 which works
+# for both scopes when the ALB is also in us-east-1 (the default).
+
+waf = WafStack(app, "PikaiaWaf", env=env)
+
+# =============================================================================
 # Media: S3 + CloudFront + Image Transformation
 # Must be created before AppStack so we can pass the bucket
 # =============================================================================
@@ -102,8 +114,7 @@ require_https = app.node.try_get_context("require_https") or False
 # Validate CORS configuration for production
 if require_https and cors_origins == ["*"]:
     raise ValueError(
-        "app_domain must be set when require_https=true. "
-        "Pass --context app_domain=app.example.com"
+        "app_domain must be set when require_https=true. Pass --context app_domain=app.example.com"
     )
 
 media = MediaStack(
@@ -112,8 +123,10 @@ media = MediaStack(
     cors_allowed_origins=cors_origins,
     enable_versioning=enable_versioning,
     enable_image_transformation=True,
+    web_acl_id=waf.cloudfront_web_acl.attr_arn,
     env=env,
 )
+media.add_dependency(waf)
 
 # =============================================================================
 # Application: Database + ECS + ALB
@@ -138,6 +151,7 @@ if require_https and not certificate_arn:
 
 if resolver.is_shared_mode:
     # Shared mode: pass shared infrastructure resources
+    # WAF is not associated with ALB in shared mode (ALB managed externally)
     shared_config = resolver.get_shared_config()
     app_stack = AppStack(
         app,
@@ -165,12 +179,14 @@ else:
         media_cdn_domain=media.distribution.distribution_domain_name,
         domain_name=domain_name,
         certificate_arn=certificate_arn,
+        waf_acl_arn=waf.regional_web_acl.attr_arn,
         min_capacity=2,
         max_capacity=10,
         env=env,
     )
 app_stack.add_dependency(network)
 app_stack.add_dependency(media)
+app_stack.add_dependency(waf)
 
 # =============================================================================
 # Frontend: S3 + CloudFront for React SPA
@@ -190,6 +206,7 @@ if resolver.is_shared_mode:
         api_domain=domain_name,  # Use API domain for HTTPS connection to ALB
         domain_name=frontend_domain,
         certificate_arn=frontend_certificate_arn,
+        web_acl_id=waf.cloudfront_web_acl.attr_arn,
         env=env,
     )
 else:
@@ -201,6 +218,7 @@ else:
         api_domain=domain_name,  # Use API domain for HTTPS connection to ALB
         domain_name=frontend_domain,
         certificate_arn=frontend_certificate_arn,
+        web_acl_id=waf.cloudfront_web_acl.attr_arn,
         env=env,
     )
 frontend.add_dependency(app_stack)

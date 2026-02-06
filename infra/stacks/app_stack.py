@@ -52,6 +52,9 @@ from aws_cdk import (
 from aws_cdk import (
     aws_secretsmanager as secretsmanager,
 )
+from aws_cdk import (
+    aws_wafv2 as wafv2,
+)
 from constructs import Construct
 
 
@@ -84,6 +87,8 @@ class AppStack(Stack):
         domain_name: str | None = None,
         min_capacity: int = 2,
         max_capacity: int = 10,
+        # WAF
+        waf_acl_arn: str | None = None,
         # Shared mode parameters
         shared_alb: elbv2.IApplicationLoadBalancer | None = None,
         shared_https_listener: elbv2.IApplicationListener | None = None,
@@ -104,7 +109,10 @@ class AppStack(Stack):
         log_stream_prefix = self.node.try_get_context("log_stream_prefix") or "pikaia-backend"
 
         # Shared mode: use project-specific database secret path
-        database_secret_path = self.node.try_get_context("database_secret_path") or f"{resource_prefix}/database-credentials"
+        database_secret_path = (
+            self.node.try_get_context("database_secret_path")
+            or f"{resource_prefix}/database-credentials"
+        )
 
         # ALB listener rule priority for shared mode (must be unique per project)
         alb_rule_priority = self.node.try_get_context("alb_rule_priority") or 100
@@ -449,7 +457,9 @@ class AppStack(Stack):
 
             # Allow shared ALB to reach ECS tasks
             ecs_security_group.add_ingress_rule(
-                peer=ec2.Peer.security_group_id(shared_alb.connections.security_groups[0].security_group_id),
+                peer=ec2.Peer.security_group_id(
+                    shared_alb.connections.security_groups[0].security_group_id
+                ),
                 connection=ec2.Port.tcp(8000),
                 description="Allow shared ALB to reach ECS",
             )
@@ -466,7 +476,9 @@ class AppStack(Stack):
         else:
             # Standalone mode: create full ALB with ApplicationLoadBalancedFargateService
             if certificate_arn:
-                certificate = acm.Certificate.from_certificate_arn(self, "Certificate", certificate_arn)
+                certificate = acm.Certificate.from_certificate_arn(
+                    self, "Certificate", certificate_arn
+                )
                 listener_protocol = elbv2.ApplicationProtocol.HTTPS
             else:
                 certificate = None
@@ -511,6 +523,20 @@ class AppStack(Stack):
             scaling = self.ecs_service.auto_scale_task_count(
                 min_capacity=min_capacity,
                 max_capacity=max_capacity,
+            )
+
+        # =================================================================
+        # WAF Association (standalone mode only)
+        # =================================================================
+        # In shared mode the ALB is managed externally and WAF should be
+        # configured in the shared infrastructure stack.
+
+        if waf_acl_arn and not self._is_shared_mode:
+            wafv2.CfnWebACLAssociation(
+                self,
+                "AlbWafAssociation",
+                resource_arn=self.alb.load_balancer_arn,
+                web_acl_arn=waf_acl_arn,
             )
 
         # ECS Exec permissions (both modes)
