@@ -160,7 +160,7 @@ export default function Login() {
               if (result.session_token && result.session_token !== PASSKEY_PLACEHOLDER_TOKEN) {
                 // Set cookies that Stytch SDK will recognize
                 // Example cookie attributes: domain=your-domain.com; path=/; secure; max-age=2592000 (30 days)
-                const cookieOptions = 'path=/; secure; max-age=2592000; SameSite=None'
+                const cookieOptions = 'path=/; secure; max-age=2592000; SameSite=Lax'
                 // biome-ignore lint/suspicious/noDocumentCookie: Stytch SDK requires these cookies
                 document.cookie = `stytch_session=${result.session_token}; ${cookieOptions}`
                 // biome-ignore lint/suspicious/noDocumentCookie: Stytch SDK requires these cookies

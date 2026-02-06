@@ -1,4 +1,4 @@
-import { useStytchMemberSession } from '@stytch/react/b2b'
+import { useStytchMember, useStytchMemberSession } from '@stytch/react/b2b'
 import { useEffect, useState } from 'react'
 import {
   type ActionFunction,
@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { SettingsSkeleton } from '@/components/ui/skeleton'
 import AppLayout from '@/layouts/app-layout'
+import { STYTCH_ROLES } from '@/lib/constants'
 
 // ============ Types ============
 
@@ -139,6 +140,18 @@ function ProtectedRoute({ children }: { children?: React.ReactNode }) {
   return <>{children ?? <Outlet />}</>
 }
 
+function AdminRoute({ children }: { children?: React.ReactNode }) {
+  const { member } = useStytchMember()
+  const roles = member?.roles || []
+  const isAdmin = roles.some((r: { role_id?: string }) => r.role_id === STYTCH_ROLES.ADMIN)
+
+  if (!isAdmin) {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  return <>{children ?? <Outlet />}</>
+}
+
 // ============ Routes Config ============
 
 const routes: AppRouteConfig[] = [
@@ -166,26 +179,31 @@ const routes: AppRouteConfig[] = [
             path: '/settings/organization',
             lazy: () => import('@/pages/settings/organization-settings'),
             fallback: SettingsFallback,
+            guards: [AdminRoute],
           },
           {
             path: '/settings/members',
             lazy: () => import('@/pages/settings/members-settings'),
             fallback: SettingsFallback,
+            guards: [AdminRoute],
           },
           {
             path: '/settings/billing',
             lazy: () => import('@/pages/settings/billing-settings'),
             fallback: SettingsFallback,
+            guards: [AdminRoute],
           },
           {
             path: '/settings/security',
             lazy: () => import('@/pages/settings/security-settings'),
             fallback: SettingsFallback,
+            guards: [AdminRoute],
           },
           {
             path: '/settings/integrations',
             lazy: () => import('@/pages/settings/integrations-settings'),
             fallback: SettingsFallback,
+            guards: [AdminRoute],
           },
         ],
       },

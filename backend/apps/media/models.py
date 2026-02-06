@@ -65,6 +65,15 @@ class UploadedImage(models.Model):
             models.Index(fields=["user", "image_type"]),
             models.Index(fields=["organization", "image_type"]),
         ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(user__isnull=False, organization__isnull=True)
+                    | models.Q(user__isnull=True, organization__isnull=False)
+                ),
+                name="uploaded_image_single_owner",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.image_type}: {self.storage_key}"

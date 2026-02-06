@@ -15,6 +15,8 @@ from apps.sms.schemas import SendOTPRequest, VerifyOTPRequest
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
 from tests.conftest import make_request_with_auth
 
+KNOWN_OTP_CODE = "9876"
+
 
 @pytest.mark.django_db
 class TestSendVerificationOTPEndpoint:
@@ -116,12 +118,15 @@ class TestVerifyPhoneOTPEndpoint:
         phone = "+14155551234"
 
         # First send OTP
-        with patch("apps.sms.services.send_otp_message") as mock_send:
+        with (
+            patch("apps.sms.services.send_otp_message") as mock_send,
+            patch("apps.sms.services.generate_otp_code", return_value=KNOWN_OTP_CODE),
+        ):
             mock_send.return_value = {"message_id": "msg-123", "success": True}
 
             from apps.sms.services import send_phone_verification_otp
 
-            otp = send_phone_verification_otp(phone, user)
+            send_phone_verification_otp(phone, user)
 
         # Then verify
         auth_request: AuthenticatedHttpRequest = make_request_with_auth(
@@ -129,7 +134,7 @@ class TestVerifyPhoneOTPEndpoint:
             AuthContext(user=user, member=member, organization=org),
         )
 
-        payload = VerifyOTPRequest(phone_number=phone, code=otp.code)
+        payload = VerifyOTPRequest(phone_number=phone, code=KNOWN_OTP_CODE)
 
         result = verify_phone_otp(auth_request, payload)
 
@@ -194,7 +199,10 @@ class TestVerifyPhoneOTPEndpoint:
         phone = "+14155551234"
 
         # Send OTP and expire it
-        with patch("apps.sms.services.send_otp_message") as mock_send:
+        with (
+            patch("apps.sms.services.send_otp_message") as mock_send,
+            patch("apps.sms.services.generate_otp_code", return_value=KNOWN_OTP_CODE),
+        ):
             mock_send.return_value = {"message_id": "msg-123", "success": True}
 
             from apps.sms.services import send_phone_verification_otp
@@ -210,7 +218,7 @@ class TestVerifyPhoneOTPEndpoint:
             AuthContext(user=user, member=member, organization=org),
         )
 
-        payload = VerifyOTPRequest(phone_number=phone, code=otp.code)
+        payload = VerifyOTPRequest(phone_number=phone, code=KNOWN_OTP_CODE)
 
         with pytest.raises(HttpError) as exc_info:
             verify_phone_otp(auth_request, payload)

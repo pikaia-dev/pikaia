@@ -64,6 +64,29 @@ else
     echo_info "ECR repository created successfully"
 fi
 
+# Apply lifecycle policy to expire untagged images after 30 days
+echo_info "Applying ECR lifecycle policy to: $ECR_REPO_NAME"
+aws ecr put-lifecycle-policy \
+    --repository-name "$ECR_REPO_NAME" \
+    --lifecycle-policy-text '{
+        "rules": [
+            {
+                "rulePriority": 1,
+                "description": "Expire untagged images after 30 days",
+                "selection": {
+                    "tagStatus": "untagged",
+                    "countType": "sinceImagePushed",
+                    "countUnit": "days",
+                    "countNumber": 30
+                },
+                "action": {
+                    "type": "expire"
+                }
+            }
+        ]
+    }' > /dev/null
+echo_info "ECR lifecycle policy applied successfully"
+
 # =============================================================================
 # Secrets Manager Secret (placeholder - real values via bootstrap-secrets.sh)
 # =============================================================================

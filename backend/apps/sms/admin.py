@@ -23,7 +23,7 @@ class OTPVerificationAdmin(admin.ModelAdmin):
     list_filter = ["purpose", "is_verified", "created_at"]
     search_fields = ["phone_number", "user__email"]
     readonly_fields = [
-        "code",
+        "code_hash",
         "created_at",
         "verified_at",
         "aws_message_id",

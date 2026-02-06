@@ -1,5 +1,5 @@
 import { AdminPortalSSO } from '@stytch/react/b2b/adminPortal'
-
+import { SettingsPageLayout } from '@/components/settings-page-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 // Style the Stytch Admin Portal to match the shadcn theme
@@ -43,29 +43,24 @@ const adminPortalStyles = {
 
 export default function SecuritySettings() {
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Security</h1>
-        <p className="text-muted-foreground">
-          Configure enterprise authentication and security settings
-        </p>
-      </div>
-
-      <div className="space-y-6 max-w-2xl">
-        {/* SSO Configuration Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Single Sign-On (SSO)</CardTitle>
-            <CardDescription>
-              Allow members to sign in using your identity provider (Okta, Microsoft Entra, Google
-              Workspace, etc.)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AdminPortalSSO styles={adminPortalStyles} />
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+    <SettingsPageLayout
+      title="Security"
+      description="Configure enterprise authentication and security settings"
+      maxWidth="max-w-2xl"
+    >
+      {/* SSO Configuration Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Single Sign-On (SSO)</CardTitle>
+          <CardDescription>
+            Allow members to sign in using your identity provider (Okta, Microsoft Entra, Google
+            Workspace, etc.)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AdminPortalSSO styles={adminPortalStyles} />
+        </CardContent>
+      </Card>
+    </SettingsPageLayout>
   )
 }

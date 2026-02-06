@@ -9,13 +9,18 @@ import json
 from datetime import UTC, datetime
 
 from django.db import transaction
+from django.utils import timezone
 from django.http import HttpRequest, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from svix.webhooks import Webhook, WebhookVerificationError
 
 from apps.accounts.models import Member
-from apps.accounts.services import get_or_create_member_from_stytch, get_or_create_user_from_stytch
+from apps.accounts.services import (
+    _parse_stytch_role,
+    get_or_create_member_from_stytch,
+    get_or_create_user_from_stytch,
+)
 from apps.core.logging import get_logger
 from apps.core.webhooks import mark_webhook_processed
 from apps.events.services import publish_event
@@ -63,12 +68,7 @@ def handle_member_created(data: dict) -> None:
         return
 
     # Determine role from Stytch RBAC
-    roles = member_data.get("roles", [])
-    role = "member"
-    for r in roles:
-        if isinstance(r, dict) and r.get("role_id") == "stytch_admin":
-            role = "admin"
-            break
+    role = _parse_stytch_role(member_data.get("roles", []))
 
     # Get or create user and member
     logger.info(
@@ -115,21 +115,16 @@ def handle_member_updated(data: dict) -> None:
         return
 
     try:
-        member = Member.objects.get(stytch_member_id=stytch_member_id)
+        member = Member.objects.select_related("user").get(stytch_member_id=stytch_member_id)
     except Member.DoesNotExist:
         logger.info("stytch_webhook_member_not_found", stytch_member_id=stytch_member_id)
         return
 
     # Update role from Stytch RBAC
-    roles = member_data.get("roles", [])
-    new_role = "member"  # Default
-    for role in roles:
-        if role.get("role_id") == "stytch_admin":
-            new_role = "admin"
-            break
+    new_role = _parse_stytch_role(member_data.get("roles", []))
 
     # Update member fields
-    updated = False
+    update_fields: list[str] = []
     if member.role != new_role:
         logger.info(
             "stytch_webhook_member_role_updated",
@@ -138,17 +133,18 @@ def handle_member_updated(data: dict) -> None:
             new_role=new_role,
         )
         member.role = new_role
-        updated = True
+        update_fields.append("role")
 
     # Check for status changes (deactivated via SCIM, etc.)
     status = member_data.get("status")
     if status == "deleted" and member.deleted_at is None:
         logger.info("stytch_webhook_member_deleted", stytch_member_id=stytch_member_id)
         member.deleted_at = datetime.now(UTC)
-        updated = True
+        update_fields.append("deleted_at")
 
-    if updated:
-        member.save()
+    if update_fields:
+        update_fields.append("updated_at")
+        member.save(update_fields=update_fields)
 
 
 def handle_member_deleted(data: dict) -> None:
@@ -164,7 +160,7 @@ def handle_member_deleted(data: dict) -> None:
         return
 
     try:
-        member = Member.objects.get(stytch_member_id=member_id)
+        member = Member.objects.select_related("user").get(stytch_member_id=member_id)
     except Member.DoesNotExist:
         logger.debug("stytch_webhook_member_already_deleted", stytch_member_id=member_id)
         return
@@ -206,7 +202,7 @@ def handle_organization_updated(data: dict) -> None:
         return
 
     # Update fields that may have changed
-    updated = False
+    update_fields: list[str] = []
 
     new_name = org_data.get("organization_name")
     if new_name and org.name != new_name:
@@ -217,7 +213,7 @@ def handle_organization_updated(data: dict) -> None:
             new_name=new_name,
         )
         org.name = new_name
-        updated = True
+        update_fields.append("name")
 
     new_slug = org_data.get("organization_slug")
     if new_slug and org.slug != new_slug:
@@ -228,16 +224,17 @@ def handle_organization_updated(data: dict) -> None:
             new_slug=new_slug,
         )
         org.slug = new_slug
-        updated = True
+        update_fields.append("slug")
 
     # Sync logo if changed
     new_logo = org_data.get("organization_logo_url", "")
     if org.logo_url != new_logo:
         org.logo_url = new_logo
-        updated = True
+        update_fields.append("logo_url")
 
-    if updated:
-        org.save()
+    if update_fields:
+        update_fields.append("updated_at")
+        org.save(update_fields=update_fields)
 
 
 def handle_organization_deleted(data: dict) -> None:
@@ -271,12 +268,10 @@ def handle_organization_deleted(data: dict) -> None:
         org_name=org.name,
     )
 
-    # Soft delete all members in the organization first
-    members = Member.objects.filter(organization=org)
-    member_count = members.count()
-    for member in members:
-        if member.deleted_at is None:
-            member.soft_delete()
+    # Soft delete all members in the organization first (bulk update)
+    member_count = Member.objects.filter(
+        organization=org, deleted_at__isnull=True
+    ).update(deleted_at=timezone.now())
 
     if member_count > 0:
         logger.info(
