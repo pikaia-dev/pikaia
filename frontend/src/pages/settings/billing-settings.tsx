@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { BillingAddress, Invoice } from '@/api/types'
+import { useApi } from '@/api/use-api'
 import { AddressAutocomplete } from '@/components/ui/address-autocomplete'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -80,25 +81,14 @@ export default function BillingSettings() {
     }
   }, [currentUseBillingEmail])
 
+  const { listInvoices } = useApi()
+
   const loadMoreInvoices = async () => {
     if (!allInvoices.length || loadingMoreInvoices) return
     setLoadingMoreInvoices(true)
     try {
       const lastInvoice = allInvoices[allInvoices.length - 1]
-      const session = localStorage.getItem('stytch_session_jwt') ?? ''
-      const response = await fetch(
-        `/api/v1/billing/invoices?limit=6&starting_after=${lastInvoice.id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${session}`,
-          },
-        }
-      )
-      if (!response.ok) throw new Error('Failed to load more invoices')
-      const data = (await response.json()) as {
-        invoices: Invoice[]
-        has_more: boolean
-      }
+      const data = await listInvoices({ limit: 6, starting_after: lastInvoice.id })
       setAdditionalInvoices((prev) => [...prev, ...data.invoices])
       setInvoicesHasMore(data.has_more)
     } catch {
