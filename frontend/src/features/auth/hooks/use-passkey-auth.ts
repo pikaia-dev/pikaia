@@ -7,6 +7,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { queryKeys } from '@/api/query-keys'
 import { useApi } from '@/api/use-api'
 
 // --- API Types ---
@@ -317,7 +318,7 @@ export function useRegisterPasskey() {
     },
     onSuccess: () => {
       // Invalidate passkey list to show the new passkey
-      void queryClient.invalidateQueries({ queryKey: ['passkeys'] })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.passkeys.all })
     },
   })
 }
@@ -373,7 +374,7 @@ export function usePasskeys() {
   const { api } = useApi()
 
   return useQuery({
-    queryKey: ['passkeys'],
+    queryKey: queryKeys.passkeys.list(),
     queryFn: () => api.get<PasskeyListResponse>('/auth/passkeys'),
     staleTime: 30000, // 30 seconds
   })
@@ -391,7 +392,7 @@ export function useDeletePasskey() {
       return api.delete(`/auth/passkeys/${String(passkeyId)}`)
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['passkeys'] })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.passkeys.all })
     },
   })
 }
