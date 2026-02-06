@@ -86,6 +86,7 @@ export function InvoiceDeliveryForm() {
                   try {
                     await updateBillingMutation.mutateAsync({
                       use_billing_email: false,
+                      billing_email: '',
                       billing_name: currentBillingName,
                       address: currentAddress,
                       vat_id: currentVatId,

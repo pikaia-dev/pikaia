@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import type { Invoice } from '@/api/types'
+import { useApi } from '@/api/use-api'
 import { useInvoices } from '@/features/billing/api/queries'
 import { InvoiceHistoryCard } from '@/features/billing/components/invoice-history-card'
 
@@ -8,6 +9,7 @@ import { InvoiceHistoryCard } from '@/features/billing/components/invoice-histor
  * Manages invoice fetching and pagination, delegating display to InvoiceHistoryCard.
  */
 export function InvoiceList() {
+  const api = useApi()
   const { data: invoicesData, isLoading: invoicesLoading } = useInvoices({
     limit: 6,
   })
@@ -16,10 +18,11 @@ export function InvoiceList() {
   const [invoicesHasMore, setInvoicesHasMore] = useState(false)
   const [loadingMoreInvoices, setLoadingMoreInvoices] = useState(false)
 
-  // Update invoices pagination state when data changes
+  // Reset additional invoices when base data changes (e.g., refetch, org switch)
   useEffect(() => {
     if (invoicesData) {
       setInvoicesHasMore(invoicesData.has_more)
+      setAdditionalInvoices([])
     }
   }, [invoicesData])
 
@@ -31,20 +34,10 @@ export function InvoiceList() {
     setLoadingMoreInvoices(true)
     try {
       const lastInvoice = allInvoices[allInvoices.length - 1]
-      const session = localStorage.getItem('stytch_session_jwt') ?? ''
-      const response = await fetch(
-        `/api/v1/billing/invoices?limit=6&starting_after=${lastInvoice.id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${session}`,
-          },
-        }
-      )
-      if (!response.ok) throw new Error('Failed to load more invoices')
-      const data = (await response.json()) as {
-        invoices: Invoice[]
-        has_more: boolean
-      }
+      const data = await api.listInvoices({
+        limit: 6,
+        starting_after: lastInvoice.id,
+      })
       setAdditionalInvoices((prev) => [...prev, ...data.invoices])
       setInvoicesHasMore(data.has_more)
     } catch {
