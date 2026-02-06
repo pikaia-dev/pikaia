@@ -53,6 +53,9 @@ from aws_cdk import (
 from aws_cdk import (
     aws_secretsmanager as secretsmanager,
 )
+from aws_cdk import (
+    aws_wafv2 as wafv2,
+)
 from constructs import Construct
 
 
@@ -85,6 +88,8 @@ class AppStack(Stack):
         domain_name: str | None = None,
         min_capacity: int = 2,
         max_capacity: int = 10,
+        # WAF
+        waf_acl_arn: str | None = None,
         # Shared mode parameters
         shared_alb: elbv2.IApplicationLoadBalancer | None = None,
         shared_https_listener: elbv2.IApplicationListener | None = None,
@@ -520,6 +525,20 @@ class AppStack(Stack):
             scaling = self.ecs_service.auto_scale_task_count(
                 min_capacity=min_capacity,
                 max_capacity=max_capacity,
+            )
+
+        # =================================================================
+        # WAF Association (standalone mode only)
+        # =================================================================
+        # In shared mode the ALB is managed externally and WAF should be
+        # configured in the shared infrastructure stack.
+
+        if waf_acl_arn and not self._is_shared_mode:
+            wafv2.CfnWebACLAssociation(
+                self,
+                "AlbWafAssociation",
+                resource_arn=self.alb.load_balancer_arn,
+                web_acl_arn=waf_acl_arn,
             )
 
         # =================================================================

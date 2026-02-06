@@ -59,6 +59,7 @@ class MediaStack(Stack):
         cors_allowed_origins: list[str],
         enable_versioning: bool = False,
         enable_image_transformation: bool = True,
+        web_acl_id: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -148,6 +149,7 @@ class MediaStack(Stack):
             "MediaDistribution",
             default_behavior=default_behavior_config,
             comment=f"{resource_prefix.title()} Media CDN with image transformation",
+            web_acl_id=web_acl_id,
             price_class=cloudfront.PriceClass.PRICE_CLASS_100,  # US, Canada, Europe
         )
 
