@@ -60,6 +60,7 @@ class FrontendStack(Stack):
         domain_name: str | None = None,
         certificate_arn: str | None = None,
         api_domain: str | None = None,
+        web_acl_id: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -71,7 +72,9 @@ class FrontendStack(Stack):
             raise ValueError("Either alb, alb_dns_name, or api_domain must be provided")
 
         # Resource naming from CDK context (allows customization without code changes)
-        frontend_bucket_prefix = self.node.try_get_context("frontend_bucket_prefix") or "pikaia-frontend"
+        frontend_bucket_prefix = (
+            self.node.try_get_context("frontend_bucket_prefix") or "pikaia-frontend"
+        )
         resource_prefix = self.node.try_get_context("resource_prefix") or "pikaia"
 
         # S3 bucket for frontend static files
@@ -131,6 +134,7 @@ class FrontendStack(Stack):
             comment=f"{resource_prefix.title()} SaaS Frontend",
             domain_names=domain_names,
             certificate=certificate,
+            web_acl_id=web_acl_id,
             default_behavior=cloudfront.BehaviorOptions(
                 origin=s3_origin,
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
