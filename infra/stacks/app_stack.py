@@ -522,16 +522,21 @@ class AppStack(Stack):
         # ALLOWED_HOSTS (both modes, after ALB is available)
         # =================================================================
 
-        # Build explicit ALLOWED_HOSTS: API domain (if provided), ALB DNS
-        # (for ALB health checks), and localhost (for container health checks).
-        # The ALB DNS is a CloudFormation token resolved at deploy time.
+        # Build explicit ALLOWED_HOSTS: API domain (if provided) and
+        # localhost (for container health checks).
+        # In dedicated mode, also include the ALB DNS for ALB health checks.
+        # In shared mode, self.alb is an imported resource so we avoid
+        # referencing load_balancer_dns_name which may not resolve.
         allowed_hosts_parts = ["localhost"]
         if domain_name:
             allowed_hosts_parts.append(domain_name)
-        allowed_hosts = Fn.join(
-            ",",
-            [*allowed_hosts_parts, self.alb.load_balancer_dns_name],
-        )
+        if not self._is_shared_mode:
+            allowed_hosts = Fn.join(
+                ",",
+                [*allowed_hosts_parts, self.alb.load_balancer_dns_name],
+            )
+        else:
+            allowed_hosts = ",".join(allowed_hosts_parts)
         container.add_environment("ALLOWED_HOSTS", allowed_hosts)
 
         # ECS Exec permissions (both modes)
