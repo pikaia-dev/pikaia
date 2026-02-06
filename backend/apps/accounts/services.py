@@ -489,14 +489,11 @@ def bulk_invite_members(
     Raises:
         ValueError: If members_data exceeds MAX_BULK_INVITE_SIZE
     """
-    import logging
-
     from stytch.core.response_base import StytchError
 
     if len(members_data) > MAX_BULK_INVITE_SIZE:
         raise ValueError(f"Bulk invite limited to {MAX_BULK_INVITE_SIZE} members")
 
-    logger = logging.getLogger(__name__)
     results = []
     succeeded = 0
     failed = 0
@@ -582,9 +579,9 @@ def bulk_invite_members(
         except StytchError as e:
             error_msg = e.details.error_message if e.details else str(e)
             logger.warning(
-                "Bulk invite failed for %s: %s",
-                email,
-                error_msg,
+                "bulk_invite_member_failed",
+                email=email,
+                error=error_msg,
             )
             results.append(
                 {
@@ -597,7 +594,7 @@ def bulk_invite_members(
             failed += 1
 
         except Exception as e:
-            logger.exception("Unexpected error inviting %s", email)
+            logger.exception("bulk_invite_member_unexpected_error", email=email)
             results.append(
                 {
                     "email": email,
