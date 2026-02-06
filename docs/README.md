@@ -7,6 +7,12 @@ Technical documentation for Pikaia.
 ### Architecture
 - [Overview](./architecture/overview.md) — System architecture and design decisions
 - [Data Models](./architecture/data-models.md) — Database schema and relationships
+- [Events](./architecture/events.md) — Event-driven architecture and EventBridge usage patterns
+- [Integrations](./architecture/integrations.md) — External webhooks, automation platforms, and third-party services
+- [Setup Script Design](./architecture/setup-script-design.md) — Minimal-conflict setup experience via `npx pikaia-setup`
+- [Shared Infrastructure](./architecture/shared-infrastructure.md) — Shared infrastructure mode for multi-project AWS deployments
+- [Sync Engine](./architecture/sync.md) — Offline-first sync engine for mobile and desktop applications
+- [Sync Engine - iOS Client](./architecture/sync-client-ios.md) — iOS Swift implementation of the sync engine
 
 ### Features
 - [Authentication](./features/authentication.md) — Stytch B2B auth flow

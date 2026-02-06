@@ -9,6 +9,7 @@ Handles Stytch B2B authentication flows:
 """
 
 import contextlib
+import secrets
 
 from django.http import HttpRequest
 from ninja import Router
@@ -303,7 +304,7 @@ def provision_mobile_user_endpoint(
         logger.error("MOBILE_PROVISION_API_KEY not configured")
         raise HttpError(401, "Mobile provisioning not configured")
 
-    if not api_key or api_key != expected_key:
+    if not api_key or not secrets.compare_digest(api_key, expected_key):
         raise HttpError(401, "Invalid or missing API key")
 
     try:
@@ -323,7 +324,7 @@ def provision_mobile_user_endpoint(
             logger.warning("Organization slug conflict: %s", e.details.error_message)
             raise HttpError(409, "Organization slug already in use. Try a different one.") from None
         logger.warning("Mobile provisioning failed: %s", e.details.error_message)
-        raise HttpError(400, f"Provisioning failed: {e.details.error_message}") from None
+        raise HttpError(400, "Provisioning failed. Please try again.") from None
 
     # Emit appropriate event
     if payload.organization_id:
@@ -411,13 +412,7 @@ def get_current_user(request: AuthenticatedHttpRequest) -> MeResponse:
     user, member, org = get_auth_context(request)
 
     return MeResponse(
-        user=UserInfo(
-            id=user.id,
-            email=user.email,
-            name=user.name,
-            avatar_url=user.avatar_url,
-            phone_number=user.phone_number,
-        ),
+        user=UserInfo.from_model(user),
         member=MemberInfo(
             id=member.id,
             stytch_member_id=member.stytch_member_id,
@@ -494,14 +489,10 @@ def update_profile(request: AuthenticatedHttpRequest, payload: UpdateProfileRequ
         organization_id=str(org.id),
     )
 
-    return UserInfo(
-        id=user.id,
-        email=user.email,
-        name=user.name,
-        avatar_url=user.avatar_url,
-        phone_number=user.phone_number,
-        sync_warning=sync_warning,
-    )
+    response = UserInfo.from_model(user)
+    if sync_warning:
+        response.sync_warning = sync_warning
+    return response
 
 
 # --- Phone Verification ---
@@ -541,9 +532,7 @@ def send_phone_otp(
         )
     except StytchError as e:
         logger.warning("Failed to send phone OTP: %s", e.details.error_message)
-        raise HttpError(
-            400, e.details.error_message or "Failed to send verification code"
-        ) from None
+        raise HttpError(400, "Failed to send verification code.") from None
 
 
 @router.post(
@@ -610,28 +599,28 @@ def verify_phone_otp(request: AuthenticatedHttpRequest, payload: VerifyPhoneOtpR
             organization_id=str(org.id),
         )
 
-        return UserInfo(
-            id=user.id,
-            email=user.email,
-            name=user.name,
-            avatar_url=user.avatar_url,
-            phone_number=user.phone_number,
-        )
+        return UserInfo.from_model(user)
 
     except StytchError as e:
-        error_msg = e.details.error_message or "Verification failed"
-        if "invalid" in error_msg.lower() or "expired" in error_msg.lower():
-            raise HttpError(400, "Invalid or expired verification code") from None
-        if "immutable" in error_msg.lower():
+        error_msg = _get_stytch_error_message(e)
+        if "invalid" in error_msg or "expired" in error_msg:
+            logger.warning(
+                "Phone OTP verification failed (invalid/expired): %s", e.details.error_message
+            )
+            raise HttpError(400, "Invalid or expired verification code.") from None
+        if "immutable" in error_msg:
             # Sessions created via passkey (trusted auth) are immutable and can't
             # have MFA factors added. User needs to re-authenticate via magic link.
+            logger.warning(
+                "Phone OTP verification failed (immutable session): %s", e.details.error_message
+            )
             raise HttpError(
                 400,
                 "Phone verification is not available for passkey sessions. "
                 "Please log out and sign in with email to update your phone number.",
             ) from None
-        logger.warning("Phone OTP verification failed: %s", error_msg)
-        raise HttpError(400, error_msg) from None
+        logger.warning("Phone OTP verification failed: %s", e.details.error_message)
+        raise HttpError(400, "Verification failed. Please try again.") from None
 
 
 # --- Email Update ---
@@ -672,9 +661,8 @@ def start_email_update(
             message=f"Verification email sent to {payload.new_email}. Check your inbox to complete the change.",
         )
     except StytchError as e:
-        error_msg = e.details.error_message or "Failed to initiate email update"
-        logger.warning("Failed to start email update: %s", error_msg)
-        raise HttpError(400, error_msg) from None
+        logger.warning("Failed to start email update: %s", e.details.error_message)
+        raise HttpError(400, "Failed to initiate email update. Please try again.") from None
 
 
 # --- Organization Settings (Admin Only) ---
@@ -810,6 +798,15 @@ def update_billing(
     org.billing_name = payload.billing_name
     org.vat_id = payload.vat_id
 
+    update_fields = [
+        "use_billing_email",
+        "billing_name",
+        "vat_id",
+        "updated_at",
+    ]
+    if payload.billing_email is not None:
+        update_fields.append("billing_email")
+
     if payload.address:
         org.billing_address_line1 = payload.address.line1
         org.billing_address_line2 = payload.address.line2
@@ -817,8 +814,18 @@ def update_billing(
         org.billing_state = payload.address.state
         org.billing_postal_code = payload.address.postal_code
         org.billing_country = payload.address.country
+        update_fields.extend(
+            [
+                "billing_address_line1",
+                "billing_address_line2",
+                "billing_city",
+                "billing_state",
+                "billing_postal_code",
+                "billing_country",
+            ]
+        )
 
-    org.save()
+    org.save(update_fields=update_fields)
 
     # Sync billing info to Stripe
     sync_warning = None
@@ -880,8 +887,9 @@ def list_members(
 
     Args:
         offset: Number of records to skip (default 0)
-        limit: Maximum records to return (default None = all)
+        limit: Maximum records to return (default None = all, capped at 500)
     """
+    limit = min(max(limit, 1), 500) if limit is not None else 500
     _, _, org = get_auth_context(request)
     members, total = list_organization_members(org, offset=offset, limit=limit)
 
@@ -955,7 +963,7 @@ def invite_member_endpoint(
         )
     except StytchError as e:
         logger.warning("Failed to invite member: %s", e.details.error_message)
-        raise HttpError(400, f"Failed to invite member: {e.details.error_message}") from e
+        raise HttpError(400, "Failed to invite member. Please try again.") from e
 
     if invite_sent is True:
         message = f"Invitation sent to {payload.email}"
@@ -1134,7 +1142,7 @@ def update_member_role_endpoint(
         update_member_role(target_member, payload.role)
     except StytchError as e:
         logger.warning("Failed to update member role: %s", e.details.error_message)
-        raise HttpError(400, f"Failed to update role: {e.details.error_message}") from e
+        raise HttpError(400, "Failed to update role. Please try again.") from e
 
     # Emit member.role_changed event
     publish_event(
@@ -1192,8 +1200,8 @@ def delete_member_endpoint(request: AuthenticatedHttpRequest, member_id: str) ->
     try:
         soft_delete_member(target_member)
     except StytchError as e:
-        logger.warning("Failed to delete member: %s", e.details.error_message)
-        raise HttpError(400, f"Failed to remove member: {e.details.error_message}") from e
+        logger.warning("Failed to remove member: %s", e.details.error_message)
+        raise HttpError(400, "Failed to remove member. Please try again.") from e
 
     # Emit member.removed event
     publish_event(

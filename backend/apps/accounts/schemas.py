@@ -2,9 +2,15 @@
 Auth API schemas - Pydantic models for request/response.
 """
 
+from __future__ import annotations
+
 import re
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
+
+if TYPE_CHECKING:
+    from apps.accounts.models import User
 
 # Stytch slug requirements: 2-128 chars, lowercase alphanumeric + ._~-
 _SLUG_ALLOWED_CHARS = re.compile(r"[^a-z0-9._~-]+")
@@ -267,6 +273,17 @@ class UserInfo(BaseModel):
         default=None,
         description="Warning message if external sync failed (changes saved locally)",
     )
+
+    @classmethod
+    def from_model(cls, user: User) -> UserInfo:
+        """Create UserInfo from a User model instance."""
+        return cls(
+            id=user.id,
+            email=user.email,
+            name=user.name,
+            avatar_url=user.avatar_url,
+            phone_number=user.phone_number,
+        )
 
 
 class MeResponse(BaseModel):

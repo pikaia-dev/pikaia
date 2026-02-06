@@ -79,7 +79,6 @@ jobs:
 
       - name: Type check (mypy)
         run: uv run mypy apps/
-        continue-on-error: true  # TODO: Remove after fixing type errors
 
       - name: Run backend tests
         run: uv run pytest --tb=short
