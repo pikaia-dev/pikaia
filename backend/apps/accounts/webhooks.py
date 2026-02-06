@@ -9,8 +9,8 @@ import json
 from datetime import UTC, datetime
 
 from django.db import transaction
-from django.utils import timezone
 from django.http import HttpRequest, HttpResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from svix.webhooks import Webhook, WebhookVerificationError
@@ -269,9 +269,9 @@ def handle_organization_deleted(data: dict) -> None:
     )
 
     # Soft delete all members in the organization first (bulk update)
-    member_count = Member.objects.filter(
-        organization=org, deleted_at__isnull=True
-    ).update(deleted_at=timezone.now())
+    member_count = Member.objects.filter(organization=org, deleted_at__isnull=True).update(
+        deleted_at=timezone.now()
+    )
 
     if member_count > 0:
         logger.info(
