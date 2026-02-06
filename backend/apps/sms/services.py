@@ -2,6 +2,7 @@
 OTP generation and verification services.
 """
 
+import hashlib
 import logging
 import secrets
 from datetime import timedelta
@@ -48,6 +49,11 @@ class OTPMaxAttemptsError(OTPError):
     """Raised when max verification attempts exceeded."""
 
     pass
+
+
+def hash_otp_code(code: str) -> str:
+    """Hash an OTP code using SHA-256 for secure storage."""
+    return hashlib.sha256(code.encode()).hexdigest()
 
 
 def generate_otp_code(length: int | None = None) -> str:
@@ -120,11 +126,11 @@ def send_phone_verification_otp(
         # Re-raise to let caller handle
         raise
 
-    # Store OTP in database
+    # Store hashed OTP in database
     otp = OTPVerification.objects.create(
         user=user,
         phone_number=phone_number,
-        code=code,
+        code_hash=hash_otp_code(code),
         purpose=purpose,
         aws_message_id=aws_message_id,
     )
@@ -189,7 +195,7 @@ def verify_otp(
         raise OTPMaxAttemptsError("Too many incorrect attempts. Please request a new code.")
 
     # Verify code (constant-time comparison to prevent timing attacks)
-    if not secrets.compare_digest(otp.code, code):
+    if not secrets.compare_digest(otp.code_hash, hash_otp_code(code)):
         otp.increment_attempts()
         remaining = otp.max_attempts - otp.attempts
         logger.info(
