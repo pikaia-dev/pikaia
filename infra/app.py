@@ -102,8 +102,7 @@ require_https = app.node.try_get_context("require_https") or False
 # Validate CORS configuration for production
 if require_https and cors_origins == ["*"]:
     raise ValueError(
-        "app_domain must be set when require_https=true. "
-        "Pass --context app_domain=app.example.com"
+        "app_domain must be set when require_https=true. Pass --context app_domain=app.example.com"
     )
 
 media = MediaStack(
@@ -241,6 +240,8 @@ observability = ObservabilityStack(
     event_bus=events_stack.event_bus,
     publisher_lambda=events_stack.publisher_lambda,
     audit_lambda=events_stack.audit_lambda,
+    publisher_dlq=events_stack.dlq,
+    audit_dlq=events_stack.audit_dlq,
     alarm_email=alarm_email,
     env=env,
 )

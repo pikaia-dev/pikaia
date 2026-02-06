@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { DirectoryUser } from '@/api/types'
 import { useApi } from '@/api/use-api'
+import { useBlobUrls } from '@/hooks/use-blob-urls'
 import { cn } from '@/lib/utils'
 
 /** Minimum characters before triggering autocomplete */
@@ -40,7 +41,7 @@ export function EmailAutocomplete({
   const { searchDirectory, getDirectoryAvatar } = useApi()
 
   const [suggestions, setSuggestions] = useState<DirectoryUser[]>([])
-  const [avatarUrls, setAvatarUrls] = useState<Record<string, string>>({})
+  const { urls: avatarUrls, addUrl: addAvatarUrl, hasUrl: hasAvatarUrl } = useBlobUrls()
   const [isOpen, setIsOpen] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const [isFocused, setIsFocused] = useState(false)
@@ -89,18 +90,18 @@ export function EmailAutocomplete({
 
     // eslint-disable-next-line @typescript-eslint/no-misused-promises -- intentional fire-and-forget
     suggestions.forEach(async (user) => {
-      if (!user.avatar_url || avatarUrls[user.email]) return
+      if (!user.avatar_url || hasAvatarUrl(user.email)) return
 
       try {
         const blobUrl = await getDirectoryAvatar(user.avatar_url)
         if (blobUrl) {
-          setAvatarUrls((prev) => ({ ...prev, [user.email]: blobUrl }))
+          addAvatarUrl(user.email, blobUrl)
         }
       } catch {
         // Ignore avatar fetch errors
       }
     })
-  }, [suggestions, avatarUrls, getDirectoryAvatar])
+  }, [suggestions, hasAvatarUrl, addAvatarUrl, getDirectoryAvatar])
 
   // Handle suggestion selection
   const handleSelect = useCallback(

@@ -1,38 +1,20 @@
 import { useStytchMemberSession } from '@stytch/react/b2b'
-
+import { SettingsPageLayout } from '@/components/settings-page-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { useCurrentUser } from '@/features/auth/api/queries'
 
 export default function Dashboard() {
   const { session } = useStytchMemberSession()
   const { data: userData, isLoading, error } = useCurrentUser()
 
-  if (isLoading || !session) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <LoadingSpinner />
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-destructive">Failed to load user data</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Welcome back, {userData?.user.name || userData?.user.email}
-        </p>
-      </div>
-
+    <SettingsPageLayout
+      title="Dashboard"
+      description={`Welcome back, ${userData?.user.name || userData?.user.email || ''}`}
+      maxWidth=""
+      isLoading={isLoading || !session}
+      error={error}
+    >
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
@@ -85,6 +67,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </SettingsPageLayout>
   )
 }

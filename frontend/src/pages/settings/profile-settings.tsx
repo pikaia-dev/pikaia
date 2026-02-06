@@ -1,7 +1,7 @@
 import { useStytchMemberSession } from '@stytch/react/b2b'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
-
+import { SettingsPageLayout } from '@/components/settings-page-layout'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -136,148 +136,82 @@ export default function ProfileSettings() {
     })
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <LoadingSpinner size="sm" />
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-destructive">Failed to load profile</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Profile</h1>
-        <p className="text-muted-foreground">Manage your personal information</p>
-      </div>
+    <SettingsPageLayout
+      title="Profile"
+      description="Manage your personal information"
+      isLoading={isLoading}
+      error={error}
+    >
+      {/* Avatar Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Profile Picture</CardTitle>
+          <CardDescription>Upload a photo to personalize your account</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ImageUploader type="avatar" value={avatarUrl} onChange={setEditedAvatarUrl} />
+        </CardContent>
+      </Card>
 
-      <div className="space-y-6 max-w-lg">
-        {/* Avatar Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Profile Picture</CardTitle>
-            <CardDescription>Upload a photo to personalize your account</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ImageUploader type="avatar" value={avatarUrl} onChange={setEditedAvatarUrl} />
-          </CardContent>
-        </Card>
+      {/* Personal Details Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Personal Details</CardTitle>
+          <CardDescription>Update your profile information</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Name */}
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium mb-1">
+              Display name
+            </label>
+            <input
+              id="name"
+              type="text"
+              value={name}
+              onChange={(e) => {
+                setEditedName(e.target.value)
+              }}
+              className="w-full h-10 px-3 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="Your name"
+            />
+            {isNameChanged && (
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={updateProfileMutation.isPending}
+                className="mt-2 h-10"
+              >
+                {updateProfileMutation.isPending ? 'Saving...' : 'Save name'}
+              </Button>
+            )}
+          </div>
 
-        {/* Personal Details Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Personal Details</CardTitle>
-            <CardDescription>Update your profile information</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Name */}
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium mb-1">
-                Display name
-              </label>
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => {
-                  setEditedName(e.target.value)
-                }}
-                className="w-full h-10 px-3 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="Your name"
-              />
-              {isNameChanged && (
-                <Button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={updateProfileMutation.isPending}
-                  className="mt-2 h-10"
-                >
-                  {updateProfileMutation.isPending ? 'Saving...' : 'Save name'}
-                </Button>
-              )}
-            </div>
-
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-1">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={newEmail}
-                onChange={(e) => {
-                  setEditedEmail(e.target.value)
-                }}
-                className="w-full h-10 px-3 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="your@email.com"
-              />
-              {/* Show status based on current state */}
-              {!isEmailChanged && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Changing your email requires verification via magic link
-                </p>
-              )}
-              {isEmailChanged && newEmail && (
-                <>
-                  <p className="text-xs text-amber-600 mt-2 flex items-center gap-1.5">
-                    <svg
-                      className="h-3.5 w-3.5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                      aria-hidden="true"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    A verification link will be sent to {newEmail}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    If you signed in with Google, changing email will disconnect that login method.
-                  </p>
-                  <Button
-                    type="button"
-                    onClick={handleStartEmailUpdate}
-                    disabled={startEmailUpdateMutation.isPending}
-                    className="mt-2 h-10"
-                  >
-                    {startEmailUpdateMutation.isPending ? 'Sending...' : 'Send verification link'}
-                  </Button>
-                </>
-              )}
-            </div>
-
-            {/* Phone Number */}
-            <div>
-              <span className="block text-sm font-medium mb-1">Phone number</span>
-              <PhoneNumberInput
-                value={phoneNumber}
-                onChange={setEditedPhoneNumber}
-                disabled={isPasskeySession}
-              />
-              {/* Passkey session warning - phone verification not available */}
-              {isPasskeySession && (
-                <Alert className="mt-3 border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950">
-                  <AlertDescription className="text-amber-800 dark:text-amber-200 text-xs">
-                    Phone verification is not available when logged in with a passkey. To add or
-                    update your phone number, please log out and sign in with email instead.
-                  </AlertDescription>
-                </Alert>
-              )}
-              {/* Show status based on current state (only if not passkey session) */}
-              {!isPasskeySession && savedPhoneNumber && !isPhoneChanged && (
-                <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1.5">
+          {/* Email */}
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium mb-1">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={newEmail}
+              onChange={(e) => {
+                setEditedEmail(e.target.value)
+              }}
+              className="w-full h-10 px-3 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="your@email.com"
+            />
+            {/* Show status based on current state */}
+            {!isEmailChanged && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Changing your email requires verification via magic link
+              </p>
+            )}
+            {isEmailChanged && newEmail && (
+              <>
+                <p className="text-xs text-amber-600 mt-2 flex items-center gap-1.5">
                   <svg
                     className="h-3.5 w-3.5"
                     fill="currentColor"
@@ -286,56 +220,103 @@ export default function ProfileSettings() {
                   >
                     <path
                       fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"
                       clipRule="evenodd"
                     />
                   </svg>
-                  Verified
+                  A verification link will be sent to {newEmail}
                 </p>
-              )}
-              {!isPasskeySession && isPhoneChanged && phoneNumber && (
-                <>
-                  <p className="text-xs text-amber-600 mt-2 flex items-center gap-1.5">
-                    <svg
-                      className="h-3.5 w-3.5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                      aria-hidden="true"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    Verification required
-                  </p>
-                  <Button
-                    type="button"
-                    onClick={handleVerifyPhone}
-                    disabled={sendPhoneOtpMutation.isPending}
-                    className="mt-2 h-10"
-                  >
-                    {sendPhoneOtpMutation.isPending ? 'Sending...' : 'Send verification code'}
-                  </Button>
-                </>
-              )}
-              {!isPasskeySession && !savedPhoneNumber && !phoneNumber && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Add a phone number for account security
+                  If you signed in with Google, changing email will disconnect that login method.
                 </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                <Button
+                  type="button"
+                  onClick={handleStartEmailUpdate}
+                  disabled={startEmailUpdateMutation.isPending}
+                  className="mt-2 h-10"
+                >
+                  {startEmailUpdateMutation.isPending ? 'Sending...' : 'Send verification link'}
+                </Button>
+              </>
+            )}
+          </div>
 
-        {/* Passkey Settings */}
-        <PasskeySettings />
+          {/* Phone Number */}
+          <div>
+            <span className="block text-sm font-medium mb-1">Phone number</span>
+            <PhoneNumberInput
+              value={phoneNumber}
+              onChange={setEditedPhoneNumber}
+              disabled={isPasskeySession}
+            />
+            {/* Passkey session warning - phone verification not available */}
+            {isPasskeySession && (
+              <Alert className="mt-3 border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950">
+                <AlertDescription className="text-amber-800 dark:text-amber-200 text-xs">
+                  Phone verification is not available when logged in with a passkey. To add or
+                  update your phone number, please log out and sign in with email instead.
+                </AlertDescription>
+              </Alert>
+            )}
+            {/* Show status based on current state (only if not passkey session) */}
+            {!isPasskeySession && savedPhoneNumber && !isPhoneChanged && (
+              <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1.5">
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Verified
+              </p>
+            )}
+            {!isPasskeySession && isPhoneChanged && phoneNumber && (
+              <>
+                <p className="text-xs text-amber-600 mt-2 flex items-center gap-1.5">
+                  <svg
+                    className="h-3.5 w-3.5"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Verification required
+                </p>
+                <Button
+                  type="button"
+                  onClick={handleVerifyPhone}
+                  disabled={sendPhoneOtpMutation.isPending}
+                  className="mt-2 h-10"
+                >
+                  {sendPhoneOtpMutation.isPending ? 'Sending...' : 'Send verification code'}
+                </Button>
+              </>
+            )}
+            {!isPasskeySession && !savedPhoneNumber && !phoneNumber && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Add a phone number for account security
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Linked Devices */}
-        <DeviceList />
-      </div>
+      {/* Passkey Settings */}
+      <PasskeySettings />
 
+      {/* Linked Devices */}
+      <DeviceList />
       {/* OTP Verification Dialog */}
       <Dialog open={showVerifyDialog} onOpenChange={setShowVerifyDialog}>
         <DialogContent className="sm:max-w-md">
@@ -400,6 +381,6 @@ export default function ProfileSettings() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </SettingsPageLayout>
   )
 }
