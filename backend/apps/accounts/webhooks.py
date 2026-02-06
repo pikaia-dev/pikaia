@@ -129,7 +129,7 @@ def handle_member_updated(data: dict) -> None:
             break
 
     # Update member fields
-    updated = False
+    update_fields: list[str] = []
     if member.role != new_role:
         logger.info(
             "stytch_webhook_member_role_updated",
@@ -138,17 +138,18 @@ def handle_member_updated(data: dict) -> None:
             new_role=new_role,
         )
         member.role = new_role
-        updated = True
+        update_fields.append("role")
 
     # Check for status changes (deactivated via SCIM, etc.)
     status = member_data.get("status")
     if status == "deleted" and member.deleted_at is None:
         logger.info("stytch_webhook_member_deleted", stytch_member_id=stytch_member_id)
         member.deleted_at = datetime.now(UTC)
-        updated = True
+        update_fields.append("deleted_at")
 
-    if updated:
-        member.save()
+    if update_fields:
+        update_fields.append("updated_at")
+        member.save(update_fields=update_fields)
 
 
 def handle_member_deleted(data: dict) -> None:
@@ -206,7 +207,7 @@ def handle_organization_updated(data: dict) -> None:
         return
 
     # Update fields that may have changed
-    updated = False
+    update_fields: list[str] = []
 
     new_name = org_data.get("organization_name")
     if new_name and org.name != new_name:
@@ -217,7 +218,7 @@ def handle_organization_updated(data: dict) -> None:
             new_name=new_name,
         )
         org.name = new_name
-        updated = True
+        update_fields.append("name")
 
     new_slug = org_data.get("organization_slug")
     if new_slug and org.slug != new_slug:
@@ -228,16 +229,17 @@ def handle_organization_updated(data: dict) -> None:
             new_slug=new_slug,
         )
         org.slug = new_slug
-        updated = True
+        update_fields.append("slug")
 
     # Sync logo if changed
     new_logo = org_data.get("organization_logo_url", "")
     if org.logo_url != new_logo:
         org.logo_url = new_logo
-        updated = True
+        update_fields.append("logo_url")
 
-    if updated:
-        org.save()
+    if update_fields:
+        update_fields.append("updated_at")
+        org.save(update_fields=update_fields)
 
 
 def handle_organization_deleted(data: dict) -> None:
