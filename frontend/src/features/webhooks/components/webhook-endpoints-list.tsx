@@ -11,9 +11,10 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import type { WebhookEndpoint, WebhookEventType } from '@/api/types'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { StatusBadge } from '@/components/status-badge'
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -35,6 +36,7 @@ import {
   useTestWebhookEndpoint,
   useUpdateWebhookEndpoint,
 } from '@/features/webhooks/api/mutations'
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog'
 
 interface WebhookEndpointsListProps {
   endpoints: WebhookEndpoint[]
@@ -56,8 +58,12 @@ export function WebhookEndpointsList({
   const deleteMutation = useDeleteWebhookEndpoint()
   const testMutation = useTestWebhookEndpoint()
 
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [endpointToDelete, setEndpointToDelete] = useState<WebhookEndpoint | null>(null)
+  const deleteDialog = useConfirmDialog<WebhookEndpoint>((endpoint) => {
+    deleteMutation.mutate(endpoint.id, {
+      onSettled: () => deleteDialog.reset(),
+    })
+  })
+
   const [testDialogOpen, setTestDialogOpen] = useState(false)
   const [endpointToTest, setEndpointToTest] = useState<WebhookEndpoint | null>(null)
 
@@ -65,21 +71,6 @@ export function WebhookEndpointsList({
     updateMutation.mutate({
       endpointId: endpoint.id,
       data: { active: !endpoint.active },
-    })
-  }
-
-  const openDeleteDialog = (endpoint: WebhookEndpoint) => {
-    setEndpointToDelete(endpoint)
-    setDeleteDialogOpen(true)
-  }
-
-  const handleDeleteConfirm = () => {
-    if (!endpointToDelete) return
-    deleteMutation.mutate(endpointToDelete.id, {
-      onSettled: () => {
-        setDeleteDialogOpen(false)
-        setEndpointToDelete(null)
-      },
     })
   }
 
@@ -104,41 +95,36 @@ export function WebhookEndpointsList({
   const getStatusBadge = (endpoint: WebhookEndpoint) => {
     if (!endpoint.active) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-          <Pause className="h-3 w-3" />
+        <StatusBadge variant="neutral" icon={<Pause className="h-3 w-3" />}>
           Disabled
-        </span>
+        </StatusBadge>
       )
     }
     if (endpoint.consecutive_failures >= 5) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
-          <AlertTriangle className="h-3 w-3" />
+        <StatusBadge variant="danger" icon={<AlertTriangle className="h-3 w-3" />}>
           Failing
-        </span>
+        </StatusBadge>
       )
     }
     if (endpoint.last_delivery_status === 'success') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-          <Check className="h-3 w-3" />
+        <StatusBadge variant="success" icon={<Check className="h-3 w-3" />}>
           Active
-        </span>
+        </StatusBadge>
       )
     }
     if (endpoint.last_delivery_status === 'failure') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-          <AlertTriangle className="h-3 w-3" />
+        <StatusBadge variant="warning" icon={<AlertTriangle className="h-3 w-3" />}>
           Warning
-        </span>
+        </StatusBadge>
       )
     }
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-        <Clock className="h-3 w-3" />
+      <StatusBadge variant="neutral" icon={<Clock className="h-3 w-3" />}>
         No deliveries
-      </span>
+      </StatusBadge>
     )
   }
 
@@ -257,7 +243,7 @@ export function WebhookEndpointsList({
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => {
-                              openDeleteDialog(endpoint)
+                              deleteDialog.openDialog(endpoint)
                             }}
                             className="text-destructive focus:text-destructive"
                           >
@@ -276,26 +262,20 @@ export function WebhookEndpointsList({
       </Card>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete webhook endpoint</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete <strong>{endpointToDelete?.name}</strong>? This action
-              cannot be undone and all delivery history will be lost.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleteDialog.open}
+        onOpenChange={deleteDialog.onOpenChange}
+        onConfirm={deleteDialog.onConfirm}
+        title="Delete webhook endpoint"
+        description={
+          <>
+            Are you sure you want to delete <strong>{deleteDialog.item?.name}</strong>? This action
+            cannot be undone and all delivery history will be lost.
+          </>
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+      />
 
       {/* Test Event Dialog */}
       <AlertDialog open={testDialogOpen} onOpenChange={setTestDialogOpen}>

@@ -75,7 +75,9 @@ flowchart TD
     I --> J
 ```
 
-**Public Paths:** `/api/v1/auth/magic-link/*`, `/api/v1/health`, `/admin/*`, `/webhooks/stripe/`, `/webhooks/stytch/`
+**Public Paths (middleware-defined):** `/api/v1/health`, `/api/v1/auth/magic-link/send`, `/api/v1/auth/magic-link/authenticate`, `/api/v1/auth/discovery/create-org`, `/api/v1/auth/discovery/exchange`, `/api/v1/auth/mobile/provision`, `/admin/`
+
+> **Note:** Webhook endpoints (`/webhooks/stripe/`, `/webhooks/stytch/`) and passkey authentication endpoints (`/auth/passkeys/authenticate/*`) are served outside the auth middleware scope and handle their own verification.
 
 ## Role-Based Access
 
@@ -105,15 +107,17 @@ Stytch webhooks provide real-time synchronization when changes occur outside aut
 
 | Event | Action |
 |-------|--------|
+| `*.member.create` | Create member in local DB if missing (reconciliation) |
 | `*.member.update` | Sync role changes, status updates |
 | `*.member.delete` | Soft delete local member |
 | `*.organization.update` | Sync name, slug, logo changes |
+| `*.organization.delete` | Soft delete organization and all its members |
 
 ### Setup
 
 1. Configure webhook endpoint in Stytch Dashboard: `https://yourapp.com/webhooks/stytch/`
 2. Copy the signing secret to `STYTCH_WEBHOOK_SECRET` environment variable
-3. Enable events: `member.update`, `member.delete`, `organization.update`
+3. Enable events: `member.create`, `member.update`, `member.delete`, `organization.update`, `organization.delete`
 
 > **Note:** Webhooks use Svix for delivery with automatic retries and signature verification.
 

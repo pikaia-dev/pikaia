@@ -16,11 +16,14 @@ from apps.sms.services import (
     OTPRateLimitError,
     cleanup_expired_otps,
     generate_otp_code,
+    hash_otp_code,
     send_phone_verification_otp,
     verify_otp,
     verify_phone_for_user,
 )
 from tests.accounts.factories import UserFactory
+
+KNOWN_OTP_CODE = "9876"
 
 
 class TestGenerateOTPCode:
@@ -57,14 +60,17 @@ class TestSendPhoneVerificationOTP:
         user = UserFactory.create()
         phone = "+14155551234"
 
-        with patch("apps.sms.services.send_otp_message") as mock_send:
+        with (
+            patch("apps.sms.services.send_otp_message") as mock_send,
+            patch("apps.sms.services.generate_otp_code", return_value=KNOWN_OTP_CODE),
+        ):
             mock_send.return_value = {"message_id": "msg-123", "success": True}
 
             otp = send_phone_verification_otp(phone, user)
 
         assert otp.phone_number == phone
         assert otp.user == user
-        assert len(otp.code) == 4  # Default from settings
+        assert otp.code_hash == hash_otp_code(KNOWN_OTP_CODE)
         assert otp.purpose == OTPVerification.Purpose.PHONE_VERIFY
         assert not otp.is_verified
         assert otp.aws_message_id == "msg-123"
@@ -113,11 +119,14 @@ class TestVerifyOTP:
         """Should verify correct OTP code."""
         phone = "+14155551234"
 
-        with patch("apps.sms.services.send_otp_message") as mock_send:
+        with (
+            patch("apps.sms.services.send_otp_message") as mock_send,
+            patch("apps.sms.services.generate_otp_code", return_value=KNOWN_OTP_CODE),
+        ):
             mock_send.return_value = {"message_id": "msg-123", "success": True}
-            otp = send_phone_verification_otp(phone)
+            send_phone_verification_otp(phone)
 
-        verified = verify_otp(phone, otp.code)
+        verified = verify_otp(phone, KNOWN_OTP_CODE)
 
         assert verified.is_verified
         assert verified.verified_at is not None
@@ -152,7 +161,10 @@ class TestVerifyOTP:
         """Should reject expired OTP."""
         phone = "+14155551234"
 
-        with patch("apps.sms.services.send_otp_message") as mock_send:
+        with (
+            patch("apps.sms.services.send_otp_message") as mock_send,
+            patch("apps.sms.services.generate_otp_code", return_value=KNOWN_OTP_CODE),
+        ):
             mock_send.return_value = {"message_id": "msg-123", "success": True}
             otp = send_phone_verification_otp(phone)
 
@@ -161,13 +173,16 @@ class TestVerifyOTP:
         otp.save()
 
         with pytest.raises(OTPExpiredError):
-            verify_otp(phone, otp.code)
+            verify_otp(phone, KNOWN_OTP_CODE)
 
     def test_rejects_after_max_attempts(self) -> None:
         """Should reject after max verification attempts."""
         phone = "+14155551234"
 
-        with patch("apps.sms.services.send_otp_message") as mock_send:
+        with (
+            patch("apps.sms.services.send_otp_message") as mock_send,
+            patch("apps.sms.services.generate_otp_code", return_value=KNOWN_OTP_CODE),
+        ):
             mock_send.return_value = {"message_id": "msg-123", "success": True}
             otp = send_phone_verification_otp(phone)
 
@@ -176,7 +191,7 @@ class TestVerifyOTP:
         otp.save()
 
         with pytest.raises(OTPMaxAttemptsError):
-            verify_otp(phone, otp.code)
+            verify_otp(phone, KNOWN_OTP_CODE)
 
     def test_rejects_when_no_otp_exists(self) -> None:
         """Should reject when no OTP exists for phone."""
@@ -193,11 +208,14 @@ class TestVerifyPhoneForUser:
         user = UserFactory.create(phone_number="", phone_verified_at=None)
         phone = "+14155551234"
 
-        with patch("apps.sms.services.send_otp_message") as mock_send:
+        with (
+            patch("apps.sms.services.send_otp_message") as mock_send,
+            patch("apps.sms.services.generate_otp_code", return_value=KNOWN_OTP_CODE),
+        ):
             mock_send.return_value = {"message_id": "msg-123", "success": True}
-            otp = send_phone_verification_otp(phone, user)
+            send_phone_verification_otp(phone, user)
 
-        updated_user = verify_phone_for_user(user, phone, otp.code)
+        updated_user = verify_phone_for_user(user, phone, KNOWN_OTP_CODE)
 
         assert updated_user.phone_number == phone
         assert updated_user.phone_verified_at is not None
@@ -226,14 +244,14 @@ class TestCleanupExpiredOTPs:
         # Create an old expired OTP
         old_otp = OTPVerification.objects.create(
             phone_number=phone,
-            code="1234",
+            code_hash=hash_otp_code("1234"),
             expires_at=timezone.now() - timedelta(hours=25),
         )
 
         # Create a recent expired OTP
         recent_otp = OTPVerification.objects.create(
             phone_number=phone,
-            code="5678",
+            code_hash=hash_otp_code("5678"),
             expires_at=timezone.now() - timedelta(hours=1),
         )
 

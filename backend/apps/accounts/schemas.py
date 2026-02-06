@@ -2,9 +2,15 @@
 Auth API schemas - Pydantic models for request/response.
 """
 
+from __future__ import annotations
+
 import re
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
+
+if TYPE_CHECKING:
+    from apps.accounts.models import User
 
 # Stytch slug requirements: 2-128 chars, lowercase alphanumeric + ._~-
 _SLUG_ALLOWED_CHARS = re.compile(r"[^a-z0-9._~-]+")
@@ -263,6 +269,21 @@ class UserInfo(BaseModel):
     name: str = Field(..., description="User's display name")
     avatar_url: str = Field("", description="URL to user's avatar image")
     phone_number: str = Field("", description="Phone number in E.164 format")
+    sync_warning: str | None = Field(
+        default=None,
+        description="Warning message if external sync failed (changes saved locally)",
+    )
+
+    @classmethod
+    def from_model(cls, user: User) -> UserInfo:
+        """Create UserInfo from a User model instance."""
+        return cls(
+            id=user.id,
+            email=user.email,
+            name=user.name,
+            avatar_url=user.avatar_url,
+            phone_number=user.phone_number,
+        )
 
 
 class MeResponse(BaseModel):
@@ -481,6 +502,10 @@ class OrganizationDetailResponse(BaseModel):
     slug: str = Field(..., description="URL-safe identifier")
     logo_url: str = Field("", description="URL to organization logo image")
     billing: BillingInfoResponse = Field(..., description="Billing information")
+    sync_warning: str | None = Field(
+        default=None,
+        description="Warning message if external sync failed (changes saved locally)",
+    )
 
 
 # --- Member Management Schemas ---
@@ -533,12 +558,18 @@ class MemberListItem(BaseModel):
 
 
 class MemberListResponse(BaseModel):
-    """Response containing list of organization members with pagination."""
+    """Response containing list of organization members with cursor-based pagination."""
 
     members: list[MemberListItem] = Field(..., description="List of active organization members")
     total: int = Field(..., description="Total number of members in the organization")
-    offset: int = Field(default=0, description="Current offset for pagination")
-    limit: int | None = Field(default=None, description="Limit per page (null means all)")
+    next_cursor: str | None = Field(
+        default=None,
+        description="Cursor for the next page of results (null if no more pages)",
+    )
+    has_more: bool = Field(
+        default=False,
+        description="Whether there are more results after this page",
+    )
 
 
 class InviteMemberResponse(BaseModel):

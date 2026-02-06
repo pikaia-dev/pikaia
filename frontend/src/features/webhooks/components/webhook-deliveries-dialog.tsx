@@ -1,5 +1,6 @@
 import { AlertTriangle, Check, Clock, RefreshCw } from 'lucide-react'
 import type { WebhookDelivery, WebhookEndpoint } from '@/api/types'
+import { StatusBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -33,24 +34,21 @@ function getStatusBadge(delivery: WebhookDelivery) {
   switch (delivery.status) {
     case 'success':
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-          {getStatusIcon(delivery.status)}
+        <StatusBadge variant="success" icon={getStatusIcon(delivery.status)}>
           {delivery.http_status}
-        </span>
+        </StatusBadge>
       )
     case 'failure':
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
-          {getStatusIcon(delivery.status)}
+        <StatusBadge variant="danger" icon={getStatusIcon(delivery.status)}>
           {delivery.http_status ? String(delivery.http_status) : delivery.error_type || 'Error'}
-        </span>
+        </StatusBadge>
       )
     case 'pending':
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-          {getStatusIcon(delivery.status)}
+        <StatusBadge variant="warning" icon={getStatusIcon(delivery.status)}>
           Retry #{delivery.attempt_number}
-        </span>
+        </StatusBadge>
       )
   }
 }
