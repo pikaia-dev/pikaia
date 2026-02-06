@@ -411,13 +411,7 @@ def get_current_user(request: AuthenticatedHttpRequest) -> MeResponse:
     user, member, org = get_auth_context(request)
 
     return MeResponse(
-        user=UserInfo(
-            id=user.id,
-            email=user.email,
-            name=user.name,
-            avatar_url=user.avatar_url,
-            phone_number=user.phone_number,
-        ),
+        user=UserInfo.from_model(user),
         member=MemberInfo(
             id=member.id,
             stytch_member_id=member.stytch_member_id,
@@ -484,13 +478,7 @@ def update_profile(request: AuthenticatedHttpRequest, payload: UpdateProfileRequ
         organization_id=str(org.id),
     )
 
-    return UserInfo(
-        id=user.id,
-        email=user.email,
-        name=user.name,
-        avatar_url=user.avatar_url,
-        phone_number=user.phone_number,
-    )
+    return UserInfo.from_model(user)
 
 
 # --- Phone Verification ---
@@ -599,13 +587,7 @@ def verify_phone_otp(request: AuthenticatedHttpRequest, payload: VerifyPhoneOtpR
             organization_id=str(org.id),
         )
 
-        return UserInfo(
-            id=user.id,
-            email=user.email,
-            name=user.name,
-            avatar_url=user.avatar_url,
-            phone_number=user.phone_number,
-        )
+        return UserInfo.from_model(user)
 
     except StytchError as e:
         error_msg = e.details.error_message or "Verification failed"
