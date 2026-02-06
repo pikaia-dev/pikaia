@@ -55,6 +55,8 @@ _REQUIRED_SECRETS = {
     "STYTCH_SECRET": settings.STYTCH_SECRET,
     "STRIPE_SECRET_KEY": settings.STRIPE_SECRET_KEY,
     "STRIPE_PRICE_ID": settings.STRIPE_PRICE_ID,
+    "STRIPE_WEBHOOK_SECRET": settings.STRIPE_WEBHOOK_SECRET,
+    "STYTCH_WEBHOOK_SECRET": settings.STYTCH_WEBHOOK_SECRET,
 }
 
 # Secrets that have obviously insecure defaults

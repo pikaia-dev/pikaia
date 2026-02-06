@@ -64,6 +64,7 @@ REQUIRED_VARS=(
     "STRIPE_SECRET_KEY"
     "STRIPE_PRICE_ID"
     "STRIPE_WEBHOOK_SECRET"
+    "STYTCH_WEBHOOK_SECRET"
     "RESEND_API_KEY"
 )
 
@@ -116,6 +117,7 @@ SECRET_JSON=$(jq -n \
     --arg stripe_key "$STRIPE_SECRET_KEY" \
     --arg stripe_price "$STRIPE_PRICE_ID" \
     --arg stripe_webhook "$STRIPE_WEBHOOK_SECRET" \
+    --arg stytch_webhook "$STYTCH_WEBHOOK_SECRET" \
     --arg resend_key "$RESEND_API_KEY" \
     --arg trusted_profile "${STYTCH_TRUSTED_AUTH_PROFILE_ID:-}" \
     --arg trusted_audience "${STYTCH_TRUSTED_AUTH_AUDIENCE:-stytch}" \
@@ -133,6 +135,7 @@ SECRET_JSON=$(jq -n \
         STRIPE_SECRET_KEY: $stripe_key,
         STRIPE_PRICE_ID: $stripe_price,
         STRIPE_WEBHOOK_SECRET: $stripe_webhook,
+        STYTCH_WEBHOOK_SECRET: $stytch_webhook,
         RESEND_API_KEY: $resend_key,
         STYTCH_TRUSTED_AUTH_PROFILE_ID: $trusted_profile,
         STYTCH_TRUSTED_AUTH_AUDIENCE: $trusted_audience,
