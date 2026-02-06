@@ -11,9 +11,9 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import type { WebhookEndpoint, WebhookEventType } from '@/api/types'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -35,6 +35,7 @@ import {
   useTestWebhookEndpoint,
   useUpdateWebhookEndpoint,
 } from '@/features/webhooks/api/mutations'
+import { useConfirmDialog } from '@/hooks/use-confirm-dialog'
 
 interface WebhookEndpointsListProps {
   endpoints: WebhookEndpoint[]
@@ -56,8 +57,12 @@ export function WebhookEndpointsList({
   const deleteMutation = useDeleteWebhookEndpoint()
   const testMutation = useTestWebhookEndpoint()
 
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [endpointToDelete, setEndpointToDelete] = useState<WebhookEndpoint | null>(null)
+  const deleteDialog = useConfirmDialog<WebhookEndpoint>((endpoint) => {
+    deleteMutation.mutate(endpoint.id, {
+      onSettled: () => deleteDialog.reset(),
+    })
+  })
+
   const [testDialogOpen, setTestDialogOpen] = useState(false)
   const [endpointToTest, setEndpointToTest] = useState<WebhookEndpoint | null>(null)
 
@@ -65,21 +70,6 @@ export function WebhookEndpointsList({
     updateMutation.mutate({
       endpointId: endpoint.id,
       data: { active: !endpoint.active },
-    })
-  }
-
-  const openDeleteDialog = (endpoint: WebhookEndpoint) => {
-    setEndpointToDelete(endpoint)
-    setDeleteDialogOpen(true)
-  }
-
-  const handleDeleteConfirm = () => {
-    if (!endpointToDelete) return
-    deleteMutation.mutate(endpointToDelete.id, {
-      onSettled: () => {
-        setDeleteDialogOpen(false)
-        setEndpointToDelete(null)
-      },
     })
   }
 
@@ -257,7 +247,7 @@ export function WebhookEndpointsList({
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => {
-                              openDeleteDialog(endpoint)
+                              deleteDialog.openDialog(endpoint)
                             }}
                             className="text-destructive focus:text-destructive"
                           >
@@ -276,26 +266,20 @@ export function WebhookEndpointsList({
       </Card>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete webhook endpoint</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete <strong>{endpointToDelete?.name}</strong>? This action
-              cannot be undone and all delivery history will be lost.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleteDialog.open}
+        onOpenChange={deleteDialog.onOpenChange}
+        onConfirm={deleteDialog.onConfirm}
+        title="Delete webhook endpoint"
+        description={
+          <>
+            Are you sure you want to delete <strong>{deleteDialog.item?.name}</strong>? This action
+            cannot be undone and all delivery history will be lost.
+          </>
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+      />
 
       {/* Test Event Dialog */}
       <AlertDialog open={testDialogOpen} onOpenChange={setTestDialogOpen}>
