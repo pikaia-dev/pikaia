@@ -115,7 +115,7 @@ def handle_member_updated(data: dict) -> None:
         return
 
     try:
-        member = Member.objects.get(stytch_member_id=stytch_member_id)
+        member = Member.objects.select_related("user").get(stytch_member_id=stytch_member_id)
     except Member.DoesNotExist:
         logger.info("stytch_webhook_member_not_found", stytch_member_id=stytch_member_id)
         return
@@ -164,7 +164,7 @@ def handle_member_deleted(data: dict) -> None:
         return
 
     try:
-        member = Member.objects.get(stytch_member_id=member_id)
+        member = Member.objects.select_related("user").get(stytch_member_id=member_id)
     except Member.DoesNotExist:
         logger.debug("stytch_webhook_member_already_deleted", stytch_member_id=member_id)
         return
