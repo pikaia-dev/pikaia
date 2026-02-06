@@ -483,7 +483,9 @@ class AppStack(Stack):
                 task_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
                 certificate=certificate,
                 protocol=listener_protocol,
-                redirect_http=certificate is not None,
+                # Disable HTTP→HTTPS redirect on ALB since CloudFront handles
+                # HTTPS termination and connects to ALB via its domain name
+                redirect_http=False,
                 health_check_grace_period=Duration.seconds(120),
                 min_healthy_percent=100,
                 max_healthy_percent=200,
