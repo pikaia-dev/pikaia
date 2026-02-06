@@ -769,6 +769,15 @@ def update_billing(
     org.billing_name = payload.billing_name
     org.vat_id = payload.vat_id
 
+    update_fields = [
+        "use_billing_email",
+        "billing_name",
+        "vat_id",
+        "updated_at",
+    ]
+    if payload.billing_email is not None:
+        update_fields.append("billing_email")
+
     if payload.address:
         org.billing_address_line1 = payload.address.line1
         org.billing_address_line2 = payload.address.line2
@@ -776,8 +785,18 @@ def update_billing(
         org.billing_state = payload.address.state
         org.billing_postal_code = payload.address.postal_code
         org.billing_country = payload.address.country
+        update_fields.extend(
+            [
+                "billing_address_line1",
+                "billing_address_line2",
+                "billing_city",
+                "billing_state",
+                "billing_postal_code",
+                "billing_country",
+            ]
+        )
 
-    org.save()
+    org.save(update_fields=update_fields)
 
     # Sync billing info to Stripe
     if org.stripe_customer_id:

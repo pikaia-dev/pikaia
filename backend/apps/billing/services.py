@@ -449,7 +449,16 @@ def handle_subscription_updated(stripe_subscription: dict) -> None:
     subscription.current_period_start = period_start
     subscription.current_period_end = period_end
     subscription.cancel_at_period_end = stripe_subscription.get("cancel_at_period_end", False)
-    subscription.save()
+    subscription.save(
+        update_fields=[
+            "status",
+            "quantity",
+            "current_period_start",
+            "current_period_end",
+            "cancel_at_period_end",
+            "updated_at",
+        ]
+    )
 
     # Emit subscription.updated event if there are meaningful changes
     if old_status != subscription.status or old_quantity != subscription.quantity:
