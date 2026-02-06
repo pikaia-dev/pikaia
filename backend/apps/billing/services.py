@@ -18,6 +18,53 @@ from config.settings.base import settings
 logger = get_logger(__name__)
 
 
+def _resolve_billing_email(org: Organization) -> str | None:
+    """Resolve the billing email for an organization.
+
+    Uses the dedicated billing email if configured, otherwise falls back
+    to the first admin's email address.
+    """
+    if org.use_billing_email and org.billing_email:
+        return org.billing_email
+
+    from apps.accounts.models import Member
+
+    admin = Member.objects.filter(organization=org, role="admin").select_related("user").first()
+    return admin.user.email if admin else None
+
+
+def _parse_stripe_period(
+    stripe_subscription: dict,
+    *,
+    fallback_start: datetime | None = None,
+    fallback_end: datetime | None = None,
+) -> tuple[datetime, datetime]:
+    """Parse current period start/end from a Stripe subscription object.
+
+    Handles both Stripe 2025 API nested format and legacy flat format.
+    Falls back to provided defaults or sensible defaults (now / now+30d).
+    """
+    current_period = stripe_subscription.get("current_period", {})
+    period_start_ts = current_period.get("start") or stripe_subscription.get("current_period_start")
+    period_end_ts = current_period.get("end") or stripe_subscription.get("current_period_end")
+
+    if period_start_ts:
+        period_start = datetime.fromtimestamp(period_start_ts, tz=UTC)
+    elif fallback_start is not None:
+        period_start = fallback_start
+    else:
+        period_start = datetime.now(tz=UTC)
+
+    if period_end_ts:
+        period_end = datetime.fromtimestamp(period_end_ts, tz=UTC)
+    elif fallback_end is not None:
+        period_end = fallback_end
+    else:
+        period_end = datetime.now(tz=UTC) + timedelta(days=30)
+
+    return period_start, period_end
+
+
 def get_or_create_stripe_customer(org: Organization) -> str:
     """
     Get or create a Stripe Customer for the organization.
@@ -29,16 +76,7 @@ def get_or_create_stripe_customer(org: Organization) -> str:
 
     stripe = get_stripe()
 
-    # Determine email for Stripe customer
-    email: str | None
-    if org.use_billing_email and org.billing_email:
-        email = org.billing_email
-    else:
-        # Fall back to first admin's email
-        from apps.accounts.models import Member
-
-        admin = Member.objects.filter(organization=org, role="admin").select_related("user").first()
-        email = admin.user.email if admin else None
+    email = _resolve_billing_email(org)
 
     # Build customer data
     customer_data: dict = {
@@ -101,15 +139,7 @@ def sync_billing_to_stripe(org: Organization) -> None:
 
     stripe = get_stripe()
 
-    # Determine email
-    email: str | None
-    if org.use_billing_email and org.billing_email:
-        email = org.billing_email
-    else:
-        from apps.accounts.models import Member
-
-        admin = Member.objects.filter(organization=org, role="admin").select_related("user").first()
-        email = admin.user.email if admin else None
+    email = _resolve_billing_email(org)
 
     # Build update data
     update_data: dict = {
@@ -352,23 +382,7 @@ def handle_subscription_created(stripe_subscription: dict) -> None:
         )
         return
 
-    # Parse dates - Stripe 2025 API may nest these differently
-    # Try new location first, fall back to old
-    current_period = stripe_subscription.get("current_period", {})
-    period_start_ts = current_period.get("start") or stripe_subscription.get("current_period_start")
-    period_end_ts = current_period.get("end") or stripe_subscription.get("current_period_end")
-
-    # Default to now if not available (shouldn't happen but be safe)
-    if period_start_ts:
-        period_start = datetime.fromtimestamp(period_start_ts, tz=UTC)
-    else:
-        period_start = datetime.now(tz=UTC)
-
-    if period_end_ts:
-        period_end = datetime.fromtimestamp(period_end_ts, tz=UTC)
-    else:
-        # Default to 30 days from now
-        period_end = datetime.now(tz=UTC) + timedelta(days=30)
+    period_start, period_end = _parse_stripe_period(stripe_subscription)
 
     # Get price ID from first item
     items = stripe_subscription.get("items", {}).get("data", [])
@@ -422,20 +436,11 @@ def handle_subscription_updated(stripe_subscription: dict) -> None:
         handle_subscription_created(stripe_subscription)
         return
 
-    # Parse dates - Stripe 2025 API may nest these differently
-    current_period = stripe_subscription.get("current_period", {})
-    period_start_ts = current_period.get("start") or stripe_subscription.get("current_period_start")
-    period_end_ts = current_period.get("end") or stripe_subscription.get("current_period_end")
-
-    if period_start_ts:
-        period_start = datetime.fromtimestamp(period_start_ts, tz=UTC)
-    else:
-        period_start = subscription.current_period_start  # Keep existing
-
-    if period_end_ts:
-        period_end = datetime.fromtimestamp(period_end_ts, tz=UTC)
-    else:
-        period_end = subscription.current_period_end  # Keep existing
+    period_start, period_end = _parse_stripe_period(
+        stripe_subscription,
+        fallback_start=subscription.current_period_start,
+        fallback_end=subscription.current_period_end,
+    )
 
     # Get quantity from first item
     items = stripe_subscription.get("items", {}).get("data", [])
