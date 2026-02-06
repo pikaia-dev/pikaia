@@ -16,7 +16,7 @@ uv sync && uv run python manage.py migrate
 uv run python manage.py runserver   # http://localhost:8000
 
 # Frontend (new terminal)
-cd frontend && cp .env.example .env
+cd ../frontend && cp .env.example .env
 pnpm install && pnpm dev            # http://localhost:5173
 ```
 
