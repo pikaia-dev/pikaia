@@ -1,4 +1,5 @@
 import type { Invoice } from '@/api/types'
+import { StatusBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
@@ -59,17 +60,17 @@ export function InvoiceHistoryCard({
                         </span>
                       </td>
                       <td className="py-3">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        <StatusBadge
+                          variant={
                             invoice.status === 'paid'
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              ? 'success'
                               : invoice.status === 'open'
-                                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                                : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-                          }`}
+                                ? 'warning'
+                                : 'neutral'
+                          }
                         >
                           {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
-                        </span>
+                        </StatusBadge>
                       </td>
                       <td className="py-3 text-right">
                         {new Intl.NumberFormat(undefined, {

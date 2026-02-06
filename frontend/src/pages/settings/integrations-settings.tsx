@@ -1,9 +1,9 @@
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
 import type { WebhookEndpoint } from '@/api/types'
+import { SettingsPageLayout } from '@/components/settings-page-layout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { useWebhookEndpoints, useWebhookEvents } from '@/features/webhooks/api/queries'
 import { WebhookDeliveriesDialog } from '@/features/webhooks/components/webhook-deliveries-dialog'
 import { WebhookEndpointDialog } from '@/features/webhooks/components/webhook-endpoint-dialog'
@@ -41,76 +41,59 @@ export default function IntegrationsSettings() {
     setDeliveriesDialogOpen(true)
   }
 
-  if (endpointsLoading || eventsLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <LoadingSpinner size="sm" />
-      </div>
-    )
-  }
-
-  if (endpointsError) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-destructive">Failed to load integrations</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Integrations</h1>
-        <p className="text-muted-foreground">Connect external services via webhooks</p>
-      </div>
+    <SettingsPageLayout
+      title="Integrations"
+      description="Connect external services via webhooks"
+      maxWidth="max-w-4xl"
+      isLoading={endpointsLoading || eventsLoading}
+      error={endpointsError}
+    >
+      {/* Add Endpoint Card */}
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between">
+          <div>
+            <CardTitle className="text-base">Webhooks</CardTitle>
+            <CardDescription>
+              Receive real-time notifications when events occur in your organization
+            </CardDescription>
+          </div>
+          <Button onClick={handleAddEndpoint}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Endpoint
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Configure webhook endpoints to receive HTTP POST requests when events like member
+            changes, billing updates, or organization changes occur. All webhooks are signed with
+            HMAC-SHA256 for security.
+          </p>
+        </CardContent>
+      </Card>
 
-      <div className="space-y-6 max-w-4xl">
-        {/* Add Endpoint Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between">
-            <div>
-              <CardTitle className="text-base">Webhooks</CardTitle>
-              <CardDescription>
-                Receive real-time notifications when events occur in your organization
-              </CardDescription>
-            </div>
-            <Button onClick={handleAddEndpoint}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Endpoint
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Configure webhook endpoints to receive HTTP POST requests when events like member
-              changes, billing updates, or organization changes occur. All webhooks are signed with
-              HMAC-SHA256 for security.
-            </p>
-          </CardContent>
-        </Card>
+      {/* Endpoints List */}
+      <WebhookEndpointsList
+        endpoints={endpoints}
+        events={events}
+        onEdit={handleEditEndpoint}
+        onViewDeliveries={handleViewDeliveries}
+      />
 
-        {/* Endpoints List */}
-        <WebhookEndpointsList
-          endpoints={endpoints}
-          events={events}
-          onEdit={handleEditEndpoint}
-          onViewDeliveries={handleViewDeliveries}
-        />
+      {/* Endpoint Dialog */}
+      <WebhookEndpointDialog
+        open={endpointDialogOpen}
+        onOpenChange={setEndpointDialogOpen}
+        endpoint={editingEndpoint}
+        events={events}
+      />
 
-        {/* Endpoint Dialog */}
-        <WebhookEndpointDialog
-          open={endpointDialogOpen}
-          onOpenChange={setEndpointDialogOpen}
-          endpoint={editingEndpoint}
-          events={events}
-        />
-
-        {/* Deliveries Dialog */}
-        <WebhookDeliveriesDialog
-          open={deliveriesDialogOpen}
-          onOpenChange={setDeliveriesDialogOpen}
-          endpoint={viewingEndpoint}
-        />
-      </div>
-    </div>
+      {/* Deliveries Dialog */}
+      <WebhookDeliveriesDialog
+        open={deliveriesDialogOpen}
+        onOpenChange={setDeliveriesDialogOpen}
+        endpoint={viewingEndpoint}
+      />
+    </SettingsPageLayout>
   )
 }

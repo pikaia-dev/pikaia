@@ -14,6 +14,7 @@ Alarms notify via SNS topic for:
 - Unhealthy infrastructure
 - Lambda failures
 - Event delivery failures
+- Dead letter queue messages (failed events requiring investigation)
 """
 
 from aws_cdk import (
@@ -48,6 +49,9 @@ from aws_cdk import (
 from aws_cdk import (
     aws_sns_subscriptions as sns_subscriptions,
 )
+from aws_cdk import (
+    aws_sqs as sqs,
+)
 from constructs import Construct
 
 
@@ -74,6 +78,8 @@ class ObservabilityStack(Stack):
         event_bus: events.IEventBus | None = None,
         publisher_lambda: lambda_.IFunction | None = None,
         audit_lambda: lambda_.IFunction | None = None,
+        publisher_dlq: sqs.IQueue | None = None,
+        audit_dlq: sqs.IQueue | None = None,
         alarm_email: str | None = None,
         **kwargs,
     ) -> None:
@@ -81,8 +87,12 @@ class ObservabilityStack(Stack):
 
         # Resource naming from CDK context (allows customization without code changes)
         resource_prefix = self.node.try_get_context("resource_prefix") or "pikaia"
-        alarm_topic_name = self.node.try_get_context("alarm_topic_name") or f"{resource_prefix}-alarms"
-        dashboard_name = self.node.try_get_context("dashboard_name") or f"{resource_prefix}-operations"
+        alarm_topic_name = (
+            self.node.try_get_context("alarm_topic_name") or f"{resource_prefix}-alarms"
+        )
+        dashboard_name = (
+            self.node.try_get_context("dashboard_name") or f"{resource_prefix}-operations"
+        )
 
         # =================================================================
         # SNS Topic for Alarms
@@ -459,6 +469,51 @@ class ObservabilityStack(Stack):
             eventbridge_alarm.add_alarm_action(alarm_action)
             eventbridge_alarm.add_ok_action(alarm_action)
 
+        # SQS Dead Letter Queue alarms
+        dlq_alarms: list[cloudwatch.Alarm] = []
+
+        if publisher_dlq:
+            publisher_dlq_alarm = cloudwatch.Alarm(
+                self,
+                "PublisherDlqAlarm",
+                alarm_name=f"{resource_prefix}-publisher-dlq-messages",
+                alarm_description=(
+                    "Event publisher DLQ has messages — failed events require investigation"
+                ),
+                metric=publisher_dlq.metric_approximate_number_of_messages_visible(
+                    period=Duration.minutes(1),
+                    statistic="Maximum",
+                ),
+                threshold=0,
+                evaluation_periods=1,
+                comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+                treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+            )
+            publisher_dlq_alarm.add_alarm_action(alarm_action)
+            publisher_dlq_alarm.add_ok_action(alarm_action)
+            dlq_alarms.append(publisher_dlq_alarm)
+
+        if audit_dlq:
+            audit_dlq_alarm = cloudwatch.Alarm(
+                self,
+                "AuditDlqAlarm",
+                alarm_name=f"{resource_prefix}-audit-dlq-messages",
+                alarm_description=(
+                    "Audit consumer DLQ has messages — failed audit events require investigation"
+                ),
+                metric=audit_dlq.metric_approximate_number_of_messages_visible(
+                    period=Duration.minutes(1),
+                    statistic="Maximum",
+                ),
+                threshold=0,
+                evaluation_periods=1,
+                comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+                treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+            )
+            audit_dlq_alarm.add_alarm_action(alarm_action)
+            audit_dlq_alarm.add_ok_action(alarm_action)
+            dlq_alarms.append(audit_dlq_alarm)
+
         # =================================================================
         # Dashboard
         # =================================================================
@@ -630,6 +685,7 @@ class ObservabilityStack(Stack):
         all_alarms.extend(lambda_alarms)
         if eventbridge_alarm:
             all_alarms.append(eventbridge_alarm)
+        all_alarms.extend(dlq_alarms)
 
         dashboard.add_widgets(
             cloudwatch.AlarmStatusWidget(
