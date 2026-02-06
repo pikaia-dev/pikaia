@@ -432,7 +432,11 @@ def _sync_subscription_quantity_safe(organization: Organization) -> None:
 
         sync_subscription_quantity(organization)
     except Exception:
-        logger.warning("billing_subscription_quantity_sync_failed", org_id=str(organization.id))
+        logger.warning(
+            "billing_subscription_quantity_sync_failed",
+            org_id=str(organization.id),
+            exc_info=True,
+        )
 
 
 def sync_logo_to_stytch(organization: Organization) -> None:
