@@ -845,8 +845,9 @@ def list_members(
 
     Args:
         offset: Number of records to skip (default 0)
-        limit: Maximum records to return (default None = all)
+        limit: Maximum records to return (default None = all, capped at 500)
     """
+    limit = min(max(limit, 1), 500) if limit is not None else 500
     _, _, org = get_auth_context(request)
     members, total = list_organization_members(org, offset=offset, limit=limit)
 
