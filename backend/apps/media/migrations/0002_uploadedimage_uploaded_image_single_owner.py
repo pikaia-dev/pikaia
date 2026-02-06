@@ -5,16 +5,22 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('media', '0001_initial'),
-        ('organizations', '0006_alter_organization_deleted_at'),
+        ("media", "0001_initial"),
+        ("organizations", "0006_alter_organization_deleted_at"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AddConstraint(
-            model_name='uploadedimage',
-            constraint=models.CheckConstraint(condition=models.Q(models.Q(('organization__isnull', True), ('user__isnull', False)), models.Q(('organization__isnull', False), ('user__isnull', True)), _connector='OR'), name='uploaded_image_single_owner'),
+            model_name="uploadedimage",
+            constraint=models.CheckConstraint(
+                condition=models.Q(
+                    models.Q(("organization__isnull", True), ("user__isnull", False)),
+                    models.Q(("organization__isnull", False), ("user__isnull", True)),
+                    _connector="OR",
+                ),
+                name="uploaded_image_single_owner",
+            ),
         ),
     ]
