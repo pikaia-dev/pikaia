@@ -9,6 +9,7 @@ import json
 from datetime import UTC, datetime
 
 from django.db import transaction
+from django.utils import timezone
 from django.http import HttpRequest, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -271,12 +272,10 @@ def handle_organization_deleted(data: dict) -> None:
         org_name=org.name,
     )
 
-    # Soft delete all members in the organization first
-    members = Member.objects.filter(organization=org)
-    member_count = members.count()
-    for member in members:
-        if member.deleted_at is None:
-            member.soft_delete()
+    # Soft delete all members in the organization first (bulk update)
+    member_count = Member.objects.filter(
+        organization=org, deleted_at__isnull=True
+    ).update(deleted_at=timezone.now())
 
     if member_count > 0:
         logger.info(
