@@ -352,7 +352,7 @@ class AppStack(Stack):
                 ),
             },
             health_check=ecs.HealthCheck(
-                command=["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"],
+                command=["CMD-SHELL", "curl -f http://localhost:8000/api/v1/health || exit 1"],
                 interval=Duration.seconds(30),
                 timeout=Duration.seconds(5),
                 retries=3,
