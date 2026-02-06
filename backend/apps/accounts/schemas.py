@@ -550,12 +550,18 @@ class MemberListItem(BaseModel):
 
 
 class MemberListResponse(BaseModel):
-    """Response containing list of organization members with pagination."""
+    """Response containing list of organization members with cursor-based pagination."""
 
     members: list[MemberListItem] = Field(..., description="List of active organization members")
     total: int = Field(..., description="Total number of members in the organization")
-    offset: int = Field(default=0, description="Current offset for pagination")
-    limit: int | None = Field(default=None, description="Limit per page (null means all)")
+    next_cursor: str | None = Field(
+        default=None,
+        description="Cursor for the next page of results (null if no more pages)",
+    )
+    has_more: bool = Field(
+        default=False,
+        description="Whether there are more results after this page",
+    )
 
 
 class InviteMemberResponse(BaseModel):
