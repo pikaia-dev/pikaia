@@ -296,6 +296,10 @@ class AppStack(Stack):
                     self.app_secrets,
                     field="STYTCH_SECRET",
                 ),
+                "STYTCH_WEBHOOK_SECRET": ecs.Secret.from_secrets_manager(
+                    self.app_secrets,
+                    field="STYTCH_WEBHOOK_SECRET",
+                ),
                 "STRIPE_SECRET_KEY": ecs.Secret.from_secrets_manager(
                     self.app_secrets,
                     field="STRIPE_SECRET_KEY",
