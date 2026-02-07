@@ -1243,7 +1243,16 @@ class TestListMembers:
         MemberFactory.create(user=member_user, organization=org, role="member")
 
         mock_client = MagicMock()
-        mock_client.organizations.members.search.side_effect = Exception("Stytch unavailable")
+        from stytch.core.response_base import StytchError, StytchErrorDetails
+
+        mock_client.organizations.members.search.side_effect = StytchError(
+            StytchErrorDetails(
+                error_type="connection_error",
+                error_message="Stytch unavailable",
+                status_code=503,
+                request_id="req-fallback",
+            )
+        )
 
         request = request_factory.get("/api/v1/auth/organization/members")
         request = make_request_with_auth(  # type: ignore[assignment]

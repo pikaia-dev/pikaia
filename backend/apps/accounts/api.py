@@ -923,8 +923,8 @@ def list_members(
         # Extract pagination metadata from Stytch response
         total = getattr(search_result, "total_count", 0) or 0
         next_cursor = getattr(search_result, "next_cursor", None) or None
-    except Exception:
-        logger.warning("stytch_member_search_failed", org_id=org.id)
+    except StytchError:
+        logger.warning("stytch_member_search_failed", org_id=org.id, exc_info=True)
 
     # Build a lookup of Stytch member statuses
     stytch_statuses: dict[str, str] = {m["member_id"]: m["status"] for m in stytch_members_data}
