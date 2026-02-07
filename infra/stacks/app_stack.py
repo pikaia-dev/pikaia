@@ -437,6 +437,7 @@ class AppStack(Stack):
                 health_check_grace_period=Duration.seconds(120),
                 min_healthy_percent=100,
                 max_healthy_percent=200,
+                circuit_breaker=ecs.DeploymentCircuitBreaker(rollback=True),
             )
 
             # Enable ECS Exec
@@ -503,6 +504,7 @@ class AppStack(Stack):
                 health_check_grace_period=Duration.seconds(120),
                 min_healthy_percent=100,
                 max_healthy_percent=200,
+                circuit_breaker=ecs.DeploymentCircuitBreaker(rollback=True),
             )
 
             # Enable ECS Exec for debugging and running migrations
