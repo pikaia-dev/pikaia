@@ -944,7 +944,9 @@ def list_members(
     # Build a lookup by stytch_member_id to preserve Stytch's page order
     local_by_stytch_id = {m.stytch_member_id: m for m in local_members}
 
-    # If no Stytch results (e.g., Stytch call failed), fall back to local DB
+    # If no Stytch results (e.g., Stytch call failed), fall back to local DB.
+    # In fallback mode, return all local members without pagination since we
+    # cannot provide a cursor for subsequent pages.
     if not stytch_members_data:
         local_fallback = (
             Member.objects.filter(organization=org, deleted_at__isnull=True)
@@ -952,8 +954,6 @@ def list_members(
             .order_by("created_at")
         )
         total = local_fallback.count()
-        paginated_fallback = local_fallback[:limit]
-        has_more = total > limit
         return MemberListResponse(
             members=[
                 MemberListItem(
@@ -966,11 +966,11 @@ def list_members(
                     status="active",
                     created_at=m.created_at.isoformat(),
                 )
-                for m in paginated_fallback
+                for m in local_fallback
             ],
             total=total,
             next_cursor=None,
-            has_more=has_more,
+            has_more=False,
         )
 
     return MemberListResponse(
