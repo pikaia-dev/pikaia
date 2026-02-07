@@ -109,7 +109,60 @@ fi
 echo ""
 echo_info "Infrastructure prerequisites complete!"
 echo ""
-echo "Next steps:"
-echo "  1. Run ./scripts/bootstrap-secrets.sh to populate API keys"
-echo "  2. Build and push Docker image to ECR"
-echo "  3. Run cdk deploy to deploy the application stack"
+
+# =============================================================================
+# Shared Infrastructure Configuration (optional)
+# =============================================================================
+echo "Would you like to configure shared infrastructure?"
+echo ""
+echo "  1) Export (provider) - This deployment exports its resources via SSM"
+echo "     so other projects can consume them in shared mode."
+echo ""
+echo "  2) Consume (shared) - This deployment uses infrastructure from an"
+echo "     existing provider deployment via SSM parameters."
+echo ""
+echo "  3) Skip - Standalone only, no shared infrastructure."
+echo ""
+read -rp "Choose [1/2/3] (default: 3): " shared_choice
+shared_choice="${shared_choice:-3}"
+
+case "$shared_choice" in
+    1)
+        read -rp "SSM prefix for export (default: /shared-infra/prod): " export_prefix
+        export_prefix="${export_prefix:-/shared-infra/prod}"
+        echo ""
+        echo_info "To deploy as a shared infrastructure provider, run:"
+        echo ""
+        echo "  cd infra && npx cdk deploy --all \\"
+        echo "    --context export_shared_infra_prefix=${export_prefix} \\"
+        echo "    --context certificate_arn=arn:aws:acm:REGION:ACCOUNT:certificate/ID \\"
+        echo "    --context domain_name=api.yourdomain.com"
+        echo ""
+        echo_info "HTTPS (certificate_arn) is required for export mode."
+        echo_info "The provider's database is created automatically by CDK."
+        ;;
+    2)
+        read -rp "SSM prefix to consume from (default: /shared-infra/prod): " shared_prefix
+        shared_prefix="${shared_prefix:-/shared-infra/prod}"
+        read -rp "API domain name (e.g., api.myproject.com): " api_domain
+        read -rp "ALB listener rule priority (100-999, must be unique): " rule_priority
+        echo ""
+        echo_warn "Before deploying, create your project database in the shared Aurora cluster:"
+        echo "  ./scripts/create-project-database.sh ${RESOURCE_PREFIX} <cluster-endpoint>"
+        echo ""
+        echo_info "Then deploy as a shared infrastructure consumer:"
+        echo ""
+        echo "  cd infra && npx cdk deploy --all \\"
+        echo "    --context shared_infra_prefix=${shared_prefix} \\"
+        echo "    --context domain_name=${api_domain} \\"
+        echo "    --context alb_rule_priority=${rule_priority}"
+        echo ""
+        ;;
+    *)
+        echo ""
+        echo "Next steps:"
+        echo "  1. Run ./scripts/bootstrap-secrets.sh to populate API keys"
+        echo "  2. Build and push Docker image to ECR"
+        echo "  3. Run cdk deploy to deploy the application stack"
+        ;;
+esac

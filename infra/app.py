@@ -51,6 +51,7 @@ from stacks.infra_resolver import InfraResolver
 from stacks.media_stack import MediaStack
 from stacks.network_stack import NetworkStack
 from stacks.observability_stack import ObservabilityStack
+from stacks.shared_export_stack import SharedExportStack
 from stacks.validation import add_validation_aspects
 from stacks.waf_stack import WafCloudFrontStack, WafRegionalStack
 
@@ -69,6 +70,14 @@ env = cdk.Environment(
 # Otherwise, create all resources in standalone mode
 
 shared_infra_prefix = app.node.try_get_context("shared_infra_prefix")
+export_shared_infra_prefix = app.node.try_get_context("export_shared_infra_prefix")
+
+if export_shared_infra_prefix and shared_infra_prefix:
+    raise ValueError(
+        "Cannot set both shared_infra_prefix and export_shared_infra_prefix. "
+        "A deployment is either a provider (export) or a consumer (shared), not both."
+    )
+
 resolver = InfraResolver(app, shared_infra_prefix)
 
 # =============================================================================
@@ -197,6 +206,38 @@ else:
 app_stack.add_dependency(network)
 app_stack.add_dependency(media)
 app_stack.add_dependency(waf_regional)
+
+# =============================================================================
+# Shared Infrastructure Export (optional)
+# =============================================================================
+# If export_shared_infra_prefix is set, write standalone resources to SSM
+# so another deployment can consume them via shared_infra_prefix.
+
+if export_shared_infra_prefix:
+    if not certificate_arn:
+        raise ValueError(
+            "certificate_arn is required when exporting shared infrastructure. "
+            "HTTPS is needed so consumers can attach listener rules. "
+            "Pass --context certificate_arn=arn:aws:acm:..."
+        )
+
+    if not app_stack.https_listener:
+        raise ValueError("HTTPS listener was not created. Ensure certificate_arn is valid.")
+
+    shared_export = SharedExportStack(
+        app,
+        "PikaiaSharedExport",
+        prefix=export_shared_infra_prefix,
+        vpc=network.vpc,
+        alb=app_stack.alb,
+        https_listener=app_stack.https_listener,
+        database=app_stack.database,
+        database_security_group=app_stack.database_security_group,
+        rds_proxy=app_stack.rds_proxy,
+        env=env,
+    )
+    shared_export.add_dependency(network)
+    shared_export.add_dependency(app_stack)
 
 # =============================================================================
 # Frontend: S3 + CloudFront for React SPA
