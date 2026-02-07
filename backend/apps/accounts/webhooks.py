@@ -6,7 +6,6 @@ Stytch uses Svix for webhook delivery and signature verification.
 """
 
 import json
-from datetime import UTC, datetime
 
 from django.db import transaction
 from django.http import HttpRequest, HttpResponse
@@ -139,7 +138,7 @@ def handle_member_updated(data: dict) -> None:
     status = member_data.get("status")
     if status == "deleted" and member.deleted_at is None:
         logger.info("stytch_webhook_member_deleted", stytch_member_id=stytch_member_id)
-        member.deleted_at = datetime.now(UTC)
+        member.deleted_at = timezone.now()
         update_fields.append("deleted_at")
 
     if update_fields:
