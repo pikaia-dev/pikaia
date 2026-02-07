@@ -355,6 +355,37 @@ See [Observability Guide](../operations/observability.md) for:
 - Dashboard and alarm customization
 - Correlation between logs, events, and audit trails
 
+## Shared Infrastructure Mode
+
+Pikaia supports sharing infrastructure (VPC, ALB, Aurora) across multiple deployments to reduce costs. There are two CDK context flags that control this:
+
+- **`export_shared_infra_prefix`** — Deploy as a provider: creates all resources and exports them as SSM parameters for other deployments to consume.
+- **`shared_infra_prefix`** — Deploy as a consumer: skips VPC/ALB/Aurora creation and reads them from SSM parameters.
+
+### Deploy as Provider (Export)
+
+```bash
+cd infra && npx cdk deploy --all \
+  --context export_shared_infra_prefix=/shared-infra/prod \
+  --context certificate_arn=arn:aws:acm:... \
+  --context domain_name=api.yourdomain.com
+```
+
+### Deploy as Consumer (Shared)
+
+```bash
+# First, create a database in the shared Aurora cluster
+./scripts/create-project-database.sh myproject <cluster-endpoint>
+
+# Then deploy
+cd infra && npx cdk deploy --all \
+  --context shared_infra_prefix=/shared-infra/prod \
+  --context domain_name=api.myproject.com \
+  --context alb_rule_priority=200
+```
+
+See [Shared Infrastructure Architecture](../architecture/shared-infrastructure.md) for full details on setup, configuration, and troubleshooting.
+
 ## Next Steps
 
 - [ ] Configure custom domain with Route 53

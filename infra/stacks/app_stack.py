@@ -469,6 +469,7 @@ class AppStack(Stack):
 
             # Store shared ALB reference
             self.alb = shared_alb
+            self.https_listener = None
 
             # Auto-scaling
             scaling = self.ecs_service.auto_scale_task_count(
@@ -514,6 +515,7 @@ class AppStack(Stack):
             self.alb = self.fargate_service.load_balancer
             self.target_group = self.fargate_service.target_group
             self.ecs_service = self.fargate_service.service
+            self.https_listener = self.fargate_service.listener if certificate_arn else None
 
             # Health check configuration
             self.target_group.configure_health_check(

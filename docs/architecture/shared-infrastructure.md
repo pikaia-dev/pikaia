@@ -16,37 +16,122 @@ Pikaia supports running in **shared infrastructure mode**, allowing multiple pro
 ### Architecture
 
 ```
-shared-infra repo (private)
-├── SharedNetworkStack → VPC, NAT Gateway, subnets
-├── SharedAlbStack → ALB, HTTPS listener
-└── SharedDatabaseStack → Aurora cluster, RDS Proxy
-    ↓ exports to SSM Parameters
-
-pikaia repo (public) + other private repos
+Provider deployment (standalone + export)
+├── NetworkStack → VPC, NAT Gateway, subnets
+├── AppStack → Aurora cluster, RDS Proxy, ALB, HTTPS listener, ECS
+└── SharedExportStack → writes 11 SSM Parameters
+    ↓ SSM Parameters
+Consumer deployment (shared mode)
 ├── Detects shared_infra_prefix context flag
-├── If set: looks up resources from SSM
+├── Reads VPC/ALB/database from SSM
 └── Creates only: ECS service, target group, listener rule
 ```
 
 ## Shared Resources via SSM Parameters
 
-The shared infrastructure repo exports these SSM parameters:
+The following SSM parameters are used to share infrastructure between deployments:
 
 ```
-/shared-infra/{env}/network/vpc-id
-/shared-infra/{env}/network/private-subnet-ids
-/shared-infra/{env}/network/public-subnet-ids
-/shared-infra/{env}/network/availability-zones
+{prefix}/network/vpc-id
+{prefix}/network/private-subnet-ids
+{prefix}/network/public-subnet-ids
+{prefix}/network/availability-zones
 
-/shared-infra/{env}/alb/arn
-/shared-infra/{env}/alb/dns-name
-/shared-infra/{env}/alb/security-group-id
-/shared-infra/{env}/alb/https-listener-arn
+{prefix}/alb/arn
+{prefix}/alb/dns-name
+{prefix}/alb/security-group-id
+{prefix}/alb/https-listener-arn
 
-/shared-infra/{env}/database/cluster-endpoint
-/shared-infra/{env}/database/security-group-id
-/shared-infra/{env}/database/proxy-endpoint
+{prefix}/database/cluster-endpoint
+{prefix}/database/security-group-id
+{prefix}/database/proxy-endpoint
 ```
+
+## Setting Up Shared Infrastructure
+
+There are two ways to provide shared infrastructure:
+
+### Option A: Export from Standalone (Recommended)
+
+The simplest approach — deploy one project in standalone mode and export its resources via SSM parameters. No separate repo required.
+
+**Prerequisites:**
+- A standalone deployment with HTTPS configured (`certificate_arn` required)
+- The provider's database is created automatically by CDK
+
+**Deploy the provider:**
+
+```bash
+cd infra && npx cdk deploy --all \
+  --context export_shared_infra_prefix=/shared-infra/prod \
+  --context certificate_arn=arn:aws:acm:us-east-1:ACCOUNT:certificate/ID \
+  --context domain_name=api.provider.com
+```
+
+This deploys the full standalone stack plus a `PikaiaSharedExport` stack that writes 11 SSM parameters. Consumer deployments can then read these parameters.
+
+### Option B: Dedicated Shared-Infra Repo
+
+For centralized management, create a private repo with CDK stacks that export to SSM. This separates infrastructure ownership from application code.
+
+```python
+# Example: shared_network_stack.py
+class SharedNetworkStack(Stack):
+    def __init__(self, scope, construct_id, *, env_name: str, **kwargs):
+        super().__init__(scope, construct_id, **kwargs)
+
+        self.vpc = ec2.Vpc(self, "SharedVpc", max_azs=2, nat_gateways=1)
+
+        ssm.StringParameter(self, "VpcIdParam",
+            parameter_name=f"/shared-infra/{env_name}/network/vpc-id",
+            string_value=self.vpc.vpc_id,
+        )
+        # ... more parameters for all 11 values
+```
+
+## Adding a Consumer Project
+
+### 1. Create Project Database
+
+Each consumer needs its own database within the shared Aurora cluster. Use the provided script:
+
+```bash
+./scripts/create-project-database.sh myproject <cluster-endpoint> [aws-profile]
+```
+
+This creates:
+- PostgreSQL database: `myproject`
+- PostgreSQL user: `myproject_user`
+- Secrets Manager secret: `myproject/database-credentials`
+
+You'll need network access to the Aurora cluster (e.g., via VPN or bastion) and the master password from the provider's Secrets Manager.
+
+### 2. Bootstrap Application Secrets
+
+```bash
+RESOURCE_PREFIX=myproject ./scripts/bootstrap-infra.sh your-profile
+RESOURCE_PREFIX=myproject ./scripts/bootstrap-secrets.sh your-profile
+```
+
+### 3. Deploy in Shared Mode
+
+```bash
+cd infra && npx cdk deploy --all \
+  --context shared_infra_prefix=/shared-infra/prod \
+  --context domain_name=api.myproject.com \
+  --context alb_rule_priority=200 \
+  --context resource_prefix=myproject
+```
+
+### 4. Assign ALB Rule Priority
+
+Each project needs a unique ALB listener rule priority. Track assignments:
+
+| Project | Priority | Domain |
+|---------|----------|--------|
+| provider (pikaia) | — (default listener) | api.pikaia.dev |
+| consumer-a | 100 | api.consumer-a.com |
+| consumer-b | 200 | api.consumer-b.com |
 
 ## Usage
 
@@ -75,6 +160,13 @@ cdk deploy --all \
 | `domain_name` | API domain for host-based routing | `api.yourproject.com` |
 | `alb_rule_priority` | Unique priority (100-999) | `100` |
 
+### Export Context (Provider Only)
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `export_shared_infra_prefix` | SSM prefix to write parameters to | `/shared-infra/prod` |
+| `certificate_arn` | Required — HTTPS needed for listener rules | `arn:aws:acm:...` |
+
 ### Optional Context
 
 | Parameter | Description | Default |
@@ -82,87 +174,9 @@ cdk deploy --all \
 | `database_secret_path` | Project-specific DB credentials | `{resource_prefix}/database-credentials` |
 | `resource_prefix` | Prefix for all resources | `pikaia` |
 
-## Setting Up Shared Infrastructure
+## Mutual Exclusivity
 
-### 1. Create the Shared Infrastructure Repo
-
-Create a private repo with CDK stacks that export to SSM:
-
-```python
-# shared_network_stack.py
-class SharedNetworkStack(Stack):
-    def __init__(self, scope, construct_id, *, env_name: str, **kwargs):
-        super().__init__(scope, construct_id, **kwargs)
-
-        self.vpc = ec2.Vpc(
-            self, "SharedVpc",
-            max_azs=2,
-            nat_gateways=1,
-            subnet_configuration=[
-                ec2.SubnetConfiguration(
-                    name="Public",
-                    subnet_type=ec2.SubnetType.PUBLIC,
-                    cidr_mask=24
-                ),
-                ec2.SubnetConfiguration(
-                    name="Private",
-                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
-                    cidr_mask=24
-                ),
-            ],
-        )
-
-        # Export via SSM Parameters
-        ssm.StringParameter(self, "VpcIdParam",
-            parameter_name=f"/shared-infra/{env_name}/network/vpc-id",
-            string_value=self.vpc.vpc_id,
-        )
-        # ... more parameters
-```
-
-### 2. Create Project Database
-
-Each project needs its own database within the shared Aurora cluster:
-
-```bash
-#!/bin/bash
-# create-project-database.sh
-
-PROJECT_PREFIX=$1
-DB_NAME="${PROJECT_PREFIX}"
-DB_USER="${PROJECT_PREFIX}_user"
-DB_PASSWORD=$(openssl rand -base64 32)
-
-# Connect to Aurora as master user
-psql -h $CLUSTER_ENDPOINT -U postgres <<EOF
-CREATE DATABASE ${DB_NAME};
-CREATE USER ${DB_USER} WITH PASSWORD '${DB_PASSWORD}';
-GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};
-\c ${DB_NAME}
-GRANT ALL ON SCHEMA public TO ${DB_USER};
-EOF
-
-# Create project-specific secret
-aws secretsmanager create-secret \
-    --name "${PROJECT_PREFIX}/database-credentials" \
-    --secret-string "{
-        \"username\": \"${DB_USER}\",
-        \"password\": \"${DB_PASSWORD}\",
-        \"host\": \"${CLUSTER_ENDPOINT}\",
-        \"port\": \"5432\",
-        \"dbname\": \"${DB_NAME}\"
-    }"
-```
-
-### 3. Assign ALB Rule Priority
-
-Each project needs a unique ALB listener rule priority. Track assignments:
-
-| Project | Priority | Domain |
-|---------|----------|--------|
-| pikaia-demo | 100 | api.pikaia.dev |
-| startup-a | 200 | api.startup-a.com |
-| startup-b | 300 | api.startup-b.com |
+A deployment cannot be both a provider and a consumer. Setting both `shared_infra_prefix` and `export_shared_infra_prefix` will fail with a validation error.
 
 ## Database Isolation
 
@@ -202,12 +216,17 @@ else:
     # Create resources normally
 ```
 
+### SharedExportStack
+
+The `SharedExportStack` in `infra/stacks/shared_export_stack.py` writes SSM parameters from standalone resources. It requires all resources as explicit parameters — no optionals, the caller validates.
+
 ### Stack Changes
 
 | Stack | Standalone | Shared |
 |-------|------------|--------|
 | NetworkStack | Creates VPC | Wraps shared VPC |
 | AppStack | Creates Aurora, ALB, ECS | Uses shared DB/ALB, creates ECS + target group |
+| SharedExportStack | Writes SSM params (if exporting) | Not created |
 | FrontendStack | Uses ALB object | Uses ALB DNS string |
 | EventsStack | No changes | Uses shared DB security group |
 | ObservabilityStack | Full metrics | Skips DB metrics (shared DB) |
@@ -219,6 +238,31 @@ else:
 ```bash
 cd infra && cdk synth --all
 # Should synthesize all stacks without shared context
+```
+
+### Export Mode Synthesizes
+
+```bash
+cdk synth --all \
+  --context export_shared_infra_prefix=/shared-infra/test \
+  --context certificate_arn=arn:aws:acm:us-east-1:123:certificate/test
+# PikaiaSharedExport stack appears with 11 SSM parameters
+```
+
+### Mutual Exclusivity Fails
+
+```bash
+cdk synth --all \
+  --context shared_infra_prefix=/x \
+  --context export_shared_infra_prefix=/x
+# Fails with ValueError
+```
+
+### Export Without HTTPS Fails
+
+```bash
+cdk synth --all --context export_shared_infra_prefix=/x
+# Fails with ValueError (certificate_arn required)
 ```
 
 ### Shared Mode Synthesizes
@@ -233,7 +277,7 @@ cdk synth --all --context shared_infra_prefix=/shared-infra/test
 
 ### "Parameter not found" during synth
 
-The SSM parameters must exist before running `cdk synth` in shared mode. Deploy the shared-infra stack first.
+The SSM parameters must exist before running `cdk synth` in shared mode. Deploy the provider (or shared-infra stack) first.
 
 ### ALB listener rule priority conflict
 
@@ -242,5 +286,5 @@ Each project must have a unique priority. Check CloudFormation events for confli
 ### Database connection issues
 
 1. Verify the database secret exists and has correct credentials
-2. Check security group allows Lambda → RDS Proxy
+2. Check security group allows ECS/Lambda → RDS Proxy
 3. Verify RDS Proxy endpoint is correct in SSM
