@@ -567,20 +567,33 @@ def verify_phone_otp(request: AuthenticatedHttpRequest, payload: VerifyPhoneOtpR
         # OTP verified - now update the phone number
         old_phone = user.phone_number
 
-        # Handle Stytch phone update (delete-then-update pattern)
-        if old_phone:
-            with contextlib.suppress(StytchError):
-                client.organizations.members.delete_mfa_phone_number(
-                    organization_id=org.stytch_org_id,
-                    member_id=member.stytch_member_id,
-                )
+        # Sync phone to Stytch (non-fatal if it fails after OTP verification)
+        sync_warning = None
+        try:
+            if old_phone:
+                with contextlib.suppress(StytchError):
+                    client.organizations.members.delete_mfa_phone_number(
+                        organization_id=org.stytch_org_id,
+                        member_id=member.stytch_member_id,
+                    )
 
-        # Set new phone number in Stytch
-        client.organizations.members.update(
-            organization_id=org.stytch_org_id,
-            member_id=member.stytch_member_id,
-            mfa_phone_number=payload.phone_number,
-        )
+            client.organizations.members.update(
+                organization_id=org.stytch_org_id,
+                member_id=member.stytch_member_id,
+                mfa_phone_number=payload.phone_number,
+            )
+        except StytchError as e:
+            logger.warning(
+                "Failed to sync phone to Stytch: %r (org=%s, member=%s)",
+                e,
+                org.stytch_org_id,
+                member.stytch_member_id,
+                exc_info=True,
+            )
+            sync_warning = (
+                "Phone verified and saved locally but failed to sync to Stytch. "
+                "Please retry or contact support if the issue persists."
+            )
 
         # Update local database
         user.phone_number = payload.phone_number
@@ -598,7 +611,10 @@ def verify_phone_otp(request: AuthenticatedHttpRequest, payload: VerifyPhoneOtpR
             organization_id=str(org.id),
         )
 
-        return UserInfo.from_model(user)
+        response = UserInfo.from_model(user)
+        if sync_warning:
+            response.sync_warning = sync_warning
+        return response
 
     except StytchError as e:
         error_msg = _get_stytch_error_message(e)
