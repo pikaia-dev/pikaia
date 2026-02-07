@@ -30,6 +30,7 @@ from apps.accounts.api import (
     update_member_role_endpoint,
     update_organization,
     update_profile,
+    verify_phone_otp,
 )
 from apps.accounts.schemas import (
     BillingAddressSchema,
@@ -43,6 +44,7 @@ from apps.accounts.schemas import (
     UpdateMemberRoleRequest,
     UpdateOrganizationRequest,
     UpdateProfileRequest,
+    VerifyPhoneOtpRequest,
 )
 from apps.core.auth import AuthContext
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
@@ -738,6 +740,58 @@ class TestStartEmailUpdate:
 
         with pytest.raises(ValidationError):
             StartEmailUpdateRequest(new_email="not-an-email")
+
+
+@pytest.mark.django_db
+class TestVerifyPhoneOtp:
+    """Tests for verify_phone_otp endpoint."""
+
+    def test_stytch_phone_sync_failure_returns_sync_warning(
+        self, request_factory: RequestFactory
+    ) -> None:
+        """Should save locally with sync_warning when Stytch phone sync fails after OTP verification."""
+        from stytch.core.response_base import StytchError, StytchErrorDetails
+
+        user = UserFactory.create(phone_number="+14155550000")
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
+
+        request = request_factory.post(
+            "/api/v1/auth/phone/verify-otp",
+            HTTP_AUTHORIZATION="Bearer test-jwt",
+        )
+        request = make_request_with_auth(  # type: ignore[assignment]
+            request, AuthContext(user=user, member=member, organization=org)
+        )
+
+        payload = VerifyPhoneOtpRequest(phone_number="+14155551234", otp_code="123456")
+
+        with patch("apps.accounts.api.get_stytch_client") as mock_get_client:
+            mock_client = MagicMock()
+            # OTP verification succeeds
+            mock_client.otps.sms.authenticate.return_value = MagicMock()
+            # Phone delete succeeds
+            mock_client.organizations.members.delete_mfa_phone_number.return_value = MagicMock()
+            # But phone update fails
+            mock_client.organizations.members.update.side_effect = StytchError(
+                StytchErrorDetails(
+                    error_type="api_error",
+                    error_message="Stytch API error",
+                    status_code=500,
+                    request_id="req-789",
+                )
+            )
+            mock_get_client.return_value = mock_client
+
+            result = verify_phone_otp(request, payload)  # type: ignore[arg-type]
+
+        # Local update should succeed
+        assert result.phone_number == "+14155551234"
+        user.refresh_from_db()
+        assert user.phone_number == "+14155551234"
+        # Warning should be surfaced
+        assert result.sync_warning is not None
+        assert "failed to sync to stytch" in result.sync_warning.lower()
 
 
 @pytest.mark.django_db
