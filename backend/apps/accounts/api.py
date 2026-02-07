@@ -945,8 +945,8 @@ def list_members(
     local_by_stytch_id = {m.stytch_member_id: m for m in local_members}
 
     # If no Stytch results (e.g., Stytch call failed), fall back to local DB.
-    # In fallback mode, return all local members without pagination since we
-    # cannot provide a cursor for subsequent pages.
+    # Apply the same limit to cap response size, but set has_more=False since
+    # we cannot provide a cursor for subsequent pages in degraded mode.
     if not stytch_members_data:
         local_fallback = (
             Member.objects.filter(organization=org, deleted_at__isnull=True)
@@ -966,7 +966,7 @@ def list_members(
                     status="active",
                     created_at=m.created_at.isoformat(),
                 )
-                for m in local_fallback
+                for m in local_fallback[:limit]
             ],
             total=total,
             next_cursor=None,
