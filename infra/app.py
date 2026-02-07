@@ -230,6 +230,7 @@ if export_shared_infra_prefix:
         prefix=export_shared_infra_prefix,
         vpc=network.vpc,
         alb=app_stack.alb,
+        alb_security_group=app_stack.alb.connections.security_groups[0],
         https_listener=app_stack.https_listener,
         database=app_stack.database,
         database_security_group=app_stack.database_security_group,

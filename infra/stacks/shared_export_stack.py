@@ -28,6 +28,7 @@ class SharedExportStack(Stack):
         prefix: str,
         vpc: ec2.IVpc,
         alb: elbv2.IApplicationLoadBalancer,
+        alb_security_group: ec2.ISecurityGroup,
         https_listener: elbv2.IApplicationListener,
         database: rds.IDatabaseCluster,
         database_security_group: ec2.ISecurityGroup,
@@ -84,7 +85,7 @@ class SharedExportStack(Stack):
             self,
             "AlbSecurityGroupId",
             parameter_name=f"{prefix}/alb/security-group-id",
-            string_value=alb.connections.security_groups[0].security_group_id,
+            string_value=alb_security_group.security_group_id,
         )
 
         ssm.StringParameter(

@@ -44,6 +44,13 @@ CLUSTER_ENDPOINT="$2"
 AWS_PROFILE="${3:-pikaia}"
 export AWS_PROFILE
 
+# Validate project prefix (must be a safe PostgreSQL identifier)
+if [[ ! "$PROJECT_PREFIX" =~ ^[a-z][a-z0-9_]*$ ]]; then
+    echo "Error: project-prefix must start with a lowercase letter and contain only"
+    echo "       lowercase letters, digits, and underscores (e.g., 'myproject', 'app_v2')."
+    exit 1
+fi
+
 DB_NAME="${PROJECT_PREFIX}"
 DB_USER="${PROJECT_PREFIX}_user"
 DB_PASSWORD=$(openssl rand -base64 32)
