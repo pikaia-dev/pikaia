@@ -6,12 +6,25 @@ Pikaia supports running in **shared infrastructure mode**, allowing multiple pro
 
 ### Cost Comparison
 
-| Scenario | Monthly Cost |
+Estimated monthly costs (us-east-1, light traffic, 2026 pricing):
+
+| Resource | Monthly Cost |
 |----------|-------------|
-| 1 project standalone | ~$120 |
-| 1 project shared (base infrastructure) | ~$90 |
-| 2 projects sharing infrastructure | ~$105 (~$52/each) |
-| 3 projects sharing infrastructure | ~$120 (~$40/each) |
+| NAT Gateway (1) | ~$33 |
+| ALB | ~$22 |
+| Aurora Serverless v2 (0.5 ACU min) | ~$45 |
+| RDS Proxy (8 ACU min for Serverless v2) | ~$88 |
+| ECS Fargate (2 tasks × 0.5 vCPU / 1 GB) | ~$36 |
+| Misc (CloudWatch, ECR, Secrets) | ~$1 |
+
+Base infrastructure (NAT + ALB + Aurora + RDS Proxy) is ~$188/mo. Each project adds ~$37/mo for ECS + misc. Sharing eliminates duplicate base infrastructure:
+
+| Scenario | Total | Per-project |
+|----------|-------|-------------|
+| 1 project standalone | ~$225 | ~$225 |
+| 2 projects standalone | ~$450 | ~$225 |
+| 2 projects sharing | ~$262 | ~$131 |
+| 3 projects sharing | ~$299 | ~$100 |
 
 ### Architecture
 
@@ -180,7 +193,7 @@ Projects share the Aurora cluster but have separate:
 ### When to Graduate to Standalone
 
 Move a project to its own infrastructure when:
-- Revenue justifies the cost (~$90/month additional)
+- Revenue justifies the cost (~$188/month additional base infrastructure)
 - Traffic/database load affects other projects
 - Compliance requires full isolation
 - Project needs different region/availability requirements
