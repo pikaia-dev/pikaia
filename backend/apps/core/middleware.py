@@ -24,18 +24,22 @@ HEALTH_CHECK_PATH = "/api/v1/health"
 
 class HealthCheckMiddleware:
     """
-    Respond to health checks before Django's SecurityMiddleware.
+    Respond to ALB health checks before Django's SecurityMiddleware.
 
     ALB health checks use the container's private IP as the Host header,
     which Django rejects via ALLOWED_HOSTS. This middleware intercepts
-    health check requests early and returns 200 directly.
+    GET/HEAD requests to the health path early and returns 200 directly.
+
+    Intentionally bypasses the rest of the middleware chain — health
+    probes are high-frequency infrastructure calls that don't need
+    correlation IDs or auth context.
     """
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
-        if request.path == HEALTH_CHECK_PATH:
+        if request.method in ("GET", "HEAD") and request.path == HEALTH_CHECK_PATH:
             return JsonResponse({"status": "ok"})
         return self.get_response(request)
 
