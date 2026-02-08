@@ -10,7 +10,7 @@ from ninja import Router
 from ninja.errors import HttpError
 
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth, get_auth_context, require_admin
+from apps.core.security import BearerAuth, get_auth_context, require_admin, require_subscription
 from apps.core.types import AuthenticatedHttpRequest
 
 from .schemas import (
@@ -80,11 +80,12 @@ def _delivery_to_response(delivery) -> WebhookDeliveryResponse:
 
 @router.get(
     "/events",
-    response={200: WebhookEventListResponse},
+    response={200: WebhookEventListResponse, 402: ErrorResponse},
     auth=bearer_auth,
     operation_id="listWebhookEvents",
     summary="List available webhook events",
 )
+@require_subscription
 def list_events(request: AuthenticatedHttpRequest) -> WebhookEventListResponse:
     """
     Get the catalog of all available webhook event types.
@@ -103,12 +104,13 @@ def list_events(request: AuthenticatedHttpRequest) -> WebhookEventListResponse:
 
 @router.get(
     "/endpoints",
-    response={200: WebhookEndpointListResponse},
+    response={200: WebhookEndpointListResponse, 402: ErrorResponse},
     auth=bearer_auth,
     operation_id="listWebhookEndpoints",
     summary="List webhook endpoints",
 )
 @require_admin
+@require_subscription
 def list_endpoints(request: AuthenticatedHttpRequest) -> WebhookEndpointListResponse:
     """
     List all webhook endpoints for the organization.
@@ -124,12 +126,13 @@ def list_endpoints(request: AuthenticatedHttpRequest) -> WebhookEndpointListResp
 
 @router.post(
     "/endpoints",
-    response={201: WebhookEndpointWithSecretResponse, 400: ErrorResponse},
+    response={201: WebhookEndpointWithSecretResponse, 400: ErrorResponse, 402: ErrorResponse},
     auth=bearer_auth,
     operation_id="createWebhookEndpoint",
     summary="Create webhook endpoint",
 )
 @require_admin
+@require_subscription
 def create_endpoint(
     request: AuthenticatedHttpRequest,
     payload: WebhookEndpointCreate,
@@ -173,12 +176,13 @@ def create_endpoint(
 
 @router.get(
     "/endpoints/{endpoint_id}",
-    response={200: WebhookEndpointResponse, 404: ErrorResponse},
+    response={200: WebhookEndpointResponse, 402: ErrorResponse, 404: ErrorResponse},
     auth=bearer_auth,
     operation_id="getWebhookEndpoint",
     summary="Get webhook endpoint",
 )
 @require_admin
+@require_subscription
 def get_endpoint(request: AuthenticatedHttpRequest, endpoint_id: str) -> WebhookEndpointResponse:
     """
     Get a specific webhook endpoint.
@@ -197,12 +201,13 @@ def get_endpoint(request: AuthenticatedHttpRequest, endpoint_id: str) -> Webhook
 
 @router.patch(
     "/endpoints/{endpoint_id}",
-    response={200: WebhookEndpointResponse, 404: ErrorResponse},
+    response={200: WebhookEndpointResponse, 402: ErrorResponse, 404: ErrorResponse},
     auth=bearer_auth,
     operation_id="updateWebhookEndpoint",
     summary="Update webhook endpoint",
 )
 @require_admin
+@require_subscription
 def update_endpoint(
     request: AuthenticatedHttpRequest,
     endpoint_id: str,
@@ -233,12 +238,13 @@ def update_endpoint(
 
 @router.delete(
     "/endpoints/{endpoint_id}",
-    response={204: None, 404: ErrorResponse},
+    response={204: None, 402: ErrorResponse, 404: ErrorResponse},
     auth=bearer_auth,
     operation_id="deleteWebhookEndpoint",
     summary="Delete webhook endpoint",
 )
 @require_admin
+@require_subscription
 def delete_endpoint(request: AuthenticatedHttpRequest, endpoint_id: str) -> tuple[int, None]:
     """
     Delete a webhook endpoint.
@@ -270,12 +276,13 @@ def delete_endpoint(request: AuthenticatedHttpRequest, endpoint_id: str) -> tupl
 
 @router.get(
     "/endpoints/{endpoint_id}/deliveries",
-    response={200: WebhookDeliveryListResponse, 404: ErrorResponse},
+    response={200: WebhookDeliveryListResponse, 402: ErrorResponse, 404: ErrorResponse},
     auth=bearer_auth,
     operation_id="listWebhookDeliveries",
     summary="List webhook deliveries",
 )
 @require_admin
+@require_subscription
 def list_deliveries(
     request: AuthenticatedHttpRequest,
     endpoint_id: str,
@@ -308,12 +315,13 @@ def list_deliveries(
 
 @router.post(
     "/endpoints/{endpoint_id}/test",
-    response={200: WebhookTestResponse, 404: ErrorResponse},
+    response={200: WebhookTestResponse, 402: ErrorResponse, 404: ErrorResponse},
     auth=bearer_auth,
     operation_id="testWebhookEndpoint",
     summary="Send test webhook",
 )
 @require_admin
+@require_subscription
 def send_test_webhook(
     request: AuthenticatedHttpRequest,
     endpoint_id: str,

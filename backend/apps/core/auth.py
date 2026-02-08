@@ -74,3 +74,35 @@ class AuthContext:
         if not member.is_admin:
             raise HttpError(403, "Admin access required")
         return user, member, org
+
+    def require_subscription(self) -> tuple["User", "Member", "Organization"]:
+        """
+        Get authenticated context and verify active subscription, or raise error.
+
+        Use this in endpoints that require an active subscription.
+
+        Returns:
+            Tuple of (user, member, organization)
+
+        Raises:
+            HttpError 401: If not authenticated
+            HttpError 402: If no active subscription
+        """
+        user, member, org = self.require_auth()
+
+        from django.conf import settings
+
+        if not settings.SUBSCRIPTION_GATING_ENABLED:
+            return user, member, org
+
+        from apps.billing.models import Subscription
+
+        try:
+            subscription = org.subscription
+        except Subscription.DoesNotExist:
+            raise HttpError(402, "Active subscription required") from None
+
+        if not subscription.is_active:
+            raise HttpError(402, "Active subscription required")
+
+        return user, member, org

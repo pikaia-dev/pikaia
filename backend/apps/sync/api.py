@@ -10,7 +10,8 @@ from ninja import Query, Router
 from ninja.errors import HttpError
 
 from apps.core.logging import get_logger
-from apps.core.security import BearerAuth, get_auth_context
+from apps.core.schemas import ErrorResponse
+from apps.core.security import BearerAuth, get_auth_context, require_subscription
 from apps.events.services import publish_event
 from apps.sync.exceptions import CursorInvalidError
 from apps.sync.registry import SyncRegistry
@@ -35,11 +36,12 @@ bearer_auth = BearerAuth()
 
 @router.post(
     "/push",
-    response=SyncPushResponse,
+    response={200: SyncPushResponse, 402: ErrorResponse},
     auth=bearer_auth,
     summary="Push sync operations",
     description="Push a batch of sync operations from client to server. Max 100 operations per batch.",
 )
+@require_subscription
 def sync_push(request: HttpRequest, payload: SyncPushRequest) -> SyncPushResponse:
     """
     Process a batch of sync operations.
@@ -100,11 +102,12 @@ def sync_push(request: HttpRequest, payload: SyncPushRequest) -> SyncPushRespons
 
 @router.get(
     "/pull",
-    response=SyncPullResponse,
+    response={200: SyncPullResponse, 402: ErrorResponse},
     auth=bearer_auth,
     summary="Pull sync changes",
     description="Pull changes from server since the given cursor. Returns paginated results.",
 )
+@require_subscription
 def sync_pull(request: HttpRequest, params: Query[SyncPullParams]) -> SyncPullResponse:
     """
     Fetch changes since the cursor.

@@ -73,6 +73,37 @@ def require_admin[F: Callable[..., Any]](func: F) -> F:
     return wrapper  # type: ignore[return-value]
 
 
+def require_subscription[F: Callable[..., Any]](func: F) -> F:
+    """
+    Decorator that enforces an active subscription for an endpoint.
+
+    Use this on any endpoint that should be restricted to organizations
+    with an active subscription (active or trialing).
+
+    Example:
+        @router.post("/endpoint")
+        @require_subscription
+        def my_endpoint(request: HttpRequest) -> Response:
+            ...
+
+    Raises:
+        HttpError(401): If user is not authenticated
+        HttpError(402): If no active subscription
+    """
+
+    @wraps(func)
+    def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> Any:
+        from ninja.errors import HttpError
+
+        auth: AuthContext | None = getattr(request, "auth", None)
+        if auth is None:
+            raise HttpError(401, "Not authenticated")
+        auth.require_subscription()
+        return func(request, *args, **kwargs)
+
+    return wrapper  # type: ignore[return-value]
+
+
 def get_auth_context(
     request: HttpRequest,
 ) -> tuple["User", "Member", "Organization"]:
