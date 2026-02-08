@@ -195,7 +195,7 @@ class WafRegionalStack(Stack):
             self,
             "RegionalWafLogGroup",
             log_group_name=f"aws-waf-logs-{resource_prefix}-regional",
-            retention=logs.RetentionDays.NINETY_DAYS,
+            retention=logs.RetentionDays.THREE_MONTHS,
             removal_policy=RemovalPolicy.RETAIN,
         )
 
@@ -255,7 +255,7 @@ class WafCloudFrontStack(Stack):
             self,
             "CloudFrontWafLogGroup",
             log_group_name=f"aws-waf-logs-{resource_prefix}-cloudfront",
-            retention=logs.RetentionDays.NINETY_DAYS,
+            retention=logs.RetentionDays.THREE_MONTHS,
             removal_policy=RemovalPolicy.RETAIN,
         )
 

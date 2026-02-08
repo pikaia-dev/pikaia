@@ -6,7 +6,7 @@ import time
 from collections.abc import Callable
 from uuid import UUID, uuid4
 
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from stytch.core.response_base import StytchError
 
 from apps.core.auth import AuthContext
@@ -18,6 +18,26 @@ logger = get_logger(__name__)
 
 # Truncate user-agent to avoid bloating event payloads
 MAX_USER_AGENT_LENGTH = 512
+
+HEALTH_CHECK_PATH = "/api/v1/health"
+
+
+class HealthCheckMiddleware:
+    """
+    Respond to health checks before Django's SecurityMiddleware.
+
+    ALB health checks use the container's private IP as the Host header,
+    which Django rejects via ALLOWED_HOSTS. This middleware intercepts
+    health check requests early and returns 200 directly.
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        if request.path == HEALTH_CHECK_PATH:
+            return JsonResponse({"status": "ok"})
+        return self.get_response(request)
 
 
 class CorrelationIdMiddleware:
