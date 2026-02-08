@@ -207,6 +207,17 @@ export interface DirectoryUser {
   avatar_url: string
 }
 
+// Connected accounts types
+export interface ConnectedAccount {
+  provider: string
+  provider_subject: string
+  connected_at: string
+}
+
+export interface ConnectedAccountsResponse {
+  accounts: ConnectedAccount[]
+}
+
 // Bulk invite types
 export interface BulkInviteMemberItem {
   email: string

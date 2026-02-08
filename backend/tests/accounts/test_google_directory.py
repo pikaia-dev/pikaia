@@ -4,74 +4,37 @@ Tests for Google Directory API client.
 Tests token retrieval from Stytch and directory user search.
 """
 
-from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
-from stytch.core.response_base import StytchError, StytchErrorDetails
 
 from apps.accounts.google_directory import (
     DirectoryUser,
     get_google_access_token,
     search_directory_users,
 )
+from apps.accounts.oauth_providers import OAuthProvider
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
 
 
-@dataclass
-class MockGoogleOAuthResponse:
-    """Mock Stytch Google OAuth response."""
-
-    access_token: str | None
-
-
 class TestGetGoogleAccessToken:
-    """Tests for get_google_access_token function."""
+    """Tests for get_google_access_token - verifies it delegates to get_oauth_token."""
 
-    @patch("apps.accounts.google_directory.get_stytch_client")
-    def test_returns_token_on_success(self, mock_get_client: MagicMock) -> None:
-        """Should return access token when Stytch call succeeds."""
-        mock_client = MagicMock()
-        mock_client.organizations.members.oauth_providers.google.return_value = (
-            MockGoogleOAuthResponse(access_token="google-access-token-123")
-        )
-        mock_get_client.return_value = mock_client
+    @patch("apps.accounts.google_directory.get_oauth_token")
+    def test_delegates_to_get_oauth_token(self, mock_get_oauth_token: MagicMock) -> None:
+        """Should delegate to get_oauth_token with GOOGLE provider."""
+        mock_get_oauth_token.return_value = "google-access-token-123"
 
         result = get_google_access_token("org-123", "member-456")
 
         assert result == "google-access-token-123"
-        mock_client.organizations.members.oauth_providers.google.assert_called_once_with(
-            organization_id="org-123",
-            member_id="member-456",
-        )
+        mock_get_oauth_token.assert_called_once_with(OAuthProvider.GOOGLE, "org-123", "member-456")
 
-    @patch("apps.accounts.google_directory.get_stytch_client")
-    def test_returns_none_on_stytch_error(self, mock_get_client: MagicMock) -> None:
-        """Should return None when Stytch returns an error."""
-        mock_client = MagicMock()
-        mock_client.organizations.members.oauth_providers.google.side_effect = StytchError(
-            StytchErrorDetails(
-                status_code=404,
-                request_id="req-123",
-                error_type="member_not_found",
-                error_message="No Google OAuth tokens for this member",
-            )
-        )
-        mock_get_client.return_value = mock_client
-
-        result = get_google_access_token("org-123", "member-789")
-
-        assert result is None
-
-    @patch("apps.accounts.google_directory.get_stytch_client")
-    def test_returns_none_when_token_is_none(self, mock_get_client: MagicMock) -> None:
-        """Should return None when Stytch returns no access token."""
-        mock_client = MagicMock()
-        mock_client.organizations.members.oauth_providers.google.return_value = (
-            MockGoogleOAuthResponse(access_token=None)
-        )
-        mock_get_client.return_value = mock_client
+    @patch("apps.accounts.google_directory.get_oauth_token")
+    def test_returns_none_when_no_token(self, mock_get_oauth_token: MagicMock) -> None:
+        """Should return None when get_oauth_token returns None."""
+        mock_get_oauth_token.return_value = None
 
         result = get_google_access_token("org-123", "member-456")
 

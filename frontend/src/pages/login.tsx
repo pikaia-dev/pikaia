@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { CheckEmailScreen } from '@/features/auth/components/check-email-screen'
 import { EmailLoginForm } from '@/features/auth/components/email-login-form'
+import { GitHubOAuthButton } from '@/features/auth/components/github-oauth-button'
 import { GoogleOAuthButton } from '@/features/auth/components/google-oauth-button'
 import { OrganizationSelector } from '@/features/auth/components/organization-selector'
 import { PasskeyLoginButton } from '@/features/auth/components/passkey-login-button'
@@ -27,6 +28,7 @@ interface PasskeyFirstLoginProps {
     user_id: number
   }) => void
   startGoogleOAuth: () => void
+  startGitHubOAuth: () => void
   sendMagicLink: (email: string) => void
   isLoading: boolean
   error: string | null
@@ -39,6 +41,7 @@ interface PasskeyFirstLoginProps {
 function PasskeyFirstLogin({
   onPasskeySuccess,
   startGoogleOAuth,
+  startGitHubOAuth,
   sendMagicLink,
   isLoading,
   error,
@@ -71,6 +74,7 @@ function PasskeyFirstLogin({
 
           <div className="space-y-2">
             <GoogleOAuthButton onClick={startGoogleOAuth} isLoading={isLoading} />
+            <GitHubOAuthButton onClick={startGitHubOAuth} isLoading={isLoading} />
             <button
               type="button"
               onClick={() => {
@@ -92,13 +96,12 @@ function PasskeyFirstLogin({
     <>
       <div className="text-center mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
-        <p className="text-sm text-muted-foreground mt-2">
-          Sign in with Google or enter your email
-        </p>
+        <p className="text-sm text-muted-foreground mt-2">Sign in to continue</p>
       </div>
 
       <div className="space-y-4">
         <GoogleOAuthButton onClick={startGoogleOAuth} isLoading={isLoading} />
+        <GitHubOAuthButton onClick={startGitHubOAuth} isLoading={isLoading} />
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
@@ -125,8 +128,14 @@ function PasskeyFirstLogin({
 export default function Login() {
   const navigate = useNavigate()
   const { session, isInitialized } = useStytchMemberSession()
-  const { state, sendMagicLink, startGoogleOAuth, exchangeSession, resetToEmail } =
-    useDiscoveryAuth()
+  const {
+    state,
+    sendMagicLink,
+    startGoogleOAuth,
+    startGitHubOAuth,
+    exchangeSession,
+    resetToEmail,
+  } = useDiscoveryAuth()
 
   // Try to show Google One Tap prompt on page load
   // If successful, it redirects to /auth/callback like regular OAuth
@@ -183,6 +192,7 @@ export default function Login() {
               }
             }}
             startGoogleOAuth={startGoogleOAuth}
+            startGitHubOAuth={startGitHubOAuth}
             sendMagicLink={sendMagicLink}
             isLoading={state.isLoading}
             error={state.error}

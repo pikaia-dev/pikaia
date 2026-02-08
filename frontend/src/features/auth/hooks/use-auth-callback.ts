@@ -15,11 +15,13 @@ import {
   generateRetryOrgInfo,
   getSingleLoginOrg,
 } from '@/features/auth/utils/org-derivation'
+import { clearConnectFlow, isConnectFlow } from '@/features/settings/hooks/use-connect-provider'
 
 export type TokenType =
   | 'discovery'
   | 'discovery_oauth'
   | 'multi_tenant_magic_links'
+  | 'oauth'
   | 'impersonation'
   | null
 
@@ -67,6 +69,15 @@ export function useAuthCallback(options: UseAuthCallbackOptions = {}): UseAuthCa
   }, [])
 
   const setSuccess = useCallback(() => {
+    // If this was a connect flow (linking a provider from settings),
+    // redirect back to profile settings instead of dashboard
+    if (isConnectFlow()) {
+      clearConnectFlow()
+      setState((prev) => ({ ...prev, error: null }))
+      window.location.href = '/settings/profile'
+      return
+    }
+
     sessionStorage.setItem('stytch_just_logged_in', 'true')
     setState((prev) => ({ ...prev, error: null }))
     window.location.href = '/dashboard'
@@ -210,6 +221,20 @@ export function useAuthCallback(options: UseAuthCallbackOptions = {}): UseAuthCa
   )
 
   /**
+   * Handle org-scoped OAuth token (e.g., connecting a provider from settings).
+   */
+  const handleOrgScopedOAuthToken = useCallback(
+    async (token: string): Promise<void> => {
+      await stytch.oauth.authenticate({
+        oauth_token: token,
+        session_duration_minutes: SESSION_DURATION_MINUTES,
+      })
+      setSuccess()
+    },
+    [stytch, setSuccess]
+  )
+
+  /**
    * Handle impersonation tokens from Stytch dashboard.
    */
   const handleImpersonationToken = useCallback(
@@ -248,6 +273,9 @@ export function useAuthCallback(options: UseAuthCallbackOptions = {}): UseAuthCa
         case 'multi_tenant_magic_links':
           await handleInviteToken(token)
           break
+        case 'oauth':
+          await handleOrgScopedOAuthToken(token)
+          break
         case 'impersonation':
           await handleImpersonationToken(token)
           break
@@ -265,6 +293,7 @@ export function useAuthCallback(options: UseAuthCallbackOptions = {}): UseAuthCa
     handleDiscoveryToken,
     handleOAuthToken,
     handleInviteToken,
+    handleOrgScopedOAuthToken,
     handleImpersonationToken,
     setError,
   ])

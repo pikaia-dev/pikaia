@@ -23,6 +23,8 @@ from apps.accounts.schemas import (
     BulkInviteRequest,
     BulkInviteResponse,
     BulkInviteResultItem,
+    ConnectedAccountSchema,
+    ConnectedAccountsResponse,
     DirectoryUserSchema,
     DiscoveredOrganization,
     DiscoveryCreateOrgRequest,
@@ -54,6 +56,7 @@ from apps.accounts.schemas import (
 )
 from apps.accounts.services import (
     bulk_invite_members,
+    get_connected_accounts_from_stytch,
     invite_member,
     provision_mobile_user,
     soft_delete_member,
@@ -1405,3 +1408,64 @@ def get_directory_avatar(request: AuthenticatedHttpRequest, url: str = ""):
         )
     except httpx.HTTPError:
         raise HttpError(404, "Failed to fetch avatar") from None
+
+
+# --- Connected Accounts ---
+
+
+@router.get(
+    "/me/connected-accounts",
+    response={200: ConnectedAccountsResponse, 401: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="getConnectedAccounts",
+    summary="Get connected OAuth providers",
+)
+def get_connected_accounts(request: AuthenticatedHttpRequest) -> ConnectedAccountsResponse:
+    """
+    Get the current member's connected OAuth providers.
+
+    Syncs from Stytch on each call to ensure freshness.
+    """
+    _, member, _ = get_auth_context(request)
+
+    accounts = get_connected_accounts_from_stytch(member)
+
+    return ConnectedAccountsResponse(
+        accounts=[
+            ConnectedAccountSchema(
+                provider=account.provider,
+                provider_subject=account.provider_subject,
+                connected_at=account.connected_at.isoformat(),
+            )
+            for account in accounts
+        ],
+    )
+
+
+@router.delete(
+    "/me/connected-accounts/{provider}",
+    response={200: MessageResponse, 401: ErrorResponse, 404: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="disconnectProvider",
+    summary="Disconnect an OAuth provider",
+)
+def disconnect_provider(request: AuthenticatedHttpRequest, provider: str) -> MessageResponse:
+    """
+    Remove a connected OAuth provider tracking record.
+
+    This only removes the local tracking record. The actual OAuth connection
+    in Stytch remains (managed via Stytch dashboard or re-authentication).
+    """
+    from apps.accounts.models import ConnectedAccount
+
+    _, member, _ = get_auth_context(request)
+
+    deleted_count, _ = ConnectedAccount.objects.filter(
+        member=member,
+        provider=provider.lower(),
+    ).delete()
+
+    if deleted_count == 0:
+        raise HttpError(404, f"No connected account found for provider: {provider}")
+
+    return MessageResponse(message=f"Disconnected {provider}")

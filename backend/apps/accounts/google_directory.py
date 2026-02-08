@@ -12,9 +12,8 @@ import httpx
 
 if TYPE_CHECKING:
     from apps.accounts.models import Member, User
-from stytch.core.response_base import StytchError
 
-from apps.accounts.stytch_client import get_stytch_client
+from apps.accounts.oauth_providers import OAuthProvider, get_oauth_token
 from apps.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -36,32 +35,9 @@ def get_google_access_token(organization_id: str, member_id: str) -> str | None:
     """
     Get Google access token from Stytch for a member.
 
-    Stytch stores and auto-refreshes Google OAuth tokens.
-    Returns None if no Google OAuth tokens are available.
+    Delegates to the generic get_oauth_token with GOOGLE provider.
     """
-    try:
-        client = get_stytch_client()
-        response = client.organizations.members.oauth_providers.google(
-            organization_id=organization_id,
-            member_id=member_id,
-        )
-        # access_token is directly on the response (Optional field)
-        if not response.access_token:
-            logger.warning(
-                "Stytch returned no access_token for member %s (org %s)",
-                member_id,
-                organization_id,
-            )
-        return response.access_token
-    except StytchError as e:
-        # No Google OAuth tokens for this member
-        error_message = e.details.error_message if e.details else str(e)
-        logger.debug(
-            "google_oauth_token_not_found",
-            member_id=member_id,
-            error=error_message,
-        )
-        return None
+    return get_oauth_token(OAuthProvider.GOOGLE, organization_id, member_id)
 
 
 def search_directory_users(

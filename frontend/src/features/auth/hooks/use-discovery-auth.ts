@@ -11,6 +11,7 @@ interface UseDiscoveryAuthReturn {
   state: LoginState
   sendMagicLink: (email: string) => Promise<void>
   startGoogleOAuth: () => void
+  startGitHubOAuth: () => void
   authenticateDiscoveryToken: (token: string) => Promise<void>
   authenticateOAuthToken: (token: string) => Promise<void>
   exchangeSession: (organizationId: string) => Promise<void>
@@ -74,6 +75,15 @@ export function useDiscoveryAuth(): UseDiscoveryAuthReturn {
     void stytch.oauth.google.discovery.start({
       discovery_redirect_url: `${window.location.origin}/auth/callback`,
       custom_scopes: ['https://www.googleapis.com/auth/admin.directory.user.readonly'],
+    })
+  }, [stytch])
+
+  /**
+   * Start GitHub OAuth Discovery flow.
+   */
+  const startGitHubOAuth = useCallback(() => {
+    void stytch.oauth.github.discovery.start({
+      discovery_redirect_url: `${window.location.origin}/auth/callback`,
     })
   }, [stytch])
 
@@ -187,6 +197,7 @@ export function useDiscoveryAuth(): UseDiscoveryAuthReturn {
     state,
     sendMagicLink,
     startGoogleOAuth,
+    startGitHubOAuth,
     authenticateDiscoveryToken,
     authenticateOAuthToken,
     exchangeSession,

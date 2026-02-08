@@ -663,3 +663,20 @@ class BulkInviteResponse(BaseModel):
     total: int = Field(..., description="Total members processed")
     succeeded: int = Field(..., description="Number of successful invites")
     failed: int = Field(..., description="Number of failed invites")
+
+
+# --- Connected Accounts Schemas ---
+
+
+class ConnectedAccountSchema(BaseModel):
+    """A connected OAuth provider for the current member."""
+
+    provider: str = Field(..., description="OAuth provider (google, github, microsoft)")
+    provider_subject: str = Field("", description="Provider-specific user identifier")
+    connected_at: str = Field(..., description="When the provider was connected (ISO format)")
+
+
+class ConnectedAccountsResponse(BaseModel):
+    """Response containing list of connected OAuth providers."""
+
+    accounts: list[ConnectedAccountSchema] = Field(..., description="List of connected providers")

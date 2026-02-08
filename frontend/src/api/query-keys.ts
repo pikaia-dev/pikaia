@@ -41,4 +41,8 @@ export const queryKeys = {
     all: ['passkeys'] as const,
     list: () => [...queryKeys.passkeys.all, 'list'] as const,
   },
+  connectedAccounts: {
+    all: ['connectedAccounts'] as const,
+    list: () => [...queryKeys.connectedAccounts.all, 'list'] as const,
+  },
 } as const
