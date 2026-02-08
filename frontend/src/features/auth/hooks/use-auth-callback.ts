@@ -16,6 +16,7 @@ import {
   getSingleLoginOrg,
 } from '@/features/auth/utils/org-derivation'
 import { clearConnectFlow, isConnectFlow } from '@/features/settings/hooks/use-connect-provider'
+import { config } from '@/lib/env'
 
 export type TokenType =
   | 'discovery'
@@ -70,18 +71,31 @@ export function useAuthCallback(options: UseAuthCallbackOptions = {}): UseAuthCa
 
   const setSuccess = useCallback(() => {
     // If this was a connect flow (linking a provider from settings),
-    // redirect back to profile settings instead of dashboard
+    // sync connected accounts from Stytch then redirect back to settings
     if (isConnectFlow()) {
       clearConnectFlow()
       setState((prev) => ({ ...prev, error: null }))
-      window.location.href = '/settings/profile'
+
+      const tokens = stytch.session.getTokens()
+      const jwt = tokens?.session_jwt
+      if (jwt) {
+        void fetch(`${config.apiUrl}/auth/me/connected-accounts/sync`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${jwt}` },
+          credentials: 'include',
+        }).finally(() => {
+          window.location.href = '/settings/profile'
+        })
+      } else {
+        window.location.href = '/settings/profile'
+      }
       return
     }
 
     sessionStorage.setItem('stytch_just_logged_in', 'true')
     setState((prev) => ({ ...prev, error: null }))
     window.location.href = '/dashboard'
-  }, [])
+  }, [stytch])
 
   const goToLogin = useCallback(() => {
     options.onRedirectToLogin?.()

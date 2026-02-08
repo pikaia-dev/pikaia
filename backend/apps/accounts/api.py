@@ -1510,7 +1510,40 @@ def get_connected_accounts(request: AuthenticatedHttpRequest) -> ConnectedAccoun
     """
     Get the current member's connected OAuth providers.
 
-    Syncs from Stytch on each call to ensure freshness.
+    Returns locally stored records. Use POST /me/connected-accounts/sync
+    to refresh from Stytch (e.g., after connecting a new provider).
+    """
+    from apps.accounts.models import ConnectedAccount
+
+    _, member, _ = get_auth_context(request)
+
+    accounts = ConnectedAccount.objects.filter(member=member)
+
+    return ConnectedAccountsResponse(
+        accounts=[
+            ConnectedAccountSchema(
+                provider=account.provider,
+                provider_subject=account.provider_subject,
+                connected_at=account.connected_at.isoformat(),
+            )
+            for account in accounts
+        ],
+    )
+
+
+@router.post(
+    "/me/connected-accounts/sync",
+    response={200: ConnectedAccountsResponse, 401: ErrorResponse},
+    auth=bearer_auth,
+    operation_id="syncConnectedAccounts",
+    summary="Sync connected accounts from Stytch",
+)
+def sync_connected_accounts(request: AuthenticatedHttpRequest) -> ConnectedAccountsResponse:
+    """
+    Refresh connected OAuth providers from Stytch.
+
+    Fetches the latest oauth_registrations from Stytch and syncs to local DB.
+    Called after connecting a new provider via OAuth flow.
     """
     _, member, _ = get_auth_context(request)
 

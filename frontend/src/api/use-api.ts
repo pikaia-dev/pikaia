@@ -149,6 +149,9 @@ export function useApi() {
       // Connected accounts
       getConnectedAccounts: () => api.get<ConnectedAccountsResponse>('/auth/me/connected-accounts'),
 
+      syncConnectedAccounts: () =>
+        api.post<ConnectedAccountsResponse>('/auth/me/connected-accounts/sync'),
+
       disconnectProvider: (provider: string) =>
         api.delete<MessageResponse>(`/auth/me/connected-accounts/${provider}`),
 
