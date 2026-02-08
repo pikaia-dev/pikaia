@@ -61,6 +61,7 @@ class FrontendStack(Stack):
         certificate_arn: str | None = None,
         api_domain: str | None = None,
         web_acl_id: str | None = None,
+        origin_verify_secret: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -104,20 +105,24 @@ class FrontendStack(Stack):
         # ALB origin for API routes
         # Use api_domain with HTTPS when available (has valid certificate)
         # Otherwise fall back to ALB DNS with HTTP (requires HTTP listener on ALB)
+        origin_custom_headers: dict[str, str] = {}
+        if origin_verify_secret:
+            origin_custom_headers["X-Origin-Verify"] = origin_verify_secret
+
         if api_domain:
             alb_origin = origins.HttpOrigin(
                 api_domain,
                 protocol_policy=cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
                 https_port=443,
+                custom_headers=origin_custom_headers or None,
             )
         else:
+            origin_custom_headers["CloudFront-Forwarded-Proto"] = "https"
             alb_origin = origins.HttpOrigin(
                 alb_dns,
                 protocol_policy=cloudfront.OriginProtocolPolicy.HTTP_ONLY,
                 http_port=80,
-                custom_headers={
-                    "CloudFront-Forwarded-Proto": "https",
-                },
+                custom_headers=origin_custom_headers,
             )
 
         # Certificate for custom domain

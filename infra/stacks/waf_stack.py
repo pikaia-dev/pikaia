@@ -6,6 +6,7 @@ Two separate stacks because AWS WAF requires different scopes and regions:
 - WafCloudFrontStack: CLOUDFRONT scope WebACL (must be deployed in us-east-1)
 
 Features:
+- Origin verification: Blocks requests to ALB that don't come via CloudFront (priority 0)
 - Rate limiting: 2000 requests per 5-minute window per IP (priority 1)
 - AWS Managed Rule Groups:
   - AWSManagedRulesAmazonIpReputationList: Blocks IPs with poor reputation
@@ -45,6 +46,47 @@ _MANAGED_RULE_GROUPS = [
         "priority": 20,
     },
 ]
+
+
+def _build_origin_verify_rule(
+    resource_prefix: str,
+    origin_verify_secret: str,
+) -> wafv2.CfnWebACL.RuleProperty:
+    """Build a rule that blocks requests missing the CloudFront origin header.
+
+    CloudFront adds a custom X-Origin-Verify header with a shared secret.
+    The ALB's regional WAF checks for this header and blocks requests
+    that bypass CloudFront (direct ALB access).
+    """
+    return wafv2.CfnWebACL.RuleProperty(
+        name=f"{resource_prefix}-origin-verify",
+        priority=0,
+        action=wafv2.CfnWebACL.RuleActionProperty(block={}),
+        statement=wafv2.CfnWebACL.StatementProperty(
+            not_statement=wafv2.CfnWebACL.NotStatementProperty(
+                statement=wafv2.CfnWebACL.StatementProperty(
+                    byte_match_statement=wafv2.CfnWebACL.ByteMatchStatementProperty(
+                        field_to_match=wafv2.CfnWebACL.FieldToMatchProperty(
+                            single_header={"Name": "x-origin-verify"},
+                        ),
+                        positional_constraint="EXACTLY",
+                        search_string=origin_verify_secret,
+                        text_transformations=[
+                            wafv2.CfnWebACL.TextTransformationProperty(
+                                priority=0,
+                                type="NONE",
+                            ),
+                        ],
+                    ),
+                ),
+            ),
+        ),
+        visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+            cloud_watch_metrics_enabled=True,
+            metric_name=f"{resource_prefix}-origin-verify",
+            sampled_requests_enabled=True,
+        ),
+    )
 
 
 def _build_rate_limit_rule(
@@ -104,8 +146,9 @@ class WafRegionalStack(Stack):
     """
     Creates a REGIONAL scope AWS WAF WebACL for ALB protection.
 
-    Includes rate limiting (2000 req/5min per IP), IP reputation filtering,
-    managed rule groups, and CloudWatch Logs logging.
+    Includes origin verification (blocks direct ALB access), rate limiting
+    (2000 req/5min per IP), IP reputation filtering, managed rule groups,
+    and CloudWatch Logs logging.
 
     Deploy in the same region as the ALB. In standalone mode, the WebACL
     is associated with the ALB via CfnWebACLAssociation in AppStack.
@@ -117,12 +160,18 @@ class WafRegionalStack(Stack):
         self,
         scope: Construct,
         construct_id: str,
+        *,
+        origin_verify_secret: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         resource_prefix = self.node.try_get_context("resource_prefix") or "pikaia"
         rules = _build_managed_rules(resource_prefix)
+
+        # Origin verification: block requests that don't come through CloudFront
+        if origin_verify_secret:
+            rules.insert(0, _build_origin_verify_rule(resource_prefix, origin_verify_secret))
 
         self.web_acl = wafv2.CfnWebACL(
             self,
