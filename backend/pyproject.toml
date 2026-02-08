@@ -26,6 +26,7 @@ dependencies = [
     "uuid6>=2024.11.27",
     "whitenoise>=6.8",
     "httpx>=0.28",
+    "sentry-sdk[django]>=2.22",
 ]
 
 [dependency-groups]

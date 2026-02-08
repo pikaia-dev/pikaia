@@ -152,6 +152,7 @@ jobs:
             --context availability_zones=${{ vars.AVAILABILITY_ZONES }}
             ${{ vars.CERTIFICATE_ARN && format('--context certificate_arn={0}', vars.CERTIFICATE_ARN) || '' }}
             ${{ vars.APP_DOMAIN_NAME && format('--context app_domain={0}', vars.APP_DOMAIN_NAME) || '' }}
+            ${{ vars.SENTRY_DSN && format('--context sentry_dsn={0}', vars.SENTRY_DSN) || '' }}
         run: |
           npm install -g aws-cdk
           uv sync
