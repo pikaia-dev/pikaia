@@ -111,6 +111,18 @@ class TestGetOAuthToken:
         assert result is None
 
     @patch("apps.accounts.oauth_providers.get_stytch_client")
+    def test_returns_none_when_provider_not_available(self, mock_get_client: MagicMock) -> None:
+        """Should return None when provider method is missing from Stytch client."""
+        mock_client = MagicMock()
+        # Simulate provider method not existing on the SDK
+        mock_client.organizations.members.oauth_providers = MagicMock(spec=[])
+        mock_get_client.return_value = mock_client
+
+        result = get_oauth_token(OAuthProvider.GOOGLE, "org-123", "member-456")
+
+        assert result is None
+
+    @patch("apps.accounts.oauth_providers.get_stytch_client")
     def test_dispatches_to_correct_provider_method(self, mock_get_client: MagicMock) -> None:
         """Should call the correct provider method on the Stytch client."""
         mock_client = MagicMock()

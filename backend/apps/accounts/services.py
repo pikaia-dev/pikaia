@@ -213,10 +213,13 @@ def sync_connected_accounts_from_member_data(
     Reads oauth_registrations from the already-fetched Stytch member object
     (no extra API call). Upserts ConnectedAccount records and removes stale ones.
     """
-    registrations = getattr(stytch_member, "oauth_registrations", None) or []
+    raw_registrations = getattr(stytch_member, "oauth_registrations", None)
+    if raw_registrations is None:
+        # Attribute missing entirely — session type doesn't include oauth data, skip sync
+        return
 
     seen_providers: set[str] = set()
-    for reg in registrations:
+    for reg in raw_registrations:
         provider = getattr(reg, "provider_type", "").lower()
         if not provider:
             continue
@@ -230,13 +233,8 @@ def sync_connected_accounts_from_member_data(
             defaults={"provider_subject": provider_subject},
         )
 
-    # Remove providers that are no longer in Stytch
-    if seen_providers:
-        ConnectedAccount.objects.filter(member=member).exclude(provider__in=seen_providers).delete()
-    else:
-        # No registrations at all - don't delete existing records
-        # (could be a session type that doesn't include oauth_registrations)
-        pass
+    # Remove providers that are no longer in Stytch (including when list is explicitly empty)
+    ConnectedAccount.objects.filter(member=member).exclude(provider__in=seen_providers).delete()
 
 
 def get_connected_accounts_from_stytch(member: Member) -> list[ConnectedAccount]:

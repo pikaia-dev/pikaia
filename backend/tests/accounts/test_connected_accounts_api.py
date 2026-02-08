@@ -103,8 +103,8 @@ class TestSyncConnectedAccountsFromMemberData:
         assert first is not None
         assert first.provider == "google"
 
-    def test_no_registrations_does_not_delete_existing(self) -> None:
-        """Should not delete records when Stytch returns no registrations."""
+    def test_empty_registrations_deletes_existing(self) -> None:
+        """Should delete existing records when Stytch returns an empty list (all disconnected)."""
         ConnectedAccount.objects.create(
             member=self.member, provider="google", provider_subject="sub-1"
         )
@@ -113,10 +113,22 @@ class TestSyncConnectedAccountsFromMemberData:
 
         sync_connected_accounts_from_member_data(self.member, stytch_member)
 
+        assert ConnectedAccount.objects.filter(member=self.member).count() == 0
+
+    def test_missing_attr_does_not_delete_existing(self) -> None:
+        """Should preserve records when oauth_registrations attribute is missing entirely."""
+        ConnectedAccount.objects.create(
+            member=self.member, provider="google", provider_subject="sub-1"
+        )
+
+        stytch_member = MagicMock(spec=[])  # No oauth_registrations attribute
+
+        sync_connected_accounts_from_member_data(self.member, stytch_member)
+
         assert ConnectedAccount.objects.filter(member=self.member).count() == 1
 
-    def test_handles_missing_oauth_registrations_attr(self) -> None:
-        """Should handle Stytch member without oauth_registrations attribute."""
+    def test_handles_missing_oauth_registrations_attr_no_records(self) -> None:
+        """Should handle Stytch member without oauth_registrations when no records exist."""
         stytch_member = MagicMock(spec=[])  # No attributes
 
         sync_connected_accounts_from_member_data(self.member, stytch_member)

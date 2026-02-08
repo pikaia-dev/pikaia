@@ -40,7 +40,15 @@ def get_oauth_token(provider: OAuthProvider, organization_id: str, member_id: st
     """
     try:
         client = get_stytch_client()
-        provider_method = getattr(client.organizations.members.oauth_providers, provider.value)
+        provider_method = getattr(
+            client.organizations.members.oauth_providers, provider.value, None
+        )
+        if provider_method is None:
+            logger.warning(
+                "stytch_oauth_provider_not_available",
+                provider=provider.value,
+            )
+            return None
         response = provider_method(
             organization_id=organization_id,
             member_id=member_id,
