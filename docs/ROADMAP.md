@@ -12,23 +12,23 @@ Security and stability items that should be addressed before going live with rea
 
 | Item | Effort | Notes |
 |------|--------|-------|
-| **Add WAF to ALB** | 2h | OWASP protection, rate limiting at edge |
-| **Add WAF to CloudFront** | 2h | Bot protection for static assets |
+| ~~**Add WAF to ALB**~~ | ~~2h~~ | Done — `infra/stacks/waf_stack.py` (WafRegionalStack) |
+| ~~**Add WAF to CloudFront**~~ | ~~2h~~ | Done — `infra/stacks/waf_stack.py` (WafCloudFrontStack) |
 | **Add second NAT gateway** | 30m | HA for private subnet egress (single point of failure) |
-| **ALB origin HTTPS** | 1h | CloudFront → ALB currently HTTP only |
+| ~~**ALB origin HTTPS**~~ | ~~1h~~ | Done — CloudFront → ALB via HTTPS with origin verification header |
 
 ### Backend
 
 | Item | Effort | Notes |
 |------|--------|-------|
 | **Admin IP allowlist** | 1h | Restrict `/admin/` to VPN/office IPs |
-| **Rate limiting (auth endpoints)** | 2h | Magic link, password reset, failed auth |
+| ~~**Rate limiting (auth endpoints)**~~ | ~~2h~~ | Done — atomic cache counters on magic link, password reset, failed auth |
 
 ### Frontend
 
 | Item | Effort | Notes |
 |------|--------|-------|
-| **Add frontend CI workflow** | 1h | `pnpm lint && pnpm typecheck && pnpm test` |
+| ~~**Add frontend CI workflow**~~ | ~~1h~~ | Done — `.github/workflows/test-frontend.yml` (lint, format, typecheck, test) |
 
 ### Documentation
 
@@ -58,7 +58,7 @@ Items that become important as the product scales or based on customer feedback.
 
 | Item | Effort | When |
 |------|--------|------|
-| Free trial support | 4h | When sales model requires it |
+| ~~Free trial support~~ | ~~4h~~ | Done — trial fields on Organization, Stripe checkout with `trial_period_days` |
 | Grace period for failed payments | 2h | When churn from failed cards is an issue |
 | MFA UI components | 4h | When enterprise customers require it |
 | Admin impersonation | 4h | When support volume increases |
@@ -72,7 +72,7 @@ Items that become important as the product scales or based on customer feedback.
 |------|--------|------|
 | E2E tests (Playwright) | 16h | When regression bugs become costly |
 | Bundle size monitoring | 2h | When load times become an issue |
-| Error boundary components | 2h | When unhandled errors affect UX |
+| ~~Error boundary components~~ | ~~2h~~ | Done — `error-fallback.tsx` with router and app-level boundaries |
 | Add aria-describedby for form errors | 2h | When accessibility audit required |
 | Coverage thresholds in CI | 1h | When coverage drift becomes a problem |
 
@@ -110,26 +110,6 @@ Nice-to-have features that expand the platform's capabilities.
 
 ## Reference Implementation Details
 
-### WAF Configuration
-
-```python
-from aws_cdk import aws_wafv2 as wafv2
-
-web_acl = wafv2.CfnWebACL(
-    self, "WebACL",
-    scope="REGIONAL",
-    default_action={"allow": {}},
-    rules=[
-        # AWSManagedRulesCommonRuleSet — OWASP Top 10
-        # AWSManagedRulesKnownBadInputsRuleSet — Log4j, etc.
-        # AWSManagedRulesSQLiRuleSet — SQL injection
-        # Rate-based rule — 2000 requests per 5 minutes per IP
-    ],
-)
-```
-
-**Cost:** ~$5/month base + $1/million requests
-
 ### Admin IP Allowlist
 
 **Options:**
@@ -138,32 +118,3 @@ web_acl = wafv2.CfnWebACL(
 3. **Separate internal ALB** — Admin on private subnet
 
 **Recommendation:** Start with middleware, migrate to WAF for production.
-
-### Free Trial Implementation
-
-```python
-class Organization(Model):
-    trial_ends_at = DateTimeField(null=True, blank=True)
-    trial_extended_count = IntegerField(default=0)
-
-    @property
-    def is_trial_active(self) -> bool:
-        if not self.trial_ends_at:
-            return False
-        return timezone.now() < self.trial_ends_at
-```
-
-**Stripe integration:**
-- Create customer without subscription during trial
-- Use Stripe Checkout with `trial_period_days` for conversion
-- Handle `customer.subscription.trial_will_end` webhook
-
-### Rate Limiting (Auth Endpoints)
-
-| Endpoint | Limit | Reason |
-|----------|-------|--------|
-| Magic link send | 5/min per email | Prevents email bombing |
-| Password reset | 3/hour per email | Prevents harassment |
-| Failed auth | 10/hour per IP+email | Prevents credential stuffing |
-
-**Implementation:** Simple DB cache counter (already using Django DB cache for passkey challenges).
