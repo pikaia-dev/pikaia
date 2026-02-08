@@ -6,7 +6,7 @@ from .frontend_stack import FrontendStack
 from .media_stack import MediaStack
 from .network_stack import NetworkStack
 from .observability_stack import ObservabilityStack
-from .waf_stack import WafStack
+from .waf_stack import WafCloudFrontStack, WafRegionalStack
 
 __all__ = [
     "AppStack",
@@ -15,5 +15,6 @@ __all__ = [
     "MediaStack",
     "NetworkStack",
     "ObservabilityStack",
-    "WafStack",
+    "WafCloudFrontStack",
+    "WafRegionalStack",
 ]

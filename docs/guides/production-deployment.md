@@ -241,17 +241,59 @@ curl http://YOUR_ALB_URL/api/v1/health
 
 ### Tasks Failing to Start
 - Check CloudWatch logs for the ECS task
-- Verify secrets are populated in AWS Secrets Manager
-- Ensure Docker image is built for `linux/amd64`
+- Verify secrets are populated in AWS Secrets Manager — each key referenced by the ECS task definition must exist in the secret JSON (including `STYTCH_WEBHOOK_SECRET` and `MOBILE_PROVISION_API_KEY`)
+- Ensure Docker image is built for `linux/amd64` (Mac builds default to ARM64)
 
-### Health Checks Failing
-- Health check path: `/api/v1/health` (no trailing slash)
-- Verify security groups allow traffic on port 8000
-- Check Django `ALLOWED_HOSTS` includes the ALB hostname
+### Health Checks Failing (DisallowedHost)
+
+ALB health checks use the container's **private IP** as the `Host` header (e.g., `10.0.3.82:8000`). Django's `SecurityMiddleware` rejects these via `ALLOWED_HOSTS` before the request reaches the health endpoint.
+
+**Fix**: `HealthCheckMiddleware` in `apps.core.middleware` intercepts requests to `/api/v1/health` *before* `SecurityMiddleware` and returns `200` directly. It must be first in the `MIDDLEWARE` list.
+
+If you see `DisallowedHost: Invalid HTTP_HOST header` in CloudWatch logs for health check requests, verify the middleware ordering in `config/settings/base.py`.
 
 ### Database Connection Issues
 - Verify the database security group allows inbound from ECS security group
 - Check secrets contain correct database credentials
+
+### CDK Bootstrap Broken (CDKToolkit Stack)
+
+If `CDKToolkit` is stuck in `ROLLBACK_COMPLETE` or `REVIEW_IN_PROGRESS`:
+
+```bash
+# 1. Delete the CDKToolkit stack
+aws cloudformation delete-stack --stack-name CDKToolkit --profile your-profile
+
+# 2. Empty and delete the orphaned S3 assets bucket (has versioning enabled)
+BUCKET=cdk-hnb659fds-assets-ACCOUNT_ID-REGION
+aws s3api list-object-versions --bucket $BUCKET --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' --output json | \
+  aws s3api delete-objects --bucket $BUCKET --delete file:///dev/stdin
+aws s3api list-object-versions --bucket $BUCKET --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' --output json | \
+  aws s3api delete-objects --bucket $BUCKET --delete file:///dev/stdin
+aws s3 rb s3://$BUCKET --profile your-profile
+
+# 3. Re-bootstrap
+AWS_PROFILE=your-profile npx cdk bootstrap aws://ACCOUNT_ID/REGION
+```
+
+### Aurora Deletion Protection Blocking Rollback
+
+CDK sets `deletion_protection=True` on Aurora clusters. If a deployment fails and CloudFormation rolls back, it can't delete the database, causing `ROLLBACK_FAILED`.
+
+```bash
+# Disable deletion protection to allow rollback
+aws rds modify-db-cluster \
+  --db-cluster-identifier CLUSTER_ID \
+  --no-deletion-protection \
+  --profile your-profile
+
+# Then continue the rollback
+aws cloudformation continue-update-rollback --stack-name PikaiaApp --profile your-profile
+```
+
+### SQS Queue Name Cooldown
+
+After deleting SQS queues, AWS enforces a **60-second cooldown** before queues with the same name can be recreated. If `PikaiaEvents` fails with "queue already exists" errors, wait 60 seconds and retry.
 
 ## Continuous Deployment (Push-to-Deploy)
 
