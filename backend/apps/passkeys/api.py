@@ -7,12 +7,15 @@ Provides endpoints for passkey registration, authentication, and management.
 import json
 import logging
 
+from django.conf import settings as django_settings
 from django.http import HttpRequest
 from ninja import Router
 from ninja.errors import HttpError
 
 from apps.accounts.stytch_client import get_stytch_client
 from apps.core.security import BearerAuth, get_auth_context
+from apps.core.throttling import RateLimitExceeded, check_rate_limit
+from apps.core.utils import get_client_ip
 from apps.passkeys.models import Passkey
 from apps.passkeys.schemas import (
     PasskeyAuthenticationOptionsRequest,
@@ -104,6 +107,16 @@ def get_authentication_options(
     payload: PasskeyAuthenticationOptionsRequest,
 ) -> PasskeyAuthenticationOptionsResponse:
     """Generate authentication options (optionally filtered by email)."""
+    try:
+        client_ip = get_client_ip(request, default="unknown")
+        check_rate_limit(
+            f"passkey_auth_options:ip:{client_ip}",
+            max_requests=django_settings.AUTH_RATE_LIMIT_PASSKEY_AUTH_PER_IP * 2,
+            window_seconds=django_settings.AUTH_RATE_LIMIT_PASSKEY_AUTH_WINDOW,
+        )
+    except RateLimitExceeded as e:
+        raise HttpError(429, str(e)) from None
+
     service = get_passkey_service()
     result = service.generate_authentication_options(email=payload.email)
 
@@ -124,7 +137,15 @@ def verify_authentication(
     payload: PasskeyAuthenticationVerifyRequest,
 ) -> PasskeyAuthenticationVerifyResponse:
     """Verify authentication response and create Stytch session."""
-    from django.conf import settings as django_settings
+    try:
+        client_ip = get_client_ip(request, default="unknown")
+        check_rate_limit(
+            f"passkey_auth_verify:ip:{client_ip}",
+            max_requests=django_settings.AUTH_RATE_LIMIT_PASSKEY_AUTH_PER_IP,
+            window_seconds=django_settings.AUTH_RATE_LIMIT_PASSKEY_AUTH_WINDOW,
+        )
+    except RateLimitExceeded as e:
+        raise HttpError(429, str(e)) from None
 
     from apps.passkeys.trusted_auth import create_trusted_auth_token
 
