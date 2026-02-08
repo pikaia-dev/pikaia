@@ -1,19 +1,22 @@
 """
 Tests for core security module.
 
-Tests BearerAuth authentication class and require_admin decorator.
+Tests BearerAuth authentication class, require_admin, and require_subscription decorators.
 """
 
 from unittest.mock import MagicMock
 
 import pytest
 from django.http import HttpRequest, HttpResponse
+from django.test import override_settings
 from ninja.errors import HttpError
 
 from apps.accounts.models import User
+from apps.billing.models import Subscription
 from apps.core.auth import AuthContext
-from apps.core.security import BearerAuth, require_admin
+from apps.core.security import BearerAuth, require_admin, require_subscription
 from tests.accounts.factories import MemberFactory, OrganizationFactory, UserFactory
+from tests.billing.factories import SubscriptionFactory
 from tests.conftest import MockRequest, make_request_with_auth
 
 
@@ -143,3 +146,147 @@ class TestGetAuthContext:
             get_auth_context(request)
 
         assert exc.value.status_code == 401
+
+
+@pytest.mark.django_db
+class TestRequireSubscription:
+    """Tests for require_subscription decorator."""
+
+    @override_settings(SUBSCRIPTION_GATING_ENABLED=True)
+    def test_allows_user_with_active_subscription(self, request_factory) -> None:
+        """Should allow users with active subscription through."""
+        sub = SubscriptionFactory.create(status=Subscription.Status.ACTIVE)
+        org = sub.organization
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
+
+        request = request_factory.get("/")
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
+
+        @require_subscription
+        def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("OK")
+
+        result = view(request)
+        assert result.status_code == 200
+
+    @override_settings(SUBSCRIPTION_GATING_ENABLED=True)
+    def test_allows_user_with_trialing_subscription(self, request_factory) -> None:
+        """Should allow users with trialing subscription through."""
+        sub = SubscriptionFactory.create(status=Subscription.Status.TRIALING)
+        org = sub.organization
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
+
+        request = request_factory.get("/")
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
+
+        @require_subscription
+        def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("OK")
+
+        result = view(request)
+        assert result.status_code == 200
+
+    @override_settings(SUBSCRIPTION_GATING_ENABLED=True)
+    def test_rejects_user_with_canceled_subscription(self, request_factory) -> None:
+        """Should reject users with canceled subscription with 402."""
+        sub = SubscriptionFactory.create(status=Subscription.Status.CANCELED)
+        org = sub.organization
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
+
+        request = request_factory.get("/")
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
+
+        @require_subscription
+        def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("OK")
+
+        with pytest.raises(HttpError) as exc:
+            view(request)
+
+        assert exc.value.status_code == 402
+
+    @override_settings(SUBSCRIPTION_GATING_ENABLED=True)
+    def test_rejects_user_with_no_subscription(self, request_factory) -> None:
+        """Should reject users with no subscription record with 402."""
+        user = UserFactory.create()
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
+
+        request = request_factory.get("/")
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
+
+        @require_subscription
+        def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("OK")
+
+        with pytest.raises(HttpError) as exc:
+            view(request)
+
+        assert exc.value.status_code == 402
+
+    @override_settings(SUBSCRIPTION_GATING_ENABLED=True)
+    def test_rejects_unauthenticated_user(self, request_factory) -> None:
+        """Should reject unauthenticated users with 401."""
+        request = request_factory.get("/")
+        request = make_request_with_auth(request, AuthContext())
+
+        @require_subscription
+        def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("OK")
+
+        with pytest.raises(HttpError) as exc:
+            view(request)
+
+        assert exc.value.status_code == 401
+
+    @override_settings(SUBSCRIPTION_GATING_ENABLED=False)
+    def test_bypasses_check_when_gating_disabled(self, request_factory) -> None:
+        """Should bypass subscription check when gating is disabled."""
+        user = UserFactory.create()
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
+
+        request = request_factory.get("/")
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
+
+        @require_subscription
+        def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("OK")
+
+        result = view(request)
+        assert result.status_code == 200
+
+    @override_settings(SUBSCRIPTION_GATING_ENABLED=True)
+    def test_admin_check_runs_before_subscription_check(self, request_factory) -> None:
+        """Non-admin should get 403, not 402, when decorators are stacked."""
+        user = UserFactory.create()
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="member")
+
+        request = request_factory.get("/")
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
+
+        @require_admin
+        @require_subscription
+        def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("OK")
+
+        with pytest.raises(HttpError) as exc:
+            view(request)
+
+        assert exc.value.status_code == 403

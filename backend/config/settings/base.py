@@ -89,6 +89,9 @@ class Settings(BaseSettings):
     AWS_SMS_OTP_LENGTH: int = 4  # Length of OTP codes
     AWS_SMS_OTP_EXPIRY_MINUTES: int = 30  # OTP expiration time
 
+    # Feature gating
+    SUBSCRIPTION_GATING_ENABLED: bool = True
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
@@ -347,3 +350,6 @@ SYNC_PULL_DEFAULT_LIMIT = 100  # Default changes per pull request
 SYNC_PULL_MAX_LIMIT = 500  # Max changes per pull request
 SYNC_TOMBSTONE_RETENTION_DAYS = 90  # Days to keep soft-deleted records
 SYNC_CLOCK_SKEW_TOLERANCE_MS = 100  # Overlap window for cursor queries
+
+# Feature gating
+SUBSCRIPTION_GATING_ENABLED = settings.SUBSCRIPTION_GATING_ENABLED

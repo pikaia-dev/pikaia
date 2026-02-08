@@ -21,7 +21,7 @@ from ninja import Router
 from ninja.errors import HttpError
 
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth, get_auth_context, require_admin
+from apps.core.security import BearerAuth, get_auth_context, require_admin, require_subscription
 from apps.core.types import AuthenticatedHttpRequest
 
 from .events import WEBHOOK_EVENTS, get_event_type
@@ -63,12 +63,13 @@ def _detect_source(target_url: str) -> WebhookEndpoint.Source:
 
 @router.post(
     "",
-    response={201: RestHookSubscribeResponse, 400: ErrorResponse},
+    response={201: RestHookSubscribeResponse, 400: ErrorResponse, 402: ErrorResponse},
     auth=bearer_auth,
     operation_id="subscribeHook",
     summary="Subscribe to webhook events",
 )
 @require_admin
+@require_subscription
 def subscribe(
     request: AuthenticatedHttpRequest,
     payload: RestHookSubscribeRequest,
@@ -125,12 +126,13 @@ def subscribe(
 
 @router.get(
     "",
-    response={200: RestHookListResponse},
+    response={200: RestHookListResponse, 402: ErrorResponse},
     auth=bearer_auth,
     operation_id="listHooks",
     summary="List webhook subscriptions",
 )
 @require_admin
+@require_subscription
 def list_subscriptions(request: AuthenticatedHttpRequest) -> RestHookListResponse:
     """
     List all REST Hook subscriptions for the organization.
@@ -159,12 +161,13 @@ def list_subscriptions(request: AuthenticatedHttpRequest) -> RestHookListRespons
 
 @router.delete(
     "/{subscription_id}",
-    response={204: None, 404: ErrorResponse},
+    response={204: None, 402: ErrorResponse, 404: ErrorResponse},
     auth=bearer_auth,
     operation_id="unsubscribeHook",
     summary="Unsubscribe from webhook events",
 )
 @require_admin
+@require_subscription
 def unsubscribe(
     request: AuthenticatedHttpRequest,
     subscription_id: str,
@@ -201,12 +204,13 @@ def unsubscribe(
 
 @router.get(
     "/samples/{event_type}",
-    response={200: EventSampleResponse, 404: ErrorResponse},
+    response={200: EventSampleResponse, 402: ErrorResponse, 404: ErrorResponse},
     auth=bearer_auth,
     operation_id="getEventSample",
     summary="Get sample payload for event type",
 )
 @require_admin
+@require_subscription
 def get_sample(
     request: AuthenticatedHttpRequest,
     event_type: str,
@@ -250,12 +254,13 @@ def get_sample(
 
 @router.get(
     "/auth/test",
-    response={200: AuthTestResponse},
+    response={200: AuthTestResponse, 402: ErrorResponse},
     auth=bearer_auth,
     operation_id="testAuth",
     summary="Test authentication",
 )
 @require_admin
+@require_subscription
 def verify_auth(request: AuthenticatedHttpRequest) -> AuthTestResponse:
     """
     Test that authentication is working.

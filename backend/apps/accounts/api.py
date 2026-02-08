@@ -65,7 +65,7 @@ from apps.accounts.stytch_client import get_stytch_client
 from apps.billing.services import sync_billing_to_stripe
 from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth, get_auth_context, require_admin
+from apps.core.security import BearerAuth, get_auth_context, require_admin, require_subscription
 from apps.core.throttling import RateLimitExceeded, check_rate_limit
 from apps.core.types import AuthenticatedHttpRequest
 from apps.core.utils import get_client_ip
@@ -741,11 +741,12 @@ def start_email_update(
 
 @router.get(
     "/organization",
-    response={200: OrganizationDetailResponse, 401: ErrorResponse},
+    response={200: OrganizationDetailResponse, 401: ErrorResponse, 402: ErrorResponse},
     auth=bearer_auth,
     operation_id="getOrganization",
     summary="Get current organization details",
 )
+@require_subscription
 def get_organization(request: AuthenticatedHttpRequest) -> OrganizationDetailResponse:
     """
     Get current organization details including billing info.
@@ -779,12 +780,18 @@ def get_organization(request: AuthenticatedHttpRequest) -> OrganizationDetailRes
 
 @router.patch(
     "/organization",
-    response={200: OrganizationDetailResponse, 401: ErrorResponse, 403: ErrorResponse},
+    response={
+        200: OrganizationDetailResponse,
+        401: ErrorResponse,
+        402: ErrorResponse,
+        403: ErrorResponse,
+    },
     auth=bearer_auth,
     operation_id="updateOrganization",
     summary="Update organization settings",
 )
 @require_admin
+@require_subscription
 def update_organization(
     request: AuthenticatedHttpRequest, payload: UpdateOrganizationRequest
 ) -> OrganizationDetailResponse:
@@ -846,12 +853,18 @@ def update_organization(
 
 @router.patch(
     "/organization/billing",
-    response={200: OrganizationDetailResponse, 401: ErrorResponse, 403: ErrorResponse},
+    response={
+        200: OrganizationDetailResponse,
+        401: ErrorResponse,
+        402: ErrorResponse,
+        403: ErrorResponse,
+    },
     auth=bearer_auth,
     operation_id="updateBilling",
     summary="Update organization billing info",
 )
 @require_admin
+@require_subscription
 def update_billing(
     request: AuthenticatedHttpRequest, payload: UpdateBillingRequest
 ) -> OrganizationDetailResponse:
@@ -942,12 +955,13 @@ def update_billing(
 
 @router.get(
     "/organization/members",
-    response={200: MemberListResponse, 401: ErrorResponse, 403: ErrorResponse},
+    response={200: MemberListResponse, 401: ErrorResponse, 402: ErrorResponse, 403: ErrorResponse},
     auth=bearer_auth,
     operation_id="listMembers",
     summary="List organization members",
 )
 @require_admin
+@require_subscription
 def list_members(
     request: AuthenticatedHttpRequest,
     cursor: str | None = None,
@@ -1072,6 +1086,7 @@ def list_members(
         200: InviteMemberResponse,
         400: ErrorResponse,
         401: ErrorResponse,
+        402: ErrorResponse,
         403: ErrorResponse,
     },
     auth=bearer_auth,
@@ -1079,6 +1094,7 @@ def list_members(
     summary="Invite a new member",
 )
 @require_admin
+@require_subscription
 def invite_member_endpoint(
     request: AuthenticatedHttpRequest, payload: InviteMemberRequest
 ) -> InviteMemberResponse:
@@ -1136,6 +1152,7 @@ def invite_member_endpoint(
         200: BulkInviteResponse,
         400: ErrorResponse,
         401: ErrorResponse,
+        402: ErrorResponse,
         403: ErrorResponse,
     },
     auth=bearer_auth,
@@ -1143,6 +1160,7 @@ def invite_member_endpoint(
     summary="Bulk invite multiple members",
 )
 @require_admin
+@require_subscription
 def bulk_invite_members_endpoint(
     request: AuthenticatedHttpRequest, payload: BulkInviteRequest
 ) -> BulkInviteResponse:
@@ -1243,6 +1261,7 @@ def bulk_invite_members_endpoint(
         200: MessageResponse,
         400: ErrorResponse,
         401: ErrorResponse,
+        402: ErrorResponse,
         403: ErrorResponse,
         404: ErrorResponse,
     },
@@ -1251,6 +1270,7 @@ def bulk_invite_members_endpoint(
     summary="Update member role",
 )
 @require_admin
+@require_subscription
 def update_member_role_endpoint(
     request: AuthenticatedHttpRequest, member_id: str, payload: UpdateMemberRoleRequest
 ) -> MessageResponse:
@@ -1304,6 +1324,7 @@ def update_member_role_endpoint(
         200: MessageResponse,
         400: ErrorResponse,
         401: ErrorResponse,
+        402: ErrorResponse,
         403: ErrorResponse,
         404: ErrorResponse,
     },
@@ -1312,6 +1333,7 @@ def update_member_role_endpoint(
     summary="Remove member from organization",
 )
 @require_admin
+@require_subscription
 def delete_member_endpoint(request: AuthenticatedHttpRequest, member_id: str) -> MessageResponse:
     """
     Remove a member from the organization.
@@ -1361,11 +1383,12 @@ def delete_member_endpoint(request: AuthenticatedHttpRequest, member_id: str) ->
 
 @router.get(
     "/directory/search",
-    response={200: list[DirectoryUserSchema], 401: ErrorResponse},
+    response={200: list[DirectoryUserSchema], 401: ErrorResponse, 402: ErrorResponse},
     auth=bearer_auth,
     operation_id="searchDirectory",
     summary="Search Google Workspace directory for users",
 )
+@require_subscription
 def search_directory(request: AuthenticatedHttpRequest, q: str = "") -> list[DirectoryUserSchema]:
     """
     Search Google Workspace directory for coworkers.
@@ -1396,11 +1419,18 @@ def search_directory(request: AuthenticatedHttpRequest, q: str = "") -> list[Dir
 
 @router.get(
     "/directory/avatar",
-    response={200: bytes, 400: ErrorResponse, 401: ErrorResponse, 404: ErrorResponse},
+    response={
+        200: bytes,
+        400: ErrorResponse,
+        401: ErrorResponse,
+        402: ErrorResponse,
+        404: ErrorResponse,
+    },
     auth=bearer_auth,
     operation_id="getDirectoryAvatar",
     summary="Proxy Google Workspace avatar image",
 )
+@require_subscription
 def get_directory_avatar(request: AuthenticatedHttpRequest, url: str = ""):
     """
     Proxy a Google Workspace avatar image.
