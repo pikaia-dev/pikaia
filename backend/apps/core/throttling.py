@@ -40,6 +40,11 @@ def check_rate_limit(
     """
     Check and increment a rate limit counter.
 
+    Uses ``cache.add()`` + ``cache.incr()`` for near-atomic increments.
+    ``add()`` is a no-op when the key exists, and ``incr()`` uses
+    ``SELECT ... FOR UPDATE`` in Django's DatabaseCache, preventing most
+    race conditions across concurrent ECS tasks.
+
     Args:
         key: Cache key identifying the rate limit bucket
             (e.g., "magic_link_send:user@example.com").
@@ -50,13 +55,21 @@ def check_rate_limit(
         RateLimitExceeded: If the limit has been reached.
     """
     cache_key = f"rate_limit:{key}"
-    current = cache.get(cache_key, 0)
 
-    if current >= max_requests:
+    # Atomically create key with 0 if it doesn't exist (no-op if it does)
+    cache.add(cache_key, 0, timeout=window_seconds)
+
+    # Atomically increment and get new value
+    try:
+        current = cache.incr(cache_key)
+    except ValueError:
+        # Key expired between add() and incr() — treat as first request
+        cache.set(cache_key, 1, timeout=window_seconds)
+        return
+
+    if current > max_requests:
         logger.warning("rate_limit_exceeded", key=key, limit=max_requests, window=window_seconds)
         raise RateLimitExceeded(
             "Too many requests. Please try again later.",
             retry_after=window_seconds,
         )
-
-    cache.set(cache_key, current + 1, timeout=window_seconds)
