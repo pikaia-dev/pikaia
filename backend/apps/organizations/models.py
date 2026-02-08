@@ -3,6 +3,7 @@ Organizations models - multi-tenancy foundation.
 """
 
 from django.db import models
+from django.utils import timezone
 
 from apps.core.models import SoftDeleteAllManager, SoftDeleteManager, SoftDeleteMixin
 
@@ -75,6 +76,17 @@ class Organization(SoftDeleteMixin, models.Model):
         help_text="EU VAT number, e.g. 'DE123456789'",
     )
 
+    # Free trial
+    trial_ends_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the free trial expires (null = no trial)",
+    )
+    trial_extended_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of times the trial has been extended",
+    )
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -88,3 +100,16 @@ class Organization(SoftDeleteMixin, models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    @property
+    def is_trial_active(self) -> bool:
+        if not self.trial_ends_at:
+            return False
+        return timezone.now() < self.trial_ends_at
+
+    @property
+    def trial_days_remaining(self) -> int:
+        if not self.trial_ends_at:
+            return 0
+        remaining = (self.trial_ends_at - timezone.now()).days
+        return max(0, remaining)

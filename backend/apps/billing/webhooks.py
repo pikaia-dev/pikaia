@@ -109,6 +109,14 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
                         customer_id=invoice["customer"],
                     )
 
+                case "customer.subscription.trial_will_end":
+                    subscription = event["data"]["object"]
+                    logger.info(
+                        "stripe_subscription_trial_will_end",
+                        subscription_id=subscription["id"],
+                        customer_id=subscription.get("customer"),
+                    )
+
                 case _:
                     logger.debug("stripe_webhook_unhandled_event", event_type=event["type"])
 

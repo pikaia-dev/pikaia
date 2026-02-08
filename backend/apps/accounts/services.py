@@ -4,9 +4,12 @@ Auth services - business logic for authentication.
 Handles sync between Stytch and local User/Member/Organization models.
 """
 
+from datetime import timedelta
 from typing import Any
 
+from django.conf import settings as django_settings
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
 from apps.accounts.constants import StytchRoles
 from apps.accounts.models import Member, User
@@ -98,6 +101,7 @@ def get_or_create_organization_from_stytch(
                 stytch_org_id=stytch_org_id,
                 name=name,
                 slug=slug,
+                trial_ends_at=timezone.now() + timedelta(days=django_settings.FREE_TRIAL_DAYS),
             )
         except IntegrityError:
             # Concurrent insert won the race, fetch the winner
