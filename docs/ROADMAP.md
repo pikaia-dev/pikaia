@@ -35,7 +35,7 @@ Security and stability items that should be addressed before going live with rea
 | Item | Effort | Notes |
 |------|--------|-------|
 | **Deployment runbook** | 2h | Step-by-step deploy, rollback, secrets rotation |
-| **scripts/setup-client.sh** | 1h | Setup script for customers forking repo: generates cdk.context.json, removes it from .gitignore, sets up GitHub env vars |
+| ~~**scripts/setup-client.sh**~~ | ~~1h~~ | Done — see `scripts/setup/setup.sh` (interactive setup wizard via `@clack/prompts`) |
 
 ---
 
