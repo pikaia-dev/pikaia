@@ -140,6 +140,8 @@ def get_subscription(request: AuthenticatedHttpRequest) -> SubscriptionResponse:
     """
     _, _, org = get_auth_context(request)
 
+    trial_ends_at = org.trial_ends_at.isoformat() if org.trial_ends_at else None
+
     try:
         subscription = org.subscription
         return SubscriptionResponse(
@@ -148,6 +150,8 @@ def get_subscription(request: AuthenticatedHttpRequest) -> SubscriptionResponse:
             current_period_end=subscription.current_period_end.isoformat(),
             cancel_at_period_end=subscription.cancel_at_period_end,
             stripe_customer_id=org.stripe_customer_id,
+            trial_ends_at=trial_ends_at,
+            is_trial_active=org.is_trial_active,
         )
     except Subscription.DoesNotExist:
         # No subscription
@@ -160,6 +164,8 @@ def get_subscription(request: AuthenticatedHttpRequest) -> SubscriptionResponse:
             current_period_end=None,
             cancel_at_period_end=False,
             stripe_customer_id=org.stripe_customer_id,
+            trial_ends_at=trial_ends_at,
+            is_trial_active=org.is_trial_active,
         )
 
 

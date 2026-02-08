@@ -39,6 +39,8 @@ class SubscriptionResponse(Schema):
     current_period_end: str | None
     cancel_at_period_end: bool
     stripe_customer_id: str | None
+    trial_ends_at: str | None  # ISO timestamp
+    is_trial_active: bool
 
 
 class SubscriptionIntentRequest(Schema):

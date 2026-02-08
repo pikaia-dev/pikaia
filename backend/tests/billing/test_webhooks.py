@@ -301,6 +301,33 @@ class TestStripeWebhookEventDispatching:
     @patch("apps.billing.webhooks.stripe.Webhook.construct_event")
     @patch("apps.billing.webhooks.settings")
     @patch("apps.billing.webhooks.get_stripe")
+    def test_trial_will_end_event_logged(
+        self,
+        mock_get_stripe: MagicMock,
+        mock_settings: MagicMock,
+        mock_construct: MagicMock,
+        client: Client,
+        webhook_url: str,
+    ) -> None:
+        """Should handle customer.subscription.trial_will_end event successfully."""
+        mock_settings.STRIPE_WEBHOOK_SECRET = "whsec_test"
+        mock_construct.return_value = build_webhook_payload(
+            "customer.subscription.trial_will_end",
+            {"id": "sub_123", "customer": "cus_123"},
+        )
+
+        response = client.post(
+            webhook_url,
+            data=json.dumps({"type": "customer.subscription.trial_will_end"}),
+            content_type="application/json",
+            HTTP_STRIPE_SIGNATURE="valid_signature",
+        )
+
+        assert response.status_code == 200
+
+    @patch("apps.billing.webhooks.stripe.Webhook.construct_event")
+    @patch("apps.billing.webhooks.settings")
+    @patch("apps.billing.webhooks.get_stripe")
     def test_unhandled_event_returns_200(
         self,
         mock_get_stripe: MagicMock,

@@ -56,6 +56,16 @@ refactor(api): extract pagination logic
 
 See [.agent/rules/](./.agent/rules/) for detailed coding standards.
 
+## Environment Variables
+
+All app branding and resource names are configurable via environment variables — never hardcode project-specific values in source code:
+
+- **Backend**: `APP_SLUG`, `WEBAUTHN_RP_NAME`, `DEVICE_LINK_URL_SCHEME` in `backend/.env`
+- **Infrastructure**: `resource_prefix` and related keys in `infra/cdk.json` context
+- **Docker**: `COMPOSE_PROJECT_NAME` in `.env.local`
+
+Run `./scripts/setup/setup.sh` to generate all config files interactively.
+
 ## AI Agent Configuration
 
 This project uses a unified `.agent/` directory for AI coding assistant configuration:

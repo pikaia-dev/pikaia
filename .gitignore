@@ -241,6 +241,12 @@ infra/uv.lock
 # Production secrets
 .env.production
 
+# Setup script state
+.pikaia-setup.json
+
+# Setup script dependencies
+scripts/setup/node_modules/
+
 # AI Agent Local Config
 *.local.md
 .agent/settings.local.json

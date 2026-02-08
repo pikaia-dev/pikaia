@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     DEVICE_SESSION_EXPIRY_MINUTES: int = 525600  # 1 year default
     DEVICE_LINK_URL_SCHEME: str = "pikaia://device/link"  # Deep link URL for QR code
 
+    # Free trial
+    FREE_TRIAL_DAYS: int = 14
+
     # Application branding (used for Stripe metadata, etc.)
     APP_SLUG: str = "pikaia"
 
@@ -85,6 +88,9 @@ class Settings(BaseSettings):
     AWS_SMS_ORIGINATION_IDENTITY: str = ""  # Phone number or sender ID
     AWS_SMS_OTP_LENGTH: int = 4  # Length of OTP codes
     AWS_SMS_OTP_EXPIRY_MINUTES: int = 30  # OTP expiration time
+
+    # Feature gating
+    SUBSCRIPTION_GATING_ENABLED: bool = True
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
@@ -312,12 +318,28 @@ AWS_SMS_ORIGINATION_IDENTITY = settings.AWS_SMS_ORIGINATION_IDENTITY
 AWS_SMS_OTP_LENGTH = settings.AWS_SMS_OTP_LENGTH
 AWS_SMS_OTP_EXPIRY_MINUTES = settings.AWS_SMS_OTP_EXPIRY_MINUTES
 
+# Auth endpoint rate limits
+AUTH_RATE_LIMIT_MAGIC_LINK_SEND_PER_EMAIL = 5  # Per email per 15 min
+AUTH_RATE_LIMIT_MAGIC_LINK_SEND_PER_IP = 20  # Per IP per 15 min
+AUTH_RATE_LIMIT_MAGIC_LINK_SEND_WINDOW = 900  # 15 minutes
+AUTH_RATE_LIMIT_TOKEN_AUTH_PER_IP = 10  # Per IP per minute
+AUTH_RATE_LIMIT_TOKEN_AUTH_WINDOW = 60  # 1 minute
+AUTH_RATE_LIMIT_ORG_CREATE_PER_IP = 3  # Per IP per hour
+AUTH_RATE_LIMIT_ORG_CREATE_WINDOW = 3600  # 1 hour
+AUTH_RATE_LIMIT_MOBILE_PROVISION_PER_IP = 5  # Per IP per minute
+AUTH_RATE_LIMIT_MOBILE_PROVISION_WINDOW = 60  # 1 minute
+AUTH_RATE_LIMIT_PASSKEY_AUTH_PER_IP = 10  # Per IP per minute
+AUTH_RATE_LIMIT_PASSKEY_AUTH_WINDOW = 60  # 1 minute
+
 # Device linking
 DEVICE_LINK_TOKEN_EXPIRY_SECONDS = 300  # 5 minutes
 DEVICE_MAX_LINK_ATTEMPTS_PER_HOUR = 5  # Rate limit for initiating links (per user)
 DEVICE_LINK_COMPLETE_MAX_ATTEMPTS_PER_HOUR = 20  # Rate limit for completing links (per IP)
 DEVICE_SESSION_EXPIRY_MINUTES = settings.DEVICE_SESSION_EXPIRY_MINUTES
 DEVICE_LINK_URL_SCHEME = settings.DEVICE_LINK_URL_SCHEME
+
+# Free trial
+FREE_TRIAL_DAYS = settings.FREE_TRIAL_DAYS
 
 # Application branding
 APP_SLUG = settings.APP_SLUG
@@ -328,3 +350,6 @@ SYNC_PULL_DEFAULT_LIMIT = 100  # Default changes per pull request
 SYNC_PULL_MAX_LIMIT = 500  # Max changes per pull request
 SYNC_TOMBSTONE_RETENTION_DAYS = 90  # Days to keep soft-deleted records
 SYNC_CLOCK_SKEW_TOLERANCE_MS = 100  # Overlap window for cursor queries
+
+# Feature gating
+SUBSCRIPTION_GATING_ENABLED = settings.SUBSCRIPTION_GATING_ENABLED

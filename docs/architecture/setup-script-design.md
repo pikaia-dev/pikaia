@@ -401,36 +401,37 @@ Minimal state to enable idempotency:
 
 ### Codebase Refactoring (Do First)
 
-- [ ] `backend/config/settings/base.py` — Add `APP_SLUG`, `DEVICE_LINK_URL_SCHEME` as env vars
-- [ ] `backend/apps/billing/management/commands/setup_stripe.py` — Use `settings.APP_SLUG`
-- [ ] `infra/cdk.json` — Add context defaults
-- [ ] `infra/stacks/app_stack.py` — Read resource names from context
-- [ ] `infra/stacks/events_stack.py` — Read resource names from context
-- [ ] `infra/stacks/observability_stack.py` — Read resource names from context
-- [ ] `infra/stacks/frontend_stack.py` — Read bucket prefix from context
-- [ ] `docker-compose.yml` — Add env var substitution
-- [ ] `scripts/bootstrap-infra.sh` — Read from env vars
-- [ ] `scripts/bootstrap-secrets.sh` — Read from env vars
-- [ ] `.gitignore` — Add `cdk.context.json`, `.pikaia-setup.json`
-- [ ] `.env.example` files — Add new env vars with defaults
+- [x] `backend/config/settings/base.py` — Add `APP_SLUG`, `DEVICE_LINK_URL_SCHEME` as env vars
+- [x] `backend/apps/billing/management/commands/setup_stripe.py` — Use `settings.APP_SLUG`
+- [x] `infra/cdk.json` — Add context defaults
+- [x] `infra/stacks/app_stack.py` — Read resource names from context
+- [x] `infra/stacks/events_stack.py` — Read resource names from context
+- [x] `infra/stacks/observability_stack.py` — Read resource names from context
+- [x] `infra/stacks/frontend_stack.py` — Read bucket prefix from context
+- [x] `docker-compose.yml` — Add env var substitution
+- [x] `scripts/bootstrap-infra.sh` — Read from env vars
+- [x] `scripts/bootstrap-secrets.sh` — Read from env vars
+- [x] `.gitignore` — Add `cdk.context.json`, `.pikaia-setup.json`
+- [x] `.env.example` files — Add new env vars with defaults
 
 ### Setup Script (After Refactoring)
 
-- [ ] `scripts/setup/package.json` — Minimal dependencies
-- [ ] `scripts/setup/src/index.ts` — Main entry point
-- [ ] `scripts/setup/src/prompts.ts` — Clack prompts
-- [ ] `scripts/setup/src/generators/env.ts` — .env generation
-- [ ] `scripts/setup/src/generators/cdk-context.ts` — CDK context generation
-- [ ] `scripts/setup/src/generators/secrets.ts` — Crypto key generation
-- [ ] `scripts/setup/src/validators/` — API key validation (Stytch, Stripe, AWS)
-- [ ] `scripts/setup/setup.sh` — Bash entry point
+- [x] `scripts/setup/package.json` — Minimal dependencies (`@clack/prompts`, `picocolors`, `tsx`)
+- [x] `scripts/setup/src/index.ts` — Main entry point with CLI parsing and commands
+- [x] `scripts/setup/src/prompts.ts` — Clack prompts (branding, services, AWS)
+- [x] `scripts/setup/src/generators/env.ts` — .env generation (backend, frontend, docker, production)
+- [x] `scripts/setup/src/generators/cdk-context.ts` — CDK context generation
+- [x] `scripts/setup/src/generators/secrets.ts` — Crypto key generation
+- [x] `scripts/setup/src/validators.ts` — Input validation (prefix, domain, API key format)
+- [x] `scripts/setup/src/state.ts` — State tracking (`.pikaia-setup.json`)
+- [x] `scripts/setup/setup.sh` — Bash entry point
 
 ### Documentation
 
-- [ ] Update `docs/guides/local-development.md` — Reference setup script
-- [ ] Update `README.md` — Add setup instructions
+- [x] Update `docs/guides/local-development.md` — Reference setup script
+- [x] Update `README.md` — Add setup instructions
 - [ ] Create `docs/guides/forking.md` — Guide for forking and customizing
-- [ ] Update `CONTRIBUTING.md` — Note about env var conventions
+- [x] Update `CONTRIBUTING.md` — Note about env var conventions
 
 ---
 

@@ -10,7 +10,8 @@ from django.http import HttpRequest
 from ninja import Router
 from ninja.errors import HttpError
 
-from apps.core.security import BearerAuth, get_auth_context
+from apps.core.schemas import ErrorResponse
+from apps.core.security import BearerAuth, get_auth_context, require_subscription
 from apps.core.utils import get_client_ip
 from apps.devices.exceptions import (
     DeviceAlreadyLinkedError,
@@ -43,11 +44,12 @@ bearer_auth = BearerAuth()
 
 @router.post(
     "/link/initiate",
-    response=InitiateLinkResponse,
+    response={200: InitiateLinkResponse, 402: ErrorResponse},
     auth=bearer_auth,
     summary="Initiate device linking",
     description="Generate QR code data for linking a mobile device. Requires authentication.",
 )
+@require_subscription
 def initiate_link(request: HttpRequest) -> InitiateLinkResponse:
     """Generate QR code data for device linking."""
     user, member, organization = get_auth_context(request)
@@ -129,11 +131,12 @@ def complete_link(
 
 @router.get(
     "/",
-    response=DeviceListResponse,
+    response={200: DeviceListResponse, 402: ErrorResponse},
     auth=bearer_auth,
     summary="List linked devices",
     description="Get all linked devices for the authenticated user.",
 )
+@require_subscription
 def list_devices(request: HttpRequest) -> DeviceListResponse:
     """List all linked devices for the authenticated user."""
     user, _, _ = get_auth_context(request)
@@ -158,11 +161,12 @@ def list_devices(request: HttpRequest) -> DeviceListResponse:
 
 @router.delete(
     "/{device_id}",
-    response={204: None},
+    response={204: None, 402: ErrorResponse},
     auth=bearer_auth,
     summary="Revoke a device",
     description="Revoke a linked device, preventing it from syncing.",
 )
+@require_subscription
 def delete_device(request: HttpRequest, device_id: int):
     """Revoke a device owned by the authenticated user."""
     user, _, _ = get_auth_context(request)
@@ -177,11 +181,12 @@ def delete_device(request: HttpRequest, device_id: int):
 
 @router.post(
     "/session/refresh",
-    response=SessionRefreshResponse,
+    response={200: SessionRefreshResponse, 402: ErrorResponse},
     auth=bearer_auth,
     summary="Refresh device session",
     description="Get new session tokens for a linked device. Use when JWT expires.",
 )
+@require_subscription
 def refresh_session(
     request: HttpRequest,
     payload: SessionRefreshRequest,

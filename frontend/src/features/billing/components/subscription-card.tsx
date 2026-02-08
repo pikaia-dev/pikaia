@@ -22,6 +22,14 @@ export function SubscriptionCard({ subscription, memberCount }: SubscriptionCard
   const confirmSubscriptionMutation = useConfirmSubscription()
 
   const isSubscribed = subscription && subscription.status !== 'none'
+  const isTrialActive = subscription?.is_trial_active ?? false
+  const trialExpired = subscription?.trial_ends_at && !subscription.is_trial_active
+
+  const trialDaysRemaining = (() => {
+    if (!subscription?.trial_ends_at) return 0
+    const diff = new Date(subscription.trial_ends_at).getTime() - Date.now()
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+  })()
 
   const handleUpgradeSuccess = (subscriptionId: string) => {
     setShowUpgradeForm(false)
@@ -108,6 +116,46 @@ export function SubscriptionCard({ subscription, memberCount }: SubscriptionCard
                 {createPortalMutation.isPending ? 'Loading...' : 'Manage Subscription'}
               </Button>
             </div>
+          </div>
+        ) : isTrialActive ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">Pro Plan Trial</span>
+                <StatusBadge variant="info">
+                  {trialDaysRemaining} {trialDaysRemaining === 1 ? 'day' : 'days'} remaining
+                </StatusBadge>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                {memberCount} {memberCount === 1 ? 'member' : 'members'} · Full access during trial
+              </p>
+            </div>
+            <Button
+              onClick={() => {
+                setShowUpgradeForm(true)
+              }}
+            >
+              Subscribe Now
+            </Button>
+          </div>
+        ) : trialExpired ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">Pro Plan Trial</span>
+                <StatusBadge variant="warning">Expired</StatusBadge>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Subscribe to continue using all features
+              </p>
+            </div>
+            <Button
+              onClick={() => {
+                setShowUpgradeForm(true)
+              }}
+            >
+              Subscribe Now
+            </Button>
           </div>
         ) : (
           <div className="flex items-center justify-between">

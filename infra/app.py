@@ -27,6 +27,8 @@ Usage:
     cdk deploy --all \\
         --context require_https=true \\
         --context certificate_arn=arn:aws:acm:... \\
+        --context domain_name=api.example.com \\
+        --context origin_verify_secret=<random-string> \\
         --context cors_origins='["https://app.example.com"]'
 
     # Deploy with custom domain
@@ -101,7 +103,14 @@ else:
 # - Regional WAF (REGIONAL scope): deployed in the ALB's region
 # - CloudFront WAF (CLOUDFRONT scope): must always be in us-east-1
 
-waf_regional = WafRegionalStack(app, "PikaiaWafRegional", env=env)
+# Origin verification secret: shared secret between CloudFront and ALB
+# When set, CloudFront adds this as X-Origin-Verify header and the regional
+# WAF blocks requests that don't include it (prevents direct ALB access)
+origin_verify_secret = app.node.try_get_context("origin_verify_secret")
+
+waf_regional = WafRegionalStack(
+    app, "PikaiaWafRegional", origin_verify_secret=origin_verify_secret, env=env
+)
 
 cloudfront_waf_env = cdk.Environment(account=env.account, region="us-east-1")
 waf_cloudfront = WafCloudFrontStack(
@@ -166,6 +175,20 @@ if require_https and not certificate_arn:
     raise ValueError(
         "certificate_arn is required when require_https=true. "
         "For production deployments, always use HTTPS."
+    )
+
+if require_https and not domain_name:
+    raise ValueError(
+        "domain_name is required when require_https=true. "
+        "CloudFront needs a custom domain to connect to ALB via HTTPS. "
+        "Pass --context domain_name=api.example.com"
+    )
+
+if require_https and not origin_verify_secret:
+    raise ValueError(
+        "origin_verify_secret is required when require_https=true. "
+        "This shared secret ensures only CloudFront can reach the ALB. "
+        "Pass --context origin_verify_secret=<random-string>"
     )
 
 if resolver.is_shared_mode:
@@ -259,6 +282,7 @@ if resolver.is_shared_mode:
         domain_name=frontend_domain,
         certificate_arn=frontend_certificate_arn,
         web_acl_id=waf_cloudfront.web_acl.attr_arn,
+        origin_verify_secret=origin_verify_secret,
         env=env,
         cross_region_references=True,
     )
@@ -272,6 +296,7 @@ else:
         domain_name=frontend_domain,
         certificate_arn=frontend_certificate_arn,
         web_acl_id=waf_cloudfront.web_acl.attr_arn,
+        origin_verify_secret=origin_verify_secret,
         env=env,
         cross_region_references=True,
     )

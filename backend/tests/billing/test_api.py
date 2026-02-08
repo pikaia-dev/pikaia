@@ -4,10 +4,12 @@ Tests for billing API endpoints.
 Covers all billing endpoints with mocked Stripe services.
 """
 
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
 from django.test import RequestFactory
+from django.utils import timezone
 from ninja.errors import HttpError
 
 from apps.billing.api import (
@@ -64,6 +66,35 @@ class TestGetSubscription:
 
         assert result.status == "none"
         assert result.quantity >= 1  # Should default to member count
+
+    def test_returns_trial_info_when_active(self, request_factory: RequestFactory) -> None:
+        """Should return trial info when org has an active trial."""
+        org = OrganizationFactory.create(trial_ends_at=timezone.now() + timedelta(days=10))
+        MemberFactory.create(organization=org)
+
+        request = create_authenticated_request(
+            request_factory, "get", "/api/v1/billing/subscription", org=org
+        )
+
+        result = get_subscription(request)
+
+        assert result.is_trial_active is True
+        assert result.trial_ends_at is not None
+        assert result.status == "none"
+
+    def test_returns_expired_trial_info(self, request_factory: RequestFactory) -> None:
+        """Should return is_trial_active=False when trial has expired."""
+        org = OrganizationFactory.create(trial_ends_at=timezone.now() - timedelta(days=1))
+        MemberFactory.create(organization=org)
+
+        request = create_authenticated_request(
+            request_factory, "get", "/api/v1/billing/subscription", org=org
+        )
+
+        result = get_subscription(request)
+
+        assert result.is_trial_active is False
+        assert result.trial_ends_at is not None
 
     def test_unauthenticated_returns_401(self, request_factory: RequestFactory) -> None:
         """Should raise 401 when not authenticated."""

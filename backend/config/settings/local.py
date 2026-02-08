@@ -9,6 +9,9 @@ from .base import *  # noqa: F403
 DEBUG = True
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
+# Disable subscription gating for local development
+SUBSCRIPTION_GATING_ENABLED = False
+
 # CORS settings for local development
 # Cannot use CORS_ALLOW_ALL_ORIGINS with credentials: 'include'
 CORS_ALLOWED_ORIGINS = [

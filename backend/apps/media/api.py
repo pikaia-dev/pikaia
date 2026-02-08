@@ -8,7 +8,7 @@ from ninja.files import UploadedFile
 
 from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth, get_auth_context
+from apps.core.security import BearerAuth, get_auth_context, require_subscription
 from apps.core.types import AuthenticatedHttpRequest
 from apps.media.models import UploadedImage
 from apps.media.schemas import (
@@ -28,11 +28,17 @@ bearer_auth = BearerAuth()
 
 @router.post(
     "/upload-request",
-    response={200: UploadResponseSchema, 400: ErrorResponse, 401: ErrorResponse},
+    response={
+        200: UploadResponseSchema,
+        400: ErrorResponse,
+        401: ErrorResponse,
+        402: ErrorResponse,
+    },
     auth=bearer_auth,
     operation_id="requestImageUpload",
     summary="Request an image upload URL",
 )
+@require_subscription
 def request_upload(
     request: AuthenticatedHttpRequest, payload: UploadRequestSchema
 ) -> UploadResponseSchema:
@@ -82,11 +88,18 @@ def request_upload(
 
 @router.post(
     "/confirm",
-    response={200: ImageResponseSchema, 400: ErrorResponse, 401: ErrorResponse, 404: ErrorResponse},
+    response={
+        200: ImageResponseSchema,
+        400: ErrorResponse,
+        401: ErrorResponse,
+        402: ErrorResponse,
+        404: ErrorResponse,
+    },
     auth=bearer_auth,
     operation_id="confirmImageUpload",
     summary="Confirm an image upload",
 )
+@require_subscription
 def confirm_upload(
     request: AuthenticatedHttpRequest, payload: ConfirmUploadSchema
 ) -> ImageResponseSchema:
@@ -156,11 +169,17 @@ def confirm_upload(
 
 @router.post(
     "/direct-upload",
-    response={200: DirectUploadResponseSchema, 400: ErrorResponse, 401: ErrorResponse},
+    response={
+        200: DirectUploadResponseSchema,
+        400: ErrorResponse,
+        401: ErrorResponse,
+        402: ErrorResponse,
+    },
     auth=bearer_auth,
     operation_id="directUpload",
     summary="Direct upload for local development",
 )
+@require_subscription
 def direct_upload(
     request: AuthenticatedHttpRequest,
     file: UploadedFile = File(...),  # noqa: B008
@@ -206,11 +225,18 @@ def direct_upload(
 
 @router.delete(
     "/{image_id}",
-    response={200: dict, 401: ErrorResponse, 403: ErrorResponse, 404: ErrorResponse},
+    response={
+        200: dict,
+        401: ErrorResponse,
+        402: ErrorResponse,
+        403: ErrorResponse,
+        404: ErrorResponse,
+    },
     auth=bearer_auth,
     operation_id="deleteImage",
     summary="Delete an uploaded image",
 )
+@require_subscription
 def delete_image(request: AuthenticatedHttpRequest, image_id: str) -> dict:
     """
     Delete an uploaded image.

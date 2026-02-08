@@ -8,6 +8,8 @@ External calls must NOT be inside database transactions.
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
+from django.utils import timezone
+
 from apps.billing.models import Subscription
 from apps.billing.stripe_client import get_stripe
 from apps.core.logging import get_logger
@@ -510,6 +512,45 @@ def handle_subscription_deleted(stripe_subscription: dict) -> None:
     )
 
     logger.info("stripe_subscription_canceled", subscription_id=subscription.stripe_subscription_id)
+
+
+def activate_trial(org: Organization) -> None:
+    """Activate a free trial for an organization.
+
+    Idempotent — does nothing if the org already has an active trial.
+    """
+    if org.is_trial_active:
+        return
+
+    from django.conf import settings as django_settings
+
+    org.trial_ends_at = timezone.now() + timedelta(days=django_settings.FREE_TRIAL_DAYS)
+    org.save(update_fields=["trial_ends_at", "updated_at"])
+
+    logger.info("trial_activated", org_id=str(org.id), trial_ends_at=str(org.trial_ends_at))
+
+
+def extend_trial(org: Organization, days: int) -> None:
+    """Extend an organization's trial by the given number of days.
+
+    If the trial has already expired, extends from now.
+    Increments trial_extended_count for auditing.
+    """
+    if org.trial_ends_at and org.trial_ends_at > timezone.now():
+        org.trial_ends_at = org.trial_ends_at + timedelta(days=days)
+    else:
+        org.trial_ends_at = timezone.now() + timedelta(days=days)
+
+    org.trial_extended_count += 1
+    org.save(update_fields=["trial_ends_at", "trial_extended_count", "updated_at"])
+
+    logger.info(
+        "trial_extended",
+        org_id=str(org.id),
+        days=days,
+        trial_ends_at=str(org.trial_ends_at),
+        extended_count=org.trial_extended_count,
+    )
 
 
 def _get_tax_id_type(country_code: str, vat_id: str) -> str | None:
