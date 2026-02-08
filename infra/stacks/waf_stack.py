@@ -57,6 +57,9 @@ def _build_origin_verify_rule(
     CloudFront adds a custom X-Origin-Verify header with a shared secret.
     The ALB's regional WAF checks for this header and blocks requests
     that bypass CloudFront (direct ALB access).
+
+    AWS WAF normalizes header names to lowercase for matching, so
+    "X-Origin-Verify" sent by CloudFront matches "x-origin-verify" here.
     """
     return wafv2.CfnWebACL.RuleProperty(
         name=f"{resource_prefix}-origin-verify",
@@ -67,6 +70,7 @@ def _build_origin_verify_rule(
                 statement=wafv2.CfnWebACL.StatementProperty(
                     byte_match_statement=wafv2.CfnWebACL.ByteMatchStatementProperty(
                         field_to_match=wafv2.CfnWebACL.FieldToMatchProperty(
+                            # WAF normalizes header names to lowercase
                             single_header={"Name": "x-origin-verify"},
                         ),
                         positional_constraint="EXACTLY",

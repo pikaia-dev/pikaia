@@ -105,6 +105,10 @@ class FrontendStack(Stack):
         # ALB origin for API routes
         # Use api_domain with HTTPS when available (has valid certificate)
         # Otherwise fall back to ALB DNS with HTTP (requires HTTP listener on ALB)
+        #
+        # Origin verification header is added here (before the HTTPS/HTTP branch)
+        # so it's sent in BOTH modes. The regional WAF validates it regardless
+        # of whether CloudFront connects via HTTPS or HTTP.
         origin_custom_headers: dict[str, str] = {}
         if origin_verify_secret:
             origin_custom_headers["X-Origin-Verify"] = origin_verify_secret
