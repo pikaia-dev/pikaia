@@ -40,6 +40,8 @@ class HealthCheckMiddleware:
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         if request.method in ("GET", "HEAD") and request.path == HEALTH_CHECK_PATH:
+            if request.method == "HEAD":
+                return HttpResponse(status=200)
             return JsonResponse({"status": "ok"})
         return self.get_response(request)
 
