@@ -4,16 +4,20 @@ Tests for billing services.
 All Stripe API calls are mocked to isolate tests from external dependencies.
 """
 
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.utils import timezone
 
 from apps.billing.models import Subscription
 from apps.billing.services import (
     _get_tax_id_type,
+    activate_trial,
     create_checkout_session,
     create_customer_portal_session,
     create_subscription_intent,
+    extend_trial,
     get_or_create_stripe_customer,
     handle_subscription_created,
     handle_subscription_deleted,
@@ -465,3 +469,80 @@ class TestGetTaxIdType:
     def test_returns_none_for_unsupported_country(self) -> None:
         """Should return None for unsupported countries."""
         assert _get_tax_id_type("XX", "123") is None
+
+
+@pytest.mark.django_db
+class TestActivateTrial:
+    """Tests for activate_trial service."""
+
+    def test_activates_trial_on_org_without_trial(self) -> None:
+        """Should set trial_ends_at when org has no trial."""
+        org = OrganizationFactory.create(trial_ends_at=None)
+
+        activate_trial(org)
+
+        org.refresh_from_db()
+        assert org.trial_ends_at is not None
+        assert org.is_trial_active is True
+
+    def test_idempotent_when_trial_active(self) -> None:
+        """Should not overwrite an active trial."""
+        original_end = timezone.now() + timedelta(days=30)
+        org = OrganizationFactory.create(trial_ends_at=original_end)
+
+        activate_trial(org)
+
+        org.refresh_from_db()
+        # Should remain unchanged (within a second tolerance)
+        assert org.trial_ends_at is not None
+        assert abs((org.trial_ends_at - original_end).total_seconds()) < 1
+
+    def test_reactivates_expired_trial(self) -> None:
+        """Should set a new trial when the previous one expired."""
+        org = OrganizationFactory.create(trial_ends_at=timezone.now() - timedelta(days=1))
+
+        activate_trial(org)
+
+        org.refresh_from_db()
+        assert org.is_trial_active is True
+
+
+@pytest.mark.django_db
+class TestExtendTrial:
+    """Tests for extend_trial service."""
+
+    def test_extends_active_trial(self) -> None:
+        """Should add days to an active trial."""
+        original_end = timezone.now() + timedelta(days=5)
+        org = OrganizationFactory.create(trial_ends_at=original_end)
+
+        extend_trial(org, days=10)
+
+        org.refresh_from_db()
+        expected = original_end + timedelta(days=10)
+        assert org.trial_ends_at is not None
+        assert abs((org.trial_ends_at - expected).total_seconds()) < 1
+        assert org.trial_extended_count == 1
+
+    def test_extends_expired_trial_from_now(self) -> None:
+        """Should extend from now when trial already expired."""
+        org = OrganizationFactory.create(trial_ends_at=timezone.now() - timedelta(days=5))
+
+        extend_trial(org, days=7)
+
+        org.refresh_from_db()
+        assert org.is_trial_active is True
+        assert org.trial_days_remaining >= 6
+        assert org.trial_extended_count == 1
+
+    def test_increments_extended_count(self) -> None:
+        """Should increment trial_extended_count on each extension."""
+        org = OrganizationFactory.create(
+            trial_ends_at=timezone.now() + timedelta(days=5),
+            trial_extended_count=2,
+        )
+
+        extend_trial(org, days=3)
+
+        org.refresh_from_db()
+        assert org.trial_extended_count == 3

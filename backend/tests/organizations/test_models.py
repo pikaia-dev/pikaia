@@ -2,8 +2,11 @@
 Tests for organizations app models and business logic.
 """
 
+from datetime import timedelta
+
 import pytest
 from django.db import IntegrityError
+from django.utils import timezone
 
 from apps.organizations.models import Organization
 from tests.accounts.factories import OrganizationFactory
@@ -167,3 +170,50 @@ class TestOrganizationQueryset:
         result = Organization.objects.filter(stripe_customer_id="cus_lookup123").first()
 
         assert result == org
+
+
+@pytest.mark.django_db
+class TestOrganizationTrial:
+    """Tests for Organization trial fields and properties."""
+
+    def test_is_trial_active_when_future(self) -> None:
+        """Should return True when trial_ends_at is in the future."""
+        org = OrganizationFactory.create(trial_ends_at=timezone.now() + timedelta(days=7))
+
+        assert org.is_trial_active is True
+
+    def test_is_trial_active_when_past(self) -> None:
+        """Should return False when trial_ends_at is in the past."""
+        org = OrganizationFactory.create(trial_ends_at=timezone.now() - timedelta(days=1))
+
+        assert org.is_trial_active is False
+
+    def test_is_trial_active_when_null(self) -> None:
+        """Should return False when trial_ends_at is None."""
+        org = OrganizationFactory.create(trial_ends_at=None)
+
+        assert org.is_trial_active is False
+
+    def test_trial_days_remaining_future(self) -> None:
+        """Should return positive days when trial is active."""
+        org = OrganizationFactory.create(trial_ends_at=timezone.now() + timedelta(days=10))
+
+        assert org.trial_days_remaining >= 9  # Account for test execution time
+
+    def test_trial_days_remaining_past(self) -> None:
+        """Should return 0 when trial has expired."""
+        org = OrganizationFactory.create(trial_ends_at=timezone.now() - timedelta(days=3))
+
+        assert org.trial_days_remaining == 0
+
+    def test_trial_days_remaining_null(self) -> None:
+        """Should return 0 when trial_ends_at is None."""
+        org = OrganizationFactory.create(trial_ends_at=None)
+
+        assert org.trial_days_remaining == 0
+
+    def test_trial_extended_count_default(self) -> None:
+        """Should default trial_extended_count to 0."""
+        org = OrganizationFactory.create()
+
+        assert org.trial_extended_count == 0

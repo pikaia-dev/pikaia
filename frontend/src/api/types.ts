@@ -116,6 +116,8 @@ export interface SubscriptionInfo {
   current_period_end: string | null
   cancel_at_period_end: boolean
   stripe_customer_id: string | null
+  trial_ends_at: string | null
+  is_trial_active: boolean
 }
 
 export interface CheckoutSessionRequest {

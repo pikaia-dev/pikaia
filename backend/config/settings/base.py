@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     DEVICE_SESSION_EXPIRY_MINUTES: int = 525600  # 1 year default
     DEVICE_LINK_URL_SCHEME: str = "pikaia://device/link"  # Deep link URL for QR code
 
+    # Free trial
+    FREE_TRIAL_DAYS: int = 14
+
     # Application branding (used for Stripe metadata, etc.)
     APP_SLUG: str = "pikaia"
 
@@ -331,6 +334,9 @@ DEVICE_MAX_LINK_ATTEMPTS_PER_HOUR = 5  # Rate limit for initiating links (per us
 DEVICE_LINK_COMPLETE_MAX_ATTEMPTS_PER_HOUR = 20  # Rate limit for completing links (per IP)
 DEVICE_SESSION_EXPIRY_MINUTES = settings.DEVICE_SESSION_EXPIRY_MINUTES
 DEVICE_LINK_URL_SCHEME = settings.DEVICE_LINK_URL_SCHEME
+
+# Free trial
+FREE_TRIAL_DAYS = settings.FREE_TRIAL_DAYS
 
 # Application branding
 APP_SLUG = settings.APP_SLUG
