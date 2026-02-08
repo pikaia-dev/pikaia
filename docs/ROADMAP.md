@@ -34,7 +34,6 @@ Security and stability items that should be addressed before going live with rea
 
 | Item | Effort | Notes |
 |------|--------|-------|
-| **Deployment runbook** | 2h | Step-by-step deploy, rollback, secrets rotation |
 | ~~**scripts/setup-client.sh**~~ | ~~1h~~ | Done — see `scripts/setup/setup.sh` (interactive setup wizard via `@clack/prompts`) |
 
 ---
