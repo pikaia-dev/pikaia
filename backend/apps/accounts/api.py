@@ -11,6 +11,7 @@ Handles Stytch B2B authentication flows:
 import contextlib
 import secrets
 
+from django.conf import settings as django_settings
 from django.http import HttpRequest
 from ninja import Router
 from ninja.errors import HttpError
@@ -65,7 +66,9 @@ from apps.billing.services import sync_billing_to_stripe
 from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth, get_auth_context, require_admin
+from apps.core.throttling import RateLimitExceeded, check_rate_limit
 from apps.core.types import AuthenticatedHttpRequest
+from apps.core.utils import get_client_ip
 from apps.events.services import publish_event
 
 logger = get_logger(__name__)
@@ -101,6 +104,21 @@ def send_magic_link(request: HttpRequest, payload: MagicLinkSendRequest) -> Mess
 
     Uses discovery flow - user authenticates first, then picks/creates org.
     """
+    try:
+        client_ip = get_client_ip(request, default="unknown")
+        check_rate_limit(
+            f"magic_link_send:email:{payload.email.lower()}",
+            max_requests=django_settings.AUTH_RATE_LIMIT_MAGIC_LINK_SEND_PER_EMAIL,
+            window_seconds=django_settings.AUTH_RATE_LIMIT_MAGIC_LINK_SEND_WINDOW,
+        )
+        check_rate_limit(
+            f"magic_link_send:ip:{client_ip}",
+            max_requests=django_settings.AUTH_RATE_LIMIT_MAGIC_LINK_SEND_PER_IP,
+            window_seconds=django_settings.AUTH_RATE_LIMIT_MAGIC_LINK_SEND_WINDOW,
+        )
+    except RateLimitExceeded as e:
+        raise HttpError(429, str(e)) from None
+
     client = get_stytch_client()
 
     try:
@@ -130,6 +148,16 @@ def authenticate_magic_link(
     Returns an intermediate session token (IST) and list of
     organizations the user can join or create.
     """
+    try:
+        client_ip = get_client_ip(request, default="unknown")
+        check_rate_limit(
+            f"magic_link_auth:ip:{client_ip}",
+            max_requests=django_settings.AUTH_RATE_LIMIT_TOKEN_AUTH_PER_IP,
+            window_seconds=django_settings.AUTH_RATE_LIMIT_TOKEN_AUTH_WINDOW,
+        )
+    except RateLimitExceeded as e:
+        raise HttpError(429, str(e)) from None
+
     client = get_stytch_client()
 
     try:
@@ -173,6 +201,16 @@ def create_organization(
 
     Exchanges the IST for a session and creates the org.
     """
+    try:
+        client_ip = get_client_ip(request, default="unknown")
+        check_rate_limit(
+            f"discovery_create_org:ip:{client_ip}",
+            max_requests=django_settings.AUTH_RATE_LIMIT_ORG_CREATE_PER_IP,
+            window_seconds=django_settings.AUTH_RATE_LIMIT_ORG_CREATE_WINDOW,
+        )
+    except RateLimitExceeded as e:
+        raise HttpError(429, str(e)) from None
+
     client = get_stytch_client()
 
     try:
@@ -235,6 +273,16 @@ def exchange_session(
     """
     Exchange IST for session by joining an existing organization.
     """
+    try:
+        client_ip = get_client_ip(request, default="unknown")
+        check_rate_limit(
+            f"discovery_exchange:ip:{client_ip}",
+            max_requests=django_settings.AUTH_RATE_LIMIT_TOKEN_AUTH_PER_IP,
+            window_seconds=django_settings.AUTH_RATE_LIMIT_TOKEN_AUTH_WINDOW,
+        )
+    except RateLimitExceeded as e:
+        raise HttpError(429, str(e)) from None
+
     client = get_stytch_client()
 
     try:
@@ -293,7 +341,15 @@ def provision_mobile_user_endpoint(
     Either provide organization_id to join an existing org,
     or organization_name + organization_slug to create a new one.
     """
-    from django.conf import settings as django_settings
+    try:
+        client_ip = get_client_ip(request, default="unknown")
+        check_rate_limit(
+            f"mobile_provision:ip:{client_ip}",
+            max_requests=django_settings.AUTH_RATE_LIMIT_MOBILE_PROVISION_PER_IP,
+            window_seconds=django_settings.AUTH_RATE_LIMIT_MOBILE_PROVISION_WINDOW,
+        )
+    except RateLimitExceeded as e:
+        raise HttpError(429, str(e)) from None
 
     # Validate API key
     api_key = request.headers.get("X-Mobile-API-Key")
