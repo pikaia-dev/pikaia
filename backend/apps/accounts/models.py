@@ -160,3 +160,47 @@ class Member(SoftDeleteMixin, models.Model):
     def is_admin(self) -> bool:
         """Check if member has admin role."""
         return self.role == "admin"
+
+
+class ConnectedAccount(models.Model):
+    """
+    Tracks which OAuth providers a member has connected.
+
+    This is metadata only - Stytch remains the source of truth for tokens.
+    Used to display connection status in the UI without calling Stytch.
+    """
+
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name="connected_accounts",
+    )
+    provider = models.CharField(
+        max_length=50,
+        db_index=True,
+        help_text="OAuth provider identifier (e.g., google, github, microsoft)",
+    )
+    provider_subject = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Provider-specific user identifier (e.g., Google sub claim)",
+    )
+    connected_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last time this provider's token was used",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["member", "provider"],
+                name="unique_provider_per_member",
+            ),
+        ]
+        ordering = ["provider"]
+
+    def __str__(self) -> str:
+        return f"{self.member} - {self.provider}"

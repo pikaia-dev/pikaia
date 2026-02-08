@@ -12,7 +12,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.accounts.constants import StytchRoles
-from apps.accounts.models import Member, User
+from apps.accounts.models import ConnectedAccount, Member, User
 from apps.core.logging import get_logger
 from apps.organizations.models import Organization
 
@@ -187,7 +187,82 @@ def sync_session_to_local(
             role=role,
         )
 
+    # Sync connected accounts from Stytch member data (no extra API call)
+    try:
+        sync_connected_accounts_from_member_data(member, stytch_member)
+    except Exception:
+        logger.warning(
+            "connected_accounts_sync_failed",
+            member_id=member.id,
+            exc_info=True,
+        )
+
     return user, member, org
+
+
+# --- Connected Accounts ---
+
+
+def sync_connected_accounts_from_member_data(
+    member: Member,
+    stytch_member: Any,
+) -> None:
+    """
+    Sync connected OAuth providers from Stytch member data.
+
+    Reads oauth_registrations from the already-fetched Stytch member object
+    (no extra API call). Upserts ConnectedAccount records and removes stale ones.
+    """
+    raw_registrations = getattr(stytch_member, "oauth_registrations", None)
+    if raw_registrations is None:
+        # Attribute missing entirely — session type doesn't include oauth data, skip sync
+        return
+
+    seen_providers: set[str] = set()
+    for reg in raw_registrations:
+        provider = getattr(reg, "provider_type", "").lower()
+        if not provider:
+            continue
+
+        provider_subject = getattr(reg, "provider_subject", "") or ""
+        seen_providers.add(provider)
+
+        ConnectedAccount.objects.update_or_create(
+            member=member,
+            provider=provider,
+            defaults={"provider_subject": provider_subject},
+        )
+
+    # Remove providers that are no longer in Stytch (including when list is explicitly empty)
+    ConnectedAccount.objects.filter(member=member).exclude(provider__in=seen_providers).delete()
+
+
+def get_connected_accounts_from_stytch(member: Member) -> list[ConnectedAccount]:
+    """
+    Fetch connected accounts from Stytch and sync to local DB.
+
+    Called from the settings page endpoint to ensure freshness.
+    Returns the current list of ConnectedAccount records.
+    """
+    from stytch.core.response_base import StytchError
+
+    from apps.accounts.stytch_client import get_stytch_client
+
+    try:
+        client = get_stytch_client()
+        response = client.organizations.members.get(
+            organization_id=member.organization.stytch_org_id,
+            member_id=member.stytch_member_id,
+        )
+        sync_connected_accounts_from_member_data(member, response.member)
+    except StytchError:
+        logger.warning(
+            "connected_accounts_stytch_fetch_failed",
+            member_id=member.id,
+            exc_info=True,
+        )
+
+    return list(ConnectedAccount.objects.filter(member=member))
 
 
 # --- Member Management Services ---

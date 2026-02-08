@@ -23,6 +23,7 @@ import {
   useUpdateProfile,
   useVerifyPhoneOtp,
 } from '@/features/profile/api/mutations'
+import { ConnectedAccounts } from '@/features/settings/components/connected-accounts'
 import { PasskeySettings } from '@/features/settings/components/passkey-settings'
 
 // Delay before updating state after dialog close animation
@@ -311,6 +312,9 @@ export default function ProfileSettings() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Connected Accounts */}
+      <ConnectedAccounts />
 
       {/* Passkey Settings */}
       <PasskeySettings />

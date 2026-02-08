@@ -15,11 +15,14 @@ import {
   generateRetryOrgInfo,
   getSingleLoginOrg,
 } from '@/features/auth/utils/org-derivation'
+import { clearConnectFlow, isConnectFlow } from '@/features/settings/hooks/use-connect-provider'
+import { config } from '@/lib/env'
 
 export type TokenType =
   | 'discovery'
   | 'discovery_oauth'
   | 'multi_tenant_magic_links'
+  | 'oauth'
   | 'impersonation'
   | null
 
@@ -67,10 +70,32 @@ export function useAuthCallback(options: UseAuthCallbackOptions = {}): UseAuthCa
   }, [])
 
   const setSuccess = useCallback(() => {
+    // If this was a connect flow (linking a provider from settings),
+    // sync connected accounts from Stytch then redirect back to settings
+    if (isConnectFlow()) {
+      clearConnectFlow()
+      setState((prev) => ({ ...prev, error: null }))
+
+      const tokens = stytch.session.getTokens()
+      const jwt = tokens?.session_jwt
+      if (jwt) {
+        void fetch(`${config.apiUrl}/auth/me/connected-accounts/sync`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${jwt}` },
+          credentials: 'include',
+        }).finally(() => {
+          window.location.href = '/settings/profile'
+        })
+      } else {
+        window.location.href = '/settings/profile'
+      }
+      return
+    }
+
     sessionStorage.setItem('stytch_just_logged_in', 'true')
     setState((prev) => ({ ...prev, error: null }))
     window.location.href = '/dashboard'
-  }, [])
+  }, [stytch])
 
   const goToLogin = useCallback(() => {
     options.onRedirectToLogin?.()
@@ -210,6 +235,20 @@ export function useAuthCallback(options: UseAuthCallbackOptions = {}): UseAuthCa
   )
 
   /**
+   * Handle org-scoped OAuth token (e.g., connecting a provider from settings).
+   */
+  const handleOrgScopedOAuthToken = useCallback(
+    async (token: string): Promise<void> => {
+      await stytch.oauth.authenticate({
+        oauth_token: token,
+        session_duration_minutes: SESSION_DURATION_MINUTES,
+      })
+      setSuccess()
+    },
+    [stytch, setSuccess]
+  )
+
+  /**
    * Handle impersonation tokens from Stytch dashboard.
    */
   const handleImpersonationToken = useCallback(
@@ -248,6 +287,9 @@ export function useAuthCallback(options: UseAuthCallbackOptions = {}): UseAuthCa
         case 'multi_tenant_magic_links':
           await handleInviteToken(token)
           break
+        case 'oauth':
+          await handleOrgScopedOAuthToken(token)
+          break
         case 'impersonation':
           await handleImpersonationToken(token)
           break
@@ -265,6 +307,7 @@ export function useAuthCallback(options: UseAuthCallbackOptions = {}): UseAuthCa
     handleDiscoveryToken,
     handleOAuthToken,
     handleInviteToken,
+    handleOrgScopedOAuthToken,
     handleImpersonationToken,
     setError,
   ])

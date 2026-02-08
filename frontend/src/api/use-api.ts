@@ -11,6 +11,7 @@ import type {
   ConfirmSubscriptionRequest,
   ConfirmSubscriptionResponse,
   ConfirmUploadRequest,
+  ConnectedAccountsResponse,
   DeviceListResponse,
   DirectoryUser,
   EmailUpdateResponse,
@@ -144,6 +145,15 @@ export function useApi() {
         api.post<ImageResponse>('/media/confirm', data),
 
       deleteImage: (imageId: string) => api.delete<MessageResponse>(`/media/${imageId}`),
+
+      // Connected accounts
+      getConnectedAccounts: () => api.get<ConnectedAccountsResponse>('/auth/me/connected-accounts'),
+
+      syncConnectedAccounts: () =>
+        api.post<ConnectedAccountsResponse>('/auth/me/connected-accounts/sync'),
+
+      disconnectProvider: (provider: string) =>
+        api.delete<MessageResponse>(`/auth/me/connected-accounts/${provider}`),
 
       // Directory search (Google Workspace)
       searchDirectory: (q: string) =>
