@@ -64,6 +64,14 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
     # Log event for debugging
     logger.info("stripe_webhook_received", event_id=event_id, event_type=event["type"])
 
+    # Pre-fetch external data before entering the transaction to avoid
+    # holding DB locks open during network calls.
+    checkout_subscription = None
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        if session.get("subscription"):
+            checkout_subscription = stripe.Subscription.retrieve(session["subscription"])
+
     # Use transaction to ensure idempotency marker is rolled back if handler fails
     try:
         with transaction.atomic():
@@ -75,12 +83,8 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
             # Dispatch to handlers
             match event["type"]:
                 case "checkout.session.completed":
-                    # Get the subscription from the session
-                    session = event["data"]["object"]
-                    if session.get("subscription"):
-                        # Fetch full subscription details
-                        subscription = stripe.Subscription.retrieve(session["subscription"])
-                        handle_subscription_created(subscription)
+                    if checkout_subscription:
+                        handle_subscription_created(checkout_subscription)
 
                 case "customer.subscription.created":
                     handle_subscription_created(event["data"]["object"])
