@@ -22,6 +22,7 @@ export interface ServicesAnswers {
   stripeSecretKey: string;
   stripePublishableKey: string;
   resendApiKey: string;
+  sentryDsn: string;
 }
 
 export interface AwsAnswers {
@@ -183,6 +184,14 @@ export async function promptServices(
     }),
   );
 
+  const sentryDsn = exitOnCancel(
+    await p.text({
+      message: "Sentry DSN (for error tracking)",
+      placeholder: "https://xxxx@o12345.ingest.us.sentry.io/12345",
+      defaultValue: defaults?.sentryDsn || "",
+    }),
+  );
+
   return {
     stytchProjectId,
     stytchSecret,
@@ -190,6 +199,7 @@ export async function promptServices(
     stripeSecretKey,
     stripePublishableKey,
     resendApiKey,
+    sentryDsn,
   };
 }
 

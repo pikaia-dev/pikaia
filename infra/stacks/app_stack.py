@@ -237,10 +237,13 @@ class AppStack(Stack):
 
         # Build environment variables including S3 config if media bucket is provided
         # ALLOWED_HOSTS is set after ALB creation so we can reference its DNS name
+        sentry_dsn = self.node.try_get_context("sentry_dsn") or ""
+
         container_env = {
             "DJANGO_SETTINGS_MODULE": "config.settings.production",
             # API goes directly to ALB (not through CloudFront), so use standard header
             "PROXY_SSL_HEADER": "X-Forwarded-Proto",
+            "SENTRY_DSN": sentry_dsn,
         }
         if media_bucket:
             container_env.update(

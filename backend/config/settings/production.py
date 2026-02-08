@@ -137,6 +137,22 @@ if not CORS_ALLOWED_ORIGINS:
 
     get_logger(__name__).warning("cors_allowed_origins_empty")
 
+# =============================================================================
+# Sentry Error Tracking
+# =============================================================================
+if settings.SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=0.1,
+        profiles_sample_rate=0.1,
+        send_default_pii=False,
+        environment="production",
+    )
+
 # Validate S3 storage configuration
 if settings.USE_S3_STORAGE:
     _required_s3_settings = {

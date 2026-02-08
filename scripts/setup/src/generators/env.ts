@@ -23,6 +23,7 @@ export interface EnvConfig {
     stripeWebhookSecret?: string;
     resendApiKey?: string;
     googlePlacesApiKey?: string;
+    sentryDsn?: string;
   };
 }
 
@@ -68,6 +69,9 @@ export function generateBackendEnv(rootDir: string, config: EnvConfig): string {
     "# Resend (https://resend.com/api-keys)",
     `RESEND_API_KEY=${config.services.resendApiKey || ""}`,
     "",
+    "# Sentry (https://sentry.io)",
+    `SENTRY_DSN=${config.services.sentryDsn || ""}`,
+    "",
     "# Field Encryption",
     `FIELD_ENCRYPTION_KEY=${config.secrets.fieldEncryptionKey}`,
     "",
@@ -94,6 +98,9 @@ export function generateFrontendEnv(
     "",
     "# Google Places API (for address autocomplete)",
     `VITE_GOOGLE_PLACES_API_KEY=${config.services.googlePlacesApiKey || ""}`,
+    "",
+    "# Sentry (https://sentry.io)",
+    `VITE_SENTRY_DSN=${config.services.sentryDsn || ""}`,
     "",
   ];
 
@@ -158,6 +165,9 @@ export function generateProductionEnv(
     "STYTCH_TRUSTED_AUTH_AUDIENCE=stytch",
     "STYTCH_TRUSTED_AUTH_ISSUER=passkey-auth",
     "PASSKEY_JWT_PRIVATE_KEY=",
+    "",
+    "# Sentry",
+    `SENTRY_DSN=${config.services.sentryDsn || ""}`,
     "",
     "# Field Encryption",
     `FIELD_ENCRYPTION_KEY=${config.secrets.fieldEncryptionKey}`,

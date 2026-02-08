@@ -89,6 +89,9 @@ class Settings(BaseSettings):
     AWS_SMS_OTP_LENGTH: int = 4  # Length of OTP codes
     AWS_SMS_OTP_EXPIRY_MINUTES: int = 30  # OTP expiration time
 
+    # Sentry
+    SENTRY_DSN: str = ""
+
     # Feature gating
     SUBSCRIPTION_GATING_ENABLED: bool = True
 
