@@ -10,17 +10,20 @@ A production-ready B2B SaaS starter built with Django Ninja, Stytch authenticati
 git clone https://github.com/pikaia-dev/pikaia.git
 cd pikaia
 
+# Run the interactive setup wizard (generates .env files)
+./scripts/setup/setup.sh
+
 # Backend
-cd backend && cp .env.example .env  # Add your API keys
-uv sync && uv run python manage.py migrate
+cd backend && uv sync && uv run python manage.py migrate
 uv run python manage.py runserver   # http://localhost:8000
 
 # Frontend (new terminal)
-cd ../frontend && cp .env.example .env
-pnpm install && pnpm dev            # http://localhost:5173
+cd ../frontend && pnpm install && pnpm dev  # http://localhost:5173
 ```
 
-> **First time?** See the [Local Development Guide](./docs/guides/local-development.md) for PostgreSQL setup, environment variables, third-party service configuration, and troubleshooting.
+> **First time?** See the [Local Development Guide](./docs/guides/local-development.md) for PostgreSQL setup, third-party service configuration, and troubleshooting.
+>
+> **Forking?** The setup script handles branding customization (app name, resource prefix) and generates all config files. See [Setup Script Design](./docs/architecture/setup-script-design.md) for details.
 
 ## Tech Stack
 

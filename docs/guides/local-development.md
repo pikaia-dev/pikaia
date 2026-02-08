@@ -27,21 +27,38 @@ psql -U postgres -c "ALTER USER postgres PASSWORD 'postgres';"
 createdb -U postgres pikaia
 ```
 
-### 3. Backend Setup
+### 3. Run Setup Script
+
+The interactive setup wizard generates all `.env` files with your configuration:
+
+```bash
+./scripts/setup/setup.sh
+```
+
+This will prompt for project branding and optionally third-party API keys (Stytch, Stripe, Resend). You can also configure these later:
+
+```bash
+./scripts/setup/setup.sh services   # Configure API keys
+./scripts/setup/setup.sh aws        # Configure AWS deployment
+./scripts/setup/setup.sh status     # View current config
+./scripts/setup/setup.sh doctor     # Check for issues
+```
+
+> **Prefer manual setup?** Copy `.env.example` to `.env` in both `backend/` and `frontend/` and edit with your values.
+
+### 4. Backend Setup
 
 ```bash
 cd backend
-cp .env.example .env  # Edit with your API keys
 uv sync
 uv run python manage.py migrate
 uv run python manage.py setup_stripe  # Create Stripe product/price
 ```
 
-### 4. Frontend Setup
+### 5. Frontend Setup
 
 ```bash
 cd frontend
-cp .env.example .env  # Edit with Stytch public token
 pnpm install
 ```
 
