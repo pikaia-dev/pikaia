@@ -19,7 +19,7 @@ fi
 # Install dependencies if needed
 if [ ! -d "$SCRIPT_DIR/node_modules" ]; then
   echo "Installing setup dependencies..."
-  (cd "$SCRIPT_DIR" && npm install --silent 2>/dev/null)
+  (cd "$SCRIPT_DIR" && npm install --silent)
 fi
 
 # Run the setup script

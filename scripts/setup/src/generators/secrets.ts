@@ -1,11 +1,10 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 
 export function generateDjangoSecretKey(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)";
-  const bytes = randomBytes(50);
-  return Array.from(bytes)
-    .map((b) => chars[b % chars.length])
-    .join("");
+  return Array.from({ length: 50 }, () => chars[randomInt(chars.length)]).join(
+    "",
+  );
 }
 
 export function generateFieldEncryptionKey(): string {

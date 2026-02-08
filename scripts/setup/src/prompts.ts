@@ -205,7 +205,12 @@ export async function promptAws(
     }),
   );
 
-  const suggestedApiDomain = defaults?.apiDomain || `api.${domain.split(".").slice(1).join(".")}`;
+  const parts = domain.split(".");
+  const suggestedApiDomain =
+    defaults?.apiDomain ||
+    (parts.length > 2
+      ? `api.${parts.slice(1).join(".")}`
+      : `api.${domain}`);
 
   const apiDomain = exitOnCancel(
     await p.text({

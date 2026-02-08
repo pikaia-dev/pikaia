@@ -30,6 +30,10 @@ import {
   generateDjangoSecretKey,
   generateFieldEncryptionKey,
 } from "./generators/secrets.js";
+import {
+  loadExistingServices,
+  loadExistingSecrets,
+} from "./env-parser.js";
 
 // --- CLI Argument Parsing ---
 
@@ -181,6 +185,7 @@ async function runCiMode(): Promise<void> {
     process.exit(1);
   }
 
+  const existingSecrets = loadExistingSecrets(ROOT_DIR);
   const config: EnvConfig = {
     project: {
       displayName,
@@ -189,10 +194,12 @@ async function runCiMode(): Promise<void> {
       apiDomain: args["api-domain"] as string | undefined,
     },
     secrets: {
-      djangoSecretKey: generateDjangoSecretKey(),
-      fieldEncryptionKey: generateFieldEncryptionKey(),
+      djangoSecretKey:
+        existingSecrets.djangoSecretKey || generateDjangoSecretKey(),
+      fieldEncryptionKey:
+        existingSecrets.fieldEncryptionKey || generateFieldEncryptionKey(),
     },
-    services: {},
+    services: loadExistingServices(ROOT_DIR),
   };
 
   const generated: string[] = [];
@@ -239,7 +246,8 @@ async function runInteractive(sections?: SetupSection[]): Promise<void> {
   let domain = state?.project.domain;
   let apiDomain = state?.project.api_domain;
   let certificateArn: string | undefined;
-  let services: Partial<EnvConfig["services"]> = {};
+  // Preserve existing service keys from .env files
+  let services: Partial<EnvConfig["services"]> = loadExistingServices(ROOT_DIR);
 
   // --- Branding ---
   if (selectedSections.includes("branding")) {
@@ -274,11 +282,15 @@ async function runInteractive(sections?: SetupSection[]): Promise<void> {
   }
 
   // --- Generate Files ---
+  // Preserve existing secrets unless this is a fresh setup
+  const existingSecrets = loadExistingSecrets(ROOT_DIR);
   const config: EnvConfig = {
     project: { displayName, prefix, domain, apiDomain },
     secrets: {
-      djangoSecretKey: generateDjangoSecretKey(),
-      fieldEncryptionKey: generateFieldEncryptionKey(),
+      djangoSecretKey:
+        existingSecrets.djangoSecretKey || generateDjangoSecretKey(),
+      fieldEncryptionKey:
+        existingSecrets.fieldEncryptionKey || generateFieldEncryptionKey(),
     },
     services,
   };
@@ -414,7 +426,7 @@ async function regenerateSecrets(): Promise<void> {
       djangoSecretKey: generateDjangoSecretKey(),
       fieldEncryptionKey: generateFieldEncryptionKey(),
     },
-    services: {},
+    services: loadExistingServices(ROOT_DIR),
   };
 
   generateBackendEnv(ROOT_DIR, config);
