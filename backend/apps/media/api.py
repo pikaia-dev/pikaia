@@ -8,7 +8,7 @@ from ninja.files import UploadedFile
 
 from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth, get_auth_context, require_subscription
+from apps.core.security import BearerAuth, get_auth_context
 from apps.core.types import AuthenticatedHttpRequest
 from apps.media.models import UploadedImage
 from apps.media.schemas import (
@@ -38,7 +38,6 @@ bearer_auth = BearerAuth()
     operation_id="requestImageUpload",
     summary="Request an image upload URL",
 )
-@require_subscription
 def request_upload(
     request: AuthenticatedHttpRequest, payload: UploadRequestSchema
 ) -> UploadResponseSchema:
@@ -99,7 +98,6 @@ def request_upload(
     operation_id="confirmImageUpload",
     summary="Confirm an image upload",
 )
-@require_subscription
 def confirm_upload(
     request: AuthenticatedHttpRequest, payload: ConfirmUploadSchema
 ) -> ImageResponseSchema:
@@ -179,7 +177,6 @@ def confirm_upload(
     operation_id="directUpload",
     summary="Direct upload for local development",
 )
-@require_subscription
 def direct_upload(
     request: AuthenticatedHttpRequest,
     file: UploadedFile = File(...),  # noqa: B008
@@ -236,7 +233,6 @@ def direct_upload(
     operation_id="deleteImage",
     summary="Delete an uploaded image",
 )
-@require_subscription
 def delete_image(request: AuthenticatedHttpRequest, image_id: str) -> dict:
     """
     Delete an uploaded image.

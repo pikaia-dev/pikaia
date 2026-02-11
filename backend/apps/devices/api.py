@@ -11,7 +11,7 @@ from ninja import Router
 from ninja.errors import HttpError
 
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth, get_auth_context, require_subscription
+from apps.core.security import BearerAuth, get_auth_context
 from apps.core.utils import get_client_ip
 from apps.devices.exceptions import (
     DeviceAlreadyLinkedError,
@@ -49,7 +49,6 @@ bearer_auth = BearerAuth()
     summary="Initiate device linking",
     description="Generate QR code data for linking a mobile device. Requires authentication.",
 )
-@require_subscription
 def initiate_link(request: HttpRequest) -> InitiateLinkResponse:
     """Generate QR code data for device linking."""
     user, member, organization = get_auth_context(request)
@@ -136,7 +135,6 @@ def complete_link(
     summary="List linked devices",
     description="Get all linked devices for the authenticated user.",
 )
-@require_subscription
 def list_devices(request: HttpRequest) -> DeviceListResponse:
     """List all linked devices for the authenticated user."""
     user, _, _ = get_auth_context(request)
@@ -166,7 +164,6 @@ def list_devices(request: HttpRequest) -> DeviceListResponse:
     summary="Revoke a device",
     description="Revoke a linked device, preventing it from syncing.",
 )
-@require_subscription
 def delete_device(request: HttpRequest, device_id: int):
     """Revoke a device owned by the authenticated user."""
     user, _, _ = get_auth_context(request)
@@ -186,7 +183,6 @@ def delete_device(request: HttpRequest, device_id: int):
     summary="Refresh device session",
     description="Get new session tokens for a linked device. Use when JWT expires.",
 )
-@require_subscription
 def refresh_session(
     request: HttpRequest,
     payload: SessionRefreshRequest,

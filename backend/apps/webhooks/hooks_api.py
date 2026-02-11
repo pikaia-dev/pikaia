@@ -21,7 +21,7 @@ from ninja import Router
 from ninja.errors import HttpError
 
 from apps.core.schemas import ErrorResponse
-from apps.core.security import BearerAuth, get_auth_context, require_admin, require_subscription
+from apps.core.security import BearerAuth, get_auth_context, require_admin
 from apps.core.types import AuthenticatedHttpRequest
 
 from .events import WEBHOOK_EVENTS, get_event_type
@@ -69,7 +69,6 @@ def _detect_source(target_url: str) -> WebhookEndpoint.Source:
     summary="Subscribe to webhook events",
 )
 @require_admin
-@require_subscription
 def subscribe(
     request: AuthenticatedHttpRequest,
     payload: RestHookSubscribeRequest,
@@ -132,7 +131,6 @@ def subscribe(
     summary="List webhook subscriptions",
 )
 @require_admin
-@require_subscription
 def list_subscriptions(request: AuthenticatedHttpRequest) -> RestHookListResponse:
     """
     List all REST Hook subscriptions for the organization.
@@ -167,7 +165,6 @@ def list_subscriptions(request: AuthenticatedHttpRequest) -> RestHookListRespons
     summary="Unsubscribe from webhook events",
 )
 @require_admin
-@require_subscription
 def unsubscribe(
     request: AuthenticatedHttpRequest,
     subscription_id: str,
@@ -210,7 +207,6 @@ def unsubscribe(
     summary="Get sample payload for event type",
 )
 @require_admin
-@require_subscription
 def get_sample(
     request: AuthenticatedHttpRequest,
     event_type: str,
@@ -260,7 +256,6 @@ def get_sample(
     summary="Test authentication",
 )
 @require_admin
-@require_subscription
 def verify_auth(request: AuthenticatedHttpRequest) -> AuthTestResponse:
     """
     Test that authentication is working.
