@@ -15,8 +15,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { SettingsSkeleton } from '@/components/ui/skeleton'
-import { useSubscription } from '@/features/billing/api/queries'
-import { SubscriptionRequiredPrompt } from '@/features/billing/components/subscription-required-prompt'
 import AppLayout from '@/layouts/app-layout'
 import { STYTCH_ROLES } from '@/lib/constants'
 
@@ -164,25 +162,6 @@ function AdminRoute({ children }: { children?: React.ReactNode }) {
   return <>{children ?? <Outlet />}</>
 }
 
-function SubscribedRoute({ children }: { children?: React.ReactNode }) {
-  const { data: subscription, isLoading } = useSubscription()
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <LoadingSpinner />
-      </div>
-    )
-  }
-
-  const status = subscription?.status
-  if (status !== 'active' && status !== 'trialing') {
-    return <SubscriptionRequiredPrompt />
-  }
-
-  return <>{children ?? <Outlet />}</>
-}
-
 // ============ Routes Config ============
 
 const routes: AppRouteConfig[] = [
@@ -202,7 +181,6 @@ const routes: AppRouteConfig[] = [
           {
             path: '/dashboard',
             lazy: () => import('@/pages/dashboard'),
-            guards: [SubscribedRoute],
           },
           { path: '/settings', redirectTo: '/settings/profile' },
           {
@@ -214,13 +192,13 @@ const routes: AppRouteConfig[] = [
             path: '/settings/organization',
             lazy: () => import('@/pages/settings/organization-settings'),
             fallback: SettingsFallback,
-            guards: [AdminRoute, SubscribedRoute],
+            guards: [AdminRoute],
           },
           {
             path: '/settings/members',
             lazy: () => import('@/pages/settings/members-settings'),
             fallback: SettingsFallback,
-            guards: [AdminRoute, SubscribedRoute],
+            guards: [AdminRoute],
           },
           {
             path: '/settings/billing',
@@ -238,7 +216,7 @@ const routes: AppRouteConfig[] = [
             path: '/settings/integrations',
             lazy: () => import('@/pages/settings/integrations-settings'),
             fallback: SettingsFallback,
-            guards: [AdminRoute, SubscribedRoute],
+            guards: [AdminRoute],
           },
         ],
       },
