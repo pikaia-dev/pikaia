@@ -5,7 +5,7 @@ Handles sync between Stytch and local User/Member/Organization models.
 """
 
 from datetime import timedelta
-from typing import Any, TypeVar
+from typing import Any
 
 from django.conf import settings as django_settings
 from django.db import IntegrityError, models, transaction
@@ -19,8 +19,6 @@ from apps.organizations.models import Organization, generate_unique_slug
 
 logger = get_logger(__name__)
 
-_M = TypeVar("_M", bound=models.Model)
-
 # An org is only considered stale (safe to soft-delete on slug collision)
 # if it was created more than this many minutes ago.  This prevents a
 # concurrent request from destroying a freshly-created legitimate org
@@ -33,11 +31,11 @@ STALE_ORG_THRESHOLD_MINUTES = 5
 # ---------------------------------------------------------------------------
 
 
-def _reactivate_soft_deleted(
-    model_class: type[_M],
+def _reactivate_soft_deleted[M: models.Model](
+    model_class: type[M],
     lookup: dict[str, Any],
     update_fields: dict[str, Any],
-) -> _M | None:
+) -> M | None:
     """Reactivate a soft-deleted record if one matches *lookup*.
 
     Queries ``all_objects`` with ``select_for_update()`` for a record that
@@ -45,7 +43,7 @@ def _reactivate_soft_deleted(
     updated with *update_fields*, ``deleted_at`` is cleared, and it is saved
     and returned.  Returns ``None`` when no soft-deleted record exists.
     """
-    instance: _M | None = (
+    instance: M | None = (
         model_class.all_objects.select_for_update()  # type: ignore[attr-defined]
         .filter(**lookup, deleted_at__isnull=False)
         .first()
@@ -62,12 +60,12 @@ def _reactivate_soft_deleted(
     return instance
 
 
-def _create_with_race_guard(
-    model_class: type[_M],
+def _create_with_race_guard[M: models.Model](
+    model_class: type[M],
     lookup_field: str,
     lookup_value: Any,
     **create_kwargs: Any,
-) -> _M:
+) -> M:
     """Create a record inside a savepoint, falling back on the race winner.
 
     Wraps the ``create()`` in ``transaction.atomic()`` so an

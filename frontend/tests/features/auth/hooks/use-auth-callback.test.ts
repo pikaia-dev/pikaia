@@ -32,6 +32,7 @@ const mockStytchClient = {
   },
   session: {
     updateSession: vi.fn(),
+    getTokens: vi.fn(),
   },
 }
 
