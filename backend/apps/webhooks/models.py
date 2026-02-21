@@ -304,7 +304,6 @@ class WebhookDelivery(models.Model):
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["endpoint", "created_at"]),
-            models.Index(fields=["event_id", "endpoint"]),  # Idempotency check
             models.Index(fields=["status", "next_retry_at"]),  # Retry queue
         ]
         # Ensure idempotency: one delivery per event per endpoint
@@ -415,6 +414,7 @@ class WebhookDelivery(models.Model):
             defaults={
                 "event_type": event_type,
                 "url_snapshot": endpoint.url,
+                "next_retry_at": timezone.now(),
             },
         )
         return delivery

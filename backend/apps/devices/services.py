@@ -207,28 +207,37 @@ def complete_device_link(
         raise TokenInvalidError("Invalid token type.")
 
     token_hash = _hash_token(token)
-    try:
-        token_record = DeviceLinkToken.objects.select_related("user", "member", "organization").get(
-            token_hash=token_hash
-        )
-    except DeviceLinkToken.DoesNotExist:
-        raise TokenInvalidError("Link token not found.") from None
-
-    if token_record.is_used:
-        raise TokenUsedError("Link token has already been used.")
-
-    if token_record.is_expired:
-        raise TokenExpiredError("Link token has expired. Please generate a new QR code.")
-
-    user = token_record.user
-    member = token_record.member
-    organization = token_record.organization
-
-    existing_device = Device.all_objects.filter(device_uuid=device_uuid).first()
-    if existing_device and existing_device.user_id != user.id and not existing_device.is_revoked:
-        raise DeviceAlreadyLinkedError("This device is already linked to another account.")
 
     with transaction.atomic():
+        try:
+            token_record = (
+                DeviceLinkToken.objects.select_for_update()
+                .select_related("user", "member", "organization")
+                .get(token_hash=token_hash)
+            )
+        except DeviceLinkToken.DoesNotExist:
+            raise TokenInvalidError("Link token not found.") from None
+
+        if token_record.is_used:
+            raise TokenUsedError("Link token has already been used.")
+
+        if token_record.is_expired:
+            raise TokenExpiredError("Link token has expired. Please generate a new QR code.")
+
+        user = token_record.user
+        member = token_record.member
+        organization = token_record.organization
+
+        existing_device = (
+            Device.all_objects.select_for_update().filter(device_uuid=device_uuid).first()
+        )
+        if (
+            existing_device
+            and existing_device.user_id != user.id
+            and not existing_device.is_revoked
+        ):
+            raise DeviceAlreadyLinkedError("This device is already linked to another account.")
+
         token_record.mark_used()
 
         if existing_device and existing_device.user_id == user.id:

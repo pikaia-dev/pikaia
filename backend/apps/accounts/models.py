@@ -151,6 +151,7 @@ class Member(SoftDeleteMixin, models.Model):
         ]
         indexes = [
             models.Index(fields=["organization", "deleted_at"]),
+            models.Index(fields=["organization", "role", "deleted_at"]),
         ]
 
     def __str__(self) -> str:

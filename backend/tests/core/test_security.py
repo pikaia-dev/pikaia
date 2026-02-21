@@ -4,11 +4,13 @@ Tests for core security module.
 Tests BearerAuth authentication class, require_admin, and require_subscription decorators.
 """
 
+from datetime import timedelta
 from unittest.mock import MagicMock
 
 import pytest
 from django.http import HttpRequest, HttpResponse
 from django.test import override_settings
+from django.utils import timezone
 from ninja.errors import HttpError
 
 from apps.accounts.models import User
@@ -215,10 +217,50 @@ class TestRequireSubscription:
         assert exc.value.status_code == 402
 
     @override_settings(SUBSCRIPTION_GATING_ENABLED=True)
-    def test_rejects_user_with_no_subscription(self, request_factory) -> None:
-        """Should reject users with no subscription record with 402."""
+    def test_rejects_user_with_no_subscription_and_no_trial(self, request_factory) -> None:
+        """Should reject users with no subscription record and no active trial with 402."""
         user = UserFactory.create()
-        org = OrganizationFactory.create()
+        org = OrganizationFactory.create(trial_ends_at=None)
+        member = MemberFactory.create(user=user, organization=org)
+
+        request = request_factory.get("/")
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
+
+        @require_subscription
+        def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("OK")
+
+        with pytest.raises(HttpError) as exc:
+            view(request)
+
+        assert exc.value.status_code == 402
+
+    @override_settings(SUBSCRIPTION_GATING_ENABLED=True)
+    def test_allows_user_with_active_trial_and_no_subscription(self, request_factory) -> None:
+        """Should allow users in an active free trial even without a Subscription record."""
+        user = UserFactory.create()
+        org = OrganizationFactory.create(trial_ends_at=timezone.now() + timedelta(days=7))
+        member = MemberFactory.create(user=user, organization=org)
+
+        request = request_factory.get("/")
+        request = make_request_with_auth(
+            request, AuthContext(user=user, member=member, organization=org)
+        )
+
+        @require_subscription
+        def view(request: HttpRequest) -> HttpResponse:
+            return HttpResponse("OK")
+
+        result = view(request)
+        assert result.status_code == 200
+
+    @override_settings(SUBSCRIPTION_GATING_ENABLED=True)
+    def test_rejects_user_with_expired_trial_and_no_subscription(self, request_factory) -> None:
+        """Should reject users with an expired trial and no subscription with 402."""
+        user = UserFactory.create()
+        org = OrganizationFactory.create(trial_ends_at=timezone.now() - timedelta(days=1))
         member = MemberFactory.create(user=user, organization=org)
 
         request = request_factory.get("/")

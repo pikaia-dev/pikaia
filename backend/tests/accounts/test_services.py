@@ -3,9 +3,11 @@ Tests for accounts services.
 """
 
 from dataclasses import dataclass
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.utils import timezone
 
 from apps.accounts.models import Member, User
 from apps.accounts.services import (
@@ -108,6 +110,215 @@ class TestGetOrCreateOrganizationFromStytch:
         assert org.slug == "updated-corp"
         assert Organization.objects.count() == 1
 
+    def test_creates_org_when_slug_held_by_soft_deleted_org(self) -> None:
+        """Should create org when slug is only held by a soft-deleted organization."""
+        old_org = OrganizationFactory.create(
+            stytch_org_id="org-old-456",
+            slug="gmail-wojteksz",
+        )
+        old_org.soft_delete()
+
+        new_org = get_or_create_organization_from_stytch(
+            stytch_org_id="org-new-789",
+            name="New Org",
+            slug="gmail-wojteksz",
+        )
+
+        assert new_org.stytch_org_id == "org-new-789"
+        assert new_org.slug == "gmail-wojteksz"
+        assert new_org.deleted_at is None
+
+    def test_reactivates_soft_deleted_org_by_stytch_id(self) -> None:
+        """Should reactivate a soft-deleted org when Stytch sends the same org ID."""
+        org = OrganizationFactory.create(
+            stytch_org_id="org-reactivate-123",
+            name="Old Name",
+            slug="old-slug",
+        )
+        org.soft_delete()
+
+        reactivated = get_or_create_organization_from_stytch(
+            stytch_org_id="org-reactivate-123",
+            name="New Name",
+            slug="new-slug",
+        )
+
+        assert reactivated.id == org.id
+        assert reactivated.deleted_at is None
+        assert reactivated.name == "New Name"
+        assert reactivated.slug == "new-slug"
+
+    def test_soft_deletes_stale_org_on_slug_collision(self) -> None:
+        """Should soft-delete a stale org when a new Stytch org reuses the same slug.
+
+        This happens when a Stytch org deletion webhook was missed -- the local
+        org is still active but its stytch_org_id no longer exists in Stytch.
+        The stale org must be old (beyond the threshold) and have no active members.
+        """
+        from apps.accounts.services import STALE_ORG_THRESHOLD_MINUTES
+
+        stale_org = OrganizationFactory.create(
+            stytch_org_id="org-stale-old",
+            name="Stale Org",
+            slug="gmail-wojteksz",
+        )
+        # Push created_at beyond the staleness threshold
+        old_time = timezone.now() - timedelta(minutes=STALE_ORG_THRESHOLD_MINUTES + 1)
+        Organization.all_objects.filter(pk=stale_org.pk).update(created_at=old_time)
+
+        new_org = get_or_create_organization_from_stytch(
+            stytch_org_id="org-fresh-new",
+            name="Fresh Org",
+            slug="gmail-wojteksz",
+        )
+
+        assert new_org.stytch_org_id == "org-fresh-new"
+        assert new_org.slug == "gmail-wojteksz"
+        assert new_org.deleted_at is None
+
+        # Stale org should be soft-deleted
+        stale = Organization.all_objects.get(stytch_org_id="org-stale-old")
+        assert stale.deleted_at is not None
+
+    def test_slug_collision_does_not_poison_outer_transaction(self) -> None:
+        """IntegrityError from slug collision should not break the outer transaction."""
+        from apps.accounts.services import STALE_ORG_THRESHOLD_MINUTES
+
+        stale_org = OrganizationFactory.create(
+            stytch_org_id="org-stale-tx",
+            slug="collision-slug",
+        )
+        # Push created_at beyond the staleness threshold
+        old_time = timezone.now() - timedelta(minutes=STALE_ORG_THRESHOLD_MINUTES + 1)
+        Organization.all_objects.filter(pk=stale_org.pk).update(created_at=old_time)
+
+        from django.db import transaction
+
+        with transaction.atomic():
+            org = get_or_create_organization_from_stytch(
+                stytch_org_id="org-new-tx",
+                name="New Org",
+                slug="collision-slug",
+            )
+            # Subsequent query should work (transaction not poisoned)
+            assert Organization.objects.filter(id=org.id).exists()
+
+    def test_appends_suffix_for_recently_created_org_on_slug_collision(self) -> None:
+        """Should append a numeric suffix when slug collides with a recently-created org.
+
+        A recently-created org is likely legitimate -- it must not be soft-deleted.
+        Instead the new org gets a suffixed slug (e.g. ``contested-slug-2``).
+        """
+        _active_org = OrganizationFactory.create(
+            stytch_org_id="org-active-recent",
+            slug="contested-slug",
+        )
+        # created_at is auto_now_add, so it's "just now" -- within the threshold
+
+        new_org = get_or_create_organization_from_stytch(
+            stytch_org_id="org-new-attempt",
+            name="New Org",
+            slug="contested-slug",
+        )
+
+        assert new_org.stytch_org_id == "org-new-attempt"
+        assert new_org.slug == "contested-slug-2"
+
+        # Original org must be untouched
+        original = Organization.objects.get(stytch_org_id="org-active-recent")
+        assert original.deleted_at is None
+        assert original.slug == "contested-slug"
+
+    def test_appends_suffix_for_org_with_active_members(self) -> None:
+        """Should append a numeric suffix when slug collides with an org that has active members.
+
+        Even if the org is old, destroying it would orphan member data.
+        Instead the new org gets a suffixed slug.
+        """
+        from apps.accounts.services import STALE_ORG_THRESHOLD_MINUTES
+
+        org_with_members = OrganizationFactory.create(
+            stytch_org_id="org-has-members",
+            slug="member-slug",
+        )
+        _member = MemberFactory.create(organization=org_with_members)
+
+        # Push created_at beyond the staleness threshold so only
+        # the "has active members" check is protecting it
+        old_time = timezone.now() - timedelta(minutes=STALE_ORG_THRESHOLD_MINUTES + 1)
+        Organization.all_objects.filter(pk=org_with_members.pk).update(created_at=old_time)
+
+        new_org = get_or_create_organization_from_stytch(
+            stytch_org_id="org-new-attempt-2",
+            name="New Org",
+            slug="member-slug",
+        )
+
+        assert new_org.stytch_org_id == "org-new-attempt-2"
+        assert new_org.slug == "member-slug-2"
+
+        # Original org must be untouched
+        original = Organization.objects.get(stytch_org_id="org-has-members")
+        assert original.deleted_at is None
+        assert original.slug == "member-slug"
+
+    def test_allows_delete_of_old_org_without_members(self) -> None:
+        """Should soft-delete an old org without members on slug collision.
+
+        This is the legitimate stale-org scenario: Stytch deletion webhook was
+        missed, the local org is old, and it has no active members.
+        """
+        from apps.accounts.services import STALE_ORG_THRESHOLD_MINUTES
+
+        stale_org = OrganizationFactory.create(
+            stytch_org_id="org-old-no-members",
+            slug="reusable-slug",
+        )
+        old_time = timezone.now() - timedelta(minutes=STALE_ORG_THRESHOLD_MINUTES + 1)
+        Organization.all_objects.filter(pk=stale_org.pk).update(created_at=old_time)
+
+        new_org = get_or_create_organization_from_stytch(
+            stytch_org_id="org-new-reuse",
+            name="New Org",
+            slug="reusable-slug",
+        )
+
+        assert new_org.stytch_org_id == "org-new-reuse"
+        assert new_org.slug == "reusable-slug"
+        assert new_org.deleted_at is None
+
+        # Old org should be soft-deleted
+        old = Organization.all_objects.get(stytch_org_id="org-old-no-members")
+        assert old.deleted_at is not None
+
+    def test_soft_deleted_members_do_not_block_stale_org_deletion(self) -> None:
+        """Soft-deleted members should not prevent stale org cleanup.
+
+        Only active (non-deleted) members should protect an org from being
+        considered stale.
+        """
+        from apps.accounts.services import STALE_ORG_THRESHOLD_MINUTES
+
+        org = OrganizationFactory.create(
+            stytch_org_id="org-with-deleted-members",
+            slug="zombie-slug",
+        )
+        member = MemberFactory.create(organization=org)
+        member.soft_delete()
+
+        old_time = timezone.now() - timedelta(minutes=STALE_ORG_THRESHOLD_MINUTES + 1)
+        Organization.all_objects.filter(pk=org.pk).update(created_at=old_time)
+
+        new_org = get_or_create_organization_from_stytch(
+            stytch_org_id="org-new-zombie",
+            name="New Org",
+            slug="zombie-slug",
+        )
+
+        assert new_org.stytch_org_id == "org-new-zombie"
+        old = Organization.all_objects.get(stytch_org_id="org-with-deleted-members")
+        assert old.deleted_at is not None
+
 
 @pytest.mark.django_db
 class TestGetOrCreateMemberFromStytch:
@@ -148,6 +359,29 @@ class TestGetOrCreateMemberFromStytch:
         assert member.id == existing.id
         assert member.role == "admin"
         assert Member.objects.count() == 1
+
+    def test_reactivates_soft_deleted_member(self) -> None:
+        """Should reactivate a soft-deleted member when Stytch sends the same member ID."""
+        user = UserFactory.create()
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(
+            user=user,
+            organization=org,
+            stytch_member_id="member-reactivate-123",
+            role="member",
+        )
+        member.soft_delete()
+
+        reactivated = get_or_create_member_from_stytch(
+            user=user,
+            organization=org,
+            stytch_member_id="member-reactivate-123",
+            role="admin",
+        )
+
+        assert reactivated.id == member.id
+        assert reactivated.deleted_at is None
+        assert reactivated.role == "admin"
 
 
 @pytest.mark.django_db

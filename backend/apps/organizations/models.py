@@ -2,10 +2,15 @@
 Organizations models - multi-tenancy foundation.
 """
 
+import re
+
 from django.db import models
 from django.utils import timezone
 
 from apps.core.models import SoftDeleteAllManager, SoftDeleteManager, SoftDeleteMixin
+
+# Maximum number of suffix attempts when resolving slug collisions.
+MAX_SLUG_SUFFIX_ATTEMPTS = 100
 
 
 class Organization(SoftDeleteMixin, models.Model):
@@ -29,7 +34,6 @@ class Organization(SoftDeleteMixin, models.Model):
     name = models.CharField(max_length=255)
     slug = models.SlugField(
         max_length=255,
-        unique=True,
         help_text="URL-safe identifier, e.g. 'acme-corp'",
     )
     logo_url = models.URLField(
@@ -97,6 +101,13 @@ class Organization(SoftDeleteMixin, models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["slug"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="unique_active_org_slug",
+            ),
+        ]
 
     def __str__(self) -> str:
         return self.name
@@ -113,3 +124,43 @@ class Organization(SoftDeleteMixin, models.Model):
             return 0
         remaining = (self.trial_ends_at - timezone.now()).days
         return max(0, remaining)
+
+
+def generate_unique_slug(base_slug: str) -> str:
+    """Return a slug that does not collide with any active organization.
+
+    If *base_slug* is already free among active (non-deleted) orgs, it is
+    returned unchanged.  Otherwise a numeric suffix is appended:
+    ``base_slug-2``, ``base_slug-3``, etc.  If the base slug already ends
+    with a numeric suffix (e.g. ``my-org-3``), the counter starts from the
+    next number (``my-org-4``).
+
+    Uses ``select_for_update()`` to lock colliding rows, preventing
+    concurrent requests from generating the same slug (TOCTOU race).
+    Must be called within a ``transaction.atomic()`` block.
+
+    Raises ``RuntimeError`` after ``MAX_SLUG_SUFFIX_ATTEMPTS`` tries to
+    prevent infinite loops.
+    """
+    if not Organization.objects.select_for_update().filter(slug=base_slug).exists():
+        return base_slug
+
+    # Strip an existing trailing numeric suffix so we increment from
+    # the right starting point.  E.g. "my-org-3" -> ("my-org", 3).
+    match = re.match(r"^(.+)-(\d+)$", base_slug)
+    if match:
+        stem = match.group(1)
+        start = int(match.group(2)) + 1
+    else:
+        stem = base_slug
+        start = 2
+
+    for suffix in range(start, start + MAX_SLUG_SUFFIX_ATTEMPTS):
+        candidate = f"{stem}-{suffix}"
+        if not Organization.objects.select_for_update().filter(slug=candidate).exists():
+            return candidate
+
+    raise RuntimeError(
+        f"Could not generate a unique slug after {MAX_SLUG_SUFFIX_ATTEMPTS} "
+        f"attempts (base='{base_slug}')"
+    )

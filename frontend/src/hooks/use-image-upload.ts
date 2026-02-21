@@ -1,6 +1,6 @@
 import { useStytchB2BClient } from '@stytch/react/b2b'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { queryKeys } from '@/api/query-keys'
 import type { ImageResponse, UploadRequest } from '@/api/types'
 import { useApi } from '@/api/use-api'
@@ -17,9 +17,22 @@ export function useImageUpload(imageType: 'avatar' | 'logo', options: UseImageUp
   const [isUploading, setIsUploading] = useState(false)
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<Error | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  // Abort any in-flight upload on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort()
+    }
+  }, [])
 
   const upload = useCallback(
     async (file: Blob, filename: string): Promise<ImageResponse | null> => {
+      // Abort previous upload if still in progress
+      abortControllerRef.current?.abort()
+      const controller = new AbortController()
+      abortControllerRef.current = controller
+
       setIsUploading(true)
       setProgress(0)
       setError(null)
@@ -33,7 +46,9 @@ export function useImageUpload(imageType: 'avatar' | 'logo', options: UseImageUp
           size_bytes: file.size,
           image_type: imageType,
         }
-        const uploadInfo = await requestUpload(uploadRequest)
+        const uploadInfo = await requestUpload(uploadRequest, { signal: controller.signal })
+
+        if (controller.signal.aborted) return null
 
         // Step 2: Upload to storage
         setProgress(30)
@@ -46,6 +61,7 @@ export function useImageUpload(imageType: 'avatar' | 'logo', options: UseImageUp
             headers: {
               'Content-Type': file.type || 'image/png',
             },
+            signal: controller.signal,
           })
           if (!response.ok) {
             throw new Error(
@@ -75,6 +91,7 @@ export function useImageUpload(imageType: 'avatar' | 'logo', options: UseImageUp
             method: 'POST',
             body: formData,
             headers,
+            signal: controller.signal,
           })
           if (!response.ok) {
             const errorText = await response.text()
@@ -82,12 +99,16 @@ export function useImageUpload(imageType: 'avatar' | 'logo', options: UseImageUp
           }
         }
 
+        if (controller.signal.aborted) return null
+
         // Step 3: Confirm upload
         setProgress(80)
-        const result = await confirmUpload({
-          key: uploadInfo.key,
-          image_type: imageType,
-        })
+        const result = await confirmUpload(
+          { key: uploadInfo.key, image_type: imageType },
+          { signal: controller.signal }
+        )
+
+        if (controller.signal.aborted) return null
 
         setProgress(100)
 
@@ -99,18 +120,22 @@ export function useImageUpload(imageType: 'avatar' | 'logo', options: UseImageUp
         options.onSuccess?.(result)
         return result
       } catch (err) {
+        if (controller.signal.aborted) return null
         const error = err instanceof Error ? err : new Error(`Failed to upload ${imageType}`)
         setError(error)
         options.onError?.(error)
         return null
       } finally {
-        setIsUploading(false)
+        if (!controller.signal.aborted) {
+          setIsUploading(false)
+        }
       }
     },
     [imageType, requestUpload, confirmUpload, options, stytch, queryClient]
   )
 
   const reset = useCallback(() => {
+    abortControllerRef.current?.abort()
     setIsUploading(false)
     setProgress(0)
     setError(null)

@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react'
 import { useStytchMember, useStytchMemberSession } from '@stytch/react/b2b'
 import { useEffect, useState } from 'react'
 import {
@@ -15,6 +16,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { SettingsSkeleton } from '@/components/ui/skeleton'
+import { AUTH_STORAGE_KEYS } from '@/features/auth/constants'
 import AppLayout from '@/layouts/app-layout'
 import { STYTCH_ROLES } from '@/lib/constants'
 
@@ -65,10 +67,42 @@ function SettingsFallback() {
   return <SettingsSkeleton />
 }
 
+// ============ Chunk Load Error Handling ============
+
+const CHUNK_RELOAD_KEY = 'chunk_reload_ts'
+
+function isChunkLoadError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const msg = error.message
+  return (
+    msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes('is not a valid JavaScript MIME type') ||
+    msg.includes('Importing a module script failed') ||
+    error.name === 'ChunkLoadError'
+  )
+}
+
+function reloadIfStaleChunk(error: unknown): boolean {
+  if (!isChunkLoadError(error)) return false
+
+  const lastReload = sessionStorage.getItem(CHUNK_RELOAD_KEY)
+  if (lastReload && Date.now() - Number(lastReload) < 10_000) return false
+
+  sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()))
+  window.location.reload()
+  return true
+}
+
 // ============ Route Error Boundary ============
 
 function RootErrorBoundary() {
   const error = useRouteError()
+
+  if (reloadIfStaleChunk(error)) return null
+
+  if (!isRouteErrorResponse(error)) {
+    Sentry.captureException(error)
+  }
 
   let message = 'An unexpected error occurred. Please try again.'
   if (isRouteErrorResponse(error)) {
@@ -95,12 +129,12 @@ function ProtectedRoute({ children }: { children?: React.ReactNode }) {
   const [waitingTimedOut, setWaitingTimedOut] = useState(false)
 
   // Check if we should wait for session (set during login flow)
-  const justLoggedIn = sessionStorage.getItem('stytch_just_logged_in') === 'true'
+  const justLoggedIn = sessionStorage.getItem(AUTH_STORAGE_KEYS.JUST_LOGGED_IN) === 'true'
 
   // Clear flag when session arrives
   useEffect(() => {
     if (session && justLoggedIn) {
-      sessionStorage.removeItem('stytch_just_logged_in')
+      sessionStorage.removeItem(AUTH_STORAGE_KEYS.JUST_LOGGED_IN)
     }
   }, [session, justLoggedIn])
 
@@ -109,7 +143,7 @@ function ProtectedRoute({ children }: { children?: React.ReactNode }) {
     if (!justLoggedIn || session || waitingTimedOut) return
 
     const timer = setTimeout(() => {
-      sessionStorage.removeItem('stytch_just_logged_in')
+      sessionStorage.removeItem(AUTH_STORAGE_KEYS.JUST_LOGGED_IN)
       setWaitingTimedOut(true)
     }, 5000)
     return () => {
@@ -253,16 +287,27 @@ function buildRoutes(configs: AppRouteConfig[]): RouteObject[] {
       handle: config.handle,
     }
 
-    // Add lazy loading with HydrateFallback
+    // Add lazy loading with HydrateFallback and stale chunk recovery
     if (config.lazy) {
       const lazyLoader = config.lazy
       const Fallback = config.fallback ?? GlobalFallback
       const guards = config.guards
 
+      const loadWithChunkRecovery = async () => {
+        try {
+          return await lazyLoader()
+        } catch (error) {
+          if (reloadIfStaleChunk(error)) {
+            return await new Promise<never>(() => {})
+          }
+          throw error
+        }
+      }
+
       // Guards on leaf routes (no children) - wrap the lazy component
       if (!config.children && guards?.length) {
         route.lazy = async () => {
-          const module = await lazyLoader()
+          const module = await loadWithChunkRecovery()
           const Component = module.default
           const GuardedComponent = () => composeGuards(guards, <Component />) as React.ReactElement
           return {
@@ -272,7 +317,7 @@ function buildRoutes(configs: AppRouteConfig[]): RouteObject[] {
         }
       } else {
         route.lazy = async () => {
-          const module = await lazyLoader()
+          const module = await loadWithChunkRecovery()
           return {
             Component: module.default,
             HydrateFallback: Fallback,

@@ -5,7 +5,12 @@ Tests for the rate limiting utility.
 import pytest
 from django.core.cache import cache
 
-from apps.core.throttling import RateLimitExceeded, check_rate_limit
+from apps.core.throttling import (
+    RateLimitExceeded,
+    check_rate_limit,
+    increment_rate_limit,
+    peek_rate_limit,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -64,3 +69,71 @@ class TestCheckRateLimit:
 
         check_rate_limit("test_key", max_requests=10, window_seconds=60)
         assert cache.get("rate_limit:test_key") == 2
+
+
+@pytest.mark.django_db
+class TestPeekRateLimit:
+    """Tests for the peek_rate_limit function (check without increment)."""
+
+    def test_allows_when_no_counter_exists(self) -> None:
+        """Should not raise when the rate limit key does not exist yet."""
+        peek_rate_limit("fresh_key", max_requests=3, window_seconds=60)
+
+    def test_allows_when_under_limit(self) -> None:
+        """Should not raise when counter is under the limit."""
+        cache.set("rate_limit:peek_key", 2, timeout=60)
+
+        peek_rate_limit("peek_key", max_requests=3, window_seconds=60)
+
+    def test_blocks_when_over_limit(self) -> None:
+        """Should raise RateLimitExceeded when counter exceeds the limit."""
+        cache.set("rate_limit:peek_key", 4, timeout=60)
+
+        with pytest.raises(RateLimitExceeded) as exc_info:
+            peek_rate_limit("peek_key", max_requests=3, window_seconds=60)
+
+        assert exc_info.value.retry_after == 60
+
+    def test_blocks_when_at_limit(self) -> None:
+        """Should raise RateLimitExceeded when counter equals the limit exactly."""
+        cache.set("rate_limit:peek_key", 3, timeout=60)
+
+        with pytest.raises(RateLimitExceeded) as exc_info:
+            peek_rate_limit("peek_key", max_requests=3, window_seconds=60)
+
+        assert exc_info.value.retry_after == 60
+
+    def test_does_not_increment_counter(self) -> None:
+        """Should not change the counter value."""
+        cache.set("rate_limit:peek_key", 2, timeout=60)
+
+        peek_rate_limit("peek_key", max_requests=3, window_seconds=60)
+
+        assert cache.get("rate_limit:peek_key") == 2
+
+
+@pytest.mark.django_db
+class TestIncrementRateLimit:
+    """Tests for the increment_rate_limit function (increment without check)."""
+
+    def test_creates_counter_when_none_exists(self) -> None:
+        """Should create a counter starting at 1 when key does not exist."""
+        increment_rate_limit("new_key", window_seconds=60)
+
+        assert cache.get("rate_limit:new_key") == 1
+
+    def test_increments_existing_counter(self) -> None:
+        """Should increment an existing counter."""
+        cache.set("rate_limit:inc_key", 3, timeout=60)
+
+        increment_rate_limit("inc_key", window_seconds=60)
+
+        assert cache.get("rate_limit:inc_key") == 4
+
+    def test_does_not_raise_when_over_limit(self) -> None:
+        """Should not raise even when counter exceeds any limit -- that is peek's job."""
+        cache.set("rate_limit:inc_key", 100, timeout=60)
+
+        increment_rate_limit("inc_key", window_seconds=60)
+
+        assert cache.get("rate_limit:inc_key") == 101

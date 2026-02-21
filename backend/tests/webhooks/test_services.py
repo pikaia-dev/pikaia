@@ -422,4 +422,4 @@ class TestGetAvailableEvents:
         types = {e["type"] for e in events}
 
         assert "member.created" in types
-        assert "member.deleted" in types
+        assert "member.removed" in types

@@ -2,12 +2,11 @@
 API endpoints for SMS/OTP verification.
 """
 
-import logging
-
 from django.conf import settings
 from ninja import Router
 from ninja.errors import HttpError
 
+from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth, get_auth_context
 from apps.core.types import AuthenticatedHttpRequest
@@ -29,7 +28,7 @@ from apps.sms.services import (
     verify_phone_for_user,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = Router(tags=["Phone Verification"])
 bearer_auth = BearerAuth()
@@ -74,7 +73,7 @@ def send_verification_otp(
 
 @router.post(
     "/verify",
-    response={200: VerifyOTPResponse, 400: ErrorResponse, 401: ErrorResponse},
+    response={200: VerifyOTPResponse, 400: ErrorResponse, 401: ErrorResponse, 429: ErrorResponse},
     auth=bearer_auth,
     operation_id="verifyPhoneOTP",
     summary="Verify phone OTP and update profile",
@@ -96,6 +95,8 @@ def verify_phone_otp(
             phone_number=payload.phone_number,
             code=payload.code,
         )
+    except OTPRateLimitError as e:
+        raise HttpError(429, str(e)) from None
     except OTPExpiredError as e:
         raise HttpError(400, str(e)) from None
     except OTPMaxAttemptsError as e:

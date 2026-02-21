@@ -3,12 +3,17 @@ import { z } from 'zod'
 /**
  * Normalize a slug to meet Stytch requirements.
  * Allowed characters: a-z, 0-9, hyphen, period, underscore, tilde
+ *
+ * IMPORTANT: This must match the backend normalization in
+ * backend/apps/accounts/schemas.py:normalize_slug()
  */
+const SLUG_DISALLOWED_CHARS = /[^a-z0-9._~-]+/g
+
 export function normalizeSlug(value: string): string {
   return value
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9._~-]+/g, '-')
+    .replace(SLUG_DISALLOWED_CHARS, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 128)
 }

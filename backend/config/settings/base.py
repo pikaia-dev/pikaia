@@ -61,7 +61,9 @@ class Settings(BaseSettings):
 
     # Stytch Trusted Auth Token (for passkey -> Stytch session)
     STYTCH_TRUSTED_AUTH_PROFILE_ID: str = ""  # From Stytch dashboard
-    STYTCH_TRUSTED_AUTH_AUDIENCE: str = "stytch"  # Must match dashboard config
+    STYTCH_TRUSTED_AUTH_AUDIENCE: str = (
+        ""  # Stytch project ID (e.g. project-live-xxx or project-test-xxx)
+    )
     STYTCH_TRUSTED_AUTH_ISSUER: str = "passkey-auth"  # Must match dashboard config
     PASSKEY_JWT_PRIVATE_KEY: str = ""  # RSA private key (PEM format)
 
@@ -189,7 +191,12 @@ SESSION_COOKIE_SAMESITE = "None"
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SECURE = True
-CSRF_TRUSTED_ORIGINS = parse_comma_list(settings.WEBAUTHN_ORIGIN)
+CSRF_TRUSTED_ORIGINS = list(
+    {
+        *parse_comma_list(settings.CORS_ALLOWED_ORIGINS),
+        *parse_comma_list(settings.WEBAUTHN_ORIGIN),
+    }
+)
 
 
 # Database configuration
@@ -308,7 +315,7 @@ WEBAUTHN_ORIGIN = settings.WEBAUTHN_ORIGIN
 
 # Stytch Trusted Auth Token (for passkey -> Stytch session)
 STYTCH_TRUSTED_AUTH_PROFILE_ID = settings.STYTCH_TRUSTED_AUTH_PROFILE_ID
-STYTCH_TRUSTED_AUTH_AUDIENCE = settings.STYTCH_TRUSTED_AUTH_AUDIENCE
+STYTCH_TRUSTED_AUTH_AUDIENCE = settings.STYTCH_TRUSTED_AUTH_AUDIENCE or settings.STYTCH_PROJECT_ID
 STYTCH_TRUSTED_AUTH_ISSUER = settings.STYTCH_TRUSTED_AUTH_ISSUER
 PASSKEY_JWT_PRIVATE_KEY = settings.PASSKEY_JWT_PRIVATE_KEY
 JWT_SIGNING_KEY_ID = "passkey-auth-key-1"  # Key ID for JWT headers

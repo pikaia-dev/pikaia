@@ -142,3 +142,95 @@ def validate_avatar_url(url: str, resolve_dns: bool = True) -> str:
             raise SSRFError(f"DNS resolution failed: {e}") from e
 
     return url
+
+
+# Hostnames that are always blocked for webhook targets, regardless of DNS.
+BLOCKED_WEBHOOK_HOSTNAMES = frozenset(
+    {
+        "localhost",
+        "metadata.google.internal",
+    }
+)
+
+
+def validate_webhook_url(url: str, *, resolve_dns: bool = True) -> str:
+    """
+    Validate a customer-supplied webhook URL against SSRF attacks.
+
+    Unlike ``validate_avatar_url`` (which uses an allow-list), this function
+    accepts any *public* HTTPS hostname that does not resolve to a
+    private/internal IP address.
+
+    Checks performed:
+    1. HTTPS scheme required.
+    2. Hostname present and not a bare IP literal in a private range.
+    3. Hostname not in the explicit block-list (``localhost``, cloud metadata, ...).
+    4. Port restricted to 443 (default) -- custom ports are rejected.
+    5. Credentials in the URL are rejected (``user:pass@host``).
+    6. DNS resolution confirms all addresses are public (defense-in-depth).
+
+    Args:
+        url: The URL to validate.
+        resolve_dns: Whether to resolve the hostname and verify the IPs are
+            public.  Set to ``False`` in unit tests to avoid real DNS lookups.
+
+    Returns:
+        The validated URL (unchanged).
+
+    Raises:
+        SSRFError: If the URL fails any validation check.
+    """
+    if not url:
+        raise SSRFError("Empty URL")
+
+    try:
+        parsed = urlparse(url)
+    except Exception as e:
+        raise SSRFError(f"Invalid URL format: {e}") from e
+
+    # --- scheme ----------------------------------------------------------
+    if parsed.scheme != "https":
+        raise SSRFError(f"Webhook URL must use HTTPS, got: {parsed.scheme}")
+
+    # --- hostname --------------------------------------------------------
+    hostname = parsed.hostname
+    if not hostname:
+        raise SSRFError("Webhook URL has no hostname")
+
+    hostname = hostname.lower()
+
+    # Block explicit hostnames
+    if hostname in BLOCKED_WEBHOOK_HOSTNAMES:
+        raise SSRFError(f"Hostname not allowed: {hostname}")
+
+    # Block bare IP literals that fall in private ranges.
+    # Only check if the hostname parses as a valid IP address.
+    try:
+        ipaddress.ip_address(hostname)
+        # It's a valid IP literal -- check if it's private
+        if is_private_ip(hostname):
+            raise SSRFError(f"Webhook URL points to a private IP: {hostname}")
+    except ValueError:
+        pass  # Not an IP literal -- will be validated via DNS below
+
+    # --- port ------------------------------------------------------------
+    port = parsed.port
+    if port is not None and port != 443:
+        raise SSRFError(f"Webhook URL must use port 443, got: {port}")
+
+    # --- credentials -----------------------------------------------------
+    if parsed.username or parsed.password:
+        raise SSRFError("Webhook URL must not contain credentials")
+
+    # --- DNS resolution (defense-in-depth) -------------------------------
+    if resolve_dns:
+        try:
+            addr_info = socket.getaddrinfo(hostname, 443, proto=socket.IPPROTO_TCP)
+            for _family, _type, _proto, _canonname, sockaddr in addr_info:
+                ip = sockaddr[0]
+                if isinstance(ip, str) and is_private_ip(ip):
+                    raise SSRFError(f"Webhook URL resolves to private IP: {ip}")
+        except socket.gaierror as e:
+            raise SSRFError(f"DNS resolution failed for webhook URL: {e}") from e
+
+    return url

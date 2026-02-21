@@ -1,6 +1,6 @@
 import { AlertCircle, Clock } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -23,12 +23,13 @@ export function LinkDeviceDialog({ open, onOpenChange }: LinkDeviceDialogProps) 
   const [qrData, setQrData] = useState<{ url: string; expiresAt: Date } | null>(null)
   const [secondsRemaining, setSecondsRemaining] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const cancelledRef = useRef(false)
 
-  // Store mutate in ref for stable reference
+  // Stable ref for mutate to avoid re-creating callbacks on every render
   const mutateRef = useRef(initiateMutation.mutate)
   mutateRef.current = initiateMutation.mutate
 
-  const startCountdown = (expiresInSeconds: number) => {
+  const startCountdown = useCallback((expiresInSeconds: number) => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
     }
@@ -36,30 +37,26 @@ export function LinkDeviceDialog({ open, onOpenChange }: LinkDeviceDialogProps) 
     intervalRef.current = setInterval(() => {
       setSecondsRemaining((prev) => (prev > 0 ? prev - 1 : 0))
     }, 1000)
-  }
+  }, [])
 
-  const generateQrCode = () => {
+  const generateQrCode = useCallback(() => {
     mutateRef.current(undefined, {
       onSuccess: (data) => {
+        if (cancelledRef.current) return
         setQrData({ url: data.qr_url, expiresAt: new Date(data.expires_at) })
         startCountdown(data.expires_in_seconds)
       },
     })
-  }
+  }, [startCountdown])
 
-  // Handle dialog open/close and countdown timer
   useEffect(() => {
     if (!open) return
 
-    // Generate QR code when dialog opens
-    mutateRef.current(undefined, {
-      onSuccess: (data) => {
-        setQrData({ url: data.qr_url, expiresAt: new Date(data.expires_at) })
-        startCountdown(data.expires_in_seconds)
-      },
-    })
+    cancelledRef.current = false
+    generateQrCode()
 
     return () => {
+      cancelledRef.current = true
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
         intervalRef.current = null
@@ -67,7 +64,7 @@ export function LinkDeviceDialog({ open, onOpenChange }: LinkDeviceDialogProps) 
       setQrData(null)
       setSecondsRemaining(0)
     }
-  }, [open])
+  }, [open, generateQrCode])
 
   const isExpired = qrData && secondsRemaining <= 0
   const minutes = Math.floor(secondsRemaining / 60)

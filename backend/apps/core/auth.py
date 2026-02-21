@@ -95,6 +95,9 @@ class AuthContext:
         if not settings.SUBSCRIPTION_GATING_ENABLED:
             return user, member, org
 
+        if org.is_trial_active:
+            return user, member, org
+
         from apps.billing.models import Subscription
 
         try:

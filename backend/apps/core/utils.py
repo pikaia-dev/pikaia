@@ -37,3 +37,27 @@ def get_client_ip(request: HttpRequest, default: str | None = None) -> str | Non
     if remote_addr is not None:
         return remote_addr
     return default
+
+
+def normalize_email(email: str) -> str:
+    """Normalize an email address for case-insensitive comparison.
+
+    Strips whitespace and lowercases the entire address.
+    """
+    return email.strip().lower()
+
+
+def extract_bearer_token(request: HttpRequest) -> str | None:
+    """
+    Extract token from Authorization: Bearer header.
+
+    Args:
+        request: The Django HTTP request.
+
+    Returns:
+        The bearer token string, or None if no valid Bearer header present.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header.removeprefix("Bearer ")
+    return None

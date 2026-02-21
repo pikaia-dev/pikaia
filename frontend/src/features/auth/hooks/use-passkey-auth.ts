@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { queryKeys } from '@/api/query-keys'
 import { useApi } from '@/api/use-api'
+import { AUTH_STORAGE_KEYS } from '@/features/auth/constants'
 
 // --- API Types ---
 
@@ -52,14 +53,12 @@ interface PasskeyListResponse {
 // --- LocalStorage Passkey Hint ---
 // Used to remember if the user has logged in with a passkey before
 
-const PASSKEY_HINT_KEY = 'passkey_hint'
-
 /**
  * Check if the user has previously logged in with a passkey.
  */
 export function hasPasskeyHint(): boolean {
   if (typeof window === 'undefined') return false
-  return localStorage.getItem(PASSKEY_HINT_KEY) === 'true'
+  return localStorage.getItem(AUTH_STORAGE_KEYS.PASSKEY_HINT) === 'true'
 }
 
 /**
@@ -67,7 +66,7 @@ export function hasPasskeyHint(): boolean {
  */
 export function setPasskeyHint(): void {
   if (typeof window === 'undefined') return
-  localStorage.setItem(PASSKEY_HINT_KEY, 'true')
+  localStorage.setItem(AUTH_STORAGE_KEYS.PASSKEY_HINT, 'true')
 }
 
 /**
@@ -75,7 +74,7 @@ export function setPasskeyHint(): void {
  */
 export function clearPasskeyHint(): void {
   if (typeof window === 'undefined') return
-  localStorage.removeItem(PASSKEY_HINT_KEY)
+  localStorage.removeItem(AUTH_STORAGE_KEYS.PASSKEY_HINT)
 }
 
 // --- Helper Functions ---
@@ -176,17 +175,19 @@ interface JsonAuthenticationOptions {
 function parseRegistrationOptions(
   options: JsonRegistrationOptions
 ): PublicKeyCredentialCreationOptions {
+  if (!options.user) {
+    throw new Error('Registration options missing required "user" field')
+  }
+
   const result: PublicKeyCredentialCreationOptions = {
     challenge: base64urlToBuffer(options.challenge),
     rp: options.rp,
     pubKeyCredParams: options.pubKeyCredParams as PublicKeyCredentialParameters[],
-    user: options.user
-      ? {
-          id: base64urlToBuffer(options.user.id),
-          name: options.user.name,
-          displayName: options.user.displayName,
-        }
-      : (undefined as unknown as PublicKeyCredentialUserEntity),
+    user: {
+      id: base64urlToBuffer(options.user.id),
+      name: options.user.name,
+      displayName: options.user.displayName,
+    },
     timeout: options.timeout,
     attestation: options.attestation as AttestationConveyancePreference,
     authenticatorSelection: options.authenticatorSelection as AuthenticatorSelectionCriteria,
@@ -296,9 +297,17 @@ export function useRegisterPasskey() {
 
       // Step 2: Parse options and create credential
       const options = parseRegistrationOptions(optionsResponse.options)
-      const credential = (await navigator.credentials.create({
-        publicKey: options,
-      })) as PublicKeyCredential | null
+      let credential: PublicKeyCredential | null
+      try {
+        credential = (await navigator.credentials.create({
+          publicKey: options,
+        })) as PublicKeyCredential | null
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'NotAllowedError') {
+          throw new Error('Passkey registration was cancelled')
+        }
+        throw err
+      }
 
       if (!credential) {
         throw new Error('Failed to create credential')
@@ -343,9 +352,17 @@ export function useAuthenticateWithPasskey() {
 
       // Step 2: Parse options and get credential
       const credentialOptions = parseAuthenticationOptions(optionsResponse.options)
-      const credential = (await navigator.credentials.get({
-        publicKey: credentialOptions,
-      })) as PublicKeyCredential | null
+      let credential: PublicKeyCredential | null
+      try {
+        credential = (await navigator.credentials.get({
+          publicKey: credentialOptions,
+        })) as PublicKeyCredential | null
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'NotAllowedError') {
+          throw new Error('Passkey authentication was cancelled')
+        }
+        throw err
+      }
 
       if (!credential) {
         throw new Error('Failed to get credential')

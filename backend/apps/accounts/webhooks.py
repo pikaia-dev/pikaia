@@ -7,7 +7,8 @@ Stytch uses Svix for webhook delivery and signature verification.
 
 import json
 
-from django.db import transaction
+from django.core.exceptions import ObjectDoesNotExist
+from django.db import IntegrityError, transaction
 from django.http import HttpRequest, HttpResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -375,10 +376,23 @@ def stytch_webhook(request: HttpRequest) -> HttpResponse:
             else:
                 logger.debug("stytch_webhook_unhandled_object_type", object_type=object_type)
 
-    except Exception:
-        logger.exception("stytch_webhook_handler_error")
+    except (IntegrityError, ObjectDoesNotExist) as e:
+        logger.warning(
+            "stytch_webhook_handler_db_error",
+            error_type=type(e).__name__,
+            error=str(e),
+            event_id=event_id,
+            event_type=event_type,
+        )
         # Return 500 so Svix will retry with exponential backoff
         # Transaction rollback ensures idempotency marker is not committed
+        return HttpResponse(status=500)
+    except Exception:
+        logger.exception(
+            "stytch_webhook_handler_unexpected_error",
+            event_id=event_id,
+            event_type=event_type,
+        )
         return HttpResponse(status=500)
 
     return HttpResponse(status=200)

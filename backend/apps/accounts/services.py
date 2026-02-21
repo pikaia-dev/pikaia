@@ -5,18 +5,80 @@ Handles sync between Stytch and local User/Member/Organization models.
 """
 
 from datetime import timedelta
-from typing import Any
+from typing import Any, TypeVar
 
 from django.conf import settings as django_settings
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
 from apps.accounts.constants import StytchRoles
 from apps.accounts.models import ConnectedAccount, Member, User
 from apps.core.logging import get_logger
-from apps.organizations.models import Organization
+from apps.core.utils import normalize_email
+from apps.organizations.models import Organization, generate_unique_slug
 
 logger = get_logger(__name__)
+
+_M = TypeVar("_M", bound=models.Model)
+
+# An org is only considered stale (safe to soft-delete on slug collision)
+# if it was created more than this many minutes ago.  This prevents a
+# concurrent request from destroying a freshly-created legitimate org
+# whose Stytch deletion webhook simply hasn't arrived yet.
+STALE_ORG_THRESHOLD_MINUTES = 5
+
+
+# ---------------------------------------------------------------------------
+# Private helpers for the get-or-create-from-Stytch pattern
+# ---------------------------------------------------------------------------
+
+
+def _reactivate_soft_deleted(
+    model_class: type[_M],
+    lookup: dict[str, Any],
+    update_fields: dict[str, Any],
+) -> _M | None:
+    """Reactivate a soft-deleted record if one matches *lookup*.
+
+    Queries ``all_objects`` with ``select_for_update()`` for a record that
+    matches *lookup* **and** has ``deleted_at`` set.  If found, the record is
+    updated with *update_fields*, ``deleted_at`` is cleared, and it is saved
+    and returned.  Returns ``None`` when no soft-deleted record exists.
+    """
+    instance: _M | None = (
+        model_class.all_objects.select_for_update()  # type: ignore[attr-defined]
+        .filter(**lookup, deleted_at__isnull=False)
+        .first()
+    )
+    if instance is None:
+        return None
+
+    for field, value in update_fields.items():
+        setattr(instance, field, value)
+    instance.deleted_at = None  # type: ignore[attr-defined]
+
+    save_fields = [*update_fields.keys(), "deleted_at", "updated_at"]
+    instance.save(update_fields=save_fields)
+    return instance
+
+
+def _create_with_race_guard(
+    model_class: type[_M],
+    lookup_field: str,
+    lookup_value: Any,
+    **create_kwargs: Any,
+) -> _M:
+    """Create a record inside a savepoint, falling back on the race winner.
+
+    Wraps the ``create()`` in ``transaction.atomic()`` so an
+    ``IntegrityError`` does not poison an outer transaction.  On conflict the
+    existing row is fetched by *lookup_field*/*lookup_value* and returned.
+    """
+    try:
+        with transaction.atomic():
+            return model_class.objects.create(**create_kwargs)  # type: ignore[attr-defined, no-any-return]
+    except IntegrityError:
+        return model_class.objects.get(**{lookup_field: lookup_value})  # type: ignore[attr-defined, no-any-return]
 
 
 def parse_stytch_role(roles: list) -> str:
@@ -70,11 +132,14 @@ def get_or_create_user_from_stytch(
         user.save(update_fields=update_fields)
         return user
     except User.DoesNotExist:
-        try:
-            return User.objects.create(email=email, name=name, avatar_url=avatar_url)
-        except IntegrityError:
-            # Concurrent insert won the race, fetch the winner
-            return User.objects.get(email=email)
+        return _create_with_race_guard(
+            User,
+            "email",
+            email,
+            email=email,
+            name=name,
+            avatar_url=avatar_url,
+        )
 
 
 def get_or_create_organization_from_stytch(
@@ -86,9 +151,13 @@ def get_or_create_organization_from_stytch(
     Get or create an Organization from Stytch data.
 
     Called during org creation or when user joins an org.
+    Handles soft-deleted orgs (reactivation), stale slug collisions
+    (e.g. when a Stytch deletion webhook was missed), and active slug
+    collisions (appends a numeric suffix like ``-2``, ``-3``).
 
     Uses select_for_update for explicit row locking under concurrent requests.
     """
+    # Fast path: active org exists with this Stytch ID
     try:
         org = Organization.objects.select_for_update().get(stytch_org_id=stytch_org_id)
         org.name = name
@@ -96,16 +165,111 @@ def get_or_create_organization_from_stytch(
         org.save(update_fields=["name", "slug", "updated_at"])
         return org
     except Organization.DoesNotExist:
+        pass
+
+    # Check for soft-deleted org with this Stytch ID -- reactivate it
+    reactivated = _reactivate_soft_deleted(
+        Organization,
+        lookup={"stytch_org_id": stytch_org_id},
+        update_fields={"name": name, "slug": slug},
+    )
+    if reactivated:
+        return reactivated
+
+    # Create new org -- savepoint prevents IntegrityError from poisoning outer transaction
+    create_kwargs = dict(
+        stytch_org_id=stytch_org_id,
+        name=name,
+        slug=slug,
+        trial_ends_at=timezone.now() + timedelta(days=django_settings.FREE_TRIAL_DAYS),
+    )
+    try:
+        with transaction.atomic():
+            return Organization.objects.create(**create_kwargs)
+    except IntegrityError:
+        # Race condition: concurrent request created the same org by stytch_org_id
         try:
-            return Organization.objects.create(
-                stytch_org_id=stytch_org_id,
-                name=name,
-                slug=slug,
-                trial_ends_at=timezone.now() + timedelta(days=django_settings.FREE_TRIAL_DAYS),
-            )
-        except IntegrityError:
-            # Concurrent insert won the race, fetch the winner
             return Organization.objects.get(stytch_org_id=stytch_org_id)
+        except Organization.DoesNotExist:
+            pass
+
+        # Slug collision with a potentially stale org whose Stytch deletion
+        # webhook was missed.  Before soft-deleting, verify the org is truly
+        # stale to avoid destroying a legitimate, active organization.
+        colliding_org = Organization.objects.select_for_update().filter(slug=slug).first()
+        if colliding_org:
+            stale_threshold = timezone.now() - timedelta(
+                minutes=STALE_ORG_THRESHOLD_MINUTES,
+            )
+            is_recently_created = colliding_org.created_at > stale_threshold
+            has_active_members = Member.objects.filter(
+                organization=colliding_org,
+            ).exists()
+
+            if is_recently_created or has_active_members:
+                # The colliding org is active -- generate a suffixed slug
+                # and retry the create in a loop to handle further races.
+                logger.warning(
+                    "slug_collision_with_active_org_appending_suffix",
+                    colliding_stytch_org_id=colliding_org.stytch_org_id,
+                    new_stytch_org_id=stytch_org_id,
+                    slug=slug,
+                )
+                return _create_org_with_slug_retry(
+                    stytch_org_id=stytch_org_id,
+                    name=name,
+                    slug=slug,
+                )
+
+            logger.warning(
+                "soft_deleting_stale_org_for_slug_reuse",
+                stale_stytch_org_id=colliding_org.stytch_org_id,
+                new_stytch_org_id=stytch_org_id,
+                slug=slug,
+            )
+            colliding_org.soft_delete()
+            return Organization.objects.create(**create_kwargs)
+        raise
+
+
+# Maximum number of retry attempts when resolving slug collisions at
+# insert time (race between concurrent requests).
+_MAX_SLUG_CREATE_RETRIES = 10
+
+
+def _create_org_with_slug_retry(
+    stytch_org_id: str,
+    name: str,
+    slug: str,
+) -> Organization:
+    """Create an organization, retrying with incremented slug suffixes on collision.
+
+    Used when ``generate_unique_slug`` picked a candidate that was claimed
+    between the check and the insert (TOCTOU race).  Each retry regenerates
+    a unique slug and attempts the insert inside a savepoint.
+    """
+    for _attempt in range(_MAX_SLUG_CREATE_RETRIES):
+        candidate_slug = generate_unique_slug(slug)
+        try:
+            with transaction.atomic():
+                return Organization.objects.create(
+                    stytch_org_id=stytch_org_id,
+                    name=name,
+                    slug=candidate_slug,
+                    trial_ends_at=timezone.now() + timedelta(days=django_settings.FREE_TRIAL_DAYS),
+                )
+        except IntegrityError:
+            # Could be stytch_org_id race -- check first
+            try:
+                return Organization.objects.get(stytch_org_id=stytch_org_id)
+            except Organization.DoesNotExist:
+                # Slug was claimed between check and insert; retry
+                continue
+
+    raise RuntimeError(
+        f"Could not create organization after {_MAX_SLUG_CREATE_RETRIES} "
+        f"attempts (stytch_org_id={stytch_org_id}, base_slug='{slug}')"
+    )
 
 
 def get_or_create_member_from_stytch(
@@ -118,9 +282,11 @@ def get_or_create_member_from_stytch(
     Get or create a Member linking User to Organization.
 
     Called during authentication after org selection.
+    Handles soft-deleted members (reactivation).
 
     Uses select_for_update for explicit row locking under concurrent requests.
     """
+    # Fast path: active member exists
     try:
         member = Member.objects.select_for_update().get(stytch_member_id=stytch_member_id)
         member.user = user
@@ -129,16 +295,27 @@ def get_or_create_member_from_stytch(
         member.save(update_fields=["user", "organization", "role", "updated_at"])
         return member
     except Member.DoesNotExist:
-        try:
-            return Member.objects.create(
-                stytch_member_id=stytch_member_id,
-                user=user,
-                organization=organization,
-                role=role,
-            )
-        except IntegrityError:
-            # Concurrent insert won the race, fetch the winner
-            return Member.objects.get(stytch_member_id=stytch_member_id)
+        pass
+
+    # Check for soft-deleted member -- reactivate it
+    reactivated = _reactivate_soft_deleted(
+        Member,
+        lookup={"stytch_member_id": stytch_member_id},
+        update_fields={"user": user, "organization": organization, "role": role},
+    )
+    if reactivated:
+        return reactivated
+
+    # Create new -- savepoint prevents IntegrityError from poisoning outer transaction
+    return _create_with_race_guard(
+        Member,
+        "stytch_member_id",
+        stytch_member_id,
+        stytch_member_id=stytch_member_id,
+        user=user,
+        organization=organization,
+        role=role,
+    )
 
 
 def sync_session_to_local(
@@ -337,7 +514,7 @@ def invite_member(
     stytch = get_stytch_client()
 
     # Normalize email to prevent search mismatches
-    email = email.strip().lower()
+    email = normalize_email(email)
 
     # Map role to Stytch role IDs
     roles = [StytchRoles.ADMIN] if role == "admin" else []
@@ -515,13 +692,21 @@ def _sync_subscription_quantity_safe(organization: Organization) -> None:
     per-seat subscription quantity. Failures are logged but don't fail
     the parent operation.
     """
+    import stripe
+
     try:
         from apps.billing.services import sync_subscription_quantity
 
         sync_subscription_quantity(organization)
-    except Exception:
+    except stripe.StripeError:
         logger.warning(
-            "billing_subscription_quantity_sync_failed",
+            "billing_subscription_quantity_sync_stripe_error",
+            org_id=str(organization.id),
+            exc_info=True,
+        )
+    except Exception:
+        logger.error(
+            "billing_subscription_quantity_sync_unexpected_error",
             org_id=str(organization.id),
             exc_info=True,
         )
@@ -594,7 +779,7 @@ def bulk_invite_members(
     seen_emails: set[str] = set()
     unique_members_data = []
     for member_item in members_data:
-        email_lower = member_item.get("email", "").lower()
+        email_lower = normalize_email(member_item.get("email", ""))
         if email_lower in seen_emails:
             # Skip duplicate, report as failed
             results.append(
@@ -743,7 +928,7 @@ def provision_mobile_user(
     from apps.passkeys.trusted_auth import create_trusted_auth_token
 
     # Input validation
-    email = email.strip().lower()
+    email = normalize_email(email)
     creating_org = organization_name is not None or organization_slug is not None
     joining_org = organization_id is not None
 

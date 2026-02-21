@@ -12,8 +12,18 @@ import { config } from '@/lib/env'
 
 const API_URL = config.apiUrl
 
-interface ApiError {
+interface ApiErrorBody {
   detail: string
+}
+
+export class ApiError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
 }
 
 /**
@@ -45,17 +55,23 @@ export function createApiClient(getToken: TokenProvider) {
     })
 
     if (!response.ok) {
-      const error = (await response.json().catch(
-        (): ApiError => ({
+      const body = (await response.json().catch(
+        (): ApiErrorBody => ({
           detail: 'An error occurred',
         })
-      )) as ApiError
-      throw new Error(error.detail)
+      )) as ApiErrorBody
+      throw new ApiError(body.detail, response.status)
     }
 
     // Handle empty-body responses (204 No Content, 205 Reset Content)
     if (response.status === 204 || response.status === 205) {
       return undefined as T
+    }
+
+    // Guard against non-JSON responses (e.g. HTML served by CDN/proxy fallback)
+    const contentType = response.headers.get('content-type') ?? ''
+    if (!contentType.includes('application/json')) {
+      throw new ApiError('Expected JSON response from API but received a non-JSON response', 502)
     }
 
     return response.json() as Promise<T>
@@ -66,10 +82,11 @@ export function createApiClient(getToken: TokenProvider) {
       return request<T>(endpoint, { method: 'GET' })
     },
 
-    post<T>(endpoint: string, data?: unknown): Promise<T> {
+    post<T>(endpoint: string, data?: unknown, options?: { signal?: AbortSignal }): Promise<T> {
       return request<T>(endpoint, {
         method: 'POST',
         body: data ? JSON.stringify(data) : undefined,
+        signal: options?.signal,
       })
     },
 
@@ -103,7 +120,7 @@ export function createApiClient(getToken: TokenProvider) {
         credentials: 'include',
       })
       if (!response.ok) {
-        throw new Error('Failed to fetch blob')
+        throw new ApiError('Failed to fetch blob', response.status)
       }
       return response.blob()
     },

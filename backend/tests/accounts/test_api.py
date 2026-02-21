@@ -963,6 +963,48 @@ class TestUpdateOrganization:
         request2 = UpdateOrganizationRequest(name="Test", slug="my_company.test~v2")
         assert request2.slug == "my_company.test~v2"
 
+    def test_slug_collision_rejected(self, request_factory: RequestFactory) -> None:
+        """Updating slug to one already used by another active org should fail with 409."""
+        OrganizationFactory.create(slug="taken-slug")
+        org = OrganizationFactory.create(name="My Org", slug="my-slug")
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="admin")
+
+        request = request_factory.patch("/api/v1/auth/organization")
+        request = make_request_with_auth(  # type: ignore[assignment]
+            request, AuthContext(user=user, member=member, organization=org)
+        )
+
+        payload = UpdateOrganizationRequest(name="My Org", slug="taken-slug")
+
+        with pytest.raises(HttpError) as exc_info:
+            update_organization(request, payload)  # type: ignore[arg-type]
+
+        assert exc_info.value.status_code == 409
+        org.refresh_from_db()
+        assert org.slug == "my-slug"  # Slug should not have changed
+
+    def test_slug_collision_allows_own_slug(self, request_factory: RequestFactory) -> None:
+        """Updating with the org's own current slug should succeed (no self-collision)."""
+        org = OrganizationFactory.create(name="My Org", slug="my-slug")
+        user = UserFactory.create()
+        member = MemberFactory.create(user=user, organization=org, role="admin")
+
+        request = request_factory.patch("/api/v1/auth/organization")
+        request = make_request_with_auth(  # type: ignore[assignment]
+            request, AuthContext(user=user, member=member, organization=org)
+        )
+
+        payload = UpdateOrganizationRequest(name="My Org", slug="my-slug")
+
+        with patch("apps.accounts.api.get_stytch_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_get_client.return_value = mock_client
+
+            result = update_organization(request, payload)  # type: ignore[arg-type]
+
+        assert result.slug == "my-slug"
+
 
 @pytest.mark.django_db
 class TestUpdateBilling:

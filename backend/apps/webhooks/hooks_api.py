@@ -13,13 +13,13 @@ Endpoints:
     GET /api/v1/hooks/auth/test - Test authentication
 """
 
-import logging
 from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 from ninja import Router
 from ninja.errors import HttpError
 
+from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth, get_auth_context, require_admin
 from apps.core.types import AuthenticatedHttpRequest
@@ -37,7 +37,7 @@ from .schemas import (
 )
 from .services import WebhookService
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = Router(tags=["hooks"])
 bearer_auth = BearerAuth()

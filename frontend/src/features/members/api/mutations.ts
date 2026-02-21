@@ -38,8 +38,8 @@ export function useUpdateMemberRole() {
   const { updateMemberRole } = useApi()
   const queryClient = useQueryClient()
 
-  return useMutation<MessageResponse, Error, { memberId: number; role: 'admin' | 'member' }>({
-    mutationFn: ({ memberId, role }) => updateMemberRole(memberId, { role }),
+  return useMutation<MessageResponse, Error, { stytchMemberId: string; role: 'admin' | 'member' }>({
+    mutationFn: ({ stytchMemberId, role }) => updateMemberRole(stytchMemberId, { role }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.members.all })
       toast.success('Role updated')
@@ -57,7 +57,7 @@ export function useDeleteMember() {
   const { deleteMember } = useApi()
   const queryClient = useQueryClient()
 
-  return useMutation<MessageResponse, Error, number>({
+  return useMutation<MessageResponse, Error, string>({
     mutationFn: deleteMember,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.members.all })

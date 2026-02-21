@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react'
 import { useStytchB2BClient } from '@stytch/react/b2b'
 import { useMemo } from 'react'
 
@@ -108,11 +109,11 @@ export function useApi() {
       bulkInviteMembers: (data: BulkInviteRequest) =>
         api.post<BulkInviteResponse>('/auth/organization/members/bulk', data),
 
-      updateMemberRole: (memberId: number, data: UpdateMemberRoleRequest) =>
-        api.patch<MessageResponse>(`/auth/organization/members/${String(memberId)}`, data),
+      updateMemberRole: (stytchMemberId: string, data: UpdateMemberRoleRequest) =>
+        api.patch<MessageResponse>(`/auth/organization/members/${stytchMemberId}`, data),
 
-      deleteMember: (memberId: number) =>
-        api.delete<MessageResponse>(`/auth/organization/members/${String(memberId)}`),
+      deleteMember: (stytchMemberId: string) =>
+        api.delete<MessageResponse>(`/auth/organization/members/${stytchMemberId}`),
 
       // Billing
       getSubscription: () => api.get<SubscriptionInfo>('/billing/subscription'),
@@ -138,11 +139,11 @@ export function useApi() {
       },
 
       // Media
-      requestUpload: (data: UploadRequest) =>
-        api.post<UploadResponse>('/media/upload-request', data),
+      requestUpload: (data: UploadRequest, options?: { signal?: AbortSignal }) =>
+        api.post<UploadResponse>('/media/upload-request', data, options),
 
-      confirmUpload: (data: ConfirmUploadRequest) =>
-        api.post<ImageResponse>('/media/confirm', data),
+      confirmUpload: (data: ConfirmUploadRequest, options?: { signal?: AbortSignal }) =>
+        api.post<ImageResponse>('/media/confirm', data, options),
 
       deleteImage: (imageId: string) => api.delete<MessageResponse>(`/media/${imageId}`),
 
@@ -166,7 +167,10 @@ export function useApi() {
             `/auth/directory/avatar?url=${encodeURIComponent(googleUrl)}`
           )
           return URL.createObjectURL(response)
-        } catch {
+        } catch (error) {
+          Sentry.captureException(error, {
+            extra: { googleUrl, context: 'DirectoryAvatar fetch failed' },
+          })
           return null
         }
       },

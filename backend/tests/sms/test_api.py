@@ -226,6 +226,34 @@ class TestVerifyPhoneOTPEndpoint:
         assert exc_info.value.status_code == 400
         assert "expired" in str(exc_info.value.message).lower()
 
+    def test_rate_limit_returns_429(self, request_factory: RequestFactory) -> None:
+        """Should return 429 when verification rate limit is exceeded."""
+        from apps.sms.services import OTPRateLimitError
+
+        user = UserFactory.create()
+        org = OrganizationFactory.create()
+        member = MemberFactory.create(user=user, organization=org)
+        phone = "+14155551234"
+
+        auth_request: AuthenticatedHttpRequest = make_request_with_auth(
+            request_factory.post("/api/v1/auth/phone/verify"),
+            AuthContext(user=user, member=member, organization=org),
+        )
+
+        payload = VerifyOTPRequest(phone_number=phone, code="1234")
+
+        with patch(
+            "apps.sms.api.verify_phone_for_user",
+            side_effect=OTPRateLimitError(
+                "Too many verification attempts. Please try again later."
+            ),
+        ):
+            with pytest.raises(HttpError) as exc_info:
+                verify_phone_otp(auth_request, payload)
+
+            assert exc_info.value.status_code == 429
+            assert "Too many" in str(exc_info.value.message)
+
 
 @pytest.mark.django_db
 class TestOTPSchemaValidation:

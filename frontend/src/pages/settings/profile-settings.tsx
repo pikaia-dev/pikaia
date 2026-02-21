@@ -1,5 +1,5 @@
 import { useStytchMemberSession } from '@stytch/react/b2b'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { SettingsPageLayout } from '@/components/settings-page-layout'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -16,6 +16,7 @@ import { ImageUploader } from '@/components/ui/image-uploader'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { PhoneNumberInput } from '@/components/ui/phone-number-input'
 import { useCurrentUser } from '@/features/auth/api/queries'
+import { AUTH_STORAGE_KEYS } from '@/features/auth/constants'
 import { DeviceList } from '@/features/devices/components/device-list'
 import {
   useSendPhoneOtp,
@@ -36,6 +37,14 @@ export default function ProfileSettings() {
   const sendPhoneOtpMutation = useSendPhoneOtp()
   const verifyPhoneOtpMutation = useVerifyPhoneOtp()
   const startEmailUpdateMutation = useStartEmailUpdate()
+
+  // Show success toast after OAuth provider connect redirect
+  useEffect(() => {
+    if (sessionStorage.getItem(AUTH_STORAGE_KEYS.PROVIDER_JUST_CONNECTED) === 'true') {
+      sessionStorage.removeItem(AUTH_STORAGE_KEYS.PROVIDER_JUST_CONNECTED)
+      toast.success('Provider connected successfully')
+    }
+  }, [])
 
   // Detect if user logged in with passkey (trusted_auth_token type)
   // Passkey sessions are immutable and cannot have phone factors added

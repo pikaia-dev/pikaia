@@ -1,5 +1,5 @@
 import { Building2, Upload, User, X } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { toast } from 'sonner'
 
@@ -36,6 +36,7 @@ export function ImageUploader({
   className,
 }: ImageUploaderProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
+  const objectUrlRef = useRef<string | null>(null)
   const [showCropper, setShowCropper] = useState(false)
   const [originalFilename, setOriginalFilename] = useState('')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -50,6 +51,15 @@ export function ImageUploader({
       onError?.(error)
     },
   })
+
+  // Revoke any lingering object URL on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current)
+      }
+    }
+  }, [])
 
   const isCircular = type === 'avatar'
   const label = type === 'avatar' ? 'profile picture' : 'logo'
@@ -73,8 +83,12 @@ export function ImageUploader({
         return
       }
 
-      // Create object URL for cropper
+      // Revoke any existing object URL before creating a new one
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current)
+      }
       const objectUrl = URL.createObjectURL(file)
+      objectUrlRef.current = objectUrl
       setSelectedFile(objectUrl)
       setOriginalFilename(file.name)
       setShowCropper(true)
@@ -91,13 +105,12 @@ export function ImageUploader({
   })
 
   const handleCropComplete = async (croppedBlob: Blob) => {
-    setShowCropper(false)
-
-    // Clean up object URL
-    if (selectedFile) {
-      URL.revokeObjectURL(selectedFile)
-      setSelectedFile(null)
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
     }
+    setShowCropper(false)
+    setSelectedFile(null)
 
     // Upload cropped image
     const ext = originalFilename.split('.').pop() || 'png'
@@ -106,11 +119,12 @@ export function ImageUploader({
   }
 
   const handleCropCancel = () => {
-    setShowCropper(false)
-    if (selectedFile) {
-      URL.revokeObjectURL(selectedFile)
-      setSelectedFile(null)
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
     }
+    setShowCropper(false)
+    setSelectedFile(null)
   }
 
   const handleRemoveConfirm = () => {

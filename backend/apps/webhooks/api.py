@@ -4,11 +4,10 @@ Webhook API endpoints.
 Allows organization admins to manage webhook endpoints and view delivery logs.
 """
 
-import logging
-
 from ninja import Router
 from ninja.errors import HttpError
 
+from apps.core.logging import get_logger
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth, get_auth_context, require_admin
 from apps.core.types import AuthenticatedHttpRequest
@@ -28,7 +27,7 @@ from .schemas import (
 )
 from .services import WebhookDispatcher, WebhookService, get_available_events
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = Router(tags=["webhooks"])
 bearer_auth = BearerAuth()

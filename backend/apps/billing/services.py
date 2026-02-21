@@ -318,7 +318,17 @@ def sync_subscription_quantity(org: Organization) -> None:
     try:
         # Get subscription items
         stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
-        item_id = stripe_sub["items"]["data"][0]["id"]
+        items = stripe_sub.get("items", {}).get("data", [])
+
+        if not items:
+            logger.warning(
+                "stripe_subscription_has_no_items",
+                subscription_id=subscription.stripe_subscription_id,
+                org_id=str(org.id),
+            )
+            return
+
+        item_id = items[0]["id"]
 
         # Update quantity with proration
         stripe.Subscription.modify(

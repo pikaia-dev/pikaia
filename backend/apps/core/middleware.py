@@ -11,7 +11,7 @@ from stytch.core.response_base import StytchError
 
 from apps.core.auth import AuthContext
 from apps.core.logging import bind_contextvars, clear_contextvars, get_logger
-from apps.core.utils import get_client_ip
+from apps.core.utils import extract_bearer_token, get_client_ip
 from apps.events.services import set_correlation_id
 
 logger = get_logger(__name__)
@@ -141,7 +141,10 @@ class StytchAuthMiddleware:
     - organization.id: Organization Stytch ID
     """
 
-    # Paths that don't require authentication
+    # Paths that don't require Stytch JWT authentication.
+    # Internal service-to-service paths use their own API key auth
+    # (InternalApiKeyAuth), so the middleware must not attempt to
+    # decode their bearer tokens as Stytch JWTs.
     PUBLIC_PATHS = {
         "/api/v1/health",
         "/api/v1/auth/magic-link/send",
@@ -149,6 +152,7 @@ class StytchAuthMiddleware:
         "/api/v1/auth/discovery/create-org",
         "/api/v1/auth/discovery/exchange",
         "/api/v1/auth/mobile/provision",
+        "/api/v1/internal/",
         "/admin/",
     }
 
@@ -164,12 +168,9 @@ class StytchAuthMiddleware:
             return self.get_response(request)
 
         # Extract JWT from Authorization header or Cookies
-        auth_header = request.headers.get("Authorization", "")
-        session_jwt = None
+        session_jwt = extract_bearer_token(request)
 
-        if auth_header.startswith("Bearer "):
-            session_jwt = auth_header.replace("Bearer ", "")
-        else:
+        if session_jwt is None:
             # Fallback to cookies (used after discovery/create-org)
             session_jwt = request.COOKIES.get("stytch_session_jwt")
 

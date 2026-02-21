@@ -25,7 +25,7 @@ class WebhookEndpointFactory(DjangoModelFactory[WebhookEndpoint]):
     name = factory.Sequence(lambda n: f"Webhook Endpoint {n}")
     description = "Test webhook endpoint"
     url = factory.Sequence(lambda n: f"https://example.com/webhook/{n}")
-    events = ["member.created", "member.deleted"]
+    events = ["member.created", "member.removed"]
     active = True
 
 
