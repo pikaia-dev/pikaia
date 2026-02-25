@@ -1,8 +1,8 @@
 # SOC 2 / ISO 27001 Compliance Checklist
 
 > Assessment date: 2026-02-25
-> Scope: Pikaia, Prelint, Tango Finance, supporting AWS infrastructure
-> AWS accounts: `403682862630` (tango-admin), `507481515916` (snowball-prod), `498155006695` (tango-b2b-demo)
+> Scope: Prelint (and Pikaia infrastructure it depends on)
+> AWS accounts in scope: those hosting Prelint and its Pikaia dependencies
 
 ## How to read this
 
@@ -62,8 +62,6 @@ These are controls you can present evidence for today:
 
 ### Credentials & secrets hygiene
 
-- [ ] **Rotate AWS IAM key in tango-finance .env** — `AKIAV...DWDVY3` appears to be a real key. Rotate immediately via AWS IAM console, update local `.env`. `SOC2-CC6.1` `ISO-A.8.9`
-- [ ] **Rotate QuickBooks client secret in tango-finance .env** — real secret found in plaintext. `SOC2-CC6.1` `ISO-A.8.9`
 - [ ] **Move ~/private.pem and ~/id_ed into ~/.ssh/** — private keys should not sit in home directory root. Set `chmod 600`. `ISO-A.8.9`
 - [ ] **Remove auth token from ~/.sentryclirc** — use `SENTRY_AUTH_TOKEN` env var or `sentry-cli login` with token stored in keychain. `ISO-A.8.9`
 - [ ] **Audit all .env files for real credentials** — ensure test credentials are clearly prefixed with `test`, document which are safe to keep locally. `SOC2-CC6.1` `ISO-A.8.9`
@@ -73,7 +71,7 @@ These are controls you can present evidence for today:
 - [ ] **Write an incident response plan** — even a 1-page doc: who gets paged, escalation path, communication template, post-mortem process. `SOC2-CC7.3` `SOC2-CC7.4` `ISO-A.5.24` `ISO-A.5.25` `ISO-A.5.26`
 - [ ] **Write a data retention policy** — audit logs kept forever (already documented in observability.md), user data retention period, backup retention, log retention. Just formalize what you already do. `SOC2-CC6.5` `SOC2-P1.1` `ISO-A.8.10`
 - [ ] **Write a brief access control policy** — who can access AWS console, GitHub repos, production DB, Stytch dashboard, Stripe dashboard. Document current state. `SOC2-CC6.2` `SOC2-CC6.3` `ISO-A.5.15` `ISO-A.8.2`
-- [ ] **Add privacy policy and terms of service for Pikaia** — tango-finance has one, Pikaia does not. `SOC2-P1.1` `SOC2-P1.2` `ISO-A.5.34`
+- [ ] **Add privacy policy and terms of service for Prelint** — needed for customer-facing SaaS. `SOC2-P1.1` `SOC2-P1.2` `ISO-A.5.34`
 - [ ] **Document the change management process** — it's already enforced (PR-based, CI gates, conventional commits), just write it down. `SOC2-CC8.1` `ISO-A.8.32`
 - [ ] **Document the onboarding/offboarding process** — Stytch SCIM handles provisioning, but document the steps: grant AWS access, add to GitHub org, add to Slack, etc. `SOC2-CC6.2` `ISO-A.6.1` `ISO-A.6.5`
 
@@ -135,28 +133,27 @@ These are controls you can present evidence for today:
 ## Recommended priority order
 
 **This week (Tier 1 — credentials):**
-1. Rotate the AWS IAM key in tango-finance
-2. Move private keys to proper locations
-3. Clean up sentryclirc
-4. Audit all .env files
+1. Move private keys to proper locations
+2. Clean up sentryclirc
+3. Audit all .env files
 
 **This month (Tier 1 — documentation):**
-5. Write incident response plan
-6. Write access control policy
-7. Write data retention policy
-8. Document change management process
-9. Fix `ALLOWED_HOSTS`
-10. Enable CloudTrail on all accounts
+4. Write incident response plan
+5. Write access control policy
+6. Write data retention policy
+7. Document change management process
+8. Fix `ALLOWED_HOSTS`
+9. Enable CloudTrail
 
 **Next quarter (Tier 2 — infrastructure + process):**
-11. Enable GuardDuty
-12. First quarterly access review
-13. Build vendor risk register
-14. Write risk assessment
-15. Add privacy policy to Pikaia
+10. Enable GuardDuty
+11. First quarterly access review
+12. Build vendor risk register
+13. Write risk assessment
+14. Add privacy policy to Prelint
 
 **When ready to pursue certification (Tier 3):**
-16. Evaluate compliance platforms (Vanta/Drata/Secureframe)
-17. Engage SOC 2 Type I auditor
-18. Build BCP/DR plan
-19. Schedule first pentest
+15. Evaluate compliance platforms (Vanta/Drata/Secureframe)
+16. Engage SOC 2 Type I auditor
+17. Build BCP/DR plan
+18. Schedule first pentest
