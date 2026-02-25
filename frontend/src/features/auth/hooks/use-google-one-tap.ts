@@ -32,6 +32,8 @@ export function useGoogleOneTap(options: UseGoogleOneTapOptions = {}): UseGoogle
   const { autoShow = true, redirectUrl } = options
   const stytch = useStytchB2BClient()
   const hasAutoShown = useRef(false)
+  const redirectUrlRef = useRef(redirectUrl)
+  redirectUrlRef.current = redirectUrl
 
   const [state, setState] = useState<OneTapState>({
     isAvailable: true,
@@ -46,7 +48,7 @@ export function useGoogleOneTap(options: UseGoogleOneTapOptions = {}): UseGoogle
 
     try {
       const result = await stytch.oauth.googleOneTap.discovery.start({
-        discovery_redirect_url: redirectUrl ?? `${window.location.origin}/auth/callback`,
+        discovery_redirect_url: redirectUrlRef.current ?? `${window.location.origin}/auth/callback`,
       })
 
       // The SDK returns { success: true } when the prompt is displayed
@@ -68,7 +70,7 @@ export function useGoogleOneTap(options: UseGoogleOneTapOptions = {}): UseGoogle
         error: message,
       }))
     }
-  }, [stytch, redirectUrl])
+  }, [stytch])
 
   // Auto-show on mount if enabled
   useEffect(() => {

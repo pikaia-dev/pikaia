@@ -1,7 +1,7 @@
 import { useStytchB2BClient, useStytchMember } from '@stytch/react/b2b'
 import { useCallback } from 'react'
 
-const OAUTH_CONNECT_FLOW_KEY = 'oauth_connect_flow'
+import { AUTH_STORAGE_KEYS } from '@/features/auth/constants'
 
 /**
  * Hook for connecting OAuth providers from settings page.
@@ -16,7 +16,7 @@ export function useConnectProvider() {
 
   const connectGoogle = useCallback(() => {
     if (!member?.organization_id) return
-    sessionStorage.setItem(OAUTH_CONNECT_FLOW_KEY, 'true')
+    sessionStorage.setItem(AUTH_STORAGE_KEYS.OAUTH_CONNECT_FLOW, 'true')
     void stytch.oauth.google.start({
       organization_id: member.organization_id,
       login_redirect_url: `${window.location.origin}/auth/callback`,
@@ -27,7 +27,7 @@ export function useConnectProvider() {
 
   const connectGitHub = useCallback(() => {
     if (!member?.organization_id) return
-    sessionStorage.setItem(OAUTH_CONNECT_FLOW_KEY, 'true')
+    sessionStorage.setItem(AUTH_STORAGE_KEYS.OAUTH_CONNECT_FLOW, 'true')
     void stytch.oauth.github.start({
       organization_id: member.organization_id,
       login_redirect_url: `${window.location.origin}/auth/callback`,
@@ -42,12 +42,12 @@ export function useConnectProvider() {
  * Check if current auth callback is a connect flow (not a login).
  */
 export function isConnectFlow(): boolean {
-  return sessionStorage.getItem(OAUTH_CONNECT_FLOW_KEY) === 'true'
+  return sessionStorage.getItem(AUTH_STORAGE_KEYS.OAUTH_CONNECT_FLOW) === 'true'
 }
 
 /**
  * Clear the connect flow flag after handling.
  */
 export function clearConnectFlow(): void {
-  sessionStorage.removeItem(OAUTH_CONNECT_FLOW_KEY)
+  sessionStorage.removeItem(AUTH_STORAGE_KEYS.OAUTH_CONNECT_FLOW)
 }

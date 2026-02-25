@@ -61,7 +61,7 @@ class TestListEvents:
         event_types = {e.type for e in result.events}
 
         assert "member.created" in event_types
-        assert "member.deleted" in event_types
+        assert "member.removed" in event_types
 
 
 @pytest.mark.django_db

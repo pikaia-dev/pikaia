@@ -19,7 +19,7 @@ class TestEventCatalog:
     def test_has_member_events(self) -> None:
         """Should have member-related events."""
         assert "member.created" in WEBHOOK_EVENTS
-        assert "member.deleted" in WEBHOOK_EVENTS
+        assert "member.removed" in WEBHOOK_EVENTS
         assert "member.updated" in WEBHOOK_EVENTS
         assert "member.role_changed" in WEBHOOK_EVENTS
 
@@ -29,8 +29,8 @@ class TestEventCatalog:
 
     def test_has_billing_events(self) -> None:
         """Should have billing-related events."""
-        assert "billing.subscription_created" in WEBHOOK_EVENTS
-        assert "billing.subscription_canceled" in WEBHOOK_EVENTS
+        assert "subscription.activated" in WEBHOOK_EVENTS
+        assert "subscription.canceled" in WEBHOOK_EVENTS
         assert "billing.payment_succeeded" in WEBHOOK_EVENTS
         assert "billing.payment_failed" in WEBHOOK_EVENTS
 
@@ -143,12 +143,12 @@ class TestMatchesSubscription:
     def test_matches_exact_subscription(self) -> None:
         """Should match exact event subscriptions."""
         assert matches_subscription("member.created", ["member.created"]) is True
-        assert matches_subscription("member.created", ["member.deleted"]) is False
+        assert matches_subscription("member.created", ["member.removed"]) is False
 
     def test_matches_wildcard_subscription(self) -> None:
         """Should match wildcard subscriptions."""
         assert matches_subscription("member.created", ["member.*"]) is True
-        assert matches_subscription("member.deleted", ["member.*"]) is True
+        assert matches_subscription("member.removed", ["member.*"]) is True
         assert matches_subscription("billing.payment_succeeded", ["member.*"]) is False
 
     def test_matches_mixed_subscriptions(self) -> None:
@@ -157,7 +157,7 @@ class TestMatchesSubscription:
 
         assert matches_subscription("member.created", subscriptions) is True
         assert matches_subscription("billing.payment_succeeded", subscriptions) is True
-        assert matches_subscription("member.deleted", subscriptions) is False
+        assert matches_subscription("member.removed", subscriptions) is False
         assert matches_subscription("organization.updated", subscriptions) is False
 
     def test_empty_subscriptions_never_match(self) -> None:

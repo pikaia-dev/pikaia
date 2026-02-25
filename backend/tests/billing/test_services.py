@@ -260,6 +260,70 @@ class TestSyncSubscriptionQuantity:
 
         mock_get_stripe.return_value.Subscription.modify.assert_not_called()
 
+    @patch("apps.billing.services.get_stripe")
+    def test_returns_early_when_subscription_has_no_items(self, mock_get_stripe) -> None:
+        """Should log warning and return when Stripe subscription has zero items."""
+        from tests.accounts.factories import MemberFactory
+
+        mock_stripe = MagicMock()
+        mock_get_stripe.return_value = mock_stripe
+        mock_stripe.Subscription.retrieve.return_value = {"items": {"data": []}}
+
+        sub = SubscriptionFactory.create(quantity=1)
+        MemberFactory.create(organization=sub.organization)
+        MemberFactory.create(organization=sub.organization)
+
+        sync_subscription_quantity(sub.organization)
+
+        mock_stripe.Subscription.modify.assert_not_called()
+        sub.refresh_from_db()
+        assert sub.quantity == 1  # Unchanged
+
+    @patch("apps.billing.services.get_stripe")
+    def test_returns_early_when_items_key_missing(self, mock_get_stripe) -> None:
+        """Should log warning and return when Stripe subscription has no items key."""
+        from tests.accounts.factories import MemberFactory
+
+        mock_stripe = MagicMock()
+        mock_get_stripe.return_value = mock_stripe
+        mock_stripe.Subscription.retrieve.return_value = {}
+
+        sub = SubscriptionFactory.create(quantity=1)
+        MemberFactory.create(organization=sub.organization)
+        MemberFactory.create(organization=sub.organization)
+
+        sync_subscription_quantity(sub.organization)
+
+        mock_stripe.Subscription.modify.assert_not_called()
+        sub.refresh_from_db()
+        assert sub.quantity == 1  # Unchanged
+
+    @patch("apps.billing.services.get_stripe")
+    def test_updates_quantity_when_items_present(self, mock_get_stripe) -> None:
+        """Should update quantity when subscription has items (normal case)."""
+        from tests.accounts.factories import MemberFactory
+
+        mock_stripe = MagicMock()
+        mock_get_stripe.return_value = mock_stripe
+        mock_stripe.Subscription.retrieve.return_value = {
+            "items": {"data": [{"id": "si_item_1"}]},
+        }
+
+        sub = SubscriptionFactory.create(quantity=1)
+        MemberFactory.create(organization=sub.organization)
+        MemberFactory.create(organization=sub.organization)
+        MemberFactory.create(organization=sub.organization)
+
+        sync_subscription_quantity(sub.organization)
+
+        mock_stripe.Subscription.modify.assert_called_once_with(
+            sub.stripe_subscription_id,
+            items=[{"id": "si_item_1", "quantity": 3}],
+            proration_behavior="create_prorations",
+        )
+        sub.refresh_from_db()
+        assert sub.quantity == 3
+
 
 @pytest.mark.django_db
 class TestCreateCustomerPortalSession:

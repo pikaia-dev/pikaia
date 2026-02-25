@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
+import { AUTH_STORAGE_KEYS } from '@/features/auth/constants'
 import {
   isWebAuthnSupported,
   usePasskeys,
@@ -26,28 +27,24 @@ import {
 } from '@/features/auth/hooks/use-passkey-auth'
 import { generatePasskeyName } from '@/features/auth/utils/error-helpers'
 
-// LocalStorage key for tracking prompt dismissal
-const PROMPT_DISMISSED_KEY = 'passkey_prompt_dismissed'
-const PROMPT_NEVER_ASK_KEY = 'passkey_prompt_never_ask'
-
 function hasSeenPromptThisSession(): boolean {
   if (typeof window === 'undefined') return true
-  return sessionStorage.getItem(PROMPT_DISMISSED_KEY) === 'true'
+  return sessionStorage.getItem(AUTH_STORAGE_KEYS.PASSKEY_PROMPT_DISMISSED) === 'true'
 }
 
 function setPromptDismissedThisSession(): void {
   if (typeof window === 'undefined') return
-  sessionStorage.setItem(PROMPT_DISMISSED_KEY, 'true')
+  sessionStorage.setItem(AUTH_STORAGE_KEYS.PASSKEY_PROMPT_DISMISSED, 'true')
 }
 
 function hasNeverAskAgain(): boolean {
   if (typeof window === 'undefined') return true
-  return localStorage.getItem(PROMPT_NEVER_ASK_KEY) === 'true'
+  return localStorage.getItem(AUTH_STORAGE_KEYS.PASSKEY_PROMPT_NEVER_ASK) === 'true'
 }
 
 function setNeverAskAgain(): void {
   if (typeof window === 'undefined') return
-  localStorage.setItem(PROMPT_NEVER_ASK_KEY, 'true')
+  localStorage.setItem(AUTH_STORAGE_KEYS.PASSKEY_PROMPT_NEVER_ASK, 'true')
 }
 
 export function PasskeyEnrollmentPrompt() {

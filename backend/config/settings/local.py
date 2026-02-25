@@ -20,6 +20,9 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 
+# Include both CORS origins and WebAuthn origin for CSRF protection
+CSRF_TRUSTED_ORIGINS = list({*CORS_ALLOWED_ORIGINS, WEBAUTHN_ORIGIN})  # noqa: F405
+
 # =============================================================================
 # Structured Logging Configuration (Development)
 # =============================================================================

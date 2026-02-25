@@ -94,6 +94,8 @@ class Command(BaseCommand):
         Fetch and publish a batch of pending events.
 
         Uses SELECT FOR UPDATE SKIP LOCKED to allow concurrent workers.
+        Transitions claimed rows to PUBLISHING inside the transaction so
+        concurrent workers cannot pick them up after the lock is released.
         Returns number of events processed.
         """
         from django.db.models import Q
@@ -114,30 +116,43 @@ class Command(BaseCommand):
             if not events:
                 return 0
 
-        # Convert to EventEnvelope for publishing
-        envelopes = []
+            # Claim events before releasing the lock so concurrent workers
+            # skip them (they filter on status=PENDING).
+            event_ids = [e.pk for e in events]
+            OutboxEvent.objects.filter(pk__in=event_ids).update(
+                status=OutboxEvent.Status.PUBLISHING,
+                claimed_at=now,
+            )
+            # Refresh in-memory objects to reflect the persisted state
+            for event in events:
+                event.status = OutboxEvent.Status.PUBLISHING
+                event.claimed_at = now
+
+        # Convert to EventEnvelope for publishing, tracking valid pairs
+        valid_pairs: list[tuple[OutboxEvent, EventEnvelope]] = []
         for event in events:
             try:
                 envelope = EventEnvelope(**event.payload)
-                envelopes.append(envelope)
+                valid_pairs.append((event, envelope))
             except Exception as e:
                 logger.error(
                     "event_payload_parse_failed", event_id=str(event.event_id), error=str(e)
                 )
                 event.mark_failed(f"Payload parse error: {e}", max_attempts)
-                continue
 
-        if not envelopes:
+        if not valid_pairs:
             return 0
 
+        valid_events, envelopes = zip(*valid_pairs, strict=True)
+
         # Publish batch
-        results = backend.publish(envelopes)
+        results = backend.publish(list(envelopes))
 
         # Process results
         published_count = 0
         is_local_backend = isinstance(backend, LocalBackend)
 
-        for event, result in zip(events, results, strict=True):
+        for event, result in zip(valid_events, results, strict=True):
             if result.get("status") == "success":
                 event.status = OutboxEvent.Status.PUBLISHED
                 event.published_at = timezone.now()

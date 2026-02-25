@@ -7,6 +7,8 @@ from datetime import datetime
 from ninja import Schema
 from pydantic import Field, field_validator
 
+from apps.core.url_validation import SSRFError, validate_webhook_url
+
 from .events import is_valid_event_type
 
 # =============================================================================
@@ -25,10 +27,11 @@ class WebhookEndpointCreate(Schema):
     @field_validator("url")
     @classmethod
     def validate_url(cls, v: str) -> str:
-        """Ensure URL is HTTPS."""
-        if not v.startswith("https://"):
-            raise ValueError("Webhook URL must use HTTPS")
-        return v
+        """Validate URL is HTTPS and safe from SSRF attacks."""
+        try:
+            return validate_webhook_url(v, resolve_dns=False)
+        except SSRFError as e:
+            raise ValueError(str(e)) from e
 
     @field_validator("events")
     @classmethod
@@ -52,10 +55,13 @@ class WebhookEndpointUpdate(Schema):
     @field_validator("url")
     @classmethod
     def validate_url(cls, v: str | None) -> str | None:
-        """Ensure URL is HTTPS."""
-        if v is not None and not v.startswith("https://"):
-            raise ValueError("Webhook URL must use HTTPS")
-        return v
+        """Validate URL is HTTPS and safe from SSRF attacks."""
+        if v is None:
+            return v
+        try:
+            return validate_webhook_url(v, resolve_dns=False)
+        except SSRFError as e:
+            raise ValueError(str(e)) from e
 
     @field_validator("events")
     @classmethod
@@ -211,10 +217,11 @@ class RestHookSubscribeRequest(Schema):
     @field_validator("target_url")
     @classmethod
     def validate_target_url(cls, v: str) -> str:
-        """Ensure URL is HTTPS."""
-        if not v.startswith("https://"):
-            raise ValueError("Webhook URL must use HTTPS")
-        return v
+        """Validate URL is HTTPS and safe from SSRF attacks."""
+        try:
+            return validate_webhook_url(v, resolve_dns=False)
+        except SSRFError as e:
+            raise ValueError(str(e)) from e
 
     @field_validator("event_type")
     @classmethod

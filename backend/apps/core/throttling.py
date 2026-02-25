@@ -73,3 +73,62 @@ def check_rate_limit(
             "Too many requests. Please try again later.",
             retry_after=window_seconds,
         )
+
+
+def peek_rate_limit(
+    key: str,
+    *,
+    max_requests: int,
+    window_seconds: int,
+) -> None:
+    """
+    Check whether a rate limit has been exceeded **without** incrementing.
+
+    Useful when the caller wants to gate entry to an operation but only
+    count it as a "request" on certain code paths (e.g. failed attempts).
+
+    Args:
+        key: Cache key identifying the rate limit bucket.
+        max_requests: Maximum allowed requests within the window.
+        window_seconds: Time window in seconds.
+
+    Raises:
+        RateLimitExceeded: If the limit has already been reached.
+    """
+    cache_key = f"rate_limit:{key}"
+    current = cache.get(cache_key)
+
+    if current is not None and current >= max_requests:
+        logger.warning("rate_limit_exceeded", key=key, limit=max_requests, window=window_seconds)
+        raise RateLimitExceeded(
+            "Too many requests. Please try again later.",
+            retry_after=window_seconds,
+        )
+
+
+def increment_rate_limit(
+    key: str,
+    *,
+    window_seconds: int,
+) -> None:
+    """
+    Increment a rate limit counter **without** checking the limit.
+
+    Meant to be paired with ``peek_rate_limit`` so the caller can
+    increment only on specific code paths (e.g. failed verification
+    attempts).
+
+    Args:
+        key: Cache key identifying the rate limit bucket.
+        window_seconds: Time window in seconds.
+    """
+    cache_key = f"rate_limit:{key}"
+
+    # Ensure the key exists with the correct TTL
+    cache.add(cache_key, 0, timeout=window_seconds)
+
+    try:
+        cache.incr(cache_key)
+    except ValueError:
+        # Key expired between add() and incr()
+        cache.set(cache_key, 1, timeout=window_seconds)

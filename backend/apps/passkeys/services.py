@@ -5,7 +5,6 @@ Handles passkey registration and authentication using the webauthn library.
 Integrates with Stytch for session management after successful authentication.
 """
 
-import logging
 import secrets
 from dataclasses import dataclass
 
@@ -28,9 +27,10 @@ from webauthn.helpers.structs import (
 )
 
 from apps.accounts.models import Member, User
+from apps.core.logging import get_logger
 from apps.passkeys.models import Passkey
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Cache key prefixes for challenges
 REGISTRATION_CHALLENGE_PREFIX = "passkey:reg:"

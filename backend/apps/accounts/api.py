@@ -12,6 +12,7 @@ import contextlib
 import secrets
 
 from django.conf import settings as django_settings
+from django.db import IntegrityError, transaction
 from django.http import HttpRequest
 from ninja import Router
 from ninja.errors import HttpError
@@ -71,21 +72,13 @@ from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth, get_auth_context, require_admin
 from apps.core.throttling import RateLimitExceeded, check_rate_limit
 from apps.core.types import AuthenticatedHttpRequest
-from apps.core.utils import get_client_ip
+from apps.core.utils import extract_bearer_token, get_client_ip, normalize_email
 from apps.events.services import publish_event
 
 logger = get_logger(__name__)
 
 router = Router(tags=["auth"])
 bearer_auth = BearerAuth()
-
-
-def _extract_bearer_token(request: HttpRequest) -> str | None:
-    """Extract JWT from Authorization: Bearer header."""
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        return auth_header.replace("Bearer ", "")
-    return None
 
 
 def _get_stytch_error_message(error: StytchError) -> str:
@@ -435,11 +428,9 @@ def logout(request: HttpRequest) -> MessageResponse:
     consistent with other authenticated endpoints.
     """
     # Get session JWT from Authorization header
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
+    session_jwt = extract_bearer_token(request)
+    if not session_jwt:
         raise HttpError(401, "No session provided")
-
-    session_jwt = auth_header.replace("Bearer ", "")
     client = get_stytch_client()
 
     try:
@@ -574,7 +565,7 @@ def send_phone_otp(
     """
     _, member, org = get_auth_context(request)
 
-    session_jwt = _extract_bearer_token(request)
+    session_jwt = extract_bearer_token(request)
 
     try:
         client = get_stytch_client()
@@ -608,7 +599,7 @@ def verify_phone_otp(request: AuthenticatedHttpRequest, payload: VerifyPhoneOtpR
     """
     user, member, org = get_auth_context(request)
 
-    session_jwt = _extract_bearer_token(request)
+    session_jwt = extract_bearer_token(request)
 
     try:
         client = get_stytch_client()
@@ -809,7 +800,11 @@ def update_organization(
     if payload.slug is not None:
         org.slug = payload.slug
         update_fields.append("slug")
-    org.save(update_fields=update_fields)
+    try:
+        with transaction.atomic():
+            org.save(update_fields=update_fields)
+    except IntegrityError:
+        raise HttpError(409, "Organization slug already in use") from None
 
     # Sync to Stytch
     sync_warning = None
@@ -1104,7 +1099,7 @@ def invite_member_endpoint(
     _, member, org = get_auth_context(request)
 
     # Prevent inviting yourself
-    if payload.email.lower() == member.user.email.lower():
+    if normalize_email(payload.email) == normalize_email(member.user.email):
         raise HttpError(400, "Cannot invite yourself - you're already a member")
 
     try:
@@ -1171,14 +1166,14 @@ def bulk_invite_members_endpoint(
     """
     _, member, org = get_auth_context(request)
 
-    current_user_email = member.user.email.lower()
+    current_user_email = normalize_email(member.user.email)
 
     # Filter out self-invites, normalize emails
     members_data = []
     skipped_results = []
     for item in payload.members:
         # Normalize email: strip whitespace and lowercase for comparison
-        normalized_email = item.email.strip().lower()
+        normalized_email = normalize_email(item.email)
 
         if normalized_email == current_user_email:
             skipped_results.append(
@@ -1438,7 +1433,7 @@ def get_directory_avatar(request: AuthenticatedHttpRequest, url: str = ""):
 
     from apps.core.url_validation import SSRFError, validate_avatar_url
 
-    user, _, _ = get_auth_context(request)
+    _, member, org = get_auth_context(request)
 
     # Validate URL against SSRF attacks
     try:
@@ -1447,22 +1442,10 @@ def get_directory_avatar(request: AuthenticatedHttpRequest, url: str = ""):
         logger.warning("Avatar URL validation failed: %s (url=%s)", e, url)
         raise HttpError(400, "Invalid avatar URL") from None
 
-    # Import here to avoid circular imports
     from apps.accounts.google_directory import get_google_access_token
-    from apps.accounts.models import Member
-
-    # Get member to find Stytch IDs (query all memberships, not just current)
-    member = (
-        Member.objects.filter(user=user, deleted_at__isnull=True)
-        .select_related("organization")
-        .first()
-    )
-
-    if not member:
-        raise HttpError(404, "No member found")
 
     access_token = get_google_access_token(
-        organization_id=member.organization.stytch_org_id,
+        organization_id=org.stytch_org_id,
         member_id=member.stytch_member_id,
     )
 

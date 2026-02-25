@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Users } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import type { DirectoryUser } from '@/api/types'
 import { ConfirmDialog } from '@/components/confirm-dialog'
@@ -49,8 +49,8 @@ export default function MembersSettings() {
   const [bulkInviteOpen, setBulkInviteOpen] = useState(false)
 
   // Delete confirmation dialog
-  const deleteDialog = useConfirmDialog<{ id: number; email: string }>((member) => {
-    deleteMutation.mutate(member.id, {
+  const deleteDialog = useConfirmDialog<{ stytchMemberId: string; email: string }>((member) => {
+    deleteMutation.mutate(member.stytchMemberId, {
       onSettled: () => deleteDialog.reset(),
     })
   })
@@ -97,13 +97,16 @@ export default function MembersSettings() {
     )
   }
 
-  const handleRoleChange = (memberId: number, newRole: 'admin' | 'member') => {
-    updateRoleMutation.mutate({ memberId, role: newRole })
+  const handleRoleChange = (stytchMemberId: string, newRole: 'admin' | 'member') => {
+    updateRoleMutation.mutate({ stytchMemberId, role: newRole })
   }
 
-  const openDeleteDialog = (memberId: number, email: string) => {
-    deleteDialog.openDialog({ id: memberId, email })
-  }
+  const openDeleteDialog = useCallback(
+    (stytchMemberId: string, email: string) => {
+      deleteDialog.openDialog({ stytchMemberId, email })
+    },
+    [deleteDialog.openDialog]
+  )
 
   return (
     <SettingsPageLayout
@@ -133,7 +136,7 @@ export default function MembersSettings() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleInvite} className="flex flex-wrap gap-3 items-end">
-            <div className="flex-1 min-w-[200px]">
+            <div className="relative flex-1 min-w-[200px] pb-5">
               <label htmlFor="email" className="block text-sm font-medium mb-1">
                 Email
               </label>
@@ -147,12 +150,12 @@ export default function MembersSettings() {
                 placeholder="user@example.com"
               />
               {inviteForm.formState.errors.email && (
-                <p className="text-xs text-destructive mt-1">
+                <p className="absolute text-xs text-destructive mt-1">
                   {inviteForm.formState.errors.email.message}
                 </p>
               )}
             </div>
-            <div className="w-40">
+            <div className="relative w-40 pb-5">
               <label htmlFor="name" className="block text-sm font-medium mb-1">
                 Name (optional)
               </label>
@@ -164,12 +167,12 @@ export default function MembersSettings() {
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
               {inviteForm.formState.errors.name && (
-                <p className="text-xs text-destructive mt-1">
+                <p className="absolute text-xs text-destructive mt-1">
                   {inviteForm.formState.errors.name.message}
                 </p>
               )}
             </div>
-            <div className="w-32">
+            <div className="w-32 pb-5">
               <label htmlFor="role" className="block text-sm font-medium mb-1">
                 Role
               </label>
@@ -190,9 +193,14 @@ export default function MembersSettings() {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" disabled={inviteMutation.isPending || !inviteForm.watch('email')}>
-              {inviteMutation.isPending ? 'Sending...' : 'Send Invite'}
-            </Button>
+            <div className="pb-5">
+              <Button
+                type="submit"
+                disabled={inviteMutation.isPending || !inviteForm.watch('email')}
+              >
+                {inviteMutation.isPending ? 'Sending...' : 'Send Invite'}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>

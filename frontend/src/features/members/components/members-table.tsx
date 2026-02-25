@@ -12,8 +12,8 @@ import {
 
 interface MembersTableProps {
   members: MemberListItem[]
-  onRoleChange: (memberId: number, newRole: 'admin' | 'member') => void
-  onRemove: (memberId: number, email: string) => void
+  onRoleChange: (stytchMemberId: string, newRole: 'admin' | 'member') => void
+  onRemove: (stytchMemberId: string, email: string) => void
 }
 
 /**
@@ -59,7 +59,7 @@ export function MembersTable({ members, onRoleChange, onRemove }: MembersTablePr
                     <Select
                       value={member.role}
                       onValueChange={(value) => {
-                        onRoleChange(member.id, value as 'admin' | 'member')
+                        onRoleChange(member.stytch_member_id, value as 'admin' | 'member')
                       }}
                     >
                       <SelectTrigger className="w-28 h-8">
@@ -76,7 +76,7 @@ export function MembersTable({ members, onRoleChange, onRemove }: MembersTablePr
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        onRemove(member.id, member.email)
+                        onRemove(member.stytch_member_id, member.email)
                       }}
                       className="text-destructive hover:text-destructive"
                     >

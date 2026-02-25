@@ -8,7 +8,7 @@ import pytest
 from django.db import IntegrityError
 from django.utils import timezone
 
-from apps.organizations.models import Organization
+from apps.organizations.models import Organization, generate_unique_slug
 from tests.accounts.factories import OrganizationFactory
 
 
@@ -42,12 +42,21 @@ class TestOrganizationModel:
         with pytest.raises(IntegrityError):
             OrganizationFactory.create(stytch_org_id="org-unique-123")
 
-    def test_slug_unique(self) -> None:
-        """Should enforce unique slug."""
+    def test_slug_unique_among_active_orgs(self) -> None:
+        """Should enforce unique slug among active (non-deleted) organizations."""
         OrganizationFactory.create(slug="unique-slug")
 
         with pytest.raises(IntegrityError):
             OrganizationFactory.create(slug="unique-slug")
+
+    def test_slug_reusable_after_soft_delete(self) -> None:
+        """Should allow reusing a slug after the original org is soft-deleted."""
+        org = OrganizationFactory.create(slug="reused-slug")
+        org.soft_delete()
+
+        new_org = OrganizationFactory.create(slug="reused-slug")
+        assert new_org.slug == "reused-slug"
+        assert new_org.deleted_at is None
 
     def test_timestamps_auto_set(self) -> None:
         """Should auto-set created_at and updated_at."""
@@ -217,3 +226,73 @@ class TestOrganizationTrial:
         org = OrganizationFactory.create()
 
         assert org.trial_extended_count == 0
+
+
+@pytest.mark.django_db
+class TestGenerateUniqueSlug:
+    """Tests for generate_unique_slug helper."""
+
+    def test_returns_base_slug_when_no_collision(self) -> None:
+        """Should return the base slug unchanged when it is not taken."""
+        result = generate_unique_slug("fresh-slug")
+
+        assert result == "fresh-slug"
+
+    def test_appends_suffix_on_collision(self) -> None:
+        """Should append '-2' when the base slug is already taken."""
+        _existing = OrganizationFactory.create(slug="taken-slug")
+
+        result = generate_unique_slug("taken-slug")
+
+        assert result == "taken-slug-2"
+
+    def test_increments_suffix_through_multiple_collisions(self) -> None:
+        """Should keep incrementing until a free slug is found."""
+        _org1 = OrganizationFactory.create(slug="popular")
+        _org2 = OrganizationFactory.create(slug="popular-2")
+        _org3 = OrganizationFactory.create(slug="popular-3")
+
+        result = generate_unique_slug("popular")
+
+        assert result == "popular-4"
+
+    def test_increments_existing_numeric_suffix(self) -> None:
+        """Should increment when the base slug itself ends with a number."""
+        _existing = OrganizationFactory.create(slug="my-org-5")
+
+        result = generate_unique_slug("my-org-5")
+
+        assert result == "my-org-6"
+
+    def test_ignores_soft_deleted_slugs(self) -> None:
+        """Should allow reuse of a slug held by a soft-deleted org."""
+        deleted_org = OrganizationFactory.create(slug="recycled")
+        deleted_org.soft_delete()
+
+        result = generate_unique_slug("recycled")
+
+        assert result == "recycled"
+
+    def test_skips_soft_deleted_and_finds_gap(self) -> None:
+        """Should skip over soft-deleted slugs and find the next free one."""
+        _active = OrganizationFactory.create(slug="mixed")
+        deleted = OrganizationFactory.create(slug="mixed-2")
+        deleted.soft_delete()
+        _active3 = OrganizationFactory.create(slug="mixed-3")
+
+        result = generate_unique_slug("mixed")
+
+        # mixed-2 is soft-deleted so it's free
+        assert result == "mixed-2"
+
+    def test_raises_runtime_error_after_max_attempts(self) -> None:
+        """Should raise RuntimeError if no free slug is found within limits."""
+        from apps.organizations.models import MAX_SLUG_SUFFIX_ATTEMPTS
+
+        # Create the base slug and all suffixed variants up to the limit
+        _base = OrganizationFactory.create(slug="exhausted")
+        for i in range(2, 2 + MAX_SLUG_SUFFIX_ATTEMPTS):
+            OrganizationFactory.create(slug=f"exhausted-{i}")
+
+        with pytest.raises(RuntimeError, match="Could not generate a unique slug"):
+            generate_unique_slug("exhausted")

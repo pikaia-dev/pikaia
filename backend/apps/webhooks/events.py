@@ -61,9 +61,9 @@ MEMBER_UPDATED = _register(
     )
 )
 
-MEMBER_DELETED = _register(
+MEMBER_REMOVED = _register(
     WebhookEventType(
-        type="member.deleted",
+        type="member.removed",
         description="Triggered when a member is removed from the organization",
         category="member",
         payload_example={
@@ -119,14 +119,14 @@ ORGANIZATION_UPDATED = _register(
 )
 
 # =============================================================================
-# Billing Events
+# Subscription Events
 # =============================================================================
 
-BILLING_SUBSCRIPTION_CREATED = _register(
+SUBSCRIPTION_ACTIVATED = _register(
     WebhookEventType(
-        type="billing.subscription_created",
+        type="subscription.activated",
         description="Triggered when a new subscription is started",
-        category="billing",
+        category="subscription",
         payload_example={
             "subscription_id": "sub_01HN...",
             "plan": "pro",
@@ -136,11 +136,11 @@ BILLING_SUBSCRIPTION_CREATED = _register(
     )
 )
 
-BILLING_SUBSCRIPTION_UPDATED = _register(
+SUBSCRIPTION_UPDATED = _register(
     WebhookEventType(
-        type="billing.subscription_updated",
+        type="subscription.updated",
         description="Triggered when a subscription is changed (plan, seats, etc.)",
-        category="billing",
+        category="subscription",
         payload_example={
             "subscription_id": "sub_01HN...",
             "plan": "enterprise",
@@ -151,11 +151,11 @@ BILLING_SUBSCRIPTION_UPDATED = _register(
     )
 )
 
-BILLING_SUBSCRIPTION_CANCELED = _register(
+SUBSCRIPTION_CANCELED = _register(
     WebhookEventType(
-        type="billing.subscription_canceled",
+        type="subscription.canceled",
         description="Triggered when a subscription is canceled",
-        category="billing",
+        category="subscription",
         payload_example={
             "subscription_id": "sub_01HN...",
             "plan": "pro",

@@ -2,14 +2,17 @@
 Webhook service layer - business logic for webhook management and delivery.
 """
 
-import logging
+import threading
 import time
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import httpx
+from django.db import transaction
 
+from apps.core.logging import get_logger
+from apps.core.url_validation import SSRFError, validate_webhook_url
 from apps.organizations.models import Organization
 
 from .events import WEBHOOK_EVENTS, get_event_type, matches_subscription
@@ -17,7 +20,7 @@ from .models import WebhookDelivery, WebhookEndpoint
 from .schemas import WebhookEndpointCreate, WebhookEndpointUpdate, WebhookPayload
 from .signing import generate_headers
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Delivery timeout in seconds
 DELIVERY_TIMEOUT = 30
@@ -166,6 +169,27 @@ class WebhookDispatcher:
 
         # Generate signed headers
         headers = generate_headers(payload_json, endpoint.secret, event_id)
+
+        # Defense-in-depth: revalidate URL with DNS resolution before dispatch.
+        # This catches URLs that were persisted before SSRF hardening was added,
+        # or cases where a hostname's DNS has changed to point at an internal IP.
+        try:
+            validate_webhook_url(endpoint.url, resolve_dns=True)
+        except SSRFError as e:
+            logger.warning(
+                "SSRF check blocked dispatch to %s: %s",
+                endpoint.url,
+                e,
+            )
+            return DeliveryResult(
+                success=False,
+                http_status=None,
+                duration_ms=0,
+                response_snippet="",
+                error_type=WebhookDelivery.ErrorType.CONNECTION_ERROR,
+                error_message=f"URL blocked by SSRF protection: {e}",
+                signature=headers["X-Webhook-Signature"],
+            )
 
         # Send request
         start_time = time.monotonic()
@@ -351,25 +375,105 @@ def dispatch_event_to_subscribers(
         )
 
         # Update delivery record
-        if result.success:
-            delivery.mark_success(
-                http_status=result.http_status or 200,
-                duration_ms=result.duration_ms,
-                response_snippet=result.response_snippet,
-            )
-        else:
-            delivery.mark_failure(
-                error_type=result.error_type,
-                error_message=result.error_message,
-                http_status=result.http_status,
-                duration_ms=result.duration_ms,
-                response_snippet=result.response_snippet,
-                terminal=(result.http_status in (410, 404)),
-            )
+        _record_delivery_result(delivery, result)
 
         results.append((endpoint, result))
 
     return results
+
+
+def _record_delivery_result(delivery: WebhookDelivery, result: DeliveryResult) -> None:
+    """Persist the outcome of a webhook delivery attempt."""
+    if result.success:
+        delivery.mark_success(
+            http_status=result.http_status or 200,
+            duration_ms=result.duration_ms,
+            response_snippet=result.response_snippet,
+        )
+    else:
+        delivery.mark_failure(
+            error_type=result.error_type,
+            error_message=result.error_message,
+            http_status=result.http_status,
+            duration_ms=result.duration_ms,
+            response_snippet=result.response_snippet,
+            terminal=(result.http_status in (410, 404)),
+        )
+
+
+def dispatch_event_to_subscribers_async(
+    organization_id: str,
+    event_id: str,
+    event_type: str,
+    event_data: dict,
+    timestamp: datetime | None = None,
+) -> list[WebhookDelivery]:
+    """
+    Non-blocking webhook dispatch safe to call from request handlers.
+
+    Creates WebhookDelivery records on the calling thread (so the caller gets
+    immediate confirmation that deliveries are queued), then fires actual HTTP
+    dispatch in a background daemon thread.
+
+    Args:
+        organization_id: Organization this event belongs to
+        event_id: Unique event identifier
+        event_type: Type of event
+        event_data: Event payload data
+        timestamp: Event timestamp
+
+    Returns:
+        List of WebhookDelivery records created (in pending state).
+    """
+    endpoints = get_subscribed_endpoints(organization_id, event_type)
+
+    # Create delivery records on the calling thread so they are visible
+    # to the caller immediately and participate in the current transaction.
+    deliveries: list[WebhookDelivery] = []
+    for endpoint in endpoints:
+        delivery = WebhookDelivery.create_for_event(
+            endpoint=endpoint,
+            event_id=event_id,
+            event_type=event_type,
+        )
+        if delivery.status != WebhookDelivery.Status.SUCCESS:
+            deliveries.append(delivery)
+
+    if not deliveries:
+        return []
+
+    def _background_dispatch() -> None:
+        """Run dispatch in a background thread."""
+        try:
+            dispatch_event_to_subscribers(
+                organization_id=organization_id,
+                event_id=event_id,
+                event_type=event_type,
+                event_data=event_data,
+                timestamp=timestamp,
+            )
+        except Exception:
+            logger.exception(
+                "Background webhook dispatch failed for event %s (org %s)",
+                event_id,
+                organization_id,
+            )
+
+    # Spawn the background thread only after the current transaction commits,
+    # so delivery records are visible in the DB when the thread reads them.
+    # The daemon flag means the thread is fire-and-forget: if the process shuts
+    # down before dispatch completes, the process_webhook_retries management
+    # command will pick up any pending deliveries on its next poll.
+    def _start_thread() -> None:
+        threading.Thread(
+            target=_background_dispatch,
+            name=f"webhook-dispatch-{event_id}",
+            daemon=True,
+        ).start()
+
+    transaction.on_commit(_start_thread)
+
+    return deliveries
 
 
 def get_available_events() -> list[dict]:

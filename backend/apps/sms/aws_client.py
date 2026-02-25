@@ -4,7 +4,6 @@ AWS End User Messaging SMS client wrapper.
 Uses boto3 pinpoint-sms-voice-v2 API to send SMS messages.
 """
 
-import logging
 from functools import lru_cache
 from typing import Any
 
@@ -13,7 +12,9 @@ from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 
-logger = logging.getLogger(__name__)
+from apps.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 # Timeout configuration for AWS API calls
 # Boto3 default is 60s which can be too long for web requests

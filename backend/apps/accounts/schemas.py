@@ -29,6 +29,9 @@ def normalize_slug(value: str) -> str:
     5. Truncate to 128 chars
 
     Allowed characters: a-z, 0-9, hyphen, period, underscore, tilde
+
+    IMPORTANT: This must match the frontend normalization in
+    frontend/src/features/organization/forms/schema.ts:normalizeSlug()
     """
     slug = value.strip().lower()
     # Replace consecutive non-allowed chars with single hyphen

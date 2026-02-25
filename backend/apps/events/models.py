@@ -20,6 +20,7 @@ class OutboxEvent(models.Model):
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
+        PUBLISHING = "publishing", "Publishing"
         PUBLISHED = "published", "Published"
         FAILED = "failed", "Failed"
 
@@ -88,6 +89,11 @@ class OutboxEvent(models.Model):
         db_index=True,
         help_text="When to retry publishing (for exponential backoff)",
     )
+    claimed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the event was claimed for publishing (for stuck-event recovery)",
+    )
     last_error = models.TextField(
         blank=True,
         help_text="Last error message from failed publish attempt",
@@ -124,6 +130,8 @@ class OutboxEvent(models.Model):
             self.status = self.Status.FAILED
             self.next_attempt_at = None
         else:
+            # Reset to PENDING so the event is eligible for retry after backoff
+            self.status = self.Status.PENDING
             # Exponential backoff: 1s, 2s, 4s, 8s... up to 5 minutes
             delay_seconds = min(2**self.attempts, 300)
             self.next_attempt_at = timezone.now() + timedelta(seconds=delay_seconds)

@@ -7,7 +7,7 @@
 
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import type { StripeElementsOptions } from '@stripe/stripe-js'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useApi } from '@/api/use-api'
 import { Button } from '@/components/ui/button'
@@ -106,16 +106,19 @@ function PaymentFormInner({
  */
 export function PaymentForm({ quantity, onSuccess, onCancel }: PaymentFormProps) {
   const { createSubscriptionIntent } = useApi()
+  const createSubscriptionIntentRef = useRef(createSubscriptionIntent)
+  createSubscriptionIntentRef.current = createSubscriptionIntent
+
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [subscriptionId, setSubscriptionId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: createSubscriptionIntent excluded to prevent infinite re-renders
   useEffect(() => {
     let cancelled = false
 
-    createSubscriptionIntent({ quantity })
+    createSubscriptionIntentRef
+      .current({ quantity })
       .then((response) => {
         if (!cancelled) {
           setClientSecret(response.client_secret)

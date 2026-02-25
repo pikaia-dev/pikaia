@@ -36,6 +36,10 @@ LOGGING = {
         "level": "WARNING",
     },
     "loggers": {
+        "django.security.DisallowedHost": {
+            "handlers": [],
+            "propagate": False,
+        },
         "django.request": {
             "handlers": ["console"],
             "level": "ERROR",
@@ -137,12 +141,29 @@ if not CORS_ALLOWED_ORIGINS:
 
     get_logger(__name__).warning("cors_allowed_origins_empty")
 
+# Include both CORS origins and WebAuthn origin for CSRF protection
+CSRF_TRUSTED_ORIGINS = list(
+    {
+        *CORS_ALLOWED_ORIGINS,
+        *parse_comma_list(settings.WEBAUTHN_ORIGIN),
+    }
+)
+
 # =============================================================================
 # Sentry Error Tracking
 # =============================================================================
 if settings.SENTRY_DSN:
     import sentry_sdk
     from sentry_sdk.integrations.django import DjangoIntegration
+
+    def _before_send(event, hint):
+        """Drop DisallowedHost errors -- bot/scanner noise hitting the ALB IP directly."""
+        exc_info = hint.get("exc_info")
+        if exc_info:
+            exc_type = exc_info[0]
+            if exc_type and exc_type.__name__ == "DisallowedHost":
+                return None
+        return event
 
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
@@ -151,6 +172,7 @@ if settings.SENTRY_DSN:
         profiles_sample_rate=0.1,
         send_default_pii=False,
         environment="production",
+        before_send=_before_send,
     )
 
 # Validate S3 storage configuration

@@ -11,6 +11,7 @@ import { GitHubOAuthButton } from '@/features/auth/components/github-oauth-butto
 import { GoogleOAuthButton } from '@/features/auth/components/google-oauth-button'
 import { OrganizationSelector } from '@/features/auth/components/organization-selector'
 import { PasskeyLoginButton } from '@/features/auth/components/passkey-login-button'
+import { AUTH_STORAGE_KEYS } from '@/features/auth/constants'
 import { useDiscoveryAuth } from '@/features/auth/hooks/use-discovery-auth'
 import { useGoogleOneTap } from '@/features/auth/hooks/use-google-one-tap'
 import { hasPasskeyHint, isWebAuthnSupported } from '@/features/auth/hooks/use-passkey-auth'
@@ -66,9 +67,7 @@ function PasskeyFirstLogin({
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs">
-              <span className="bg-background px-2 text-muted-foreground">
-                Other sign in options
-              </span>
+              <span className="bg-card px-2 text-muted-foreground">Other sign in options</span>
             </div>
           </div>
 
@@ -108,7 +107,7 @@ function PasskeyFirstLogin({
             <span className="w-full border-t" />
           </div>
           <div className="relative flex justify-center text-xs">
-            <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+            <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
           </div>
         </div>
 
@@ -176,7 +175,7 @@ export default function Login() {
                 document.cookie = `stytch_session_jwt=${result.session_jwt}; ${cookieOptions}`
 
                 // Set flag so ProtectedRoute shows loading instead of redirecting to login
-                sessionStorage.setItem('stytch_just_logged_in', 'true')
+                sessionStorage.setItem(AUTH_STORAGE_KEYS.JUST_LOGGED_IN, 'true')
 
                 // Use full page redirect so Stytch SDK reinitializes with new session
                 window.location.href = '/dashboard'

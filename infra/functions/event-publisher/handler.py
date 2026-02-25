@@ -28,6 +28,10 @@ EVENT_BUS_NAME = os.environ.get("EVENT_BUS_NAME", "default")
 BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "100"))
 MAX_ATTEMPTS = int(os.environ.get("MAX_ATTEMPTS", "10"))
 
+# Events stuck in 'publishing' for longer than this are considered abandoned
+# and will be reset to 'pending' for retry.
+PUBLISHING_TIMEOUT_MINUTES = 5
+
 
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """
@@ -52,129 +56,182 @@ def publish_pending_events() -> int:
     """
     Fetch pending events and publish to EventBridge.
 
-    Uses FOR UPDATE SKIP LOCKED for safe concurrent execution:
-    - Row locks prevent duplicate publishes from concurrent Lambdas
-    - SKIP LOCKED allows other Lambdas to process different events
-    - Lock held during EventBridge call (~100-500ms) is acceptable
+    Uses a two-phase approach to minimize lock duration:
+    1. SELECT FOR UPDATE SKIP LOCKED, mark as 'publishing', COMMIT (releases locks)
+    2. Publish to EventBridge (no DB locks held)
+    3. Update final status (published/failed)
+
+    Also recovers events stuck in 'publishing' from crashed invocations.
 
     Returns number of successfully published events.
     """
     eventbridge = boto3.client("events")
 
-    with (
-        psycopg2.connect(DATABASE_URL) as conn,
-        conn.cursor(cursor_factory=RealDictCursor) as cur,
-    ):
-        # Fetch and lock pending events
-        cur.execute(
-            """
-            SELECT id, event_type, payload
-            FROM events_outboxevent
-            WHERE status = 'pending'
-              AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
-            ORDER BY created_at
-            LIMIT %s
-            FOR UPDATE SKIP LOCKED
-            """,
-            (BATCH_SIZE,),
-        )
-        events = cur.fetchall()
+    # Phase 1: Claim events (short transaction, releases locks quickly)
+    with psycopg2.connect(DATABASE_URL) as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Best-effort recovery of events stuck in 'publishing' from crashed
+            # Lambda invocations.  Wrapped in try/except so a failure here
+            # never blocks the main publish path.
+            try:
+                cur.execute(
+                    """
+                    UPDATE events_outboxevent
+                    SET status = 'pending', claimed_at = NULL
+                    WHERE status = 'publishing'
+                      AND claimed_at IS NOT NULL
+                      AND claimed_at < NOW() - %s * INTERVAL '1 minute'
+                    """,
+                    (PUBLISHING_TIMEOUT_MINUTES,),
+                )
+                recovered = cur.rowcount
+                if recovered:
+                    logger.info("Recovered %d stuck publishing events", recovered)
+            except Exception:
+                logger.exception("Stuck-event recovery failed, continuing with publish")
+                conn.rollback()
 
-        if not events:
-            logger.info("No pending events to publish")
-            return 0
+            # Fetch and lock pending events
+            cur.execute(
+                """
+                SELECT id, event_type, payload
+                FROM events_outboxevent
+                WHERE status = 'pending'
+                  AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
+                ORDER BY created_at
+                LIMIT %s
+                FOR UPDATE SKIP LOCKED
+                """,
+                (BATCH_SIZE,),
+            )
+            events = cur.fetchall()
 
-        # Pre-parse payloads to handle JSON errors before batching
-        valid_events = []
-        failed_events: list[tuple[Any, str]] = []
+            if not events:
+                conn.commit()
+                logger.info("No pending events to publish")
+                return 0
 
-        for event in events:
-            payload = event["payload"]
-            if isinstance(payload, str):
-                try:
-                    payload = json.loads(payload)
-                except json.JSONDecodeError as e:
-                    error_msg = f"Invalid JSON payload: {e}"
-                    failed_events.append((event["id"], error_msg))
-                    logger.warning(
-                        "Failed to parse JSON for event %s: %s",
-                        event["id"],
-                        error_msg,
-                    )
-                    continue
-            event["decoded_payload"] = payload
-            valid_events.append(event)
+            # Pre-parse payloads to catch JSON errors before claiming
+            valid_events = []
+            failed_events: list[tuple[Any, str]] = []
 
-        if not valid_events:
-            logger.info("No valid events to publish after JSON parsing")
-            # Still need to mark JSON failures
+            for event in events:
+                payload = event["payload"]
+                if isinstance(payload, str):
+                    try:
+                        payload = json.loads(payload)
+                    except json.JSONDecodeError as e:
+                        error_msg = f"Invalid JSON payload: {e}"
+                        failed_events.append((event["id"], error_msg))
+                        logger.warning(
+                            "Failed to parse JSON for event %s: %s",
+                            event["id"],
+                            error_msg,
+                        )
+                        continue
+                event["decoded_payload"] = payload
+                valid_events.append(event)
+
+            # Mark JSON failures immediately
             if failed_events:
                 _mark_failed_events(cur, failed_events)
+
+            if not valid_events:
                 conn.commit()
-            return 0
+                logger.info("No valid events to publish after JSON parsing")
+                return 0
 
-        logger.info("Publishing %d events", len(valid_events))
-
-        # Publish to EventBridge (max 10 per PutEvents call)
-        published_ids = []
-
-        for batch_start in range(0, len(valid_events), 10):
-            batch = valid_events[batch_start : batch_start + 10]
-            entries = []
-
-            for event in batch:
-                entries.append(
-                    {
-                        "Source": "app.outbox",
-                        "DetailType": event["event_type"],
-                        "Detail": json.dumps(event["decoded_payload"]),
-                        "EventBusName": EVENT_BUS_NAME,
-                    }
-                )
-
-            try:
-                response = eventbridge.put_events(Entries=entries)
-
-                for i, result in enumerate(response.get("Entries", [])):
-                    event_row = batch[i]
-                    if "EventId" in result:
-                        published_ids.append(event_row["id"])
-                    else:
-                        error = result.get("ErrorMessage", "Unknown error")
-                        failed_events.append((event_row["id"], error))
-                        logger.warning(
-                            "Failed to publish event %s: %s",
-                            event_row["id"],
-                            error,
-                        )
-
-            except Exception as e:
-                logger.error("Batch publish failed: %s", e)
-                for event_row in batch:
-                    failed_events.append((event_row["id"], str(e)))
-
-        # Mark successful events as published
-        if published_ids:
+            # Mark valid events as 'publishing' to claim them.
+            # claimed_at tracks when the row was claimed, separately from
+            # next_attempt_at which preserves its backoff-scheduling semantics.
+            # RETURNING id gives us only the rows we actually claimed, so we
+            # don't publish events that were concurrently claimed by another
+            # invocation.
+            valid_ids = [e["id"] for e in valid_events]
             cur.execute(
                 """
                 UPDATE events_outboxevent
-                SET status = 'published', published_at = %s
+                SET status = 'publishing', claimed_at = NOW()
                 WHERE id = ANY(%s)
+                  AND status = 'pending'
+                RETURNING id
                 """,
-                (datetime.now(UTC), published_ids),
+                (valid_ids,),
+            )
+            claimed_ids = {row[0] for row in cur.fetchall()}
+            valid_events = [e for e in valid_events if e["id"] in claimed_ids]
+
+            if not valid_events:
+                conn.commit()
+                logger.info("No events claimed after concurrent filtering")
+                return 0
+
+        conn.commit()  # Releases all row locks
+
+    # Phase 2: Publish to EventBridge (no DB locks held)
+    logger.info("Publishing %d events", len(valid_events))
+    published_ids = []
+    publish_failures: list[tuple[Any, str]] = []
+
+    for batch_start in range(0, len(valid_events), 10):
+        batch = valid_events[batch_start : batch_start + 10]
+        entries = []
+
+        for event in batch:
+            entries.append(
+                {
+                    "Source": "app.outbox",
+                    "DetailType": event["event_type"],
+                    "Detail": json.dumps(event["decoded_payload"]),
+                    "EventBusName": EVENT_BUS_NAME,
+                }
             )
 
-            # Mark failed events for retry (with exponential backoff)
-            _mark_failed_events(cur, failed_events)
+        try:
+            response = eventbridge.put_events(Entries=entries)
 
-            conn.commit()
+            for i, result in enumerate(response.get("Entries", [])):
+                event_row = batch[i]
+                if "EventId" in result:
+                    published_ids.append(event_row["id"])
+                else:
+                    error = result.get("ErrorMessage", "Unknown error")
+                    publish_failures.append((event_row["id"], error))
+                    logger.warning(
+                        "Failed to publish event %s: %s",
+                        event_row["id"],
+                        error,
+                    )
 
-            logger.info(
-                "Published %d events, %d failed",
-                len(published_ids),
-                len(failed_events),
-            )
-            return len(published_ids)
+        except Exception as e:
+            logger.error("Batch publish failed: %s", e)
+            for event_row in batch:
+                publish_failures.append((event_row["id"], str(e)))
+
+    # Phase 3: Update final status
+    with psycopg2.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            if published_ids:
+                cur.execute(
+                    """
+                    UPDATE events_outboxevent
+                    SET status = 'published', published_at = %s, claimed_at = NULL
+                    WHERE id = ANY(%s)
+                    """,
+                    (datetime.now(UTC), published_ids),
+                )
+
+            if publish_failures:
+                _mark_failed_events(cur, publish_failures)
+
+        conn.commit()
+
+    logger.info(
+        "Published %d events, %d failed",
+        len(published_ids),
+        len(publish_failures),
+    )
+    return len(published_ids)
 
 
 def _mark_failed_events(cur: Any, failed_events: list[tuple[Any, str]]) -> None:
@@ -187,6 +244,7 @@ def _mark_failed_events(cur: Any, failed_events: list[tuple[Any, str]]) -> None:
                 attempts = attempts + 1,
                 last_error = %s,
                 next_attempt_at = NOW() + (INTERVAL '1 minute' * POWER(2, attempts)),
+                claimed_at = NULL,
                 status = CASE
                     WHEN attempts + 1 >= %s THEN 'failed'
                     ELSE 'pending'
