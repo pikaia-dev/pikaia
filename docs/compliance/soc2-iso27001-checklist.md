@@ -1,7 +1,7 @@
 # SOC 2 / ISO 27001 Compliance Checklist
 
 > Assessment date: 2026-02-25
-> Scope: Pikaia, Snowball, Prelint, Tango Finance, supporting AWS infrastructure
+> Scope: Pikaia, Prelint, Tango Finance, supporting AWS infrastructure
 > AWS accounts: `403682862630` (tango-admin), `507481515916` (snowball-prod), `498155006695` (tango-b2b-demo)
 
 ## How to read this
@@ -73,14 +73,13 @@ These are controls you can present evidence for today:
 - [ ] **Write an incident response plan** — even a 1-page doc: who gets paged, escalation path, communication template, post-mortem process. `SOC2-CC7.3` `SOC2-CC7.4` `ISO-A.5.24` `ISO-A.5.25` `ISO-A.5.26`
 - [ ] **Write a data retention policy** — audit logs kept forever (already documented in observability.md), user data retention period, backup retention, log retention. Just formalize what you already do. `SOC2-CC6.5` `SOC2-P1.1` `ISO-A.8.10`
 - [ ] **Write a brief access control policy** — who can access AWS console, GitHub repos, production DB, Stytch dashboard, Stripe dashboard. Document current state. `SOC2-CC6.2` `SOC2-CC6.3` `ISO-A.5.15` `ISO-A.8.2`
-- [ ] **Add privacy policy and terms of service for Pikaia/Snowball** — tango-finance has one, main products do not. `SOC2-P1.1` `SOC2-P1.2` `ISO-A.5.34`
+- [ ] **Add privacy policy and terms of service for Pikaia** — tango-finance has one, Pikaia does not. `SOC2-P1.1` `SOC2-P1.2` `ISO-A.5.34`
 - [ ] **Document the change management process** — it's already enforced (PR-based, CI gates, conventional commits), just write it down. `SOC2-CC8.1` `ISO-A.8.32`
 - [ ] **Document the onboarding/offboarding process** — Stytch SCIM handles provisioning, but document the steps: grant AWS access, add to GitHub org, add to Slack, etc. `SOC2-CC6.2` `ISO-A.6.1` `ISO-A.6.5`
 
 ### Quick code/config fixes
 
 - [ ] **Fix `ALLOWED_HOSTS = *` in ECS** — set it to your actual domain(s). Currently mitigated by ALB host header checks but an auditor will flag it. `SOC2-CC6.1` `ISO-A.8.23`
-- [ ] **Remove `continue-on-error: true` from mypy in Snowball CI** — type checking should block merges, not just warn. `SOC2-CC8.1` `ISO-A.8.25`
 - [ ] **Add `.env` to a global gitignore** — you have project-level `.gitignore` entries, but add `~/.gitignore_global` as a safety net. `ISO-A.8.9`
 - [ ] **Enable CloudTrail if not already on** — AWS management events should be logged. Check if it's enabled on all 3 accounts. `SOC2-CC7.2` `ISO-A.8.15`
 - [ ] **Enable S3 access logging** — for media buckets, so you can prove who accessed what. `SOC2-CC7.2` `ISO-A.8.15`
@@ -91,10 +90,8 @@ These are controls you can present evidence for today:
 
 ### Infrastructure hardening
 
-- [ ] **Deploy WAF on Snowball** — Pikaia has it, Snowball does not. Copy `waf_stack.py` from Pikaia, adapt for Snowball. Adds ~$5-20/mo. `SOC2-CC6.6` `ISO-A.8.23`
-- [ ] **Enable AWS GuardDuty** — threat detection for all 3 accounts. ~$30-50/mo for small workloads. Straightforward to enable but generates alerts you need to triage. `SOC2-CC7.2` `ISO-A.8.16`
-- [ ] **Add rate limiting to Snowball auth endpoints** — Pikaia has `check_rate_limit()`, port it over. Listed in Snowball roadmap already. `SOC2-CC6.1` `ISO-A.8.6`
-- [ ] **Implement admin IP allowlist** — restrict `/admin/` to known IPs or VPN. Both products have this in their roadmaps. `SOC2-CC6.1` `ISO-A.8.20`
+- [ ] **Enable AWS GuardDuty** — threat detection for all accounts. ~$30-50/mo for small workloads. Straightforward to enable but generates alerts you need to triage. `SOC2-CC7.2` `ISO-A.8.16`
+- [ ] **Implement admin IP allowlist** — restrict `/admin/` to known IPs or VPN. `SOC2-CC6.1` `ISO-A.8.20`
 - [ ] **Add second NAT gateway** — for high availability. Currently single NAT = single AZ failure takes down outbound traffic. Doubles NAT cost (~$30/mo extra). `SOC2-A1.2` `ISO-A.8.14`
 - [ ] **Enable automated snapshots for cross-region DR** — Aurora supports cross-region replicas. ~$20-50/mo for storage. `SOC2-A1.2` `ISO-A.8.13` `ISO-A.8.14`
 - [ ] **Set up AWS Config rules** — automated compliance checking (e.g., S3 buckets must be encrypted, security groups must not allow 0.0.0.0/0). ~$2/rule/region/mo. `SOC2-CC7.1` `ISO-A.8.9`
@@ -152,16 +149,14 @@ These are controls you can present evidence for today:
 10. Enable CloudTrail on all accounts
 
 **Next quarter (Tier 2 — infrastructure + process):**
-11. Deploy WAF on Snowball
-12. Enable GuardDuty
-13. Port rate limiting to Snowball
-14. First quarterly access review
-15. Build vendor risk register
-16. Write risk assessment
-17. Add privacy policy to Pikaia/Snowball
+11. Enable GuardDuty
+12. First quarterly access review
+13. Build vendor risk register
+14. Write risk assessment
+15. Add privacy policy to Pikaia
 
 **When ready to pursue certification (Tier 3):**
-18. Evaluate compliance platforms (Vanta/Drata/Secureframe)
-19. Engage SOC 2 Type I auditor
-20. Build BCP/DR plan
-21. Schedule first pentest
+16. Evaluate compliance platforms (Vanta/Drata/Secureframe)
+17. Engage SOC 2 Type I auditor
+18. Build BCP/DR plan
+19. Schedule first pentest
