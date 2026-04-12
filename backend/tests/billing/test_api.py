@@ -350,7 +350,9 @@ class TestConfirmSubscription:
     @patch("apps.billing.api.sync_subscription_from_stripe")
     def test_stripe_error_returns_500(self, mock_sync, request_factory: RequestFactory) -> None:
         """Should return 500 on Stripe errors."""
-        mock_sync.side_effect = Exception("Stripe API error")
+        import stripe
+
+        mock_sync.side_effect = stripe.StripeError("Stripe API error")
         org = OrganizationFactory.create()
 
         request = create_authenticated_request(
@@ -474,10 +476,12 @@ class TestListInvoices:
         self, mock_get_stripe, request_factory: RequestFactory
     ) -> None:
         """Should return 500 on Stripe errors."""
+        import stripe
+
         from apps.billing.api import list_invoices
 
         mock_stripe = MagicMock()
-        mock_stripe.Invoice.list.side_effect = Exception("Stripe API error")
+        mock_stripe.Invoice.list.side_effect = stripe.StripeError("Stripe API error")
         mock_get_stripe.return_value = mock_stripe
 
         org = OrganizationFactory.create(stripe_customer_id="cus_test")

@@ -91,8 +91,14 @@ class TestGetOrCreateOrganizationFromStytch:
         assert org.slug == "new-corp"
         assert Organization.objects.count() == 1
 
-    def test_updates_existing_organization(self) -> None:
-        """Should update an existing organization when one exists."""
+    def test_updates_existing_organization_name_only(self) -> None:
+        """Should update the name but preserve the local slug.
+
+        Slug changes arrive via the organization.updated webhook, not the
+        login flow. Updating slug here would crash with IntegrityError when
+        Stytch sends a slug already taken by another active local org (e.g.
+        from a missed deletion webhook).
+        """
         existing = OrganizationFactory.create(
             stytch_org_id="org-existing-123",
             name="Old Corp",
@@ -107,7 +113,7 @@ class TestGetOrCreateOrganizationFromStytch:
 
         assert org.id == existing.id
         assert org.name == "Updated Corp"
-        assert org.slug == "updated-corp"
+        assert org.slug == "old-corp"  # slug unchanged — synced via webhook
         assert Organization.objects.count() == 1
 
     def test_creates_org_when_slug_held_by_soft_deleted_org(self) -> None:

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import httpx
+from django.conf import settings
 from django.db import transaction
 
 from apps.core.logging import get_logger
@@ -22,8 +23,8 @@ from .signing import generate_headers
 
 logger = get_logger(__name__)
 
-# Delivery timeout in seconds
-DELIVERY_TIMEOUT = 30
+# Delivery timeout in seconds — uses Django setting with module-level fallback
+DELIVERY_TIMEOUT = getattr(settings, "EXTERNAL_API_TIMEOUT_WEBHOOK_DELIVERY", 30)
 
 
 @dataclass

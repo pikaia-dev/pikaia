@@ -87,7 +87,7 @@ class TestInitiateLinkEndpoint:
         request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=organization)
         )
-        response = initiate_link(request)
+        response = initiate_link(request)  # type: ignore[arg-type]
 
         assert response.qr_url.startswith("pikaia://device/link?token=")
         assert response.expires_in_seconds >= 299  # Allow 1 second timing tolerance
@@ -115,7 +115,7 @@ class TestInitiateLinkEndpoint:
         from ninja.errors import HttpError
 
         with pytest.raises(HttpError) as exc_info:
-            initiate_link(request)
+            initiate_link(request)  # type: ignore[arg-type]
         assert exc_info.value.status_code == 429
 
 
@@ -198,7 +198,7 @@ class TestListDevicesEndpoint:
         request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=organization)
         )
-        response = list_devices(request)
+        response = list_devices(request)  # type: ignore[arg-type]
 
         assert response.count == 2
         device_names = [d.name for d in response.devices]
@@ -222,7 +222,7 @@ class TestListDevicesEndpoint:
         request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=organization)
         )
-        response = list_devices(request)
+        response = list_devices(request)  # type: ignore[arg-type]
 
         assert response.count == 1
         assert response.devices[0].name == "Active"
@@ -246,7 +246,7 @@ class TestRevokeDeviceEndpoint:
         request = make_request_with_auth(  # type: ignore[assignment]
             request, AuthContext(user=user, member=member, organization=organization)
         )
-        status, _ = delete_device(request, device.id)
+        status, _ = delete_device(request, device.id)  # type: ignore[arg-type]
 
         assert status == 204
         device.refresh_from_db()
@@ -273,7 +273,7 @@ class TestRevokeDeviceEndpoint:
         from ninja.errors import HttpError
 
         with pytest.raises(HttpError) as exc_info:
-            delete_device(request, other_device.id)
+            delete_device(request, other_device.id)  # type: ignore[arg-type]
         assert exc_info.value.status_code == 404
 
 
@@ -304,7 +304,7 @@ class TestSessionRefreshEndpoint:
 
         with patch("apps.devices.services.get_stytch_client") as mock_client:
             mock_client.return_value.sessions.attest.return_value = mock_response
-            response = refresh_session(request, payload)
+            response = refresh_session(request, payload)  # type: ignore[arg-type]
 
         assert response.session_token == "new-session-token"
         assert response.session_jwt == "new-session-jwt"
@@ -328,5 +328,5 @@ class TestSessionRefreshEndpoint:
         from ninja.errors import HttpError
 
         with pytest.raises(HttpError) as exc_info:
-            refresh_session(request, payload)
+            refresh_session(request, payload)  # type: ignore[arg-type]
         assert exc_info.value.status_code == 404

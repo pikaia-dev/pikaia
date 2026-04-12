@@ -151,6 +151,9 @@ class SyncableModel(SoftDeleteMixin, TimestampedModel):
     def save(self, *args, **kwargs):
         """Increment sync version on save."""
         self.sync_version += 1
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "sync_version" not in update_fields:
+            kwargs["update_fields"] = list(update_fields) + ["sync_version"]
         super().save(*args, **kwargs)
 
 
@@ -174,7 +177,7 @@ class SyncOperation(models.Model):
         DUPLICATE = "duplicate"
 
     # Idempotency - unique constraint ensures atomic claim pattern
-    idempotency_key = models.CharField(max_length=64, unique=True, db_index=True)
+    idempotency_key = models.CharField(max_length=64, unique=True)
 
     # Context
     organization = models.ForeignKey(

@@ -14,6 +14,7 @@ import jwt
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
+from stytch.core.response_base import StytchError
 
 from apps.accounts.models import Member, User
 from apps.accounts.stytch_client import get_stytch_client
@@ -22,6 +23,7 @@ from apps.devices.constants import JWTAction
 from apps.devices.exceptions import (
     DeviceAlreadyLinkedError,
     RateLimitError,
+    SessionCreationError,
     TokenExpiredError,
     TokenInvalidError,
     TokenUsedError,
@@ -316,6 +318,9 @@ def _create_mobile_session(
 
     Returns:
         Tuple of (session_token, session_jwt, session_expires_at)
+
+    Raises:
+        SessionCreationError: If Stytch API call fails
     """
     trusted_token = create_trusted_auth_token(
         email=user.email,
@@ -325,12 +330,23 @@ def _create_mobile_session(
     )
 
     client = get_stytch_client()
-    response = client.sessions.attest(
-        profile_id=settings.STYTCH_TRUSTED_AUTH_PROFILE_ID,
-        token=trusted_token,
-        organization_id=organization.stytch_org_id,
-        session_duration_minutes=settings.DEVICE_SESSION_EXPIRY_MINUTES,
-    )
+
+    try:
+        response = client.sessions.attest(
+            profile_id=settings.STYTCH_TRUSTED_AUTH_PROFILE_ID,
+            token=trusted_token,
+            organization_id=organization.stytch_org_id,
+            session_duration_minutes=settings.DEVICE_SESSION_EXPIRY_MINUTES,
+        )
+    except StytchError as e:
+        error_msg = e.details.error_message if e.details else str(e)
+        logger.error(
+            "mobile_session_creation_failed",
+            user_id=user.id,
+            organization_id=organization.stytch_org_id,
+            error=error_msg,
+        )
+        raise SessionCreationError("Failed to create mobile session. Please try again.") from None
 
     # Calculate session expiry time
     session_expires_at = timezone.now() + timedelta(minutes=settings.DEVICE_SESSION_EXPIRY_MINUTES)

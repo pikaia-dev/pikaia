@@ -411,10 +411,10 @@ class EmailUpdateResponse(BaseModel):
 
 
 class UpdateOrganizationRequest(BaseModel):
-    """Request to update organization settings (admin only)."""
+    """Request to update organization settings (admin only). Partial updates supported."""
 
-    name: str = Field(
-        ...,
+    name: str | None = Field(
+        default=None,
         min_length=1,
         max_length=255,
         description="Organization display name",

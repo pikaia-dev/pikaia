@@ -94,8 +94,23 @@ class Settings(BaseSettings):
     # Sentry
     SENTRY_DSN: str = ""
 
+    # Field-level encryption key (dedicated secret for encrypting model fields)
+    # Falls back to SECRET_KEY for local development; must be set in production.
+    FIELD_ENCRYPTION_KEY: str = ""
+
     # Feature gating
     SUBSCRIPTION_GATING_ENABLED: bool = True
+
+    # External API timeouts (seconds)
+    EXTERNAL_API_TIMEOUT_STYTCH: int = 30
+    EXTERNAL_API_TIMEOUT_STRIPE: int = 30
+    EXTERNAL_API_TIMEOUT_RESEND: int = 10
+    EXTERNAL_API_TIMEOUT_WEBHOOK_DELIVERY: int = 30
+
+    # Database timeouts
+    DB_STATEMENT_TIMEOUT_MS: int = 0  # 0 = no timeout (local dev default)
+    DB_CONNECT_TIMEOUT: int = 5  # seconds
+    DB_CONN_MAX_AGE: int = 600  # seconds; 0 = per-request (Django default)
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
@@ -200,12 +215,28 @@ CSRF_TRUSTED_ORIGINS = list(
 
 
 # Database configuration
+def _get_db_options() -> dict:
+    """Build PostgreSQL connection OPTIONS.
+
+    Configures connect_timeout and statement_timeout to prevent runaway queries
+    and slow connection establishment from degrading the application.
+    """
+    options: dict[str, object] = {
+        "connect_timeout": settings.DB_CONNECT_TIMEOUT,
+    }
+    if settings.DB_STATEMENT_TIMEOUT_MS:
+        options["options"] = f"-c statement_timeout={settings.DB_STATEMENT_TIMEOUT_MS}"
+    return options
+
+
 def _get_database_config() -> dict:
     """Build Django DATABASES config.
 
     For ECS: Uses individual DB_* environment variables directly (no URL encoding needed).
     For local: Uses DATABASE_URL or default localhost.
     """
+    db_options = _get_db_options()
+
     if settings.DB_HOST:
         # ECS: Use individual env vars directly - no URL parsing needed
         return {
@@ -215,6 +246,7 @@ def _get_database_config() -> dict:
             "PASSWORD": settings.DB_PASSWORD,
             "HOST": settings.DB_HOST,
             "PORT": settings.DB_PORT,
+            "OPTIONS": db_options,
         }
     elif settings.DATABASE_URL:
         # Local dev: Parse DATABASE_URL via pydantic
@@ -227,6 +259,7 @@ def _get_database_config() -> dict:
             "PASSWORD": host_info.get("password") or "",
             "HOST": host_info.get("host") or "localhost",
             "PORT": str(host_info.get("port") or 5432),
+            "OPTIONS": db_options,
         }
     else:
         # Default for local dev without DATABASE_URL
@@ -237,6 +270,7 @@ def _get_database_config() -> dict:
             "PASSWORD": "postgres",  # nosec B105
             "HOST": "localhost",
             "PORT": "5432",
+            "OPTIONS": db_options,
         }
 
 
@@ -282,6 +316,12 @@ AWS_STORAGE_BUCKET_NAME = settings.AWS_STORAGE_BUCKET_NAME
 AWS_S3_REGION_NAME = settings.AWS_S3_REGION_NAME
 AWS_S3_CUSTOM_DOMAIN = settings.AWS_S3_CUSTOM_DOMAIN or None
 IMAGE_TRANSFORM_URL = settings.IMAGE_TRANSFORM_URL or None
+
+# Request body size limits (DoS protection)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB — max in-memory request body
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB — threshold before spooling to disk
+DATA_UPLOAD_MAX_NUMBER_FILES = 10  # Max file fields per request
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000  # Max form fields per request
 
 # Media upload limits
 MEDIA_MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
@@ -342,6 +382,11 @@ AUTH_RATE_LIMIT_MOBILE_PROVISION_WINDOW = 60  # 1 minute
 AUTH_RATE_LIMIT_PASSKEY_AUTH_PER_IP = 10  # Per IP per minute
 AUTH_RATE_LIMIT_PASSKEY_AUTH_WINDOW = 60  # 1 minute
 
+# Incoming webhook rate limits (per IP, generous to allow legitimate bursts)
+WEBHOOK_RATE_LIMIT_STRIPE_PER_IP = 200  # Per IP per minute
+WEBHOOK_RATE_LIMIT_STYTCH_PER_IP = 200  # Per IP per minute
+WEBHOOK_RATE_LIMIT_WINDOW = 60  # 1 minute
+
 # Device linking
 DEVICE_LINK_TOKEN_EXPIRY_SECONDS = 300  # 5 minutes
 DEVICE_MAX_LINK_ATTEMPTS_PER_HOUR = 5  # Rate limit for initiating links (per user)
@@ -362,5 +407,14 @@ SYNC_PULL_MAX_LIMIT = 500  # Max changes per pull request
 SYNC_TOMBSTONE_RETENTION_DAYS = 90  # Days to keep soft-deleted records
 SYNC_CLOCK_SKEW_TOLERANCE_MS = 100  # Overlap window for cursor queries
 
+# Field-level encryption
+FIELD_ENCRYPTION_KEY = settings.FIELD_ENCRYPTION_KEY
+
 # Feature gating
 SUBSCRIPTION_GATING_ENABLED = settings.SUBSCRIPTION_GATING_ENABLED
+
+# External API timeouts (seconds) — prevent hanging requests from blocking workers
+EXTERNAL_API_TIMEOUT_STYTCH = settings.EXTERNAL_API_TIMEOUT_STYTCH
+EXTERNAL_API_TIMEOUT_STRIPE = settings.EXTERNAL_API_TIMEOUT_STRIPE
+EXTERNAL_API_TIMEOUT_RESEND = settings.EXTERNAL_API_TIMEOUT_RESEND
+EXTERNAL_API_TIMEOUT_WEBHOOK_DELIVERY = settings.EXTERNAL_API_TIMEOUT_WEBHOOK_DELIVERY

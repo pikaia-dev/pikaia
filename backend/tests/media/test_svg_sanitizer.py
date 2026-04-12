@@ -9,7 +9,6 @@ import pytest
 from apps.media.svg_sanitizer import (
     SVGSanitizationError,
     _has_dangerous_value,
-    _sanitize_style,
     is_svg_content,
     sanitize_svg,
 )
@@ -204,55 +203,32 @@ class TestSanitizeSVG:
         assert b"<feGaussianBlur" in result
 
 
-class TestSanitizeStyle:
-    """Tests for CSS style sanitization."""
+class TestStyleAttributeRemoved:
+    """Tests that style attributes are fully stripped (XSS prevention)."""
 
-    def test_removes_url_references(self) -> None:
-        """Should remove url() from styles."""
-        style = "background: url(http://evil.com/track.png); color: red;"
+    def test_removes_style_attribute(self) -> None:
+        """Should remove style attribute entirely instead of trying to sanitize it."""
+        svg = b"""<?xml version="1.0"?>
+        <svg xmlns="http://www.w3.org/2000/svg">
+            <rect style="fill: blue; stroke: red;" x="10" y="10" width="50" height="50"/>
+        </svg>"""
 
-        result = _sanitize_style(style)
+        result = sanitize_svg(svg)
 
-        assert "url(" not in result
-        assert "color: red" in result
+        assert b"style=" not in result
+        assert b"<rect" in result
 
-    def test_removes_expression(self) -> None:
-        """Should remove CSS expression()."""
-        style = "width: expression(alert('XSS')); height: 100px;"
+    def test_removes_style_with_dangerous_content(self) -> None:
+        """Should remove style even with XSS payloads (no regex bypass possible)."""
+        svg = b"""<?xml version="1.0"?>
+        <svg xmlns="http://www.w3.org/2000/svg">
+            <rect style="background: url(javascript:alert(1))" x="10" y="10" width="50" height="50"/>
+        </svg>"""
 
-        result = _sanitize_style(style)
+        result = sanitize_svg(svg)
 
-        assert "expression" not in result
-        assert "100px" in result
-
-    def test_removes_moz_binding(self) -> None:
-        """Should remove -moz-binding (Firefox XSS vector)."""
-        style = "-moz-binding: url(http://evil.com/xss.xml#xss); color: blue;"
-
-        result = _sanitize_style(style)
-
-        assert "-moz-binding" not in result
-        assert "color: blue" in result
-
-    def test_removes_behavior(self) -> None:
-        """Should remove behavior (IE XSS vector)."""
-        style = "behavior: url(malicious.htc); border: 1px solid red;"
-
-        result = _sanitize_style(style)
-
-        assert "behavior" not in result
-        assert "border: 1px solid red" in result
-
-    def test_preserves_safe_styles(self) -> None:
-        """Should preserve safe CSS properties."""
-        style = "fill: blue; stroke: red; stroke-width: 2px; opacity: 0.5;"
-
-        result = _sanitize_style(style)
-
-        assert "fill: blue" in result
-        assert "stroke: red" in result
-        assert "stroke-width: 2px" in result
-        assert "opacity: 0.5" in result
+        assert b"style=" not in result
+        assert b"javascript" not in result
 
 
 class TestHasDangerousValue:

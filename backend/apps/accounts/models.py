@@ -54,7 +54,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     """
 
     # User info - email is the cross-org identifier
-    email = models.EmailField(unique=True, db_index=True)
+    email = models.EmailField(unique=True)
     name = models.CharField(max_length=255, blank=True)
     avatar_url = models.URLField(
         blank=True,

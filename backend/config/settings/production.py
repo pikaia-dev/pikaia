@@ -61,6 +61,8 @@ _REQUIRED_SECRETS = {
     "STRIPE_PRICE_ID": settings.STRIPE_PRICE_ID,
     "STRIPE_WEBHOOK_SECRET": settings.STRIPE_WEBHOOK_SECRET,
     "STYTCH_WEBHOOK_SECRET": settings.STYTCH_WEBHOOK_SECRET,
+    "FIELD_ENCRYPTION_KEY": settings.FIELD_ENCRYPTION_KEY,
+    "CORS_ALLOWED_ORIGINS": settings.CORS_ALLOWED_ORIGINS,
 }
 
 # Secrets that have obviously insecure defaults
@@ -79,6 +81,14 @@ def _validate_production_secrets() -> None:
             missing.append(name)
         elif name in _INSECURE_DEFAULTS and value == _INSECURE_DEFAULTS[name]:
             insecure.append(name)
+
+    # FIELD_ENCRYPTION_KEY must differ from SECRET_KEY to limit blast radius
+    if (
+        settings.FIELD_ENCRYPTION_KEY
+        and settings.SECRET_KEY
+        and settings.FIELD_ENCRYPTION_KEY == settings.SECRET_KEY
+    ):
+        insecure.append("FIELD_ENCRYPTION_KEY (must not equal SECRET_KEY)")
 
     errors = []
     if missing:
@@ -134,12 +144,8 @@ SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"  # Isolate browsing context
 USE_X_FORWARDED_HOST = True
 
 # CORS - read from environment, required for frontend to work
+# (validated as a required setting above; empty value fails startup)
 CORS_ALLOWED_ORIGINS = parse_comma_list(settings.CORS_ALLOWED_ORIGINS or "")
-
-if not CORS_ALLOWED_ORIGINS:
-    from apps.core.logging import get_logger
-
-    get_logger(__name__).warning("cors_allowed_origins_empty")
 
 # Include both CORS origins and WebAuthn origin for CSRF protection
 CSRF_TRUSTED_ORIGINS = list(
@@ -156,13 +162,33 @@ if settings.SENTRY_DSN:
     import sentry_sdk
     from sentry_sdk.integrations.django import DjangoIntegration
 
+    def _is_management_shell_error(event):
+        """Check if the error originated from `manage.py shell -c ...`."""
+        for entry in event.get("exception", {}).get("values", []):
+            for frame in entry.get("stacktrace", {}).get("frames", []):
+                if (
+                    frame.get("module") == "django.core.management.commands.shell"
+                    and frame.get("function") == "handle"
+                ):
+                    return True
+        return False
+
     def _before_send(event, hint):
-        """Drop DisallowedHost errors -- bot/scanner noise hitting the ALB IP directly."""
+        """Filter out noisy errors before they reach Sentry.
+
+        Drops:
+        - DisallowedHost errors: bot/scanner noise hitting the ALB IP directly.
+        - Management shell errors: ad-hoc `manage.py shell -c` commands that fail.
+        """
         exc_info = hint.get("exc_info")
         if exc_info:
             exc_type = exc_info[0]
             if exc_type and exc_type.__name__ == "DisallowedHost":
                 return None
+
+        if _is_management_shell_error(event):
+            return None
+
         return event
 
     sentry_sdk.init(
@@ -187,3 +213,23 @@ if settings.USE_S3_STORAGE:
             "Production configuration error!\n"
             f"  - USE_S3_STORAGE is enabled but missing: {', '.join(missing_s3)}"
         )
+
+# =============================================================================
+# Database Timeout Protection
+# =============================================================================
+# Enforce a statement timeout in production to prevent runaway queries from
+# holding locks and exhausting connections. Overrides the base.py default of 0
+# (no timeout). The value comes from DB_STATEMENT_TIMEOUT_MS env var, falling
+# back to 30 seconds if unset.
+_statement_timeout_ms = settings.DB_STATEMENT_TIMEOUT_MS or 30_000
+DATABASES["default"].setdefault("OPTIONS", {})  # noqa: F405
+DATABASES["default"]["OPTIONS"]["options"] = (  # noqa: F405
+    f"-c statement_timeout={_statement_timeout_ms}"
+)
+
+# Connection reuse — avoid per-request TCP+SSL handshake overhead.
+# Threads keep persistent connections up to DB_CONN_MAX_AGE; health checks
+# detect stale connections before reuse. Verify aggregate connection count
+# across all tasks against your PostgreSQL max_connections setting.
+DATABASES["default"]["CONN_MAX_AGE"] = settings.DB_CONN_MAX_AGE  # noqa: F405
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = True  # noqa: F405

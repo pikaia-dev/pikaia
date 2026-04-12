@@ -22,6 +22,7 @@ from apps.accounts.services import (
     parse_stytch_role,
 )
 from apps.core.logging import get_logger
+from apps.core.throttling import rate_limit_ip_django_view
 from apps.core.webhooks import mark_webhook_processed
 from apps.events.services import publish_event
 from apps.organizations.models import Organization
@@ -121,11 +122,38 @@ def handle_member_updated(data: dict) -> None:
         return
 
     # Update role from Stytch RBAC
-    new_role = parse_stytch_role(member_data.get("roles", []))
+    stytch_roles = member_data.get("roles", [])
+    new_role = parse_stytch_role(stytch_roles)
 
     # Update member fields
     update_fields: list[str] = []
     if member.role != new_role:
+        # Guard against demoting the last admin when the Stytch roles
+        # array is empty. During JIT provisioning, a best-effort
+        # members.update(roles=[stytch_admin]) call can fail, leaving
+        # the JIT member with no roles in Stytch. A subsequent
+        # member.update webhook would overwrite the locally-restored
+        # admin role, permanently locking the org founder out of admin
+        # with no recovery path. An empty array signals "roles not yet
+        # assigned" rather than an explicit demotion, so preserving the
+        # local admin role is safe.
+        if member.role == "admin" and new_role == "member" and not stytch_roles:
+            has_other_admins = (
+                Member.objects.filter(
+                    organization=member.organization,
+                    role="admin",
+                )
+                .exclude(pk=member.pk)
+                .exists()
+            )
+            if not has_other_admins:
+                logger.error(
+                    "stytch_webhook_last_admin_demotion_blocked",
+                    stytch_member_id=stytch_member_id,
+                    organization_id=member.organization_id,
+                )
+                return
+
         logger.info(
             "stytch_webhook_member_role_updated",
             stytch_member_id=stytch_member_id,
@@ -299,6 +327,11 @@ def handle_organization_deleted(data: dict) -> None:
 
 @csrf_exempt
 @require_POST
+@rate_limit_ip_django_view(
+    "stytch_webhook",
+    "WEBHOOK_RATE_LIMIT_STYTCH_PER_IP",
+    "WEBHOOK_RATE_LIMIT_WINDOW",
+)
 def stytch_webhook(request: HttpRequest) -> HttpResponse:
     """
     Handle Stytch webhook events.

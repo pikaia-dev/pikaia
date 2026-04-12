@@ -12,10 +12,12 @@ from ninja.errors import HttpError
 
 from apps.core.schemas import ErrorResponse
 from apps.core.security import BearerAuth, get_auth_context
+from apps.core.types import AuthenticatedHttpRequest
 from apps.core.utils import get_client_ip
 from apps.devices.exceptions import (
     DeviceAlreadyLinkedError,
     RateLimitError,
+    SessionCreationError,
     TokenExpiredError,
     TokenInvalidError,
     TokenUsedError,
@@ -49,7 +51,7 @@ bearer_auth = BearerAuth()
     summary="Initiate device linking",
     description="Generate QR code data for linking a mobile device. Requires authentication.",
 )
-def initiate_link(request: HttpRequest) -> InitiateLinkResponse:
+def initiate_link(request: AuthenticatedHttpRequest) -> InitiateLinkResponse:
     """Generate QR code data for device linking."""
     user, member, organization = get_auth_context(request)
 
@@ -84,7 +86,7 @@ def _check_complete_rate_limit(request: HttpRequest) -> None:
 
 @router.post(
     "/link/complete",
-    response=CompleteLinkResponse,
+    response={200: CompleteLinkResponse, 502: ErrorResponse},
     summary="Complete device linking",
     description="Complete device linking using the QR code token. Called by mobile app.",
 )
@@ -116,6 +118,8 @@ def complete_link(
         raise HttpError(400, str(e)) from None
     except DeviceAlreadyLinkedError as e:
         raise HttpError(409, str(e)) from None
+    except SessionCreationError as e:
+        raise HttpError(502, str(e)) from None
 
     return CompleteLinkResponse(
         session_token=result.session_token,
@@ -135,7 +139,7 @@ def complete_link(
     summary="List linked devices",
     description="Get all linked devices for the authenticated user.",
 )
-def list_devices(request: HttpRequest) -> DeviceListResponse:
+def list_devices(request: AuthenticatedHttpRequest) -> DeviceListResponse:
     """List all linked devices for the authenticated user."""
     user, _, _ = get_auth_context(request)
 
@@ -164,7 +168,7 @@ def list_devices(request: HttpRequest) -> DeviceListResponse:
     summary="Revoke a device",
     description="Revoke a linked device, preventing it from syncing.",
 )
-def delete_device(request: HttpRequest, device_id: int):
+def delete_device(request: AuthenticatedHttpRequest, device_id: int):
     """Revoke a device owned by the authenticated user."""
     user, _, _ = get_auth_context(request)
 
@@ -178,13 +182,13 @@ def delete_device(request: HttpRequest, device_id: int):
 
 @router.post(
     "/session/refresh",
-    response={200: SessionRefreshResponse, 402: ErrorResponse},
+    response={200: SessionRefreshResponse, 402: ErrorResponse, 502: ErrorResponse},
     auth=bearer_auth,
     summary="Refresh device session",
     description="Get new session tokens for a linked device. Use when JWT expires.",
 )
 def refresh_session(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     payload: SessionRefreshRequest,
 ) -> SessionRefreshResponse:
     """Refresh session tokens for a linked device."""
@@ -199,6 +203,8 @@ def refresh_session(
         )
     except Device.DoesNotExist:
         raise HttpError(404, "Device not found or not linked to this account") from None
+    except SessionCreationError as e:
+        raise HttpError(502, str(e)) from None
 
     return SessionRefreshResponse(
         session_token=result.session_token,

@@ -6,6 +6,7 @@ Handles Stripe checkout, subscription management, and customer portal.
 
 from datetime import UTC, datetime
 
+import stripe
 from ninja import Router
 from ninja.errors import HttpError
 
@@ -85,7 +86,7 @@ def create_checkout(
             success_url=payload.success_url,
             cancel_url=payload.cancel_url,
         )
-    except Exception:
+    except stripe.StripeError:
         logger.exception("checkout_session_creation_failed")
         raise HttpError(500, "Failed to create checkout session") from None
 
@@ -118,7 +119,7 @@ def create_portal(
             org=org,
             return_url=payload.return_url,
         )
-    except Exception:
+    except stripe.StripeError:
         logger.exception("portal_session_creation_failed")
         raise HttpError(500, "Failed to create portal session") from None
 
@@ -216,7 +217,7 @@ def create_subscription_intent_endpoint(
             org=org,
             quantity=quantity,
         )
-    except Exception:
+    except stripe.StripeError:
         logger.exception("subscription_intent_creation_failed")
         raise HttpError(500, "Failed to create subscription intent") from None
 
@@ -251,7 +252,7 @@ def confirm_subscription_endpoint(
 
     try:
         is_active = sync_subscription_from_stripe(payload.subscription_id)
-    except Exception:
+    except stripe.StripeError:
         logger.exception("subscription_confirmation_failed")
         raise HttpError(500, "Failed to confirm subscription") from None
 
@@ -283,7 +284,7 @@ def list_invoices(
         return InvoiceListResponse(invoices=[], has_more=False)
 
     try:
-        stripe = get_stripe()
+        stripe_client = get_stripe()
 
         # Build params for Stripe API
         params: dict = {
@@ -294,10 +295,12 @@ def list_invoices(
             params["starting_after"] = starting_after
 
         # Fetch invoices from Stripe
-        invoice_list = stripe.Invoice.list(**params)
+        invoice_list = stripe_client.Invoice.list(**params)
 
         invoices = []
         for inv in invoice_list.data:
+            if inv.status in ("void", "draft"):
+                continue
             # Convert Unix timestamps to ISO format
             created = datetime.fromtimestamp(inv.created, tz=UTC).isoformat()
             period_start = (
@@ -332,6 +335,6 @@ def list_invoices(
             has_more=invoice_list.has_more,
         )
 
-    except Exception:
+    except stripe.StripeError:
         logger.exception("invoice_list_failed")
         raise HttpError(500, "Failed to retrieve invoices") from None

@@ -15,6 +15,7 @@ from apps.accounts.stytch_client import get_stytch_client
 from apps.core.logging import get_logger
 from apps.core.security import BearerAuth, get_auth_context
 from apps.core.throttling import RateLimitExceeded, check_rate_limit
+from apps.core.types import AuthenticatedHttpRequest
 from apps.core.utils import get_client_ip
 from apps.passkeys.models import Passkey
 from apps.passkeys.schemas import (
@@ -47,7 +48,9 @@ bearer_auth = BearerAuth()
     summary="Get passkey registration options",
     description="Get WebAuthn options for registering a new passkey. Requires authentication.",
 )
-def get_registration_options(request: HttpRequest) -> PasskeyRegistrationOptionsResponse:
+def get_registration_options(
+    request: AuthenticatedHttpRequest,
+) -> PasskeyRegistrationOptionsResponse:
     """Generate registration options for the authenticated user."""
     user, member, _ = get_auth_context(request)
 
@@ -68,7 +71,7 @@ def get_registration_options(request: HttpRequest) -> PasskeyRegistrationOptions
     description="Verify the registration response and store the new passkey.",
 )
 def verify_registration(
-    request: HttpRequest,
+    request: AuthenticatedHttpRequest,
     payload: PasskeyRegistrationVerifyRequest,
 ) -> PasskeyRegistrationVerifyResponse:
     """Verify registration response and create passkey."""
@@ -205,7 +208,7 @@ def verify_authentication(
     summary="List user's passkeys",
     description="Get all passkeys registered for the authenticated user.",
 )
-def list_passkeys(request: HttpRequest) -> PasskeyListResponse:
+def list_passkeys(request: AuthenticatedHttpRequest) -> PasskeyListResponse:
     """List all passkeys for the authenticated user."""
     user, _, _ = get_auth_context(request)
 
@@ -233,7 +236,7 @@ def list_passkeys(request: HttpRequest) -> PasskeyListResponse:
     summary="Delete a passkey",
     description="Delete a passkey by ID. User can only delete their own passkeys.",
 )
-def delete_passkey(request: HttpRequest, passkey_id: int) -> PasskeyDeleteResponse:
+def delete_passkey(request: AuthenticatedHttpRequest, passkey_id: int) -> PasskeyDeleteResponse:
     """Delete a passkey owned by the authenticated user."""
     user, _, _ = get_auth_context(request)
 

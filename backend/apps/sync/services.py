@@ -17,7 +17,7 @@ from django.utils import timezone
 
 from apps.core.logging import get_logger
 from apps.sync.cursor import encode_cursor, parse_cursor
-from apps.sync.exceptions import UnknownEntityTypeError
+from apps.sync.exceptions import SyncError, UnknownEntityTypeError
 from apps.sync.models import FieldLevelLWWMixin, SyncableModel, SyncOperation
 from apps.sync.registry import SyncRegistry
 from apps.sync.schemas import ChangeOut, SyncOperationIn, SyncResultOut, SyncStatus
@@ -27,6 +27,14 @@ if TYPE_CHECKING:
     from apps.organizations.models import Organization
 
 logger = get_logger(__name__)
+
+
+def _validate_entity_id(entity_id: str) -> UUID:
+    """Validate that entity_id is a well-formed UUID before DB operations."""
+    try:
+        return UUID(entity_id)
+    except (ValueError, AttributeError) as exc:
+        raise SyncError(f"Invalid entity_id format: expected UUID, got {entity_id!r}") from exc
 
 
 @dataclass
@@ -76,10 +84,21 @@ def process_sync_operation(
             error_message=f"Unknown entity type: {operation.entity_type}",
         )
 
-    # 2. Calculate drift for observability
+    # 2. Validate entity_id is a well-formed UUID before any DB operations
+    try:
+        _validate_entity_id(operation.entity_id)
+    except SyncError:
+        return SyncResult(
+            status="rejected",
+            server_timestamp=now,
+            error_code="INVALID_ENTITY_ID",
+            error_message="Invalid entity_id format: expected UUID",
+        )
+
+    # 3. Calculate drift for observability
     drift_ms = int((now - operation.client_timestamp).total_seconds() * 1000)
 
-    # 3. Atomically claim the idempotency key by creating the log record first
+    # 4. Atomically claim the idempotency key by creating the log record first
     try:
         with transaction.atomic():
             sync_op = SyncOperation.objects.create(
@@ -107,7 +126,7 @@ def process_sync_operation(
             server_timestamp=now,
         )
 
-    # 4. Process the operation based on intent
+    # 5. Process the operation based on intent
     try:
         if operation.intent == "create":
             entity = _process_create(
@@ -500,23 +519,20 @@ def _serialize_entity(entity_type: str, entity: SyncableModel) -> dict:
         if field.name in excluded:
             continue
         if field.is_relation:
-            # For FKs, include the ID if the _id attribute exists
             id_attr = f"{field.name}_id"
             if hasattr(entity, id_attr):
                 value = getattr(entity, id_attr, None)
-                if value is not None:
-                    result[id_attr] = str(value)
+                result[id_attr] = str(value) if value is not None else None
         else:
             value = getattr(entity, field.name, None)
-            if value is not None:
-                # Handle datetime serialization
-                if isinstance(value, datetime):
-                    result[field.name] = value.isoformat()
-                # Handle UUID serialization
-                elif isinstance(value, UUID):
-                    result[field.name] = str(value)
-                else:
-                    result[field.name] = value
+            if value is None:
+                result[field.name] = None
+            elif isinstance(value, datetime):
+                result[field.name] = value.isoformat()
+            elif isinstance(value, UUID):
+                result[field.name] = str(value)
+            else:
+                result[field.name] = value
 
     return result
 

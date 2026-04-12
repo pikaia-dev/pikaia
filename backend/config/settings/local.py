@@ -9,6 +9,12 @@ from .base import *  # noqa: F403
 DEBUG = True
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
+# Field-level encryption key for local dev and tests. Must be set explicitly
+# here (not only in base.py) because Django's test runner forces DEBUG=False,
+# disabling the SECRET_KEY fallback in `get_fernet()`.
+_LOCAL_FIELD_ENCRYPTION_KEY_FALLBACK = "local-dev-field-encryption-key-not-for-production"  # noqa: S105
+FIELD_ENCRYPTION_KEY = FIELD_ENCRYPTION_KEY or _LOCAL_FIELD_ENCRYPTION_KEY_FALLBACK  # noqa: F405
+
 # Disable subscription gating for local development
 SUBSCRIPTION_GATING_ENABLED = False
 

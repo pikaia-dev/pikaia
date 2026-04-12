@@ -39,3 +39,9 @@ class DeviceAlreadyLinkedError(DeviceLinkError):
     """Device is already linked to another account."""
 
     pass
+
+
+class SessionCreationError(DeviceLinkError):
+    """Failed to create a Stytch session for the device."""
+
+    pass

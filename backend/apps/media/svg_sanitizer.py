@@ -93,7 +93,6 @@ ALLOWED_ATTRIBUTES = frozenset(
         # Core attributes
         "id",
         "class",
-        "style",
         "lang",
         "tabindex",
         # Presentation attributes
@@ -343,10 +342,6 @@ def _sanitize_element(element: etree._Element) -> bool:
     for attr in attrs_to_remove:
         del element.attrib[attr]
 
-    # Sanitize style attribute specifically
-    if "style" in element.attrib:
-        element.attrib["style"] = _sanitize_style(element.attrib["style"])
-
     # Recursively process children
     children_to_remove = []
     for child in element:
@@ -362,27 +357,6 @@ def _sanitize_element(element: etree._Element) -> bool:
 def _has_dangerous_value(value: str) -> bool:
     """Check if attribute value contains dangerous patterns."""
     return any(pattern.search(value) for pattern in DANGEROUS_PATTERNS)
-
-
-def _sanitize_style(style: str) -> str:
-    """
-    Sanitize CSS style attribute.
-
-    Removes url() references and dangerous patterns.
-    """
-    # Remove url() which could reference external resources or data URIs
-    style = re.sub(r"url\s*\([^)]*\)", "", style, flags=re.IGNORECASE)
-
-    # Remove expression() (IE-specific XSS vector)
-    style = re.sub(r"expression\s*\([^)]*\)", "", style, flags=re.IGNORECASE)
-
-    # Remove -moz-binding (Firefox XSS vector)
-    style = re.sub(r"-moz-binding\s*:[^;]*", "", style, flags=re.IGNORECASE)
-
-    # Remove behavior (IE XSS vector)
-    style = re.sub(r"behavior\s*:[^;]*", "", style, flags=re.IGNORECASE)
-
-    return style.strip()
 
 
 def is_svg_content(content: bytes) -> bool:

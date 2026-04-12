@@ -788,58 +788,70 @@ def update_organization(
     request: AuthenticatedHttpRequest, payload: UpdateOrganizationRequest
 ) -> OrganizationDetailResponse:
     """
-    Update organization settings (name).
+    Update organization settings (name, slug) — partial updates supported.
 
-    Admin only. Updates local database and syncs to Stytch.
+    Admin only. Updates local database and syncs to Stytch. An empty
+    payload is a no-op that simply returns the current state.
     """
     _, _, org = get_auth_context(request)
 
-    # Update local database
-    update_fields = ["name", "updated_at"]
-    org.name = payload.name
+    # Update local database — only touch fields that were provided
+    update_fields = ["updated_at"]
+    if payload.name is not None:
+        org.name = payload.name
+        update_fields.append("name")
     if payload.slug is not None:
         org.slug = payload.slug
         update_fields.append("slug")
-    try:
-        with transaction.atomic():
-            org.save(update_fields=update_fields)
-    except IntegrityError:
-        raise HttpError(409, "Organization slug already in use") from None
 
-    # Sync to Stytch
-    sync_warning = None
-    try:
-        client = get_stytch_client()
-        stytch_update_kwargs: dict[str, str] = {
-            "organization_id": org.stytch_org_id,
-            "organization_name": payload.name,
-        }
+    has_changes = len(update_fields) > 1
+    if has_changes:
+        # Build event data with only the fields that actually changed so
+        # downstream consumers can distinguish "unchanged" from "cleared".
+        event_data: dict[str, str] = {}
+        if payload.name is not None:
+            event_data["name"] = payload.name
         if payload.slug is not None:
-            stytch_update_kwargs["organization_slug"] = payload.slug
-        # Stytch SDK has complex overloaded types; we only use simple string params
-        client.organizations.update(**stytch_update_kwargs)  # type: ignore[arg-type]
-    except StytchError as e:
-        logger.warning(
-            "Failed to sync org to Stytch: %s (org=%s)",
-            e.details.error_message,
-            org.stytch_org_id,
-            exc_info=True,
-        )
-        sync_warning = (
-            "Changes saved locally but failed to sync to Stytch. "
-            "Please retry or contact support if the issue persists."
-        )
+            event_data["slug"] = payload.slug
 
-    # Emit organization.updated event
-    publish_event(
-        event_type="organization.updated",
-        aggregate=org,
-        data={
-            "name": payload.name,
-            "slug": payload.slug,
-        },
-        actor=request.auth.user,
-    )
+        try:
+            with transaction.atomic():
+                org.save(update_fields=update_fields)
+                publish_event(
+                    event_type="organization.updated",
+                    aggregate=org,
+                    data=event_data,
+                    actor=request.auth.user,
+                )
+        except IntegrityError:
+            raise HttpError(409, "Organization slug already in use") from None
+
+    # Sync to Stytch — only when we actually have something to push
+    sync_warning = None
+    stytch_update_kwargs: dict[str, str] = {
+        "organization_id": org.stytch_org_id,
+    }
+    if payload.name is not None:
+        stytch_update_kwargs["organization_name"] = payload.name
+    if payload.slug is not None:
+        stytch_update_kwargs["organization_slug"] = payload.slug
+
+    if len(stytch_update_kwargs) > 1:
+        try:
+            client = get_stytch_client()
+            # Stytch SDK has complex overloaded types; we only use simple string params
+            client.organizations.update(**stytch_update_kwargs)  # type: ignore[arg-type]
+        except StytchError as e:
+            logger.warning(
+                "Failed to sync org to Stytch: %s (org=%s)",
+                e.details.error_message,
+                org.stytch_org_id,
+                exc_info=True,
+            )
+            sync_warning = (
+                "Changes saved locally but failed to sync to Stytch. "
+                "Please retry or contact support if the issue persists."
+            )
 
     response = get_organization(request)
     if sync_warning:

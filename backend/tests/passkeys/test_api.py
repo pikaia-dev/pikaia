@@ -45,7 +45,7 @@ class TestGetRegistrationOptions:
             request, AuthContext(user=user, member=member, organization=member.organization)
         )
 
-        response = get_registration_options(request)
+        response = get_registration_options(request)  # type: ignore[arg-type]
 
         assert response.challenge_id is not None
         assert response.options is not None
@@ -64,7 +64,7 @@ class TestGetRegistrationOptions:
             request, AuthContext(user=user, member=member, organization=member.organization)
         )
 
-        response = get_registration_options(request)
+        response = get_registration_options(request)  # type: ignore[arg-type]
 
         # Should have exclude credentials
         assert len(response.options.get("excludeCredentials", [])) == 1
@@ -91,7 +91,7 @@ class TestVerifyRegistration:
         )
 
         with pytest.raises(HttpError) as exc_info:
-            verify_registration(request, payload)
+            verify_registration(request, payload)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 400
         assert "expired or invalid" in str(exc_info.value)
@@ -106,7 +106,7 @@ class TestVerifyRegistration:
         request1 = make_request_with_auth(  # type: ignore[assignment]
             request1, AuthContext(user=member.user, member=member, organization=member.organization)
         )
-        options_response = get_registration_options(request1)
+        options_response = get_registration_options(request1)  # type: ignore[arg-type]
 
         # Try to use it with other_member's user
         request2 = request_factory.post("/api/v1/passkeys/register/verify")
@@ -124,7 +124,7 @@ class TestVerifyRegistration:
         )
 
         with pytest.raises(HttpError) as exc_info:
-            verify_registration(request2, payload)
+            verify_registration(request2, payload)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 400
         assert "does not match" in str(exc_info.value)
@@ -142,7 +142,7 @@ class TestVerifyRegistration:
         request1 = make_request_with_auth(  # type: ignore[assignment]
             request1, AuthContext(user=user, member=member, organization=member.organization)
         )
-        options_response = get_registration_options(request1)
+        options_response = get_registration_options(request1)  # type: ignore[arg-type]
 
         # Mock webauthn verification
         mock_verification = MagicMock()
@@ -174,7 +174,7 @@ class TestVerifyRegistration:
             name="My Test Passkey",
         )
 
-        response = verify_registration(request2, payload)
+        response = verify_registration(request2, payload)  # type: ignore[arg-type]
 
         assert response.id is not None
         assert response.name == "My Test Passkey"
@@ -309,7 +309,7 @@ class TestListPasskeys:
             request, AuthContext(user=user, member=member, organization=member.organization)
         )
 
-        response = list_passkeys(request)
+        response = list_passkeys(request)  # type: ignore[arg-type]
 
         assert len(response.passkeys) == 2
         names = [p.name for p in response.passkeys]
@@ -326,7 +326,7 @@ class TestListPasskeys:
             request, AuthContext(user=member.user, member=member, organization=member.organization)
         )
 
-        response = list_passkeys(request)
+        response = list_passkeys(request)  # type: ignore[arg-type]
 
         assert len(response.passkeys) == 0
 
@@ -340,7 +340,7 @@ class TestListPasskeys:
             request, AuthContext(user=member.user, member=member, organization=member.organization)
         )
 
-        response = list_passkeys(request)
+        response = list_passkeys(request)  # type: ignore[arg-type]
 
         assert len(response.passkeys) == 1
         p = response.passkeys[0]
@@ -368,7 +368,7 @@ class TestDeletePasskey:
             request, AuthContext(user=member.user, member=member, organization=member.organization)
         )
 
-        response = delete_passkey(request, passkey_id)
+        response = delete_passkey(request, passkey_id)  # type: ignore[arg-type]
 
         assert response.success is True
 
@@ -387,7 +387,7 @@ class TestDeletePasskey:
         )
 
         with pytest.raises(HttpError) as exc_info:
-            delete_passkey(request, passkey.id)
+            delete_passkey(request, passkey.id)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 404
         assert "not found" in str(exc_info.value)
@@ -402,6 +402,6 @@ class TestDeletePasskey:
         )
 
         with pytest.raises(HttpError) as exc_info:
-            delete_passkey(request, 99999)
+            delete_passkey(request, 99999)  # type: ignore[arg-type]
 
         assert exc_info.value.status_code == 404

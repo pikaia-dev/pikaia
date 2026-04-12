@@ -11,7 +11,7 @@ from typing import cast
 
 from django.conf import settings
 from django.core.files.storage import default_storage
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 from apps.core.logging import get_logger
 
@@ -176,6 +176,8 @@ class StorageService:
 
     def _confirm_s3_upload(self, key: str) -> ImageMetadata | None:
         """Confirm S3 upload and get metadata."""
+        from botocore.exceptions import BotoCoreError, ClientError
+
         try:
             response = self.s3_client.head_object(Bucket=self.bucket_name, Key=key)
             size_bytes = response["ContentLength"]
@@ -193,8 +195,8 @@ class StorageService:
                 width=width,
                 height=height,
             )
-        except Exception as e:
-            logger.warning("Failed to confirm S3 upload for key %s: %s", key, e)
+        except (ClientError, BotoCoreError) as e:
+            logger.warning("s3_upload_confirm_failed", key=key, error=str(e), exc_info=True)
             return None
 
     def _confirm_local_upload(self, key: str) -> ImageMetadata | None:
@@ -218,8 +220,8 @@ class StorageService:
                 width=width,
                 height=height,
             )
-        except Exception as e:
-            logger.warning("Failed to confirm local upload for key %s: %s", key, e)
+        except (OSError, ValueError) as e:
+            logger.warning("local_upload_confirm_failed", key=key, error=str(e), exc_info=True)
             return None
 
     def _get_image_dimensions(self, image_data: bytes) -> tuple[int, int]:
@@ -227,7 +229,8 @@ class StorageService:
         try:
             with Image.open(BytesIO(image_data)) as img:
                 return cast(tuple[int, int], img.size)
-        except Exception:
+        except (UnidentifiedImageError, OSError, ValueError) as e:
+            logger.debug("image_dimensions_extraction_failed", error=str(e))
             return (0, 0)
 
     def save_file(self, key: str, content: bytes, content_type: str) -> None:
@@ -246,14 +249,19 @@ class StorageService:
 
     def delete(self, key: str) -> None:
         """Delete file from storage."""
-        try:
-            if self.use_s3:
+        if self.use_s3:
+            from botocore.exceptions import BotoCoreError, ClientError
+
+            try:
                 self.s3_client.delete_object(Bucket=self.bucket_name, Key=key)
-            else:
+            except (ClientError, BotoCoreError) as e:
+                logger.warning("s3_file_delete_failed", key=key, error=str(e), exc_info=True)
+        else:
+            try:
                 if default_storage.exists(key):
                     default_storage.delete(key)
-        except Exception as e:
-            logger.warning("Failed to delete file %s: %s", key, e)
+            except OSError as e:
+                logger.warning("local_file_delete_failed", key=key, error=str(e), exc_info=True)
 
     def sanitize_svg_in_storage(self, key: str) -> bytes | None:
         """

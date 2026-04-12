@@ -1098,6 +1098,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "boto3" },
+    { name = "cryptography" },
     { name = "defusedxml" },
     { name = "django" },
     { name = "django-cors-headers" },
@@ -1138,6 +1139,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "boto3", specifier = ">=1.35" },
+    { name = "cryptography", specifier = ">=46.0" },
     { name = "defusedxml", specifier = ">=0.7" },
     { name = "django", specifier = ">=6.0" },
     { name = "django-cors-headers", specifier = ">=4.6" },
@@ -1152,7 +1154,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.12" },
     { name = "pydantic-settings", specifier = ">=2.6" },
     { name = "sentry-sdk", extras = ["django"], specifier = ">=2.22" },
-    { name = "stripe", specifier = ">=11.0" },
+    { name = "stripe", specifier = ">=11.0,<16" },
     { name = "structlog", specifier = ">=25.5" },
     { name = "stytch", specifier = ">=14.0" },
     { name = "svix", specifier = ">=1.84.1" },

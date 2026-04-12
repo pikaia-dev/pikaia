@@ -16,9 +16,19 @@ Usage::
         raise HttpError(429, str(e))
 """
 
+from collections.abc import Callable
+from functools import wraps
+from typing import ParamSpec, TypeVar
+
+from django.conf import settings as django_settings
 from django.core.cache import cache
+from django.http import HttpRequest, HttpResponse
 
 from apps.core.logging import get_logger
+from apps.core.utils import get_client_ip
+
+P = ParamSpec("P")
+T = TypeVar("T")
 
 logger = get_logger(__name__)
 
@@ -40,10 +50,12 @@ def check_rate_limit(
     """
     Check and increment a rate limit counter.
 
-    Uses ``cache.add()`` + ``cache.incr()`` for near-atomic increments.
-    ``add()`` is a no-op when the key exists, and ``incr()`` uses
-    ``SELECT ... FOR UPDATE`` in Django's DatabaseCache, preventing most
-    race conditions across concurrent ECS tasks.
+    Uses a sliding window: each request resets the TTL to ``window_seconds``
+    from now. The counter resets once no requests arrive within the window.
+
+    We avoid ``cache.incr()`` because Django's ``DatabaseCache.incr()``
+    calls ``set()`` without a timeout, resetting the TTL to the cache
+    default (300 s) and causing counters to accumulate indefinitely.
 
     Args:
         key: Cache key identifying the rate limit bucket
@@ -55,24 +67,20 @@ def check_rate_limit(
         RateLimitExceeded: If the limit has been reached.
     """
     cache_key = f"rate_limit:{key}"
+    current = cache.get(cache_key)
 
-    # Atomically create key with 0 if it doesn't exist (no-op if it does)
-    cache.add(cache_key, 0, timeout=window_seconds)
-
-    # Atomically increment and get new value
-    try:
-        current = cache.incr(cache_key)
-    except ValueError:
-        # Key expired between add() and incr() — treat as first request
+    if current is None:
         cache.set(cache_key, 1, timeout=window_seconds)
         return
 
-    if current > max_requests:
+    if current >= max_requests:
         logger.warning("rate_limit_exceeded", key=key, limit=max_requests, window=window_seconds)
         raise RateLimitExceeded(
             "Too many requests. Please try again later.",
             retry_after=window_seconds,
         )
+
+    cache.set(cache_key, current + 1, timeout=window_seconds)
 
 
 def peek_rate_limit(
@@ -123,12 +131,66 @@ def increment_rate_limit(
         window_seconds: Time window in seconds.
     """
     cache_key = f"rate_limit:{key}"
+    current = cache.get(cache_key)
 
-    # Ensure the key exists with the correct TTL
-    cache.add(cache_key, 0, timeout=window_seconds)
-
-    try:
-        cache.incr(cache_key)
-    except ValueError:
-        # Key expired between add() and incr()
+    if current is None:
         cache.set(cache_key, 1, timeout=window_seconds)
+    else:
+        cache.set(cache_key, current + 1, timeout=window_seconds)
+
+
+def rate_limit_ip_django_view(
+    namespace: str,
+    max_requests_setting: str,
+    window_seconds_setting: str,
+) -> Callable[[Callable[P, T]], Callable[P, T]]:
+    """
+    Decorator that applies IP-based rate limiting to a plain Django view.
+
+    Unlike ``rate_limit_ip`` (which raises ``HttpError`` for Django Ninja),
+    this returns an ``HttpResponse(status=429)`` with a ``Retry-After``
+    header, suitable for raw Django views like webhook receivers.
+
+    Args:
+        namespace: Prefix for the cache key (e.g. ``"stripe_webhook"``).
+        max_requests_setting: Django setting name for the request cap.
+        window_seconds_setting: Django setting name for the time window.
+
+    Example::
+
+        @csrf_exempt
+        @require_POST
+        @rate_limit_ip_django_view(
+            "stripe_webhook",
+            "WEBHOOK_RATE_LIMIT_STRIPE_PER_IP",
+            "WEBHOOK_RATE_LIMIT_WINDOW",
+        )
+        def stripe_webhook(request):
+            ...
+    """
+
+    def decorator(func: Callable[P, T]) -> Callable[P, T]:
+        @wraps(func)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+            request = args[0]
+            if not isinstance(request, HttpRequest):
+                raise TypeError(f"Expected HttpRequest, got {type(request).__name__}")
+            client_ip = get_client_ip(request, default="unknown")
+            key = f"{namespace}:ip:{client_ip}"
+            max_requests = getattr(django_settings, max_requests_setting)
+            window_seconds = getattr(django_settings, window_seconds_setting)
+            try:
+                check_rate_limit(key, max_requests=max_requests, window_seconds=window_seconds)
+            except RateLimitExceeded as e:
+                response = HttpResponse(
+                    "Too many requests. Please try again later.",
+                    status=429,
+                    content_type="text/plain",
+                )
+                response["Retry-After"] = str(e.retry_after)
+                return response  # type: ignore[return-value]
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator

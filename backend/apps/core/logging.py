@@ -32,7 +32,7 @@ from structlog.types import EventDict, Processor
 
 
 def _add_datadog_trace_fields(
-    logger: logging.Logger, method_name: str, event_dict: EventDict
+    logger: logging.Logger, _method_name: str, event_dict: EventDict
 ) -> EventDict:
     """
     Rename correlation_id to trace_id for Datadog APM compatibility.
@@ -45,7 +45,7 @@ def _add_datadog_trace_fields(
 
 
 def _convert_duration_to_nanoseconds(
-    logger: logging.Logger, method_name: str, event_dict: EventDict
+    logger: logging.Logger, _method_name: str, event_dict: EventDict
 ) -> EventDict:
     """
     Convert duration_ms to duration (nanoseconds) for Datadog compatibility.
@@ -55,17 +55,6 @@ def _convert_duration_to_nanoseconds(
     if "duration_ms" in event_dict:
         duration_ms = event_dict.pop("duration_ms")
         event_dict["duration"] = int(duration_ms * 1_000_000)  # ms to ns
-    return event_dict
-
-
-def _rename_level_for_datadog(
-    logger: logging.Logger, method_name: str, event_dict: EventDict
-) -> EventDict:
-    """
-    Ensure level field uses standard naming.
-
-    structlog uses 'level', which is already Datadog-compatible.
-    """
     return event_dict
 
 

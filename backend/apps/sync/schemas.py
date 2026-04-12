@@ -2,13 +2,20 @@
 Pydantic schemas for sync API.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Literal
 
+from django.utils import timezone
 from ninja import Field, Schema
+from pydantic import field_validator
 
 # Type alias for sync operation status
 SyncStatus = Literal["applied", "rejected", "conflict", "duplicate"]
+
+# Maximum allowed drift between client_timestamp and server time.
+# Timestamps beyond this window are rejected to prevent clock skew exploits
+# against LWW conflict resolution.
+MAX_CLIENT_TIMESTAMP_DRIFT = timedelta(hours=24)
 
 
 class SyncOperationIn(Schema):
@@ -28,6 +35,19 @@ class SyncOperationIn(Schema):
     # - For 'create': data is complete entity
     # - For 'delete': data is ignored (can be empty {})
     data: dict
+
+    @field_validator("client_timestamp")
+    @classmethod
+    def validate_client_timestamp_range(cls, v: datetime) -> datetime:
+        now = timezone.now()
+        drift = abs((v - now).total_seconds())
+        max_drift_seconds = MAX_CLIENT_TIMESTAMP_DRIFT.total_seconds()
+        if drift > max_drift_seconds:
+            raise ValueError(
+                f"client_timestamp is too far from server time "
+                f"(drift: {int(drift)}s, max allowed: {int(max_drift_seconds)}s)"
+            )
+        return v
 
 
 class SyncPushRequest(Schema):

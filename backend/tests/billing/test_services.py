@@ -199,9 +199,9 @@ class TestSyncSubscriptionFromStripe:
         """Should return True for active subscription."""
         mock_stripe = MagicMock()
         mock_get_stripe.return_value = mock_stripe
-        mock_sub = MagicMock()
-        mock_sub.status = "active"
-        mock_stripe.Subscription.retrieve.return_value = mock_sub
+        # Return a plain dict — normalize_stripe_object passes dicts through
+        # unchanged, matching what stripe-python >=15 gives us in production.
+        mock_stripe.Subscription.retrieve.return_value = {"id": "sub_test", "status": "active"}
 
         result = sync_subscription_from_stripe("sub_test")
 
@@ -216,9 +216,7 @@ class TestSyncSubscriptionFromStripe:
         """Should return False for incomplete subscription."""
         mock_stripe = MagicMock()
         mock_get_stripe.return_value = mock_stripe
-        mock_sub = MagicMock()
-        mock_sub.status = "incomplete"
-        mock_stripe.Subscription.retrieve.return_value = mock_sub
+        mock_stripe.Subscription.retrieve.return_value = {"id": "sub_test", "status": "incomplete"}
 
         result = sync_subscription_from_stripe("sub_test")
 

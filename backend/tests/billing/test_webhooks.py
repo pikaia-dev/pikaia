@@ -32,6 +32,7 @@ def build_webhook_payload(
     }
 
 
+@pytest.mark.django_db
 class TestStripeWebhookSignatureVerification:
     """Tests for webhook signature verification."""
 

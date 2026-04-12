@@ -20,10 +20,13 @@ STRIPE_MAX_NETWORK_RETRIES = 2
 
 
 def configure_stripe() -> None:
-    """Configure Stripe API with settings."""
+    """Configure Stripe API with settings, including explicit timeout."""
     stripe.api_key = settings.STRIPE_SECRET_KEY
     stripe.api_version = STRIPE_API_VERSION
     stripe.max_network_retries = STRIPE_MAX_NETWORK_RETRIES
+    stripe.default_http_client = stripe._http_client.RequestsClient(
+        timeout=settings.EXTERNAL_API_TIMEOUT_STRIPE,
+    )
 
 
 def get_stripe() -> ModuleType:

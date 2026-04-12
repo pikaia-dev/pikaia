@@ -11,6 +11,8 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils import timezone
 
+from apps.core.fields import EncryptedTextField
+
 
 def generate_webhook_secret() -> str:
     """Generate a secure webhook signing secret."""
@@ -100,11 +102,10 @@ class WebhookEndpoint(models.Model):
         help_text="How this endpoint was created (manual, zapier, make, rest_hooks)",
     )
 
-    # Signing secret
-    secret = models.CharField(
-        max_length=64,
+    # Signing secret (encrypted at rest via Fernet)
+    secret = EncryptedTextField(
         default=generate_webhook_secret,
-        help_text="Secret used to sign webhook payloads (HMAC-SHA256)",
+        help_text="Secret used to sign webhook payloads (HMAC-SHA256). Encrypted at rest.",
     )
 
     # Status
@@ -149,9 +150,10 @@ class WebhookEndpoint(models.Model):
         Note: This immediately invalidates the old secret.
         For dual-secret rotation, use the secret rotation service (V2 feature).
         """
-        self.secret = generate_webhook_secret()
+        new_secret = generate_webhook_secret()
+        self.secret = new_secret
         self.save(update_fields=["secret", "updated_at"])
-        return self.secret
+        return new_secret
 
     def record_delivery_success(self) -> None:
         """Update status after successful delivery."""

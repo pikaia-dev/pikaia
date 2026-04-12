@@ -5,9 +5,11 @@ All Stripe API calls are isolated here for testability.
 External calls must NOT be inside database transactions.
 """
 
+import json
 from datetime import UTC, datetime, timedelta
-from typing import cast
+from typing import Any, cast
 
+import stripe
 from django.utils import timezone
 
 from apps.billing.models import Subscription
@@ -18,6 +20,22 @@ from apps.organizations.models import Organization
 from config.settings.base import settings
 
 logger = get_logger(__name__)
+
+
+def normalize_stripe_object(obj: Any) -> dict[str, Any]:
+    """Convert a Stripe API object to a plain dict.
+
+    stripe-python v15.0.0 removed dict inheritance from StripeObject,
+    breaking .get() and other dict methods. This normalizes both
+    StripeObjects and plain dicts to a recursively plain dict structure.
+    """
+    if isinstance(obj, dict):
+        return obj
+    if isinstance(obj, stripe.StripeObject):
+        # StripeObject.__str__ returns JSON in all SDK versions.
+        result: dict[str, Any] = json.loads(str(obj))
+        return result
+    return obj  # type: ignore[no-any-return]  # passthrough for mocks
 
 
 def _resolve_billing_email(org: Organization) -> str | None:
@@ -271,19 +289,21 @@ def sync_subscription_from_stripe(subscription_id: str) -> bool:
     stripe = get_stripe()
 
     try:
-        stripe_sub = stripe.Subscription.retrieve(subscription_id)
+        stripe_sub_raw = stripe.Subscription.retrieve(subscription_id)
     except stripe.StripeError as e:
         logger.error(
             "stripe_subscription_retrieve_failed", subscription_id=subscription_id, error=str(e)
         )
         raise
 
+    stripe_sub = normalize_stripe_object(stripe_sub_raw)
+
     # Use the existing handler to sync the subscription
     # This handles all the parsing and database updates
     handle_subscription_created(stripe_sub)
 
     # Return whether subscription is now active
-    return stripe_sub.status in ("active", "trialing")
+    return stripe_sub.get("status") in ("active", "trialing")
 
 
 def sync_subscription_quantity(org: Organization) -> None:
@@ -370,7 +390,7 @@ def create_customer_portal_session(org: Organization, return_url: str) -> str:
     return cast(str, session.url)  # Portal sessions always have a URL
 
 
-def handle_subscription_created(stripe_subscription: dict) -> None:
+def handle_subscription_created(stripe_subscription: dict[str, Any]) -> None:
     """
     Handle checkout.session.completed webhook.
 
@@ -435,7 +455,7 @@ def handle_subscription_created(stripe_subscription: dict) -> None:
     )
 
 
-def handle_subscription_updated(stripe_subscription: dict) -> None:
+def handle_subscription_updated(stripe_subscription: dict[str, Any]) -> None:
     """
     Handle customer.subscription.updated webhook.
 
@@ -496,7 +516,7 @@ def handle_subscription_updated(stripe_subscription: dict) -> None:
     logger.info("stripe_subscription_updated", subscription_id=subscription.stripe_subscription_id)
 
 
-def handle_subscription_deleted(stripe_subscription: dict) -> None:
+def handle_subscription_deleted(stripe_subscription: dict[str, Any]) -> None:
     """
     Handle customer.subscription.deleted webhook.
 

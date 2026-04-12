@@ -155,12 +155,16 @@ def get_or_create_organization_from_stytch(
 
     Uses select_for_update for explicit row locking under concurrent requests.
     """
-    # Fast path: active org exists with this Stytch ID
+    # Fast path: active org exists with this Stytch ID.
+    # Only sync the name — slug changes arrive via the
+    # organization.updated webhook, not the login flow. Updating the
+    # slug here risks IntegrityError when Stytch sends a slug already
+    # taken by another active local org (e.g. from a missed deletion
+    # webhook), even when the slug hasn't actually changed.
     try:
         org = Organization.objects.select_for_update().get(stytch_org_id=stytch_org_id)
         org.name = name
-        org.slug = slug
-        org.save(update_fields=["name", "slug", "updated_at"])
+        org.save(update_fields=["name", "updated_at"])
         return org
     except Organization.DoesNotExist:
         pass

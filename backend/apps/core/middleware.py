@@ -145,16 +145,21 @@ class StytchAuthMiddleware:
     # Internal service-to-service paths use their own API key auth
     # (InternalApiKeyAuth), so the middleware must not attempt to
     # decode their bearer tokens as Stytch JWTs.
-    PUBLIC_PATHS = {
+    #
+    # Exact paths must match the full request path; prefix paths
+    # match any request path that starts with the given string.
+    PUBLIC_EXACT_PATHS: set[str] = {
         "/api/v1/health",
         "/api/v1/auth/magic-link/send",
         "/api/v1/auth/magic-link/authenticate",
         "/api/v1/auth/discovery/create-org",
         "/api/v1/auth/discovery/exchange",
         "/api/v1/auth/mobile/provision",
+    }
+    PUBLIC_PREFIX_PATHS: tuple[str, ...] = (
         "/api/v1/internal/",
         "/admin/",
-    }
+    )
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
         self.get_response = get_response
@@ -181,7 +186,7 @@ class StytchAuthMiddleware:
 
     def _is_public_path(self, path: str) -> bool:
         """Check if path is public (no auth required)."""
-        return any(path.startswith(public_path) for public_path in self.PUBLIC_PATHS)
+        return path in self.PUBLIC_EXACT_PATHS or path.startswith(self.PUBLIC_PREFIX_PATHS)
 
     def _authenticate_jwt(self, request: HttpRequest, session_jwt: str) -> None:
         """
@@ -261,8 +266,8 @@ class StytchAuthMiddleware:
             # "no auth attempted" from "auth attempted but failed"
             auth.failed = True
             logger.debug("jwt_auth_failed", error_message=e.details.error_message)
-        except Exception:
-            # Catch any other exception (network errors, timeouts, etc.)
-            # Also mark as failed - potential security issue
+        except Exception as e:
+            # Intentionally broad: any failure during JWT auth MUST mark auth as failed.
+            # Narrowing risks auth bypass if an unexpected exception type propagates.
             auth.failed = True
-            logger.exception("jwt_auth_unexpected_error")
+            logger.warning("jwt_auth_failed", error=str(e), exc_info=True)

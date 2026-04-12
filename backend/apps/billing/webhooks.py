@@ -17,9 +17,11 @@ from apps.billing.services import (
     handle_subscription_created,
     handle_subscription_deleted,
     handle_subscription_updated,
+    normalize_stripe_object,
 )
 from apps.billing.stripe_client import get_stripe
 from apps.core.logging import get_logger
+from apps.core.throttling import rate_limit_ip_django_view
 from apps.core.webhooks import mark_webhook_processed
 from config.settings.base import settings
 
@@ -28,6 +30,11 @@ logger = get_logger(__name__)
 
 @csrf_exempt
 @require_POST
+@rate_limit_ip_django_view(
+    "stripe_webhook",
+    "WEBHOOK_RATE_LIMIT_STRIPE_PER_IP",
+    "WEBHOOK_RATE_LIMIT_WINDOW",
+)
 def stripe_webhook(request: HttpRequest) -> HttpResponse:
     """
     Handle Stripe webhook events.
@@ -71,7 +78,9 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         if session.get("subscription"):
-            checkout_subscription = stripe.Subscription.retrieve(session["subscription"])
+            checkout_subscription = normalize_stripe_object(
+                stripe.Subscription.retrieve(session["subscription"])
+            )
 
     # Use transaction to ensure idempotency marker is rolled back if handler fails
     try:
@@ -88,17 +97,17 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
                         handle_subscription_created(checkout_subscription)
 
                 case "customer.subscription.created":
-                    handle_subscription_created(event["data"]["object"])
+                    handle_subscription_created(normalize_stripe_object(event["data"]["object"]))
 
                 case "customer.subscription.updated":
-                    handle_subscription_updated(event["data"]["object"])
+                    handle_subscription_updated(normalize_stripe_object(event["data"]["object"]))
 
                 case "customer.subscription.deleted":
-                    handle_subscription_deleted(event["data"]["object"])
+                    handle_subscription_deleted(normalize_stripe_object(event["data"]["object"]))
 
                 case "invoice.paid":
                     # Log successful payment
-                    invoice = event["data"]["object"]
+                    invoice = normalize_stripe_object(event["data"]["object"])
                     logger.info(
                         "stripe_invoice_paid",
                         invoice_id=invoice["id"],
@@ -107,7 +116,7 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
 
                 case "invoice.payment_failed":
                     # Log failed payment - could trigger email notification
-                    invoice = event["data"]["object"]
+                    invoice = normalize_stripe_object(event["data"]["object"])
                     logger.warning(
                         "stripe_invoice_payment_failed",
                         invoice_id=invoice["id"],
@@ -115,7 +124,7 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
                     )
 
                 case "customer.subscription.trial_will_end":
-                    subscription = event["data"]["object"]
+                    subscription = normalize_stripe_object(event["data"]["object"])
                     logger.info(
                         "stripe_subscription_trial_will_end",
                         subscription_id=subscription["id"],
